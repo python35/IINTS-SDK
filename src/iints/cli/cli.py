@@ -21,6 +21,81 @@ docs_app = typer.Typer(help="Generate documentation and technical summaries for 
 app.add_typer(docs_app, name="docs")
 
 @app.command()
+def init(
+    project_name: Annotated[str, typer.Option(help="Name of the project directory")] = "my_iints_project",
+):
+    """
+    Initialize a new IINTS-AF research project with a standard folder structure.
+    """
+    console = Console()
+    project_path = Path(project_name)
+    
+    if project_path.exists():
+         console.print(f"[bold red]Error: Directory '{project_name}' already exists.[/bold red]")
+         raise typer.Exit(code=1)
+    
+    console.print(f"[bold blue]Initializing IINTS-AF Project: {project_name}[/bold blue]")
+    
+    # Create Directories
+    (project_path / "algorithms").mkdir(parents=True)
+    (project_path / "scenarios").mkdir(parents=True)
+    (project_path / "data").mkdir(parents=True)
+    (project_path / "results").mkdir(parents=True)
+    
+    # Copy Default Algorithm
+    try:
+        if sys.version_info >= (3, 9):
+            from importlib.resources import files
+            algo_content = files("iints.templates").joinpath("default_algorithm.py").read_text()
+            scenario_content = files("iints.templates.scenarios").joinpath("example_scenario.json").read_text()
+        else:
+            from importlib import resources
+            algo_content = resources.read_text("iints.templates", "default_algorithm.py")
+            scenario_content = resources.read_text("iints.templates.scenarios", "example_scenario.json")
+    except Exception as e:
+        console.print(f"[bold red]Error reading template files: {e}[/bold red]")
+        raise typer.Exit(code=1)
+        
+    # Instantiate the default algorithm template
+    algo_content = algo_content.replace("{{ALGO_NAME}}", "ExampleAlgorithm")
+    algo_content = algo_content.replace("{{AUTHOR_NAME}}", "IINTS User")
+
+    with open(project_path / "algorithms" / "example_algorithm.py", "w") as f:
+        f.write(algo_content)
+
+    with open(project_path / "scenarios" / "example_scenario.json", "w") as f:
+        f.write(scenario_content)
+        
+    # Create README
+    readme_content = f"""# {project_name}
+    
+Powered by IINTS-AF SDK.
+
+## Structure
+- `algorithms/`: Place your custom python algorithms here.
+- `scenarios/`: JSON files defining stress test scenarios.
+- `data/`: Custom patient data or configuration.
+- `results/`: Simulation outputs.
+
+## Getting Started
+
+1. Run the example algorithm:
+   ```bash
+   iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json
+   ```
+
+2. Create a new algorithm:
+   ```bash
+   iints new-algo MyNewAlgo --output-dir algorithms/
+   ```
+"""
+    with open(project_path / "README.md", "w") as f:
+        f.write(readme_content)
+    
+    console.print(f"[green]Project initialized successfully in '{project_name}'[/green]")
+    console.print(f"To get started:\n  cd {project_name}\n  iints run --algo algorithms/example_algorithm.py")
+
+@app.command()
 def new_algo(
     name: Annotated[str, typer.Option(help="Name of the new algorithm")],
     author: Annotated[str, typer.Option(help="Author of the algorithm")],
@@ -33,67 +108,34 @@ def new_algo(
         typer.echo(f"Error: Output directory '{output_dir}' does not exist.")
         raise typer.Exit(code=1)
 
-    template_content = f"""from iints import InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata
-from typing import Dict, Any
+    try:
+        # Try Python 3.9+ style
+        if sys.version_info >= (3, 9):
+            from importlib.resources import files
+            template_content = files("iints.templates").joinpath("default_algorithm.py").read_text()
+        else:
+            # Fallback for Python 3.8
+            from importlib import resources
+            template_content = resources.read_text("iints.templates", "default_algorithm.py")
+    except Exception as e:
+        typer.echo(f"Error reading template file: {e}")
+        raise typer.Exit(code=1)
 
-class {name}Algorithm(iints.InsulinAlgorithm):
-    def __init__(self, settings: Dict[str, Any] = None):
-        super().__init__(settings)
-        self.set_algorithm_metadata(iints.AlgorithmMetadata(
-            name="{name}",
-            author="{author}",
-            description="A new custom insulin algorithm.",
-            algorithm_type="rule_based" # Change as appropriate
-        ))
-        # Initialize any specific state or parameters for your algorithm here
-
-    def predict_insulin(self, data: iints.AlgorithmInput) -> Dict[str, Any]:
-        # --- YOUR ALGORITHM LOGIC GOES HERE ---
-        # This is a basic placeholder. Implement your actual insulin prediction logic.
-
-        # Example: Deliver 0.1 units if glucose is above 120 mg/dL
-        total_insulin = 0.0
-        bolus_insulin = 0.0
-        basal_insulin = 0.0
-        correction_bolus = 0.0
-        meal_bolus = 0.0
-
-        if data.current_glucose > 120:
-            correction_bolus = (data.current_glucose - 120) / self.isf / 5 # Example: 1 unit per 50 mg/dL above 120
-            total_insulin += correction_bolus
-            self._log_reason(f"Correcting high glucose", "glucose_level", data.current_glucose, f"Delivered {{correction_bolus:.2f}} units to reduce {{data.current_glucose}} mg/dL")
-
-        if data.carb_intake > 0:
-            meal_bolus = data.carb_intake / self.icr
-            total_insulin += meal_bolus
-            self._log_reason(f"Meal intake detected", "carb_intake", data.carb_intake, f"Delivered {{meal_bolus:.2f}} units for {{data.carb_intake}}g carbs")
-
-        # Simulate basal rate (e.g., a continuous small delivery)
-        # For simplicity, let's assume a fixed basal delivery over the time step
-        # You might integrate this with your overall basal strategy
-        # basal_insulin = 0.01 * data.time_step # Example: 0.01 units per minute basal
-        # total_insulin += basal_insulin
-        self._log_reason(f"Maintaining basal rate", "basal", data.time_step, f"Delivered {{basal_insulin:.2f}} units basal")
-
-
-        # Ensure no negative insulin delivery
-        total_insulin = max(0.0, total_insulin)
-
-        # Store important decisions in the why_log for transparency
-        self._log_reason(f"Final insulin decision: {{total_insulin:.2f}} units", "decision", total_insulin)
-
-        return {{ 
-            "total_insulin_delivered": total_insulin,
-            "bolus_insulin": bolus_insulin, # You might differentiate between meal and correction bolus here
-            "basal_insulin": basal_insulin,
-            "correction_bolus": correction_bolus,
-            "meal_bolus": meal_bolus,
-        }}
-"""
+    # Replace placeholders
+    # We expect the template class name to be {{ALGO_NAME}} and author {{AUTHOR_NAME}}
+    # But wait, the file I wrote uses {{ALGO_NAME}} as a class name, which is valid syntax only if I replace it.
+    # The file on disk is valid python ONLY if those tokens are valid. 
+    # Actually, in the previous step I wrote {{ALGO_NAME}} literally into the python file.
+    # That makes the template file itself invalid python syntax until replaced. 
+    # That's fine for a template file, but might confuse linters. 
+    # Ideally it's a .txt or .tmpl, but .py is fine if we accept it's a template.
+    
+    final_content = template_content.replace("{{ALGO_NAME}}", f"{name}Algorithm")
+    final_content = final_content.replace("{{AUTHOR_NAME}}", author)
 
     output_file = output_dir / f"{name.lower().replace(' ', '_')}_algorithm.py"
     with open(output_file, "w") as f:
-        f.write(template_content)
+        f.write(final_content)
     
     typer.echo(f"Successfully created new algorithm template: {output_file}")
 

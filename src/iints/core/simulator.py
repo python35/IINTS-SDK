@@ -1,16 +1,19 @@
+import logging
 import pandas as pd
 import json
 import time
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Generator
 from iints.core.patient.models import PatientModel
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 from iints.core.safety import InputValidator
 import numpy as np
 
+logger = logging.getLogger("iints")
+
 class StressEvent:
     """Represents a discrete event that can occur during a simulation for stress testing."""
-    def __init__(self, start_time: int, event_type: str, value: Any = None, reported_value: Any = None, absorption_delay_minutes: int = 0, duration: int = 0):
+    def __init__(self, start_time: int, event_type: str, value: Any = None, reported_value: Any = None, absorption_delay_minutes: int = 0, duration: int = 0) -> None:
         """
         Args:
             start_time (int): The simulation time (in minutes) when the event should occur.
@@ -27,7 +30,7 @@ class StressEvent:
         self.absorption_delay_minutes = absorption_delay_minutes # New attribute
         self.duration = duration
 
-    def __str__(self):
+    def __str__(self) -> str:
         reported_str = f", Reported: {self.reported_value}" if self.reported_value is not None else ""
         delay_str = f", Delay: {self.absorption_delay_minutes}m" if self.absorption_delay_minutes > 0 else ""
         duration_str = f", Duration: {self.duration}m" if self.duration > 0 else ""
@@ -38,7 +41,7 @@ class Simulator:
     Orchestrates the interaction between a patient model and an insulin algorithm
     over a simulated period, including stress-test scenarios.
     """
-    def __init__(self, patient_model: PatientModel, algorithm: InsulinAlgorithm, time_step: int = 5, seed: Optional[int] = None, audit_log_path: Optional[str] = None):
+    def __init__(self, patient_model: PatientModel, algorithm: InsulinAlgorithm, time_step: int = 5, seed: Optional[int] = None, audit_log_path: Optional[str] = None) -> None:
         """
         Initializes the simulator.
 
@@ -68,18 +71,18 @@ class Simulator:
                 with open(self.audit_log_path, 'w') as f:
                     f.write("") # Overwrite the file
             except IOError as e:
-                print(f"Warning: Could not clear audit log file at {self.audit_log_path}. Error: {e}")
+                logger.warning("Could not clear audit log file at %s. Error: %s", self.audit_log_path, e)
 
-    def _write_audit_log(self, data: Dict[str, Any]):
+    def _write_audit_log(self, data: Dict[str, Any]) -> None:
         """Writes a single step's audit data to the JSON log file."""
         if self.audit_log_path:
             try:
                 with open(self.audit_log_path, 'a') as f:
                     f.write(json.dumps(data, default=str) + '\n')
             except IOError as e:
-                print(f"Warning: Could not write to audit log file at {self.audit_log_path}. Error: {e}")
+                logger.warning("Could not write to audit log file at %s. Error: %s", self.audit_log_path, e)
 
-    def add_stress_event(self, event: StressEvent):
+    def add_stress_event(self, event: StressEvent) -> None:
         """Adds a stress event to be triggered during the simulation."""
         self.stress_events.append(event)
         self.stress_events.sort(key=lambda e: e.start_time) # Keep events sorted by time
@@ -99,12 +102,14 @@ class Simulator:
             pd.DataFrame: A DataFrame containing the complete simulation results.
             Dict[str, Any]: A dictionary containing the safety report from the supervisor.
         """
+        logger.info("Starting batch simulation for %d minutes...", duration_minutes)
         all_records = list(self.run_live(duration_minutes))
         simulation_results_df = pd.DataFrame(all_records)
         safety_report = self.supervisor.get_safety_report()
+        logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
         return simulation_results_df, safety_report
 
-    def run_live(self, duration_minutes: int):
+    def run_live(self, duration_minutes: int) -> Generator[Dict[str, Any], None, None]:
         """
         Runs the simulation as a generator, yielding the record of each time step.
 
@@ -122,6 +127,8 @@ class Simulator:
         self.meal_queue = [] # Reset meal queue for new run
         current_time = 0
 
+        logger.debug("Starting live simulation loop.")
+
         while current_time <= duration_minutes:
             patient_carb_intake_this_step = 0.0
             algo_carb_intake_this_step = 0.0
@@ -136,7 +143,7 @@ class Simulator:
 
             for event in self.stress_events:
                 if current_time == event.start_time:
-                    print(f"[{current_time} min] Triggering stress event: {event}")
+                    logger.info("[%d min] Triggering stress event: %s", current_time, event)
                     if event.event_type == 'meal':
                         events_to_queue_for_patient.append(event)
                         # Algorithm gets carb info based on reported_value if available, otherwise actual value

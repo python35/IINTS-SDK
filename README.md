@@ -1,4 +1,4 @@
-# IINTS-AF SDK (v0.0.5)
+# IINTS-AF SDK (v0.1.0)
 ## Intelligent Insulin Titration System for Artificial Pancreas
 
 ### Overview
@@ -33,7 +33,15 @@ pip install -e .
 
 ### Quick Start
 
-#### 1. Execute a Basic Simulation
+#### 1. Initialize a Project
+Create a new research workspace with standard templates and data:
+
+```bash
+iints init --project-name my_research
+cd my_research
+```
+
+#### 2. Execute a Basic Simulation
 Run a standard PID-controller simulation on an Ohio T1DM patient profile:
 
 ```python
