@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iints-sdk-python35" 
+version = "0.0.4"
+authors = [
+  { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
+]
+description = "A pre-clinical Edge-AI SDK for diabetes management validation."
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+]
+dependencies = [
+    "fpdf2>=2.8.0",
+    "matplotlib>=3.5.0",
+    "numpy>=1.21.0",
+    "openpyxl>=3.0.0",
+    "pandas>=1.5.0",
+    "PyYAML",
+    "rich>=12.0.0",
+    "scikit-learn>=1.0.0",
+    "scipy>=1.9.0",
+    "seaborn>=0.11.0",
+    "torch>=1.9.0",
+    "typer[all]",
+]
+
+[project.scripts]
+iints = "iints.cli.cli:app"
+
+[project.urls]
+"Homepage" = "https://github.com/python35/IINTS-SDK"

@@ -1,0 +1,11 @@
+# Configuration for a specific virtual patient (e.g., Patient 559)
+# Parameters based on src/iints/core/patient/models.py
+
+basal_insulin_rate: 0.9        # Slightly higher basal
+insulin_sensitivity: 45.0      # Slightly less sensitive
+carb_factor: 12.0              # Different carb factor
+glucose_decay_rate: 0.04       # Slower glucose decay
+initial_glucose: 130.0         # Slightly higher initial glucose
+glucose_absorption_rate: 0.035 # Slightly faster carb absorption
+insulin_action_duration: 330.0 # Longer insulin action
+insulin_peak_time: 80.0        # Later insulin peak

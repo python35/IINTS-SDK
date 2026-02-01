@@ -1,0 +1,10 @@
+name: "Ideal Patient Profile"
+version: "1.0"
+schema_version: "1.0"
+description: "Synthetic data for ideal insulin-sensitive patient with predictable responses"
+source: "synthetic"
+patient_count: 1
+duration_hours: 8
+scenarios: ["standard_meal", "hyperglycemia_correction"]
+license: "Educational use only"
+created: "2024-01-08"

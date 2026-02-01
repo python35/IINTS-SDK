@@ -1,0 +1,27 @@
+{
+  "scenario_name": "Workout Wednesday",
+  "description": "A scenario featuring a post-lunch workout and a small un-announced snack later.",
+  "events": [
+    {
+      "time": 720,
+      "type": "meal",
+      "value": 60,
+      "reported_value": 60,
+      "comment": "Lunch (12:00 PM)"
+    },
+    {
+      "time": 840,
+      "type": "exercise",
+      "value": 0.5,
+      "duration": 45,
+      "comment": "Moderate exercise (e.g., jogging) for 45 minutes starting at 2:00 PM. Value represents intensity from 0 to 1."
+    },
+    {
+      "time": 1020,
+      "type": "meal",
+      "value": 15,
+      "reported_value": 0,
+      "comment": "Small, un-announced snack (carb_error) at 5:00 PM to simulate user forgetfulness."
+    }
+  ]
+}

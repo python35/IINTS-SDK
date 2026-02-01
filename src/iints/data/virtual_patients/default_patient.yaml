@@ -1,0 +1,11 @@
+# Default patient configuration for CustomPatientModel
+# Parameters based on src/iints/core/patient/models.py
+
+basal_insulin_rate: 0.8        # U/hr
+insulin_sensitivity: 50.0      # mg/dL per Unit
+carb_factor: 10.0              # g/Unit
+glucose_decay_rate: 0.05       # Rate at which glucose naturally decreases
+initial_glucose: 120.0         # mg/dL
+glucose_absorption_rate: 0.03  # Rate at which carbs are absorbed into glucose
+insulin_action_duration: 300.0 # minutes, e.g., 5 hours
+insulin_peak_time: 75.0        # minutes

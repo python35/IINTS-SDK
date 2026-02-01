@@ -1,0 +1,23 @@
+name: "Ohio T1DM Patient 563"
+source: "Ohio University T1DM Dataset"
+patient_profile:
+  type: "real_world"
+  duration_days: 56
+  data_points: 16128
+  demographics:
+    age_group: "young_adult"
+    diabetes_duration: "medium_term"
+    insulin_regimen: "MDI"
+    control_quality: "poor"
+variables:
+  - "glucose_mg_dl"
+  - "insulin_units" 
+  - "carbs_grams"
+sampling_rate: "5_minutes"
+privacy: "anonymized"
+citation: "Marling, C., & Bunescu, R. (2018). The OhioT1DM Dataset for Blood Glucose Level Prediction"
+quality_metrics:
+  completeness: 0.91
+  sensor_gaps: 0.09
+  outliers_removed: 0.03
+clinical_notes: "Patient shows dawn phenomenon and post-meal spikes >250 mg/dL"
