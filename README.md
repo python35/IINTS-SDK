@@ -1,4 +1,4 @@
-# IINTS-AF SDK (v0.1.1)
+# IINTS-AF SDK (v0.1.2)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/quickstart_benchmark.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 ## Intelligent Insulin Titration System for Artificial Pancreas
