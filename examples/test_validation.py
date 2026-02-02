@@ -11,7 +11,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.analysis.validator import ReverseEngineeringValidator, ReliabilityLevel
+from iints.analysis.validator import ReverseEngineeringValidator, ReliabilityLevel
 
 def test_clean_data():
     """Test validation with clean, reliable data."""

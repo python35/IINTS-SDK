@@ -10,7 +10,7 @@
 
 from typing import Dict, Any, List
 
-from src.algorithm.base_algorithm import InsulinAlgorithm, AlgorithmInput, AlgorithmMetadata, WhyLogEntry
+from iints.core.algorithms.base_algorithm import InsulinAlgorithm, AlgorithmInput, AlgorithmMetadata, WhyLogEntry
 
 Dose = Dict[str, float]
 

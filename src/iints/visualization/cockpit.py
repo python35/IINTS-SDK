@@ -166,7 +166,7 @@ class ClinicalCockpit:
             
             # Uncertainty band
             if 'uncertainty' in simulation_data.columns:
-                uncertainty: np.ndarray = simulation_data['uncertainty'].values.astype(float)
+                uncertainty = np.asarray(simulation_data['uncertainty'], dtype=float)
                 lower = predictions - 30 * (1.0 + uncertainty)
                 upper = predictions + 30 * (1.0 + uncertainty)
                 ax.fill_between(timestamps, lower, upper,

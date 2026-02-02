@@ -14,7 +14,7 @@ import json
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.adapter import DataAdapter
+from iints.data.adapter import DataAdapter
 
 def import_dataset(file_path: str, pack_name: str, sanitize: bool = True):
     """Import custom dataset with validation"""
@@ -65,7 +65,7 @@ def import_dataset(file_path: str, pack_name: str, sanitize: bool = True):
 
 ## Usage
 ```python
-from src.data.adapter import DataAdapter
+from iints.data.adapter import DataAdapter
 
 adapter = DataAdapter()
 data_pack = adapter.load_data_pack("custom/{pack_name}")

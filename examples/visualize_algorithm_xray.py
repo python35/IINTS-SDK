@@ -14,7 +14,8 @@ import sys
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.analysis.algorithm_xray import AlgorithmXRay
+from iints.analysis.algorithm_xray import AlgorithmXRay
+from iints.data.quality_checker import QualityReport, DataGap, DataAnomaly
 
 class XRayVisualizer:
     """Visualize algorithm X-ray analysis"""
@@ -334,7 +335,6 @@ def main():
     print("Making invisible medical decisions visible\n")
     
     # --- Create Mock Quality Report for demonstration ---
-    from src.data.quality_checker import QualityReport, DataGap, DataAnomaly
     mock_gaps = [
         DataGap(start_time=100, end_time=150, duration_minutes=50, data_points_missing=10, percentage_of_total=5, time_range_description="100-150min")
     ]

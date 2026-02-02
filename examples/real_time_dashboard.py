@@ -19,7 +19,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
+from iints.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
 
 class RealTimeDashboard:
     """Real-time glucose monitoring dashboard with live TIR analysis"""

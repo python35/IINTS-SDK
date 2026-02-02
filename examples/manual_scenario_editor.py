@@ -11,12 +11,12 @@ from rich.text import Text
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.universal_parser import UniversalParser, StandardDataPack
-from src.algorithm.battle_runner import BattleRunner
-from src.algorithm.pid_controller import PIDController
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.simulation.simulator import StressEvent
+from iints.data.universal_parser import UniversalParser, StandardDataPack
+from iints.core.algorithms.battle_runner import BattleRunner
+from iints.core.algorithms.pid_controller import PIDController
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.simulator import StressEvent
 
 console = Console()
 

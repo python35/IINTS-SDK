@@ -16,12 +16,12 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.patient.models import PatientModel
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.simulation.simulator import Simulator, StressEvent
-from src.safety.supervisor import IndependentSupervisor
+from iints.core.patient.models import PatientModel
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.simulator import Simulator, StressEvent
+from iints.core.supervisor import IndependentSupervisor
 
 class ExperimentRunner:
     """Research-focused experiment execution and data collection"""

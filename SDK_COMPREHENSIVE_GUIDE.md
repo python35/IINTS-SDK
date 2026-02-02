@@ -1,6 +1,6 @@
 # IINTS-AF SDK: Comprehensive Guide
 
-This document provides a comprehensive overview of the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, and development guidelines.
+This document provides a complete, end-to-end manual for the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, data formats, safety features, profiling, examples, and development workflows.
 
 ## 1. Introduction to IINTS-AF SDK
 
@@ -18,16 +18,24 @@ The IINTS-AF SDK is designed for researchers and developers to create, simulate,
 To install the IINTS-AF SDK, you typically use `pip`. If you have received a distributable package (a `.whl` file), you can install it locally:
 
 ```bash
-pip install path/to/iints-0.1.0-py3-none-any.whl
+python3 -m pip install path/to/iints-0.1.0-py3-none-any.whl
 ```
 
 If you wish to install from the project source in editable mode (for development):
 
 ```bash
-pip install -e .
+python3 -m pip install -e .
 ```
 
 This will install the `iints` package and its dependencies.
+
+### 2.3 Dev Install (Recommended for Researchers)
+
+```bash
+python3 -m pip install -e ".[dev]"
+```
+
+This installs PyTest, Flake8, MyPy, and type stubs for a smooth developer workflow.
 
 ## 3. Project Structure
 
@@ -37,19 +45,25 @@ The core of the SDK's source code is located within the `src/iints/` directory. 
 src/
 └── iints/
     ├── __init__.py             # Package initialization, re-exports key APIs
-    ├── analysis/               # Modules for clinical metrics, algorithm analysis (e.g., algorithm_xray, clinical_metrics)
-    ├── api/                    # Core API for algorithms (e.g., base_algorithm.py for InsulinAlgorithm)
-    ├── cli/                    # Command-Line Interface definitions (e.g., cli.py for 'iints' command)
-    ├── core/                   # Core simulation and patient management logic
-    │   ├── algorithms/         # Implementations of various insulin algorithms
-    │   ├── patient/            # Patient models and factory for creating patient instances
-    │   ├── safety/             # Safety supervisor logic
-    │   ├── simulation/         # Simulation setup and scenario parsing
-    │   └── simulator.py        # The main simulator engine
-    ├── data/                   # Data handling, ingestors, quality checkers, universal parsers
-    ├── emulation/              # Modules for emulating existing commercial pumps
-    ├── learning/               # Modules related to autonomous optimization and learning systems
-    └── visualization/          # Tools for data visualization (e.g., cockpit, uncertainty_cloud)
+    ├── analysis/               # Clinical metrics, algorithm analysis, validation
+    ├── api/                    # Core API for algorithms (InsulinAlgorithm, AlgorithmInput, etc.)
+    ├── cli/                    # Command-Line Interface for the `iints` command
+    ├── core/                   # Core simulation and patient logic
+    │   ├── algorithms/         # PID, LSTM, hybrid, standard pump implementations
+    │   ├── patient/            # Patient models and patient factory
+    │   ├── safety/             # Safety supervisor and input validation
+    │   └── simulator.py        # Main simulator engine
+    ├── data/                   # Parsers, ingestors, data adapters
+    ├── emulation/              # Commercial pump emulators
+    ├── learning/               # Autonomous optimization and learning systems
+    └── visualization/          # Visual dashboards and plots
+
+examples/                        # End-to-end scripts and demos
+tests/                           # PyTest suite
+scenarios/                       # JSON scenario definitions
+data_packs/                      # Data packs and schema docs
+models/                          # Saved model artifacts (if any)
+scripts/                         # Helper scripts (tests, lint, demo)
 ```
 
 ## 4. Key API Components
@@ -73,8 +87,9 @@ The central class for running simulations. It orchestrates the patient model, al
 **Core Methods:**
 
 *   `run()`: Executes a single simulation run.
-*   `run_batch()`: Executes multiple simulations, often used for benchmarking.
-*   `add_stress_event()`: Adds predefined stress events (e.g., missed meal, exercise) to a simulation.
+*   `run_batch()`: Executes a full batch simulation and returns results + safety report.
+*   `add_stress_event()`: Adds predefined stress events (e.g., missed meal, exercise).
+*   `enable_profiling=True`: Records algorithm, supervisor, and step latency.
 
 ### `iints.data.ingestor.DataIngestor`
 
@@ -92,39 +107,128 @@ The SDK provides a `iints` command-line tool for common tasks.
 iints --help
 ```
 
-**Available Commands:**
+**Commands (current CLI)**
 
-*   `new-algo`: Creates a new algorithm template file (`template_algorithm.py`) based on the `InsulinAlgorithm` base class. This is your starting point for custom algorithms.
-    ```bash
-    iints new-algo MyCustomAlgorithm.py
-    ```
-*   `run`: Runs an IINTS-AF simulation using a specified algorithm and patient configuration.
-    ```bash
-    iints run --algorithm MyCustomAlgorithm --patient-config path/to/patient_config.yaml --scenario path/to/scenario.json
-    ```
-*   `benchmark`: Runs a series of simulations to benchmark an AI algorithm against a standard pump across multiple patient configurations and scenarios.
-*   `docs`: (Future functionality or internal-only) Potentially used for documentation tasks.
+1. `init`  
+Creates a new research workspace with standard folders and an example algorithm + scenario.  
 
-## 6. Creating Custom Algorithms
+```bash
+iints init --project-name my_iints_project
+```
+
+2. `new-algo`  
+Creates a new algorithm template file from `iints.templates/default_algorithm.py`.  
+
+```bash
+iints new-algo --name MyAlgo --author "Your Name" --output-dir algorithms/
+```
+
+3. `run`  
+Runs a simulation using a specific algorithm file and optional scenario.  
+
+```bash
+iints run \
+  --algo algorithms/my_algo.py \
+  --patient-config-name default \
+  --scenario-path scenarios/example_scenario.json \
+  --duration 720 \
+  --time-step 5 \
+  --output-dir ./results/data
+```
+
+4. `benchmark`  
+Benchmarks one AI algorithm against the standard pump across patient configs and scenarios.  
+
+```bash
+iints benchmark \
+  --algo-to-benchmark algorithms/my_algo.py \
+  --patient-configs-dir src/iints/data/virtual_patients \
+  --scenarios-dir scenarios \
+  --duration 720 \
+  --time-step 5 \
+  --output-dir ./results/benchmarks
+```
+
+5. `docs algo`  
+Generates an auto-documentation panel for a specific algorithm file.  
+
+```bash
+iints docs algo --algo-path algorithms/my_algo.py
+```
+
+## 6. Quick Start (End-to-End)
+
+```python
+from iints.core.simulator import Simulator, StressEvent
+from iints.core.patient.models import PatientModel
+from iints.core.algorithms.pid_controller import PIDController
+
+patient = PatientModel(initial_glucose=120)
+algo = PIDController()
+sim = Simulator(patient_model=patient, algorithm=algo, time_step=5, enable_profiling=True)
+
+# Add a meal at 8:00 (in minutes)
+sim.add_stress_event(StressEvent(start_time=8 * 60, event_type='meal', value=60))
+
+results_df, safety_report = sim.run_batch(duration_minutes=24 * 60)
+print(results_df.head())
+print(safety_report.get("performance_report", {}))
+```
+
+## 7. Creating Custom Algorithms
 
 1.  **Generate Template**: Use `iints new-algo YourAlgorithmName.py` to create a template.
 2.  **Implement Logic**: Fill in your insulin delivery logic within the `predict_insulin` method of your new algorithm class, inheriting from `InsulinAlgorithm`.
 3.  **Run**: Use `iints run --algorithm YourAlgorithmName ...` to test your algorithm in simulations.
 
-## 7. Data Formats
+## 8. Data Formats
 
 The SDK expects patient data in a standardized format, often managed through `iints.data.ingestor.DataIngestor` and `iints.data.universal_parser.UniversalParser`. Key data points typically include timestamps, glucose readings, insulin doses, and carbohydrate intake. Specific details can be found in `data_packs/DATA_SCHEMA.md`.
 
-## 8. Development Workflow
+## 9. Safety & Clinical Guardrails
 
-### 8.1 Versioning
+The SDK enforces safety constraints through two layers:
+
+1. **InputValidator**: Filters biologically implausible glucose values and unsafe insulin requests.
+2. **IndependentSupervisor**: Applies deterministic caps and overrides based on IOB and glucose state.
+
+The safety report includes:
+- Violation counts and breakdown
+- Bolus interventions
+- Recent safety events
+
+## 10. Precision Telemetry (Profiling)
+
+Enable latency profiling on the simulator to measure:
+- Algorithm inference latency
+- Supervisor latency
+- Full step latency
+
+```python
+sim = Simulator(patient_model=patient, algorithm=algo, enable_profiling=True)
+results_df, safety_report = sim.run_batch(duration_minutes=1440)
+print(safety_report["performance_report"])
+```
+
+## 11. Examples and Demos
+
+All examples use `from iints...` imports. Run them directly:
+
+```bash
+python3 examples/main.py
+python3 examples/run_final_analysis.py
+```
+
+## 12. Development Workflow
+
+### 12.1 Versioning
 
 The SDK uses semantic versioning. The current version is defined in `pyproject.toml`.
 
 *   To update the version for a new release, edit the `version` field in `pyproject.toml` (e.g., from `0.1.0` to `0.1.1`).
 *   It is good practice to use `git tag vX.Y.Z` to mark releases in your version control history.
 
-### 8.2 Continuous Integration (CI) with GitHub Actions
+### 12.2 Continuous Integration (CI) with GitHub Actions
 
 A GitHub Actions workflow (`.github/workflows/python-package.yml`) has been set up to automate the build and testing process.
 
@@ -134,11 +238,44 @@ A GitHub Actions workflow (`.github/workflows/python-package.yml`) has been set 
 
 This ensures that every change to the codebase is automatically validated, preventing regressions and maintaining code quality.
 
-### 8.3 Change Log
+### 12.3 Change Log
 
 A `CHANGELOG.md` file has been created in the project root. It is recommended to update this file with a concise summary of changes for each new version, helping users understand what's new or fixed in each release.
 
-## 9. API Documentation
+## 13. Testing, Linting, Type Checking
+
+```bash
+python3 -m pytest
+python3 -m flake8 .
+python3 -m mypy src/iints
+```
+
+Or use the one-command flow:
+
+```bash
+make dev
+make test
+make lint
+```
+
+Helper scripts:
+
+```bash
+./scripts/run_tests.sh
+./scripts/run_lint.sh
+./scripts/run_demo.sh
+```
+
+## 14. Troubleshooting
+
+**ModuleNotFoundError: `src.*`**
+- Use `from iints...` imports instead.
+- Install in editable mode: `python3 -m pip install -e ".[dev]"`
+
+**Flake8 fails on templates**
+- The template directory is excluded in `.flake8` because it contains placeholders.
+
+## 15. API Documentation
 
 Comprehensive API documentation, generated using Sphinx, is available in HTML format.
 

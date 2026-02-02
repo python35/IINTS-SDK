@@ -9,17 +9,17 @@ from typing import Optional
 # Add project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.patient.models import PatientModel
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.simulation.simulator import Simulator, StressEvent
-from src.analysis.diabetes_metrics import DiabetesMetrics
-from src.analysis.sensor_filtering import SensorNoiseModel, KalmanFilter
-from src.safety.supervisor import IndependentSupervisor
-from src.analysis.validator import ReverseEngineeringValidator
-from src.learning.autonomous_optimizer import AutonomousLearningSystem
-from src.patient.patient_factory import PatientFactory
+from iints.core.patient.models import PatientModel
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.simulator import Simulator, StressEvent
+from iints.analysis.diabetes_metrics import DiabetesMetrics
+from iints.analysis.sensor_filtering import SensorNoiseModel, KalmanFilter
+from iints.core.supervisor import IndependentSupervisor
+from iints.analysis.validator import ReverseEngineeringValidator
+from iints.learning.autonomous_optimizer import AutonomousLearningSystem
+from iints.core.patient.patient_factory import PatientFactory
 
 # --- Configuration ---
 OUTPUT_DIR = 'results/plots/final_analysis_cli'

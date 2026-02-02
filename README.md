@@ -1,5 +1,6 @@
 # IINTS-AF SDK (v0.1.0)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/quickstart_benchmark.ipynb)
+[![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 ## Intelligent Insulin Titration System for Artificial Pancreas
 
 ### Overview
@@ -29,8 +30,12 @@ pip install -i https://test.pypi.org/simple/ iints-sdk-python35
 ```bash
 git clone https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
-pip install -e .
+python3 -m pip install -e .
+python3 -m pip install -e ".[dev]"
 ```
+
+### Full Manual
+The complete SDK guide is available in `SDK_COMPREHENSIVE_GUIDE.md`.
 
 ### Quick Start
 
@@ -70,6 +75,20 @@ Run the automated test suite:
 
 ```bash
 pytest
+```
+
+### One-Command Dev Workflow
+```bash
+make dev
+make test
+make lint
+```
+
+### Helper Scripts
+```bash
+./scripts/run_tests.sh
+./scripts/run_lint.sh
+./scripts/run_demo.sh
 ```
 
 ### Performance Profiling

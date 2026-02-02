@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.learning.autonomous_optimizer import AutonomousLearningSystem, ClinicalTeacher
+from iints.learning.autonomous_optimizer import AutonomousLearningSystem, ClinicalTeacher
 
 def test_clinical_teacher():
     """Test clinical teacher data generation."""

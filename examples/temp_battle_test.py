@@ -7,13 +7,13 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.algorithm.battle_runner import BattleRunner
-from src.algorithm.pid_controller import PIDController
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.emulation.medtronic_780g import Medtronic780GEmulator
-from src.emulation.tandem_controliq import TandemControlIQEmulator
-from src.emulation.omnipod_5 import Omnipod5Emulator
+from iints.core.algorithms.battle_runner import BattleRunner
+from iints.core.algorithms.pid_controller import PIDController
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.emulation.medtronic_780g import Medtronic780GEmulator
+from iints.emulation.tandem_controliq import TandemControlIQEmulator
+from iints.emulation.omnipod_5 import Omnipod5Emulator
 
 def run_test():
     """Demonstrate battle runner functionality"""

@@ -193,13 +193,13 @@ sys.path.insert(0, "{project_root}")
 
 import numpy as np
 import pandas as pd
-from src.algorithm.battle_runner import BattleRunner
-from src.algorithm.pid_controller import PIDController
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.emulation.medtronic_780g import Medtronic780GEmulator
-from src.emulation.tandem_controliq import TandemControlIQEmulator
-from src.emulation.omnipod_5 import Omnipod5Emulator
+from iints.core.algorithms.battle_runner import BattleRunner
+from iints.core.algorithms.pid_controller import PIDController
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.emulation.medtronic_780g import Medtronic780GEmulator
+from iints.emulation.tandem_controliq import TandemControlIQEmulator
+from iints.emulation.omnipod_5 import Omnipod5Emulator
 
 # Generate sample data
 np.random.seed(42)
@@ -342,7 +342,7 @@ print(report.get_summary())
                 legacy_script = f'''
 import sys
 sys.path.insert(0, "{project_root}")
-from src.emulation.medtronic_780g import Medtronic780GEmulator
+from iints.emulation.medtronic_780g import Medtronic780GEmulator
 emu = Medtronic780GEmulator()
 print(emu.get_algorithm_personality())
 '''
@@ -355,7 +355,7 @@ print(emu.get_algorithm_personality())
                 legacy_script = f'''
 import sys
 sys.path.insert(0, "{project_root}")
-from src.emulation.tandem_controliq import TandemControlIQEmulator
+from iints.emulation.tandem_controliq import TandemControlIQEmulator
 emu = TandemControlIQEmulator()
 print(emu.get_algorithm_personality())
 '''
@@ -368,7 +368,7 @@ print(emu.get_algorithm_personality())
                 legacy_script = f'''
 import sys
 sys.path.insert(0, "{project_root}")
-from src.emulation.omnipod_5 import Omnipod5Emulator
+from iints.emulation.omnipod_5 import Omnipod5Emulator
 emu = Omnipod5Emulator()
 print(emu.get_algorithm_personality())
 '''

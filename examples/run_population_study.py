@@ -15,13 +15,13 @@ import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.patient.patient_factory import PatientFactory
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.simulation.simulator import Simulator, StressEvent
-from src.analysis.diabetes_metrics import DiabetesMetrics
-from src.safety.supervisor import IndependentSupervisor
+from iints.core.patient.patient_factory import PatientFactory
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.simulator import Simulator, StressEvent
+from iints.analysis.diabetes_metrics import DiabetesMetrics
+from iints.core.supervisor import IndependentSupervisor
 from run_final_analysis import SafetyAwareSimulator
 
 class PopulationStudy:
@@ -46,7 +46,6 @@ class PopulationStudy:
         
         # Add safety supervisor if needed
         if enable_safety:
-            from src.safety.supervisor import IndependentSupervisor
             supervisor = IndependentSupervisor()
         else:
             supervisor = None

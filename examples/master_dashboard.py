@@ -27,16 +27,16 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Import core simulation components
-from src.simulation.simulator import Simulator
-from src.patient.models import PatientModel
-from src.algorithm.discovery import discover_algorithms
-from src.data.universal_parser import UniversalParser
-from src.simulation.scenario_parser import parse_scenario # For scenario loading
-from src.simulation.simulator import StressEvent # New import for StressEvent class
+from iints.core.simulator import Simulator
+from iints.core.patient.models import PatientModel
+from iints.core.algorithms.discovery import discover_algorithms
+from iints.data.universal_parser import UniversalParser
+from iints.core.simulation.scenario_parser import parse_scenario # For scenario loading
+from iints.core.simulator import StressEvent # New import for StressEvent class
 try:
-    from src.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
-    from src.analysis.explainable_ai import ClinicalAuditTrail
-    from src.analysis.edge_performance_monitor import EdgeAIPerformanceMonitor
+    from iints.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
+    from iints.analysis.explainable_ai import ClinicalAuditTrail
+    from iints.analysis.edge_performance_monitor import EdgeAIPerformanceMonitor
 except ImportError as e:
     print(f"Warning: Some analysis modules not available: {e}")
 

@@ -18,11 +18,11 @@ import sys
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.algorithm.fixed_basal_bolus import FixedBasalBolus
-from src.algorithm.pid_controller import PIDController
-from src.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.algorithms.fixed_basal_bolus import FixedBasalBolus
+from iints.core.algorithms.pid_controller import PIDController
+from iints.analysis.clinical_tir_analyzer import ClinicalTIRAnalyzer
 
 class AlgorithmBenchmark:
     """Comparative benchmarking of diabetes management algorithms"""

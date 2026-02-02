@@ -31,8 +31,25 @@ dependencies = [
     "typer[all]",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0.0",
+  "flake8",
+  "mypy",
+  "pandas-stubs",
+  "types-PyYAML",
+  "types-psutil",
+]
+
 [project.scripts]
 iints = "iints.cli.cli:app"
 
 [project.urls]
 "Homepage" = "https://github.com/python35/IINTS-SDK"
+
+[tool.setuptools.package-data]
+iints = [
+  "templates/*.py",
+  "templates/scenarios/*.json",
+  "data/virtual_patients/*.yaml",
+]

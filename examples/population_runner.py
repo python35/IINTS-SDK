@@ -18,12 +18,12 @@ from typing import List, Dict
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.data.adapter import DataAdapter
-from src.patient.patient_factory import PatientFactory
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-from src.algorithm.hybrid_algorithm import HybridInsulinAlgorithm
-from src.simulation.simulator import Simulator, StressEvent
+from iints.data.adapter import DataAdapter
+from iints.core.patient.patient_factory import PatientFactory
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.algorithms.hybrid_algorithm import HybridInsulinAlgorithm
+from iints.core.simulator import Simulator, StressEvent
 
 class PopulationRunner:
     """Professional population study runner"""

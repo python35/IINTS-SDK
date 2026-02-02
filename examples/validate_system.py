@@ -6,6 +6,11 @@ import warnings
 # Add project root to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from iints.core.patient.models import PatientModel # Using CustomPatientModel aliased as PatientModel
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.algorithms.lstm_algorithm import LSTMInsulinAlgorithm
+from iints.core.simulator import Simulator, StressEvent
+
 def check_python_version():
     """Check if Python version is 3.8 or newer (relaxed requirement)."""
     print("Checking Python version...")
@@ -23,7 +28,7 @@ def check_python_version():
 def check_trained_model():
     """Check if the trained LSTM model file exists."""
     print("Checking for trained LSTM model...")
-    model_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'algorithm', 'trained_lstm_model.pth')
+    model_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'iints', 'core', 'algorithms', 'trained_lstm_model.pth')
     if os.path.exists(model_path):
         print(f" Trained LSTM model found at: {model_path}")
         return True
@@ -60,11 +65,6 @@ def run_basic_simulation_sanity_check():
         # Suppress the FutureWarning from torch.load
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", FutureWarning)
-            from src.patient.models import PatientModel # Using CustomPatientModel aliased as PatientModel
-            from src.algorithm.correction_bolus import CorrectionBolus
-            from src.algorithm.lstm_algorithm import LSTMInsulinAlgorithm
-            from src.simulation.simulator import Simulator, StressEvent
-
         patient = PatientModel(initial_glucose=120)
         algo_rb = CorrectionBolus()
         algo_ml = LSTMInsulinAlgorithm()

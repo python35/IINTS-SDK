@@ -17,9 +17,9 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from src.algorithm.lstm_algorithm import LSTMModel, LSTMInsulinAlgorithm
-from src.patient.patient_factory import PatientFactory
-from src.simulation.simulator import Simulator, StressEvent
+from iints.core.algorithms.lstm_algorithm import LSTMModel, LSTMInsulinAlgorithm
+from iints.core.patient.patient_factory import PatientFactory
+from iints.core.simulator import Simulator, StressEvent
 
 def calculate_weight_delta(model_path_old, model_path_new):
     """Calculate difference between old and new model weights."""
