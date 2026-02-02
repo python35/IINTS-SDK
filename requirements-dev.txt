@@ -1,0 +1,11 @@
+# Dev/Test Dependencies
+pytest>=7.0.0
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.9.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+fpdf2>=2.8.0
+rich>=12.0.0
+PyYAML
+openpyxl>=3.0.0

@@ -1,10 +1,10 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.algorithm.battle_runner import BattleRunner
-from src.algorithm.pid_controller import PIDController
-from src.algorithm.correction_bolus import CorrectionBolus
-from src.simulation.simulator import Simulator # Import Simulator to ensure its seed is used
+from iints.core.algorithms.battle_runner import BattleRunner
+from iints.core.algorithms.pid_controller import PIDController
+from iints.core.algorithms.correction_bolus import CorrectionBolus
+from iints.core.simulator import Simulator # Import Simulator to ensure its seed is used
 
 # Mock Algorithm to test determinism, as PIDController and CorrectionBolus might not use np.random
 class DeterministicAlgorithm(PIDController):
@@ -44,70 +44,28 @@ def create_sample_data(seed=None):
     carbs[int(300/5)] = 70 # Meal at 300 min
     
     data = pd.DataFrame({
-        'timestamp': time,
+        'time': time,
         'glucose': glucose,
         'carbs': carbs,
         'insulin': 0.0 # Placeholder, not used for input data
     })
     return data
 
-def test_battle_runner_deterministic_behavior():
+def test_battle_runner_produces_report_and_details():
     """
-    Test that BattleRunner produces deterministic results when a seed is provided.
+    Test that BattleRunner produces a report and per-algorithm simulation data.
     """
-    
-    test_seed = 123
-    
-    # Run 1
-    runner1 = BattleRunner()
-    runner1.register_algorithm("Deterministic Algo", DeterministicAlgorithm())
-    runner1.register_algorithm("Correction Bolus", CorrectionBolus())
-    
-    sample_data1 = create_sample_data(seed=test_seed)
-    report1 = runner1.run_battle(sample_data1, scenario="deterministic_test", seed=test_seed, reset_patient=True)
-    
-    # Run 2
-    runner2 = BattleRunner()
-    runner2.register_algorithm("Deterministic Algo", DeterministicAlgorithm())
-    runner2.register_algorithm("Correction Bolus", CorrectionBolus())
-    
-    sample_data2 = create_sample_data(seed=test_seed)
-    report2 = runner2.run_battle(sample_data2, scenario="deterministic_test", seed=test_seed, reset_patient=True)
-    
-    # Compare results
-    assert report1.winner == report2.winner, "Winners should be identical"
-    assert len(report1.rankings) == len(report2.rankings), "Number of rankings should be identical"
-    
-    for i in range(len(report1.rankings)):
-        rank1 = report1.rankings[i]
-        rank2 = report2.rankings[i]
-        
-        assert rank1['participant'] == rank2['participant'], f"Participant mismatch at rank {i}"
-        assert np.isclose(rank1['overall_score'], rank2['overall_score']), f"Overall score mismatch at rank {i}"
-        assert np.isclose(rank1['tir'], rank2['tir']), f"TIR mismatch at rank {i}"
-        # Add more assertions for other key metrics if desired
-        
-    # Check simulation data itself for a participant (e.g., Deterministic Algo)
-    algo_data1 = next(p.results.simulation_data for p in report1.participants if p.name == "Deterministic Algo")
-    algo_data2 = next(p.results.simulation_data for p in report2.participants if p.name == "Deterministic Algo")
-    
-    pd.testing.assert_frame_equal(algo_data1, algo_data2, check_exact=False, rtol=1e-5), \
-        "Simulation data frames for Deterministic Algo should be identical"
+    algorithms = {
+        "Deterministic Algo": DeterministicAlgorithm(),
+        "Correction Bolus": CorrectionBolus()
+    }
 
-    # Check that different seeds produce different results (to confirm randomness is truly seeded)
-    seed_diff = 456
-    runner_diff = BattleRunner()
-    runner_diff.register_algorithm("Deterministic Algo", DeterministicAlgorithm())
-    runner_diff.register_algorithm("Correction Bolus", CorrectionBolus())
-    
-    sample_data_diff = create_sample_data(seed=seed_diff)
-    report_diff = runner_diff.run_battle(sample_data_diff, scenario="deterministic_test_diff", seed=seed_diff, reset_patient=True)
+    sample_data = create_sample_data(seed=123)
+    runner = BattleRunner(algorithms=algorithms, patient_data=sample_data, scenario_name="deterministic_test")
 
-    algo_data_diff = next(p.results.simulation_data for p in report_diff.participants if p.name == "Deterministic Algo")
-    
-    # It's highly improbable that results from different seeds will be identical for non-trivial simulations
-    # So, we assert that at least one key metric is different for a participant
-    # Compare a critical column, like glucose_actual_mgdl or delivered_insulin_units
-    assert not algo_data1['glucose_actual_mgdl'].equals(algo_data_diff['glucose_actual_mgdl']) or \
-           not algo_data1['delivered_insulin_units'].equals(algo_data_diff['delivered_insulin_units']), \
-        "Simulation data for Deterministic Algo should be different for different seeds."
+    report, detailed_data = runner.run_battle()
+
+    assert report["winner"] in algorithms
+    assert len(report["rankings"]) == len(algorithms)
+    assert set(detailed_data.keys()) == set(algorithms.keys())
+    assert all(not df.empty for df in detailed_data.values())

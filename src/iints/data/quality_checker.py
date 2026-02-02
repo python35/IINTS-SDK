@@ -342,7 +342,7 @@ class DataQualityChecker:
                         timestamp=float(df.at[idx, 'timestamp']), # type: ignore
                         value=glucose_with_time.loc[idx, 'glucose'], # type: ignore
                         anomaly_type='rapid_change',
-                        severity='medium',
+                        severity='high',
                         description=description
                     ))
         

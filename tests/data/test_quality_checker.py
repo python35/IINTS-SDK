@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from src.data.quality_checker import DataQualityChecker, DataAnomaly, QualityReport
+from iints.data.quality_checker import DataQualityChecker, DataAnomaly, QualityReport
 
 def test_physiological_rapid_change_detection():
     """

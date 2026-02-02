@@ -258,8 +258,9 @@ class TandemControlIQEmulator(LegacyEmulator):
             # Apply individual safety adjustment factor from _check_safety_constraints (base class)
             insulin_delivered = total_calculated_insulin * safety_adjustment_factor_base
             
-            # Control-IQ has max delivery limit for automated insulin
-            insulin_delivered = min(insulin_delivered, self.behavior.max_delivery)
+            # Control-IQ has max delivery limit per hour; scale to this decision interval.
+            max_per_interval = self.behavior.max_delivery * (time_step_minutes / 60.0)
+            insulin_delivered = min(insulin_delivered, max_per_interval)
             
             if insulin_delivered > 0:
                 if meal_bolus > 0:

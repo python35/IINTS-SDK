@@ -1,4 +1,5 @@
 # IINTS-AF SDK (v0.1.0)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/quickstart_benchmark.ipynb)
 ## Intelligent Insulin Titration System for Artificial Pancreas
 
 ### Overview
@@ -63,6 +64,24 @@ iints new-algo MySmartAlgo.py
 ```
 
 Implement the logic within the `predict_insulin` method. The SDK automatically applies safety constraints such as IOB limits and maximum dose caps.
+
+### Testing
+Run the automated test suite:
+
+```bash
+pytest
+```
+
+### Performance Profiling
+Enable high-precision timing for algorithm and supervisor latency:
+
+```python
+from iints.core.simulator import Simulator
+
+sim = Simulator(patient_model=patient, algorithm=algo, enable_profiling=True)
+results_df, safety_report = sim.run_batch(duration_minutes=1440)
+print(safety_report["performance_report"])
+```
 
 ### Core Concepts
 *   **IndependentSupervisor**: A deterministic "digital cage" that validates every suggested dose against physiological safety limits.

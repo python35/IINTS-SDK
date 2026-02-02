@@ -9,7 +9,7 @@ class InputValidator:
     def __init__(self,
                  min_glucose: float = 20.0,
                  max_glucose: float = 600.0,
-                 max_glucose_delta_per_5_min: float = 20.0):
+                 max_glucose_delta_per_5_min: float = 35.0):
         """
         Initializes the validator with plausible biological limits.
 

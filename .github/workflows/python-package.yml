@@ -25,6 +25,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install build flake8 mypy pandas-stubs types-PyYAML simglucose==0.2.10 types-psutil
+        pip install -r requirements-dev.txt
         # Install project dependencies for linting/type checking if applicable
         # If your project has a requirements.txt, uncomment the next line:
         # pip install -r requirements.txt
@@ -36,6 +37,10 @@ jobs:
     - name: Type check with MyPy
       run: |
         mypy src/iints/ # adjust path to your main package
+
+    - name: Run tests with PyTest
+      run: |
+        pytest
 
     - name: Build package
       run: |

@@ -41,7 +41,15 @@ class Simulator:
     Orchestrates the interaction between a patient model and an insulin algorithm
     over a simulated period, including stress-test scenarios.
     """
-    def __init__(self, patient_model: PatientModel, algorithm: InsulinAlgorithm, time_step: int = 5, seed: Optional[int] = None, audit_log_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        patient_model: PatientModel,
+        algorithm: InsulinAlgorithm,
+        time_step: int = 5,
+        seed: Optional[int] = None,
+        audit_log_path: Optional[str] = None,
+        enable_profiling: bool = False,
+    ) -> None:
         """
         Initializes the simulator.
 
@@ -65,6 +73,12 @@ class Simulator:
         self.input_validator = InputValidator()
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
+        self.enable_profiling = enable_profiling
+        self._profiling_samples: Dict[str, List[float]] = {
+            "algorithm_latency_ms": [],
+            "supervisor_latency_ms": [],
+            "step_latency_ms": [],
+        }
         if self.audit_log_path:
             # Clear the log file at the beginning of a simulation run
             try:
@@ -106,6 +120,8 @@ class Simulator:
         all_records = list(self.run_live(duration_minutes))
         simulation_results_df = pd.DataFrame(all_records)
         safety_report = self.supervisor.get_safety_report()
+        if self.enable_profiling:
+            safety_report["performance_report"] = self._build_performance_report()
         logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
         return simulation_results_df, safety_report
 
@@ -125,11 +141,19 @@ class Simulator:
         self.input_validator.reset() # Reset input validator for new run
         self.simulation_data = []
         self.meal_queue = [] # Reset meal queue for new run
+        if self.enable_profiling:
+            self._profiling_samples = {
+                "algorithm_latency_ms": [],
+                "supervisor_latency_ms": [],
+                "step_latency_ms": [],
+            }
         current_time = 0
 
         logger.debug("Starting live simulation loop.")
 
         while current_time <= duration_minutes:
+            if self.enable_profiling:
+                step_start_time = time.perf_counter()
             patient_carb_intake_this_step = 0.0
             algo_carb_intake_this_step = 0.0
             actual_glucose_reading = self.patient_model.get_current_glucose()
@@ -199,7 +223,13 @@ class Simulator:
             )
 
             # --- Algorithm Calculation ---
-            insulin_output = self.algorithm.predict_insulin(algo_input)
+            if self.enable_profiling:
+                algo_start_time = time.perf_counter()
+                insulin_output = self.algorithm.predict_insulin(algo_input)
+                algorithm_latency_ms = (time.perf_counter() - algo_start_time) * 1000
+                self._profiling_samples["algorithm_latency_ms"].append(algorithm_latency_ms)
+            else:
+                insulin_output = self.algorithm.predict_insulin(algo_input)
             algo_recommended_insulin = insulin_output.get("total_insulin_delivered", 0.0)
             # Validate the algorithm's output to prevent negative insulin requests
             algo_recommended_insulin = self.input_validator.validate_insulin(algo_recommended_insulin)
@@ -216,6 +246,8 @@ class Simulator:
                 current_iob=self.patient_model.insulin_on_board
             )
             supervisor_latency_ms = (time.perf_counter() - start_perf_time) * 1000
+            if self.enable_profiling:
+                self._profiling_samples["supervisor_latency_ms"].append(supervisor_latency_ms)
 
             delivered_insulin = safety_result["approved_insulin"]
             overridden = safety_result["insulin_reduction"] > 0
@@ -260,7 +292,39 @@ class Simulator:
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
             }
+
+            if self.enable_profiling:
+                step_latency_ms = (time.perf_counter() - step_start_time) * 1000
+                self._profiling_samples["step_latency_ms"].append(step_latency_ms)
+                record["algorithm_latency_ms"] = algorithm_latency_ms
+                record["step_latency_ms"] = step_latency_ms
             
             yield record
 
             current_time += self.time_step
+
+    def _build_performance_report(self) -> Dict[str, Any]:
+        def summarize(samples: List[float]) -> Dict[str, float]:
+            if not samples:
+                return {}
+            values = np.array(samples, dtype=float)
+            return {
+                "mean_ms": float(np.mean(values)),
+                "median_ms": float(np.median(values)),
+                "p95_ms": float(np.percentile(values, 95)),
+                "p99_ms": float(np.percentile(values, 99)),
+                "min_ms": float(np.min(values)),
+                "max_ms": float(np.max(values)),
+                "std_ms": float(np.std(values)),
+            }
+
+        return {
+            "algorithm_latency_ms": summarize(self._profiling_samples["algorithm_latency_ms"]),
+            "supervisor_latency_ms": summarize(self._profiling_samples["supervisor_latency_ms"]),
+            "step_latency_ms": summarize(self._profiling_samples["step_latency_ms"]),
+            "sample_counts": {
+                "algorithm_latency_ms": len(self._profiling_samples["algorithm_latency_ms"]),
+                "supervisor_latency_ms": len(self._profiling_samples["supervisor_latency_ms"]),
+                "step_latency_ms": len(self._profiling_samples["step_latency_ms"]),
+            },
+        }

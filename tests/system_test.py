@@ -5,6 +5,7 @@ from pathlib import Path
 from rich.console import Console
 import numpy as np
 from typing import Optional
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent
@@ -26,7 +27,7 @@ def run_test(test_name, func, *args, **kwargs):
 # --- Test Cases ---
 
 def test_data_parsing():
-    from src.data.universal_parser import UniversalParser
+    from iints.data.universal_parser import UniversalParser
     
     # Create a dummy CSV file for testing
     dummy_csv_content = """timestamp,glucose_mg_dl,carbs,insulin
@@ -56,9 +57,9 @@ def test_data_parsing():
     os.remove(dummy_csv_path) # Clean up
 
 def test_algorithm_simulation():
-    from src.simulation.simulator import Simulator
-    from src.patient.models import PatientModel
-    from src.algorithm.pid_controller import PIDController # Use a simple algorithm
+    from iints.core.simulator import Simulator
+    from iints.core.patient.models import PatientModel
+    from iints.core.algorithms.pid_controller import PIDController # Use a simple algorithm
 
     patient = PatientModel(initial_glucose=120)
     algorithm = PIDController()
@@ -74,10 +75,10 @@ def test_algorithm_simulation():
         raise Exception("Simulation results contain null glucose values.")
 
 def test_battle_runner_execution():
-    from src.algorithm.battle_runner import BattleRunner
-    from src.algorithm.pid_controller import PIDController
-    from src.algorithm.correction_bolus import CorrectionBolus
-    from src.patient.models import PatientModel # For data generation consistency
+    from iints.core.algorithms.battle_runner import BattleRunner
+    from iints.core.algorithms.pid_controller import PIDController
+    from iints.core.algorithms.correction_bolus import CorrectionBolus
+    from iints.core.patient.models import PatientModel # For data generation consistency
 
     # Create dummy patient data
     n_points = 12 * 4 # 4 hours of 5-min intervals
@@ -111,9 +112,9 @@ def test_battle_runner_execution():
         raise Exception("Battle report missing rankings.")
 
 def test_report_generation():
-    from scripts.generate_clinical_report import ClinicalReportGenerator
-    from src.data.universal_parser import UniversalParser
-    from src.analysis.clinical_metrics import ClinicalMetricsResult
+    from examples.generate_clinical_report import ClinicalReportGenerator
+    from iints.data.universal_parser import UniversalParser
+    from iints.analysis.clinical_metrics import ClinicalMetricsResult
     
     # Mock data for report generation
     # Create a dummy CSV file for testing
@@ -176,7 +177,7 @@ def test_report_generation():
 
 
 def test_visualization_generation():
-    from src.visualization.cockpit import ClinicalCockpit
+    from iints.visualization.cockpit import ClinicalCockpit
     
     # Create dummy simulation data
     n_points = 60 # 5 hours of 5-min intervals
@@ -204,6 +205,9 @@ def test_visualization_generation():
     os.remove(viz_output_path) # Clean up
 
 def test_terminal_app_initialization():
+    terminal_app_path = Path(__file__).parent.parent / "bin" / "main.py"
+    if not terminal_app_path.exists():
+        pytest.skip("Terminal app entrypoint not present in this package layout.")
     from bin.main import IINTSTerminalApp
     try:
         app = IINTSTerminalApp()
