@@ -1,5 +1,23 @@
-import torch
 import sys
+from typing import Optional
+
+try:
+    import torch  # type: ignore
+    _TORCH_AVAILABLE = True
+except Exception:  # pragma: no cover - handles missing torch in CI
+    torch = None  # type: ignore
+    _TORCH_AVAILABLE = False
+
+
+class _FallbackDevice:
+    def __init__(self, name: str = "cpu") -> None:
+        self.type = name
+
+    def __str__(self) -> str:
+        return self.type
+
+    def __repr__(self) -> str:
+        return f"Device({self.type})"
 
 class DeviceManager:
     """
@@ -10,6 +28,10 @@ class DeviceManager:
         self._device = self._detect_device()
 
     def _detect_device(self):
+        if not _TORCH_AVAILABLE:
+            print("Torch not available. Falling back to CPU.")
+            return _FallbackDevice("cpu")
+
         if sys.platform == "darwin" and torch.backends.mps.is_available():
             print("Detected Apple Silicon (MPS) for accelerated computing.")
             return torch.device("mps")
