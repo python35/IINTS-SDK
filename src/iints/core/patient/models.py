@@ -204,6 +204,26 @@ class CustomPatientModel:
             "carbs_on_board": self.carbs_on_board,
         }
 
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "current_glucose": self.current_glucose,
+            "insulin_on_board": self.insulin_on_board,
+            "carbs_on_board": self.carbs_on_board,
+            "active_insulin_doses": self.active_insulin_doses,
+            "active_carb_intakes": self.active_carb_intakes,
+            "is_exercising": self.is_exercising,
+            "exercise_intensity": self.exercise_intensity,
+        }
+
+    def set_state(self, state: Dict[str, Any]) -> None:
+        self.current_glucose = state.get("current_glucose", self.current_glucose)
+        self.insulin_on_board = state.get("insulin_on_board", self.insulin_on_board)
+        self.carbs_on_board = state.get("carbs_on_board", self.carbs_on_board)
+        self.active_insulin_doses = state.get("active_insulin_doses", [])
+        self.active_carb_intakes = state.get("active_carb_intakes", [])
+        self.is_exercising = state.get("is_exercising", False)
+        self.exercise_intensity = state.get("exercise_intensity", 0.0)
+
 # Alias for easy import
 PatientModel = CustomPatientModel
 

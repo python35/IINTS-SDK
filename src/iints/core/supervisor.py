@@ -235,3 +235,41 @@ class IndependentSupervisor:
         self.emergency_mode = False
         self.last_iob = 0.0
         self.dose_history = []
+
+    def get_state(self) -> Dict[str, Any]:
+        return {
+            "glucose_history": self.glucose_history,
+            "violations": [
+                {
+                    "level": v.level.value,
+                    "message": v.message,
+                    "glucose_value": v.glucose_value,
+                    "insulin_dose": v.insulin_dose,
+                    "timestamp": v.timestamp,
+                    "action_taken": v.action_taken,
+                    "original_proposed_insulin": v.original_proposed_insulin,
+                }
+                for v in self.violations
+            ],
+            "emergency_mode": self.emergency_mode,
+            "last_iob": self.last_iob,
+            "dose_history": self.dose_history,
+        }
+
+    def set_state(self, state: Dict[str, Any]) -> None:
+        self.glucose_history = state.get("glucose_history", [])
+        self.violations = [
+            SafetyViolation(
+                level=SafetyLevel(v["level"]),
+                message=v["message"],
+                glucose_value=v["glucose_value"],
+                insulin_dose=v["insulin_dose"],
+                timestamp=v["timestamp"],
+                action_taken=v["action_taken"],
+                original_proposed_insulin=v["original_proposed_insulin"],
+            )
+            for v in state.get("violations", [])
+        ]
+        self.emergency_mode = state.get("emergency_mode", False)
+        self.last_iob = state.get("last_iob", 0.0)
+        self.dose_history = state.get("dose_history", [])

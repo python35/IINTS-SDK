@@ -352,6 +352,30 @@ outputs = iints.run_simulation(
 )
 ```
 
+Human-in-the-loop + sensor/pump models:
+
+```python
+from iints.core.devices.models import SensorModel, PumpModel
+from iints.core.simulator import Simulator
+
+sensor = SensorModel(noise_std=8.0, lag_minutes=5, dropout_prob=0.02, seed=42)
+pump = PumpModel(max_units_per_step=0.25, quantization_units=0.05, dropout_prob=0.01, seed=42)
+
+def rescue_callback(ctx):
+    if ctx["glucose_actual_mgdl"] < 65:
+        return {"additional_carbs": 15, "note": "rescue carbs"}
+    return None
+
+sim = Simulator(patient_model=patient, algorithm=algo, sensor_model=sensor, pump_model=pump, on_step=rescue_callback)
+```
+
+State serialization (time-travel debugging):
+
+```python
+state = sim.save_state()
+sim.load_state(state)
+```
+
 ## 16. Audit Trail Export
 
 Use the simulator to export audit trails and summaries:

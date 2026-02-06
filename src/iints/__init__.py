@@ -19,6 +19,7 @@ from .core.simulator import Simulator, StressEvent
 from .core.patient.models import PatientModel
 from .core.device_manager import DeviceManager
 from .core.safety import SafetySupervisor
+from .core.devices.models import SensorModel, PumpModel
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 
 # Data Handling
@@ -45,6 +46,8 @@ __all__ = [
     # Core
     "Simulator", "StressEvent", "PatientModel", "DeviceManager",
     "SafetySupervisor",
+    "SensorModel",
+    "PumpModel",
     "StandardPumpAlgorithm",
     # Data
     "DataIngestor",

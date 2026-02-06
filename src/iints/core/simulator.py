@@ -2,12 +2,14 @@ import logging
 import pandas as pd
 import json
 import time
+from typing import Callable
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Generator
 from iints.core.patient.models import PatientModel
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 from iints.core.safety import InputValidator
+from iints.core.devices.models import SensorModel, PumpModel
 import numpy as np
 
 logger = logging.getLogger("iints")
@@ -50,6 +52,9 @@ class Simulator:
         seed: Optional[int] = None,
         audit_log_path: Optional[str] = None,
         enable_profiling: bool = False,
+        sensor_model: Optional[SensorModel] = None,
+        pump_model: Optional[PumpModel] = None,
+        on_step: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
         critical_glucose_threshold: float = 40.0,
         critical_glucose_duration_minutes: int = 30,
     ) -> None:
@@ -74,12 +79,17 @@ class Simulator:
             # Potentially set other seeds here if other random modules are used (e.g., random.seed(self.seed))
         self.supervisor = IndependentSupervisor()
         self.input_validator = InputValidator()
+        self.sensor_model = sensor_model or SensorModel(seed=seed)
+        self.pump_model = pump_model or PumpModel(seed=seed)
+        self.on_step = on_step
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
         self.enable_profiling = enable_profiling
         self.critical_glucose_threshold = critical_glucose_threshold
         self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
         self._critical_low_minutes = 0
+        self._current_time = 0
+        self._resume_state = False
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -147,6 +157,10 @@ class Simulator:
             "safety_reason",
             "safety_triggered",
             "supervisor_latency_ms",
+            "sensor_status",
+            "pump_status",
+            "pump_reason",
+            "human_intervention",
         ]
         available_columns = [c for c in audit_columns if c in simulation_results_df.columns]
         audit_df = simulation_results_df[available_columns].copy()
@@ -185,24 +199,31 @@ class Simulator:
         Yields:
             Dict[str, Any]: The data record for each simulation time step.
         """
-        self.patient_model.reset()
-        self.algorithm.reset()
-        self.supervisor.reset()
-        self.input_validator.reset() # Reset input validator for new run
-        self.simulation_data = []
-        self.meal_queue = [] # Reset meal queue for new run
-        self._critical_low_minutes = 0
+        if not self._resume_state:
+            self.patient_model.reset()
+            self.algorithm.reset()
+            self.supervisor.reset()
+            self.input_validator.reset() # Reset input validator for new run
+            self.sensor_model.reset()
+            self.pump_model.reset()
+            self.simulation_data = []
+            self.meal_queue = [] # Reset meal queue for new run
+            self._critical_low_minutes = 0
+            self._current_time = 0
+        else:
+            self._resume_state = False
         if self.enable_profiling:
             self._profiling_samples = {
                 "algorithm_latency_ms": [],
                 "supervisor_latency_ms": [],
                 "step_latency_ms": [],
             }
-        current_time = 0
+        current_time = self._current_time
 
         logger.debug("Starting live simulation loop.")
 
         while current_time <= duration_minutes:
+            self._current_time = current_time
             if self.enable_profiling:
                 step_start_time = time.perf_counter()
             patient_carb_intake_this_step = 0.0
@@ -210,7 +231,8 @@ class Simulator:
             actual_glucose_reading = self.patient_model.get_current_glucose()
             # Validate the raw sensor reading
             actual_glucose_reading = self.input_validator.validate_glucose(actual_glucose_reading, float(current_time))
-            glucose_to_algorithm = actual_glucose_reading
+            sensor_reading = self.sensor_model.read(actual_glucose_reading, float(current_time))
+            glucose_to_algorithm = sensor_reading.value
 
             # Process newly triggered stress events
             events_to_process_now = [] # Events that affect algorithm input immediately (e.g., reported carbs, sensor error)
@@ -307,6 +329,9 @@ class Simulator:
             safety_reason = safety_result.get("safety_reason", "")
             safety_triggered = safety_result.get("safety_triggered", False)
 
+            pump_delivery = self.pump_model.deliver(delivered_insulin, self.time_step)
+            delivered_insulin = pump_delivery.delivered_units
+
             # --- Audit Logging ---
             self._write_audit_log({
                 "timestamp": current_time,
@@ -317,6 +342,31 @@ class Simulator:
                 "safety_reason": safety_reason,
                 "hidden_state_summary": self.algorithm.get_state()
             })
+
+            # --- Human-in-the-loop callback ---
+            human_intervention = None
+            if self.on_step:
+                context = {
+                    "time_minutes": current_time,
+                    "glucose_actual_mgdl": actual_glucose_reading,
+                    "glucose_to_algo_mgdl": glucose_to_algorithm,
+                    "algo_recommended_insulin_units": algo_recommended_insulin,
+                    "delivered_insulin_units": delivered_insulin,
+                    "patient_iob_units": self.patient_model.insulin_on_board,
+                    "patient_cob_grams": self.patient_model.carbs_on_board,
+                    "safety_reason": safety_reason,
+                    "safety_triggered": safety_triggered,
+                    "sensor_status": sensor_reading.status,
+                    "pump_status": pump_delivery.status,
+                }
+                human_intervention = self.on_step(context) or None
+                if isinstance(human_intervention, dict):
+                    if "additional_carbs" in human_intervention:
+                        patient_carb_intake_this_step += float(human_intervention["additional_carbs"])
+                    if "override_delivered_insulin" in human_intervention:
+                        delivered_insulin = float(human_intervention["override_delivered_insulin"])
+                    if human_intervention.get("stop_simulation"):
+                        logger.warning("Simulation stopped by human-in-the-loop callback.")
 
             # --- Patient Model Update ---
             self.patient_model.update(
@@ -332,6 +382,9 @@ class Simulator:
                 "glucose_to_algo_mgdl": glucose_to_algorithm,
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
+                "sensor_status": sensor_reading.status,
+                "pump_status": pump_delivery.status,
+                "pump_reason": pump_delivery.reason,
                 "basal_insulin_units": insulin_output.get("basal_insulin", 0.0),
                 "bolus_insulin_units": insulin_output.get("bolus_insulin", 0.0) + insulin_output.get("meal_bolus", 0.0), # Combine for simplicity
                 "correction_bolus_units": insulin_output.get("correction_bolus", 0.0),
@@ -345,6 +398,8 @@ class Simulator:
                 "safety_reason": safety_reason,
                 "safety_triggered": safety_triggered,
                 "supervisor_latency_ms": supervisor_latency_ms,
+                "human_intervention": bool(human_intervention),
+                "human_intervention_note": human_intervention.get("note") if isinstance(human_intervention, dict) else "",
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
             }
@@ -356,6 +411,9 @@ class Simulator:
                 record["step_latency_ms"] = step_latency_ms
             
             yield record
+
+            if isinstance(human_intervention, dict) and human_intervention.get("stop_simulation"):
+                break
 
             # Critical failure stop: sustained severe hypoglycemia
             if actual_glucose_reading < self.critical_glucose_threshold:
@@ -371,6 +429,35 @@ class Simulator:
                 self._critical_low_minutes = 0
 
             current_time += self.time_step
+
+    def save_state(self) -> Dict[str, Any]:
+        """Serialize simulator state for time-travel debugging."""
+        return {
+            "current_time": self._current_time,
+            "patient_state": self.patient_model.get_state(),
+            "algorithm_state": self.algorithm.get_state(),
+            "supervisor_state": self.supervisor.get_state(),
+            "input_validator_state": self.input_validator.get_state(),
+            "sensor_state": self.sensor_model.get_state(),
+            "pump_state": self.pump_model.get_state(),
+            "meal_queue": self.meal_queue,
+            "stress_events": [event.__dict__ for event in self.stress_events],
+            "critical_low_minutes": self._critical_low_minutes,
+        }
+
+    def load_state(self, state: Dict[str, Any]) -> None:
+        """Restore simulator state from a previous save."""
+        self._current_time = state.get("current_time", 0)
+        self.patient_model.set_state(state.get("patient_state", {}))
+        self.algorithm.set_state(state.get("algorithm_state", {}))
+        self.supervisor.set_state(state.get("supervisor_state", {}))
+        self.input_validator.set_state(state.get("input_validator_state", {}))
+        self.sensor_model.set_state(state.get("sensor_state", {}))
+        self.pump_model.set_state(state.get("pump_state", {}))
+        self.meal_queue = state.get("meal_queue", [])
+        self.stress_events = [StressEvent(**payload) for payload in state.get("stress_events", [])]
+        self._critical_low_minutes = state.get("critical_low_minutes", 0)
+        self._resume_state = True
 
     def _build_performance_report(self) -> Dict[str, Any]:
         def summarize(samples: List[float]) -> Dict[str, float]:

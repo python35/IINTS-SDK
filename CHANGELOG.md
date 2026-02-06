@@ -5,6 +5,7 @@
 - Added Pydantic-based scenario and patient config validation with scenario versioning.
 - Added clinic-safe story presets (pizza paradox, midnight crash) and baseline comparison tables.
 - Added deterministic runs via CLI seed support and a one-line `run_simulation` API.
+- Added human-in-the-loop callbacks, sensor/pump error models, and simulation state serialization.
 
 ## v0.1.3
 
