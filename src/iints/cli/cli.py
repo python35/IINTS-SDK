@@ -2,6 +2,7 @@ import typer  # type: ignore
 from pathlib import Path
 from typing import Dict, Any, Union, List, Tuple, Optional
 from typing_extensions import Annotated
+from pydantic import ValidationError
 import os
 import importlib.util
 import sys
@@ -14,8 +15,16 @@ from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
-from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
-from iints.core.algorithms.pid_controller import PIDController
+from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.validation import (
+    build_stress_events,
+    format_validation_error,
+    load_scenario,
+    scenario_to_payloads,
+    scenario_warnings,
+    validate_patient_config_dict,
+    validate_scenario_dict,
+)
 
 
 app = typer.Typer(help="IINTS-AF SDK CLI - Intelligent Insulin Titration System for Artificial Pancreas research.")
@@ -70,88 +79,7 @@ def _get_preset(name: str) -> Dict[str, Any]:
             return preset
     raise KeyError(name)
 
-def _build_stress_events(payloads: List[Dict[str, Any]]) -> List[iints.StressEvent]:
-    events: List[iints.StressEvent] = []
-    for event_data in payloads:
-        events.append(
-            iints.StressEvent(
-                start_time=event_data["start_time"],
-                event_type=event_data["event_type"],
-                value=event_data.get("value"),
-                reported_value=event_data.get("reported_value"),
-                absorption_delay_minutes=event_data.get("absorption_delay_minutes", 0),
-                duration=event_data.get("duration", 0),
-            )
-        )
-    return events
-
-def _compute_metrics(results_df: pd.DataFrame) -> Dict[str, float]:
-    calculator = ClinicalMetricsCalculator()
-    duration_hours = results_df["time_minutes"].max() / 60.0 if len(results_df) else 0.0
-    metrics = calculator.calculate(
-        glucose=results_df["glucose_actual_mgdl"],
-        duration_hours=duration_hours,
-    )
-    return metrics.to_dict()
-
-def _run_baseline_comparison(
-    patient_params: Dict[str, Any],
-    stress_event_payloads: List[Dict[str, Any]],
-    duration: int,
-    time_step: int,
-    primary_label: str,
-    primary_results: pd.DataFrame,
-    primary_safety: Dict[str, Any],
-    compare_standard_pump: bool = True,
-) -> Dict[str, Any]:
-    rows: List[Dict[str, Any]] = []
-
-    primary_metrics = _compute_metrics(primary_results)
-    rows.append(
-        {
-            "algorithm": primary_label,
-            "tir_70_180": primary_metrics.get("tir_70_180", 0.0),
-            "tir_below_70": primary_metrics.get("tir_below_70", 0.0),
-            "tir_above_180": primary_metrics.get("tir_above_180", 0.0),
-            "bolus_interventions": primary_safety.get("bolus_interventions_count", 0),
-            "total_violations": primary_safety.get("total_violations", 0),
-        }
-    )
-
-    baselines: List[Tuple[str, iints.InsulinAlgorithm]] = [("Standard PID", PIDController())]
-    if compare_standard_pump:
-        baselines.append(("Standard Pump", iints.StandardPumpAlgorithm()))
-
-    for label, algo in baselines:
-        patient_model = iints.PatientModel(**patient_params)
-        simulator = iints.Simulator(patient_model=patient_model, algorithm=algo, time_step=time_step)
-        for event in _build_stress_events(stress_event_payloads):
-            simulator.add_stress_event(event)
-        results_df, safety_report = simulator.run_batch(duration)
-        metrics = _compute_metrics(results_df)
-        rows.append(
-            {
-                "algorithm": label,
-                "tir_70_180": metrics.get("tir_70_180", 0.0),
-                "tir_below_70": metrics.get("tir_below_70", 0.0),
-                "tir_above_180": metrics.get("tir_above_180", 0.0),
-                "bolus_interventions": safety_report.get("bolus_interventions_count", 0),
-                "total_violations": safety_report.get("total_violations", 0),
-            }
-        )
-
-    return {
-        "reference": "Standard PID",
-        "rows": rows,
-    }
-
-def _write_baseline_comparison(comparison: Dict[str, Any], output_dir: Path) -> Dict[str, str]:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "baseline_comparison.json"
-    csv_path = output_dir / "baseline_comparison.csv"
-    json_path.write_text(json.dumps(comparison, indent=2))
-    pd.DataFrame(comparison.get("rows", [])).to_csv(csv_path, index=False)
-    return {"json": str(json_path), "csv": str(csv_path)}
+ 
 
 @app.command()
 def init(
@@ -378,6 +306,7 @@ def presets_run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("./results/presets"),
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
 ):
     """Run a clinic-safe preset with an algorithm and generate outputs."""
     console = Console()
@@ -398,7 +327,13 @@ def presets_run(
     try:
         with open(patient_config_path, "r") as f:
             patient_params = yaml.safe_load(f)
-        patient_model = iints.PatientModel(**patient_params)
+        validated_patient_params = validate_patient_config_dict(patient_params).model_dump()
+        patient_model = iints.PatientModel(**validated_patient_params)
+    except ValidationError as e:
+        console.print("[bold red]Patient config validation failed:[/bold red]")
+        for line in format_validation_error(e):
+            console.print(f"- {line}")
+        raise typer.Exit(code=1)
     except Exception as e:
         console.print(f"[bold red]Error loading patient config {patient_config_path}: {e}[/bold red]")
         raise typer.Exit(code=1)
@@ -410,14 +345,27 @@ def presets_run(
         "algorithm": algorithm_instance,
         "time_step": time_step,
     }
+    if seed is not None:
+        simulator_kwargs["seed"] = seed
     if "critical_glucose_threshold" in preset:
         simulator_kwargs["critical_glucose_threshold"] = float(preset["critical_glucose_threshold"])
     if "critical_glucose_duration_minutes" in preset:
         simulator_kwargs["critical_glucose_duration_minutes"] = int(preset["critical_glucose_duration_minutes"])
     simulator = iints.Simulator(**simulator_kwargs)
 
-    stress_event_payloads = preset.get("scenario", {}).get("stress_events", [])
-    for event in _build_stress_events(stress_event_payloads):
+    scenario_payload = preset.get("scenario", {})
+    try:
+        scenario_model = validate_scenario_dict(scenario_payload)
+    except ValidationError as e:
+        console.print("[bold red]Preset scenario validation failed:[/bold red]")
+        for line in format_validation_error(e):
+            console.print(f"- {line}")
+        raise typer.Exit(code=1)
+
+    stress_event_payloads = scenario_to_payloads(scenario_model)
+    for warning in scenario_warnings(scenario_model):
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+    for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
 
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -436,17 +384,18 @@ def presets_run(
         console.print(f"[yellow]Audit export skipped: {e}[/yellow]")
 
     if compare_baselines:
-        comparison = _run_baseline_comparison(
-            patient_params=patient_params,
+        comparison = run_baseline_comparison(
+            patient_params=validated_patient_params,
             stress_event_payloads=stress_event_payloads,
             duration=duration,
             time_step=time_step,
             primary_label=algorithm_instance.get_algorithm_metadata().name,
             primary_results=results_df,
             primary_safety=safety_report,
+            seed=seed,
         )
         safety_report["baseline_comparison"] = comparison
-        baseline_paths = _write_baseline_comparison(comparison, output_dir / "baseline")
+        baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
         console.print(f"Baseline comparison saved to: {baseline_paths}")
 
     report_path = output_dir / f"preset_{name}_{algo_name}.pdf"
@@ -488,6 +437,7 @@ def presets_create(
 
     scenario = {
         "scenario_name": f"Clinic Safe {name.replace('_', ' ').title()}",
+        "scenario_version": "1.0",
         "stress_events": [
             {"start_time": 60, "event_type": "meal", "value": 45, "absorption_delay_minutes": 15, "duration": 60},
             {"start_time": 360, "event_type": "meal", "value": 60, "absorption_delay_minutes": 20, "duration": 90},
@@ -519,6 +469,7 @@ def run(
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Path, typer.Option(help="Directory to save simulation results")] = Path("./results/data"),
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
 ):
     """
     Run an IINTS-AF simulation using a specified algorithm and patient configuration.
@@ -582,8 +533,14 @@ def run(
     try:
         with open(patient_config_path, 'r') as f:
             patient_params = yaml.safe_load(f)
-        patient_model = iints.PatientModel(**patient_params)
+        validated_patient_params = validate_patient_config_dict(patient_params).model_dump()
+        patient_model = iints.PatientModel(**validated_patient_params)
         console.print(f"Using patient model: {patient_model.__class__.__name__} with config from [cyan]{patient_config_name}.yaml[/cyan]")
+    except ValidationError as e:
+        console.print("[bold red]Patient config validation failed:[/bold red]")
+        for line in format_validation_error(e):
+            console.print(f"- {line}")
+        raise typer.Exit(code=1)
     except yaml.YAMLError as e:
         console.print(f"[bold red]Error parsing patient configuration file {patient_config_path}: {e}[/bold red]")
         raise typer.Exit(code=1)
@@ -602,22 +559,27 @@ def run(
             raise typer.Exit(code=1)
         
         try:
-            with open(scenario_path, 'r') as f:
-                scenario_config = json.load(f)
-            
-            stress_event_payloads = scenario_config.get("stress_events", [])
-            stress_events = _build_stress_events(stress_event_payloads)
-            console.print(f"Loaded {len(stress_events)} stress events from scenario: [magenta]{scenario_path.name}[/magenta]")
-
-        except json.JSONDecodeError as e:
-            console.print(f"[bold red]Error parsing scenario JSON file {scenario_path}: {e}[/bold red]")
-            raise typer.Exit(code=1)
-        except KeyError as e:
-            console.print(f"[bold red]Error: Missing key in scenario event data: {e}[/bold red]")
+            scenario_model = load_scenario(scenario_path)
+            stress_event_payloads = scenario_to_payloads(scenario_model)
+            stress_events = build_stress_events(stress_event_payloads)
+            console.print(
+                f"Loaded {len(stress_events)} stress events from scenario: [magenta]{scenario_path.name}[/magenta]"
+            )
+            for warning in scenario_warnings(scenario_model):
+                console.print(f"[yellow]Warning:[/yellow] {warning}")
+        except ValidationError as e:
+            console.print("[bold red]Scenario validation failed:[/bold red]")
+            for line in format_validation_error(e):
+                console.print(f"- {line}")
             raise typer.Exit(code=1)
     
     # 5. Run Simulation
-    simulator = iints.Simulator(patient_model=patient_model, algorithm=algorithm_instance, time_step=time_step)
+    simulator = iints.Simulator(
+        patient_model=patient_model,
+        algorithm=algorithm_instance,
+        time_step=time_step,
+        seed=seed,
+    )
     
     for event in stress_events:
         simulator.add_stress_event(event)
@@ -644,17 +606,18 @@ def run(
     console.print(Panel(str(simulation_results_df.head()))) # Use Panel for rich output
 
     if compare_baselines:
-        comparison = _run_baseline_comparison(
-            patient_params=patient_params,
+        comparison = run_baseline_comparison(
+            patient_params=validated_patient_params,
             stress_event_payloads=stress_event_payloads,
             duration=duration,
             time_step=time_step,
             primary_label=algorithm_instance.get_algorithm_metadata().name,
             primary_results=simulation_results_df,
             primary_safety=safety_report,
+            seed=seed,
         )
         safety_report["baseline_comparison"] = comparison
-        baseline_paths = _write_baseline_comparison(comparison, output_dir / "baseline")
+        baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
         console.print(f"Baseline comparison saved to: {baseline_paths}")
 
     # Generate full report (using the new iints.generate_report function)
@@ -741,51 +704,16 @@ def validate(
 
     try:
         scenario = json.loads(scenario_path.read_text())
+        scenario_model = validate_scenario_dict(scenario)
+        for warning in scenario_warnings(scenario_model):
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
     except json.JSONDecodeError as e:
         console.print(f"[bold red]Error: Invalid JSON - {e}[/bold red]")
         raise typer.Exit(code=1)
-
-    errors: List[str] = []
-    warnings: List[str] = []
-    allowed_types = {"meal", "missed_meal", "sensor_error", "exercise", "exercise_end"}
-
-    for idx, event in enumerate(scenario.get("stress_events", [])):
-        prefix = f"event[{idx}]"
-        if "start_time" not in event:
-            errors.append(f"{prefix}: missing start_time")
-            continue
-        if event["start_time"] < 0:
-            errors.append(f"{prefix}: start_time must be >= 0")
-        event_type = event.get("event_type")
-        if event_type not in allowed_types:
-            errors.append(f"{prefix}: unknown event_type '{event_type}'")
-
-        value = event.get("value")
-        if event_type in {"meal", "missed_meal"}:
-            if value is None or value <= 0:
-                errors.append(f"{prefix}: meal value must be > 0")
-            elif value > 200:
-                warnings.append(f"{prefix}: meal value {value}g is unusually high")
-        if event_type == "exercise":
-            if value is None or not (0.0 <= value <= 1.0):
-                errors.append(f"{prefix}: exercise value must be between 0.0 and 1.0")
-
-        delay = event.get("absorption_delay_minutes", 0)
-        if delay < 0 or delay > 120:
-            warnings.append(f"{prefix}: absorption_delay_minutes {delay} is unusual")
-
-        duration = event.get("duration", 0)
-        if duration < 0 or duration > 240:
-            warnings.append(f"{prefix}: duration {duration} is unusual")
-
-    if warnings:
-        console.print("[yellow]Warnings:[/yellow]")
-        for warning in warnings:
-            console.print(f"- {warning}")
-    if errors:
-        console.print("[bold red]Errors:[/bold red]")
-        for error in errors:
-            console.print(f"- {error}")
+    except ValidationError as e:
+        console.print("[bold red]Scenario validation failed:[/bold red]")
+        for line in format_validation_error(e):
+            console.print(f"- {line}")
         raise typer.Exit(code=1)
 
     if patient_config_path:
@@ -794,43 +722,14 @@ def validate(
             raise typer.Exit(code=1)
         try:
             patient_config = yaml.safe_load(patient_config_path.read_text())
+            validate_patient_config_dict(patient_config)
         except yaml.YAMLError as e:
             console.print(f"[bold red]Error: Invalid YAML - {e}[/bold red]")
             raise typer.Exit(code=1)
-
-        patient_errors: List[str] = []
-        patient_warnings: List[str] = []
-
-        def _check_range(key: str, low: float, high: float, warn_only: bool = False):
-            if key not in patient_config:
-                patient_errors.append(f"missing '{key}'")
-                return
-            value = float(patient_config[key])
-            if not (low <= value <= high):
-                msg = f"{key}={value} outside [{low}, {high}]"
-                if warn_only:
-                    patient_warnings.append(msg)
-                else:
-                    patient_errors.append(msg)
-
-        _check_range("basal_insulin_rate", 0.0, 2.0, warn_only=True)
-        _check_range("insulin_sensitivity", 20.0, 100.0, warn_only=True)
-        _check_range("carb_factor", 5.0, 20.0, warn_only=True)
-        _check_range("glucose_decay_rate", 0.0, 0.2, warn_only=True)
-        _check_range("initial_glucose", 70.0, 250.0, warn_only=True)
-        _check_range("glucose_absorption_rate", 0.0, 0.1, warn_only=True)
-        _check_range("insulin_action_duration", 120.0, 480.0, warn_only=True)
-        _check_range("insulin_peak_time", 30.0, 120.0, warn_only=True)
-        _check_range("meal_mismatch_epsilon", 0.5, 1.5, warn_only=True)
-
-        if patient_warnings:
-            console.print("[yellow]Patient Config Warnings:[/yellow]")
-            for warning in patient_warnings:
-                console.print(f"- {warning}")
-        if patient_errors:
-            console.print("[bold red]Patient Config Errors:[/bold red]")
-            for error in patient_errors:
-                console.print(f"- {error}")
+        except ValidationError as e:
+            console.print("[bold red]Patient config validation failed:[/bold red]")
+            for line in format_validation_error(e):
+                console.print(f"- {line}")
             raise typer.Exit(code=1)
 
     console.print("[green]Scenario validation passed.[/green]")

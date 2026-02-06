@@ -1,9 +1,9 @@
 # src/simulation/scenario_parser.py
 
-import json
 from typing import List, Dict, Any, Tuple
 
 from iints.core.simulator import StressEvent
+from iints.validation import load_scenario, scenario_to_payloads, build_stress_events
 
 def parse_scenario(file_path: str) -> Tuple[Dict[str, Any], List[StressEvent]]:
     """
@@ -21,50 +21,19 @@ def parse_scenario(file_path: str) -> Tuple[Dict[str, Any], List[StressEvent]]:
         ValueError: If the file format or content is invalid.
     """
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    except FileNotFoundError:
-        raise ValueError(f"Scenario file not found: {file_path}")
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in scenario file {file_path}: {e}")
+        scenario = load_scenario(file_path)
+    except Exception as e:
+        raise ValueError(f"Invalid scenario file {file_path}: {e}")
 
-    # Validate top-level keys
-    if not all(k in data for k in ["scenario_name", "events"]):
-        raise ValueError("Scenario file must contain 'scenario_name' and 'events' keys.")
-        
     metadata = {
-        "name": data.get("scenario_name", "Unnamed Scenario"),
-        "description": data.get("description", ""),
-        "source_file": file_path
+        "name": scenario.scenario_name,
+        "description": scenario.description or "",
+        "version": scenario.scenario_version,
+        "source_file": file_path,
     }
-    
-    events: List[StressEvent] = []
-    if not isinstance(data["events"], list):
-        raise ValueError("'events' key must contain a list.")
 
-    for i, event_data in enumerate(data["events"]):
-        try:
-            # The 'carb_error' type is just a meal the algorithm isn't told about.
-            # We can model this by mapping it to a 'meal' event with a reported_value of 0.
-            event_type = event_data["type"]
-            if event_type == "carb_error":
-                event_data["reported_value"] = 0
-                event_type = "meal" # Treat as a meal for the StressEvent
-
-            event = StressEvent(
-                start_time=int(event_data["time"]),
-                event_type=event_type,
-                value=event_data.get("value"),
-                reported_value=event_data.get("reported_value"),
-                absorption_delay_minutes=int(event_data.get("absorption_delay_minutes", 0)),
-                duration=int(event_data.get("duration", 0))
-            )
-            events.append(event)
-        except KeyError as e:
-            raise ValueError(f"Missing required key {e} in event #{i+1} in {file_path}")
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"Invalid value in event #{i+1} in {file_path}: {e}")
-
+    payloads = scenario_to_payloads(scenario)
+    events: List[StressEvent] = build_stress_events(payloads)
     return metadata, events
 
 if __name__ == '__main__':

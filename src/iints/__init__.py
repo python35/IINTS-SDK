@@ -25,6 +25,7 @@ from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 from .data.ingestor import DataIngestor
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
+from .highlevel import run_simulation
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
@@ -52,4 +53,6 @@ __all__ = [
     "ClinicalReportGenerator",
     # Reporting
     "generate_report",
+    # High-level API
+    "run_simulation",
 ]

@@ -9,6 +9,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "Clinic Safe Baseline",
+      "scenario_version": "1.0",
       "stress_events": [
         {"start_time": 60, "event_type": "meal", "value": 45, "absorption_delay_minutes": 15, "duration": 60},
         {"start_time": 360, "event_type": "meal", "value": 60, "absorption_delay_minutes": 20, "duration": 90},
@@ -27,6 +28,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "Clinic Safe Meal Stress",
+      "scenario_version": "1.0",
       "stress_events": [
         {"start_time": 90, "event_type": "meal", "value": 55, "absorption_delay_minutes": 15, "duration": 60},
         {"start_time": 300, "event_type": "meal", "value": 90, "absorption_delay_minutes": 20, "duration": 90},
@@ -45,6 +47,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "Hypo-Prone Overnight",
+      "scenario_version": "1.0",
       "stress_events": [
         {"start_time": 60, "event_type": "meal", "value": 35, "absorption_delay_minutes": 10, "duration": 45},
         {"start_time": 240, "event_type": "exercise", "value": 0.3, "duration": 30}
@@ -61,6 +64,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "Hyper Challenge",
+      "scenario_version": "1.0",
       "stress_events": [
         {"start_time": 90, "event_type": "meal", "value": 110, "absorption_delay_minutes": 15, "duration": 90}
       ]
@@ -77,6 +81,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "The Pizza Paradox",
+      "scenario_version": "1.0",
       "stress_events": [
         {
           "start_time": 240,
@@ -99,6 +104,7 @@
     "critical_glucose_duration_minutes": 30,
     "scenario": {
       "scenario_name": "Midnight Crash",
+      "scenario_version": "1.0",
       "stress_events": [
         {"start_time": 120, "event_type": "meal", "value": 45, "absorption_delay_minutes": 10, "duration": 60},
         {"start_time": 300, "event_type": "exercise", "value": 0.6, "duration": 45}

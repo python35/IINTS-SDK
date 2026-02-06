@@ -146,6 +146,8 @@ iints report --results-csv results/data/sim_results_example.csv --output-path re
 iints validate --scenario-path scenarios/example_scenario.json
 ```
 
+Scenario files must include a `scenario_version` field for reproducibility.
+
 Full report bundle (PDF + plots + audit):
 
 ```bash
@@ -158,6 +160,28 @@ Validate a patient config alongside a scenario:
 
 ```bash
 iints validate --scenario-path scenarios/example_scenario.json --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
+```
+
+Deterministic runs (seeded):
+
+```bash
+iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json --seed 42
+```
+
+One-line Python API:
+
+```python
+import iints
+from iints.core.algorithms.pid_controller import PIDController
+
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/quick_run",
+)
 ```
 
 ### Core Concepts

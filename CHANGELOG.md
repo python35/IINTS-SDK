@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added Pydantic-based scenario and patient config validation with scenario versioning.
+- Added clinic-safe story presets (pizza paradox, midnight crash) and baseline comparison tables.
+- Added deterministic runs via CLI seed support and a one-line `run_simulation` API.
+
 ## v0.1.3
 
 - Added safety decision engine with dynamic IOB clamp, trend stop, and 60‑minute cap.

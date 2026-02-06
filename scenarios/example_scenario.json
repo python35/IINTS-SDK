@@ -1,5 +1,6 @@
 {
     "scenario_name": "Standard Meal Challenge",
+    "scenario_version": "1.0",
     "description": "A standard day with three meals and a missed bolus event.",
     "stress_events": [
       {
