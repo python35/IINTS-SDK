@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 import json
 import time
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Generator
 from iints.core.patient.models import PatientModel
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
@@ -49,6 +50,8 @@ class Simulator:
         seed: Optional[int] = None,
         audit_log_path: Optional[str] = None,
         enable_profiling: bool = False,
+        critical_glucose_threshold: float = 40.0,
+        critical_glucose_duration_minutes: int = 30,
     ) -> None:
         """
         Initializes the simulator.
@@ -74,6 +77,9 @@ class Simulator:
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
         self.enable_profiling = enable_profiling
+        self.critical_glucose_threshold = critical_glucose_threshold
+        self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
+        self._critical_low_minutes = 0
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -125,6 +131,50 @@ class Simulator:
         logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
         return simulation_results_df, safety_report
 
+    def export_audit_trail(self, simulation_results_df: pd.DataFrame, output_dir: str) -> Dict[str, str]:
+        """
+        Export audit trail as JSONL, CSV, and summary JSON.
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        audit_columns = [
+            "time_minutes",
+            "glucose_actual_mgdl",
+            "glucose_to_algo_mgdl",
+            "algo_recommended_insulin_units",
+            "delivered_insulin_units",
+            "safety_reason",
+            "safety_triggered",
+            "supervisor_latency_ms",
+        ]
+        available_columns = [c for c in audit_columns if c in simulation_results_df.columns]
+        audit_df = simulation_results_df[available_columns].copy()
+
+        jsonl_path = output_path / "audit_trail.jsonl"
+        csv_path = output_path / "audit_trail.csv"
+        summary_path = output_path / "audit_summary.json"
+
+        audit_df.to_json(jsonl_path, orient="records", lines=True)
+        audit_df.to_csv(csv_path, index=False)
+
+        overrides = audit_df[audit_df.get("safety_triggered", False) == True] if "safety_triggered" in audit_df.columns else audit_df.iloc[0:0]
+        reasons = overrides["safety_reason"].value_counts().to_dict() if "safety_reason" in overrides.columns else {}
+
+        summary = {
+            "total_steps": int(len(audit_df)),
+            "total_overrides": int(len(overrides)),
+            "top_reasons": reasons,
+        }
+        with open(summary_path, "w") as f:
+            json.dump(summary, f, indent=2)
+
+        return {
+            "jsonl": str(jsonl_path),
+            "csv": str(csv_path),
+            "summary": str(summary_path),
+        }
+
     def run_live(self, duration_minutes: int) -> Generator[Dict[str, Any], None, None]:
         """
         Runs the simulation as a generator, yielding the record of each time step.
@@ -141,6 +191,7 @@ class Simulator:
         self.input_validator.reset() # Reset input validator for new run
         self.simulation_data = []
         self.meal_queue = [] # Reset meal queue for new run
+        self._critical_low_minutes = 0
         if self.enable_profiling:
             self._profiling_samples = {
                 "algorithm_latency_ms": [],
@@ -253,6 +304,8 @@ class Simulator:
             overridden = safety_result["insulin_reduction"] > 0
             safety_level = safety_result["safety_level"]
             safety_actions = "; ".join(safety_result["actions_taken"])
+            safety_reason = safety_result.get("safety_reason", "")
+            safety_triggered = safety_result.get("safety_triggered", False)
 
             # --- Audit Logging ---
             self._write_audit_log({
@@ -261,6 +314,7 @@ class Simulator:
                 "ai_suggestion": algo_recommended_insulin,
                 "supervisor_override": overridden,
                 "final_dose": delivered_insulin,
+                "safety_reason": safety_reason,
                 "hidden_state_summary": self.algorithm.get_state()
             })
 
@@ -288,6 +342,8 @@ class Simulator:
                 "fallback_triggered": insulin_output.get("fallback_triggered", False),
                 "safety_level": safety_level.value,
                 "safety_actions": safety_actions,
+                "safety_reason": safety_reason,
+                "safety_triggered": safety_triggered,
                 "supervisor_latency_ms": supervisor_latency_ms,
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
@@ -300,6 +356,19 @@ class Simulator:
                 record["step_latency_ms"] = step_latency_ms
             
             yield record
+
+            # Critical failure stop: sustained severe hypoglycemia
+            if actual_glucose_reading < self.critical_glucose_threshold:
+                self._critical_low_minutes += self.time_step
+                if self._critical_low_minutes >= self.critical_glucose_duration_minutes:
+                    logger.error(
+                        "Critical failure: glucose < %.1f mg/dL for %d minutes. Stopping simulation.",
+                        self.critical_glucose_threshold,
+                        self._critical_low_minutes,
+                    )
+                    break
+            else:
+                self._critical_low_minutes = 0
 
             current_time += self.time_step
 

@@ -1,0 +1,108 @@
+[
+  {
+    "name": "baseline_t1d",
+    "description": "Clinic-safe baseline with stable parameters and moderate meals.",
+    "patient_config": "clinic_safe_baseline",
+    "duration_minutes": 1440,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "Clinic Safe Baseline",
+      "stress_events": [
+        {"start_time": 60, "event_type": "meal", "value": 45, "absorption_delay_minutes": 15, "duration": 60},
+        {"start_time": 360, "event_type": "meal", "value": 60, "absorption_delay_minutes": 20, "duration": 90},
+        {"start_time": 720, "event_type": "meal", "value": 70, "absorption_delay_minutes": 15, "duration": 90},
+        {"start_time": 1000, "event_type": "exercise", "value": 0.4, "duration": 45}
+      ]
+    }
+  },
+  {
+    "name": "stress_test_meal",
+    "description": "Clinic-safe meal stress test with larger lunch and safety clamps enabled.",
+    "patient_config": "clinic_safe_stress_meal",
+    "duration_minutes": 720,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "Clinic Safe Meal Stress",
+      "stress_events": [
+        {"start_time": 90, "event_type": "meal", "value": 55, "absorption_delay_minutes": 15, "duration": 60},
+        {"start_time": 300, "event_type": "meal", "value": 90, "absorption_delay_minutes": 20, "duration": 90},
+        {"start_time": 600, "event_type": "meal", "value": 60, "absorption_delay_minutes": 15, "duration": 60}
+      ]
+    }
+  }
+  ,
+  {
+    "name": "hypo_prone_night",
+    "description": "Overnight hypo risk assessment with reduced basal and conservative carbs.",
+    "patient_config": "clinic_safe_hypo_prone",
+    "duration_minutes": 720,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "Hypo-Prone Overnight",
+      "stress_events": [
+        {"start_time": 60, "event_type": "meal", "value": 35, "absorption_delay_minutes": 10, "duration": 45},
+        {"start_time": 240, "event_type": "exercise", "value": 0.3, "duration": 30}
+      ]
+    }
+  },
+  {
+    "name": "hyper_challenge",
+    "description": "Post-prandial hyperglycemia challenge with a large meal.",
+    "patient_config": "clinic_safe_hyper_challenge",
+    "duration_minutes": 480,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "Hyper Challenge",
+      "stress_events": [
+        {"start_time": 90, "event_type": "meal", "value": 110, "absorption_delay_minutes": 15, "duration": 90}
+      ]
+    }
+  }
+  ,
+  {
+    "name": "pizza_paradox",
+    "description": "Delayed glucose rise after a high-fat meal (pizza paradox).",
+    "patient_config": "clinic_safe_pizza",
+    "duration_minutes": 900,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "The Pizza Paradox",
+      "stress_events": [
+        {
+          "start_time": 240,
+          "event_type": "meal",
+          "value": 90,
+          "reported_value": 90,
+          "absorption_delay_minutes": 180,
+          "duration": 120
+        }
+      ]
+    }
+  },
+  {
+    "name": "midnight_crash",
+    "description": "Overnight crash risk after evening exercise.",
+    "patient_config": "clinic_safe_midnight",
+    "duration_minutes": 720,
+    "time_step_minutes": 5,
+    "critical_glucose_threshold": 40.0,
+    "critical_glucose_duration_minutes": 30,
+    "scenario": {
+      "scenario_name": "Midnight Crash",
+      "stress_events": [
+        {"start_time": 120, "event_type": "meal", "value": 45, "absorption_delay_minutes": 10, "duration": 60},
+        {"start_time": 300, "event_type": "exercise", "value": 0.6, "duration": 45}
+      ]
+    }
+  }
+]

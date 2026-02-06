@@ -14,11 +14,144 @@ from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
+from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.core.algorithms.pid_controller import PIDController
 
 
 app = typer.Typer(help="IINTS-AF SDK CLI - Intelligent Insulin Titration System for Artificial Pancreas research.")
 docs_app = typer.Typer(help="Generate documentation and technical summaries for IINTS-AF components.")
+presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 app.add_typer(docs_app, name="docs")
+app.add_typer(presets_app, name="presets")
+
+def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
+    if not algo.is_file():
+        console.print(f"[bold red]Error: Algorithm file '{algo}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    module_name = algo.stem
+    spec = importlib.util.spec_from_file_location(module_name, algo)
+    if spec is None:
+        console.print(f"[bold red]Error: Could not load module spec for {algo}[/bold red]")
+        raise typer.Exit(code=1)
+
+    module = importlib.util.module_from_spec(spec)
+    module.iints = iints # type: ignore
+    sys.modules[module_name] = module
+    try:
+        if spec.loader:
+            spec.loader.exec_module(module)
+        else:
+            raise ImportError(f"Could not load module loader for {algo}")
+    except Exception as e:
+        console.print(f"[bold red]Error loading algorithm module {algo}: {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    for _, obj in module.__dict__.items():
+        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
+            return obj()
+
+    console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo}[/bold red]")
+    raise typer.Exit(code=1)
+
+def _load_presets() -> List[Dict[str, Any]]:
+    if sys.version_info >= (3, 9):
+        from importlib.resources import files
+        content = files("iints.presets").joinpath("presets.json").read_text()
+    else:
+        from importlib import resources
+        content = resources.read_text("iints.presets", "presets.json")
+    return json.loads(content)
+
+def _get_preset(name: str) -> Dict[str, Any]:
+    presets = _load_presets()
+    for preset in presets:
+        if preset.get("name") == name:
+            return preset
+    raise KeyError(name)
+
+def _build_stress_events(payloads: List[Dict[str, Any]]) -> List[iints.StressEvent]:
+    events: List[iints.StressEvent] = []
+    for event_data in payloads:
+        events.append(
+            iints.StressEvent(
+                start_time=event_data["start_time"],
+                event_type=event_data["event_type"],
+                value=event_data.get("value"),
+                reported_value=event_data.get("reported_value"),
+                absorption_delay_minutes=event_data.get("absorption_delay_minutes", 0),
+                duration=event_data.get("duration", 0),
+            )
+        )
+    return events
+
+def _compute_metrics(results_df: pd.DataFrame) -> Dict[str, float]:
+    calculator = ClinicalMetricsCalculator()
+    duration_hours = results_df["time_minutes"].max() / 60.0 if len(results_df) else 0.0
+    metrics = calculator.calculate(
+        glucose=results_df["glucose_actual_mgdl"],
+        duration_hours=duration_hours,
+    )
+    return metrics.to_dict()
+
+def _run_baseline_comparison(
+    patient_params: Dict[str, Any],
+    stress_event_payloads: List[Dict[str, Any]],
+    duration: int,
+    time_step: int,
+    primary_label: str,
+    primary_results: pd.DataFrame,
+    primary_safety: Dict[str, Any],
+    compare_standard_pump: bool = True,
+) -> Dict[str, Any]:
+    rows: List[Dict[str, Any]] = []
+
+    primary_metrics = _compute_metrics(primary_results)
+    rows.append(
+        {
+            "algorithm": primary_label,
+            "tir_70_180": primary_metrics.get("tir_70_180", 0.0),
+            "tir_below_70": primary_metrics.get("tir_below_70", 0.0),
+            "tir_above_180": primary_metrics.get("tir_above_180", 0.0),
+            "bolus_interventions": primary_safety.get("bolus_interventions_count", 0),
+            "total_violations": primary_safety.get("total_violations", 0),
+        }
+    )
+
+    baselines: List[Tuple[str, iints.InsulinAlgorithm]] = [("Standard PID", PIDController())]
+    if compare_standard_pump:
+        baselines.append(("Standard Pump", iints.StandardPumpAlgorithm()))
+
+    for label, algo in baselines:
+        patient_model = iints.PatientModel(**patient_params)
+        simulator = iints.Simulator(patient_model=patient_model, algorithm=algo, time_step=time_step)
+        for event in _build_stress_events(stress_event_payloads):
+            simulator.add_stress_event(event)
+        results_df, safety_report = simulator.run_batch(duration)
+        metrics = _compute_metrics(results_df)
+        rows.append(
+            {
+                "algorithm": label,
+                "tir_70_180": metrics.get("tir_70_180", 0.0),
+                "tir_below_70": metrics.get("tir_below_70", 0.0),
+                "tir_above_180": metrics.get("tir_above_180", 0.0),
+                "bolus_interventions": safety_report.get("bolus_interventions_count", 0),
+                "total_violations": safety_report.get("total_violations", 0),
+            }
+        )
+
+    return {
+        "reference": "Standard PID",
+        "rows": rows,
+    }
+
+def _write_baseline_comparison(comparison: Dict[str, Any], output_dir: Path) -> Dict[str, str]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    json_path = output_dir / "baseline_comparison.json"
+    csv_path = output_dir / "baseline_comparison.csv"
+    json_path.write_text(json.dumps(comparison, indent=2))
+    pd.DataFrame(comparison.get("rows", [])).to_csv(csv_path, index=False)
+    return {"json": str(json_path), "csv": str(csv_path)}
 
 @app.command()
 def init(
@@ -96,6 +229,71 @@ Powered by IINTS-AF SDK.
     console.print(f"To get started:\n  cd {project_name}\n  iints run --algo algorithms/example_algorithm.py")
 
 @app.command()
+def quickstart(
+    project_name: Annotated[str, typer.Option(help="Name of the project directory")] = "iints_quickstart",
+):
+    """
+    Create a ready-to-run project using clinic-safe presets and a demo algorithm.
+    """
+    console = Console()
+    project_path = Path(project_name)
+
+    if project_path.exists():
+        console.print(f"[bold red]Error: Directory '{project_name}' already exists.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold blue]Creating IINTS-AF Quickstart Project: {project_name}[/bold blue]")
+
+    (project_path / "algorithms").mkdir(parents=True)
+    (project_path / "scenarios").mkdir(parents=True)
+    (project_path / "results").mkdir(parents=True)
+
+    try:
+        if sys.version_info >= (3, 9):
+            from importlib.resources import files
+            algo_content = files("iints.templates").joinpath("default_algorithm.py").read_text()
+        else:
+            from importlib import resources
+            algo_content = resources.read_text("iints.templates", "default_algorithm.py")
+    except Exception as e:
+        console.print(f"[bold red]Error reading template files: {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    algo_content = algo_content.replace("{{ALGO_NAME}}", "QuickstartAlgorithm")
+    algo_content = algo_content.replace("{{AUTHOR_NAME}}", "IINTS User")
+    algo_path = project_path / "algorithms" / "example_algorithm.py"
+    algo_path.write_text(algo_content)
+
+    try:
+        preset = _get_preset("baseline_t1d")
+        scenario_path = project_path / "scenarios" / "clinic_safe_baseline.json"
+        scenario_path.write_text(json.dumps(preset.get("scenario", {}), indent=2))
+    except Exception as e:
+        console.print(f"[yellow]Preset scenario not available: {e}[/yellow]")
+
+    readme_content = f"""# {project_name}
+
+Clinic-safe quickstart project powered by IINTS-AF.
+
+## Quickstart
+
+Run a clinic-safe preset:
+
+```bash
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+Run with the included scenario file:
+
+```bash
+iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/clinic_safe_baseline.json --duration 1440
+```
+"""
+    (project_path / "README.md").write_text(readme_content)
+
+    console.print(f"[green]Quickstart project ready in '{project_name}'.[/green]")
+    console.print(f"Next:\n  cd {project_name}\n  iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py")
+@app.command()
 def new_algo(
     name: Annotated[str, typer.Option(help="Name of the new algorithm")],
     author: Annotated[str, typer.Option(help="Author of the algorithm")],
@@ -140,6 +338,178 @@ def new_algo(
     typer.echo(f"Successfully created new algorithm template: {output_file}")
 
 
+@presets_app.command("list")
+def presets_list():
+    """List clinic-safe presets."""
+    console = Console()
+    presets = _load_presets()
+    table = Table(title="Clinic-Safe Presets", show_lines=False)
+    table.add_column("Name", style="cyan")
+    table.add_column("Description")
+    table.add_column("Patient Config")
+    table.add_column("Duration (min)", justify="right")
+    for preset in presets:
+        table.add_row(
+            preset.get("name", ""),
+            preset.get("description", ""),
+            preset.get("patient_config", ""),
+            str(preset.get("duration_minutes", "")),
+        )
+    console.print(table)
+
+
+@presets_app.command("show")
+def presets_show(
+    name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
+):
+    """Show a preset definition."""
+    console = Console()
+    try:
+        preset = _get_preset(name)
+    except KeyError:
+        console.print(f"[bold red]Error: Unknown preset '{name}'.[/bold red]")
+        raise typer.Exit(code=1)
+    console.print_json(json.dumps(preset, indent=2))
+
+
+@presets_app.command("run")
+def presets_run(
+    name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("./results/presets"),
+    compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
+):
+    """Run a clinic-safe preset with an algorithm and generate outputs."""
+    console = Console()
+    try:
+        preset = _get_preset(name)
+    except KeyError:
+        console.print(f"[bold red]Error: Unknown preset '{name}'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    algorithm_instance = _load_algorithm_instance(algo, console)
+    console.print(f"Loaded algorithm: [green]{algorithm_instance.get_algorithm_metadata().name}[/green]")
+
+    patient_config_name = preset.get("patient_config", "default_patient")
+    patient_config_path = Path(f"src/iints/data/virtual_patients/{patient_config_name}.yaml")
+    if not patient_config_path.is_file():
+        console.print(f"[bold red]Error: Patient configuration file '{patient_config_path}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+    try:
+        with open(patient_config_path, "r") as f:
+            patient_params = yaml.safe_load(f)
+        patient_model = iints.PatientModel(**patient_params)
+    except Exception as e:
+        console.print(f"[bold red]Error loading patient config {patient_config_path}: {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    duration = int(preset.get("duration_minutes", 720))
+    time_step = int(preset.get("time_step_minutes", 5))
+    simulator_kwargs: Dict[str, Any] = {
+        "patient_model": patient_model,
+        "algorithm": algorithm_instance,
+        "time_step": time_step,
+    }
+    if "critical_glucose_threshold" in preset:
+        simulator_kwargs["critical_glucose_threshold"] = float(preset["critical_glucose_threshold"])
+    if "critical_glucose_duration_minutes" in preset:
+        simulator_kwargs["critical_glucose_duration_minutes"] = int(preset["critical_glucose_duration_minutes"])
+    simulator = iints.Simulator(**simulator_kwargs)
+
+    stress_event_payloads = preset.get("scenario", {}).get("stress_events", [])
+    for event in _build_stress_events(stress_event_payloads):
+        simulator.add_stress_event(event)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    results_df, safety_report = simulator.run_batch(duration)
+
+    algo_name = algorithm_instance.get_algorithm_metadata().name.replace(" ", "_").lower()
+    results_file = output_dir / f"preset_{name}_{algo_name}.csv"
+    results_df.to_csv(results_file, index=False)
+    console.print(f"Results saved to: [link file://{results_file}]{results_file}[/link]")
+
+    audit_dir = output_dir / "audit"
+    try:
+        audit_paths = simulator.export_audit_trail(results_df, output_dir=str(audit_dir))
+        console.print(f"Audit trail: {audit_paths}")
+    except Exception as e:
+        console.print(f"[yellow]Audit export skipped: {e}[/yellow]")
+
+    if compare_baselines:
+        comparison = _run_baseline_comparison(
+            patient_params=patient_params,
+            stress_event_payloads=stress_event_payloads,
+            duration=duration,
+            time_step=time_step,
+            primary_label=algorithm_instance.get_algorithm_metadata().name,
+            primary_results=results_df,
+            primary_safety=safety_report,
+        )
+        safety_report["baseline_comparison"] = comparison
+        baseline_paths = _write_baseline_comparison(comparison, output_dir / "baseline")
+        console.print(f"Baseline comparison saved to: {baseline_paths}")
+
+    report_path = output_dir / f"preset_{name}_{algo_name}.pdf"
+    iints.generate_report(results_df, str(report_path), safety_report)
+    console.print(f"PDF report saved to: [link file://{report_path}]{report_path}[/link]")
+
+
+@presets_app.command("create")
+def presets_create(
+    name: Annotated[str, typer.Option(help="Preset name (snake_case)")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for preset files")] = Path("./presets"),
+    initial_glucose: Annotated[float, typer.Option(help="Initial glucose (mg/dL)")] = 140.0,
+    basal_insulin_rate: Annotated[float, typer.Option(help="Basal insulin rate (U/hr)")] = 0.5,
+    insulin_sensitivity: Annotated[float, typer.Option(help="Insulin sensitivity (mg/dL per U)")] = 50.0,
+    carb_factor: Annotated[float, typer.Option(help="Carb factor (g per U)")] = 10.0,
+):
+    """
+    Generate a clinic-safe preset scaffold (patient YAML + scenario JSON).
+    """
+    console = Console()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    patient_config_name = f"clinic_safe_{name}"
+    patient_yaml_path = output_dir / f"{patient_config_name}.yaml"
+    scenario_path = output_dir / f"{name}.json"
+
+    patient_yaml = (
+        f"basal_insulin_rate: {basal_insulin_rate}\n"
+        f"insulin_sensitivity: {insulin_sensitivity}\n"
+        f"carb_factor: {carb_factor}\n"
+        "glucose_decay_rate: 0.03\n"
+        f"initial_glucose: {initial_glucose}\n"
+        "glucose_absorption_rate: 0.03\n"
+        "insulin_action_duration: 300.0\n"
+        "insulin_peak_time: 75.0\n"
+        "meal_mismatch_epsilon: 1.0\n"
+    )
+    patient_yaml_path.write_text(patient_yaml)
+
+    scenario = {
+        "scenario_name": f"Clinic Safe {name.replace('_', ' ').title()}",
+        "stress_events": [
+            {"start_time": 60, "event_type": "meal", "value": 45, "absorption_delay_minutes": 15, "duration": 60},
+            {"start_time": 360, "event_type": "meal", "value": 60, "absorption_delay_minutes": 20, "duration": 90},
+            {"start_time": 720, "event_type": "meal", "value": 70, "absorption_delay_minutes": 15, "duration": 90},
+        ],
+    }
+    scenario_path.write_text(json.dumps(scenario, indent=2))
+
+    preset_snippet = {
+        "name": name,
+        "description": "Custom clinic-safe preset (generated).",
+        "patient_config": patient_config_name,
+        "duration_minutes": 1440,
+        "time_step_minutes": 5,
+        "critical_glucose_threshold": 40.0,
+        "critical_glucose_duration_minutes": 30,
+        "scenario": scenario,
+    }
+
+    console.print(f"[green]Preset files created:[/green] {patient_yaml_path} , {scenario_path}")
+    console.print("[bold]Add this preset to presets.json if you want it built-in:[/bold]")
+    console.print_json(json.dumps(preset_snippet, indent=2))
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
@@ -148,6 +518,7 @@ def run(
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Path, typer.Option(help="Directory to save simulation results")] = Path("./results/data"),
+    compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
 ):
     """
     Run an IINTS-AF simulation using a specified algorithm and patient configuration.
@@ -224,6 +595,7 @@ def run(
 
     # 4. Load Scenario Data (if provided)
     stress_events = []
+    stress_event_payloads: List[Dict[str, Any]] = []
     if scenario_path:
         if not scenario_path.is_file():
             console.print(f"[bold red]Error: Scenario file '{scenario_path}' not found.[/bold red]")
@@ -233,16 +605,8 @@ def run(
             with open(scenario_path, 'r') as f:
                 scenario_config = json.load(f)
             
-            for event_data in scenario_config.get("stress_events", []):
-                event = iints.StressEvent(
-                    start_time=event_data['start_time'],
-                    event_type=event_data['event_type'],
-                    value=event_data.get('value'),
-                    reported_value=event_data.get('reported_value'),
-                    absorption_delay_minutes=event_data.get('absorption_delay_minutes', 0),
-                    duration=event_data.get('duration', 0)
-                )
-                stress_events.append(event)
+            stress_event_payloads = scenario_config.get("stress_events", [])
+            stress_events = _build_stress_events(stress_event_payloads)
             console.print(f"Loaded {len(stress_events)} stress events from scenario: [magenta]{scenario_path.name}[/magenta]")
 
         except json.JSONDecodeError as e:
@@ -279,9 +643,197 @@ def run(
     console.print("\nDisplaying head of simulation results:")
     console.print(Panel(str(simulation_results_df.head()))) # Use Panel for rich output
 
+    if compare_baselines:
+        comparison = _run_baseline_comparison(
+            patient_params=patient_params,
+            stress_event_payloads=stress_event_payloads,
+            duration=duration,
+            time_step=time_step,
+            primary_label=algorithm_instance.get_algorithm_metadata().name,
+            primary_results=simulation_results_df,
+            primary_safety=safety_report,
+        )
+        safety_report["baseline_comparison"] = comparison
+        baseline_paths = _write_baseline_comparison(comparison, output_dir / "baseline")
+        console.print(f"Baseline comparison saved to: {baseline_paths}")
+
     # Generate full report (using the new iints.generate_report function)
     report_output_path = output_dir / f"sim_report_{algo_name_for_filename}_patient_{patient_config_name}_scenario_{scenario_name_for_filename}_duration_{duration}m.pdf"
-    iints.generate_report(simulation_results_df, str(report_output_path))
+    iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
+
+
+@app.command()
+def report(
+    results_csv: Annotated[Path, typer.Option(help="Path to a simulation results CSV")],
+    output_path: Annotated[Path, typer.Option(help="Output PDF path")] = Path("./results/clinical_report.pdf"),
+    safety_report_path: Annotated[Optional[Path], typer.Option(help="Optional safety report JSON path")] = None,
+    audit_output_dir: Annotated[Optional[Path], typer.Option(help="Optional audit output directory")] = None,
+    bundle_dir: Annotated[Optional[Path], typer.Option(help="If set, write PDF + plots + audit into this folder")] = None,
+):
+    """Generate a clinical PDF report (and optional audit summary) from a results CSV."""
+    console = Console()
+    if not results_csv.is_file():
+        console.print(f"[bold red]Error: Results file '{results_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    results_df = pd.read_csv(results_csv)
+    safety_report: Dict[str, Any] = {}
+    if safety_report_path:
+        if not safety_report_path.is_file():
+            console.print(f"[bold red]Error: Safety report file '{safety_report_path}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+        safety_report = json.loads(safety_report_path.read_text())
+
+    if bundle_dir:
+        bundle_dir.mkdir(parents=True, exist_ok=True)
+        output_path = bundle_dir / "clinical_report.pdf"
+        audit_output_dir = bundle_dir / "audit"
+        plots_dir = bundle_dir / "plots"
+        generator = iints.ClinicalReportGenerator()
+        generator.export_plots(results_df, str(plots_dir))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    iints.generate_report(results_df, str(output_path), safety_report)
+    console.print(f"PDF report saved to: [link file://{output_path}]{output_path}[/link]")
+
+    if audit_output_dir:
+        audit_output_dir.mkdir(parents=True, exist_ok=True)
+        audit_columns = [
+            "time_minutes",
+            "glucose_actual_mgdl",
+            "glucose_to_algo_mgdl",
+            "algo_recommended_insulin_units",
+            "delivered_insulin_units",
+            "safety_reason",
+            "safety_triggered",
+            "supervisor_latency_ms",
+        ]
+        available = [c for c in audit_columns if c in results_df.columns]
+        audit_df = results_df[available].copy()
+
+        jsonl_path = audit_output_dir / "audit_trail.jsonl"
+        csv_path = audit_output_dir / "audit_trail.csv"
+        summary_path = audit_output_dir / "audit_summary.json"
+
+        audit_df.to_json(jsonl_path, orient="records", lines=True)
+        audit_df.to_csv(csv_path, index=False)
+
+        overrides = audit_df[audit_df.get("safety_triggered", False) == True] if "safety_triggered" in audit_df.columns else audit_df.iloc[0:0]
+        reasons = overrides["safety_reason"].value_counts().to_dict() if "safety_reason" in overrides.columns else {}
+        summary = {
+            "total_steps": int(len(audit_df)),
+            "total_overrides": int(len(overrides)),
+            "top_reasons": reasons,
+        }
+        summary_path.write_text(json.dumps(summary, indent=2))
+        console.print(f"Audit exports saved to: {audit_output_dir}")
+
+
+@app.command()
+def validate(
+    scenario_path: Annotated[Path, typer.Option(help="Path to a scenario JSON file")],
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Optional patient config YAML to validate")] = None,
+):
+    """Validate a scenario JSON for out-of-range values and missing keys."""
+    console = Console()
+    if not scenario_path.is_file():
+        console.print(f"[bold red]Error: Scenario file '{scenario_path}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        scenario = json.loads(scenario_path.read_text())
+    except json.JSONDecodeError as e:
+        console.print(f"[bold red]Error: Invalid JSON - {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    errors: List[str] = []
+    warnings: List[str] = []
+    allowed_types = {"meal", "missed_meal", "sensor_error", "exercise", "exercise_end"}
+
+    for idx, event in enumerate(scenario.get("stress_events", [])):
+        prefix = f"event[{idx}]"
+        if "start_time" not in event:
+            errors.append(f"{prefix}: missing start_time")
+            continue
+        if event["start_time"] < 0:
+            errors.append(f"{prefix}: start_time must be >= 0")
+        event_type = event.get("event_type")
+        if event_type not in allowed_types:
+            errors.append(f"{prefix}: unknown event_type '{event_type}'")
+
+        value = event.get("value")
+        if event_type in {"meal", "missed_meal"}:
+            if value is None or value <= 0:
+                errors.append(f"{prefix}: meal value must be > 0")
+            elif value > 200:
+                warnings.append(f"{prefix}: meal value {value}g is unusually high")
+        if event_type == "exercise":
+            if value is None or not (0.0 <= value <= 1.0):
+                errors.append(f"{prefix}: exercise value must be between 0.0 and 1.0")
+
+        delay = event.get("absorption_delay_minutes", 0)
+        if delay < 0 or delay > 120:
+            warnings.append(f"{prefix}: absorption_delay_minutes {delay} is unusual")
+
+        duration = event.get("duration", 0)
+        if duration < 0 or duration > 240:
+            warnings.append(f"{prefix}: duration {duration} is unusual")
+
+    if warnings:
+        console.print("[yellow]Warnings:[/yellow]")
+        for warning in warnings:
+            console.print(f"- {warning}")
+    if errors:
+        console.print("[bold red]Errors:[/bold red]")
+        for error in errors:
+            console.print(f"- {error}")
+        raise typer.Exit(code=1)
+
+    if patient_config_path:
+        if not patient_config_path.is_file():
+            console.print(f"[bold red]Error: Patient config '{patient_config_path}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+        try:
+            patient_config = yaml.safe_load(patient_config_path.read_text())
+        except yaml.YAMLError as e:
+            console.print(f"[bold red]Error: Invalid YAML - {e}[/bold red]")
+            raise typer.Exit(code=1)
+
+        patient_errors: List[str] = []
+        patient_warnings: List[str] = []
+
+        def _check_range(key: str, low: float, high: float, warn_only: bool = False):
+            if key not in patient_config:
+                patient_errors.append(f"missing '{key}'")
+                return
+            value = float(patient_config[key])
+            if not (low <= value <= high):
+                msg = f"{key}={value} outside [{low}, {high}]"
+                if warn_only:
+                    patient_warnings.append(msg)
+                else:
+                    patient_errors.append(msg)
+
+        _check_range("basal_insulin_rate", 0.0, 2.0, warn_only=True)
+        _check_range("insulin_sensitivity", 20.0, 100.0, warn_only=True)
+        _check_range("carb_factor", 5.0, 20.0, warn_only=True)
+        _check_range("glucose_decay_rate", 0.0, 0.2, warn_only=True)
+        _check_range("initial_glucose", 70.0, 250.0, warn_only=True)
+        _check_range("glucose_absorption_rate", 0.0, 0.1, warn_only=True)
+        _check_range("insulin_action_duration", 120.0, 480.0, warn_only=True)
+        _check_range("insulin_peak_time", 30.0, 120.0, warn_only=True)
+        _check_range("meal_mismatch_epsilon", 0.5, 1.5, warn_only=True)
+
+        if patient_warnings:
+            console.print("[yellow]Patient Config Warnings:[/yellow]")
+            for warning in patient_warnings:
+                console.print(f"- {warning}")
+        if patient_errors:
+            console.print("[bold red]Patient Config Errors:[/bold red]")
+            for error in patient_errors:
+                console.print(f"- {error}")
+            raise typer.Exit(code=1)
+
+    console.print("[green]Scenario validation passed.[/green]")
 
 
 @docs_app.command("algo")

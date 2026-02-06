@@ -1,0 +1,9 @@
+basal_insulin_rate: 0.45
+insulin_sensitivity: 65.0
+carb_factor: 11.0
+glucose_decay_rate: 0.03
+initial_glucose: 125.0
+glucose_absorption_rate: 0.03
+insulin_action_duration: 300.0
+insulin_peak_time: 75.0
+meal_mismatch_epsilon: 1.0

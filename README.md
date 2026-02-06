@@ -1,4 +1,4 @@
-# IINTS-AF SDK (v0.1.2)
+# IINTS-AF SDK (v0.1.3)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/quickstart_benchmark.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 ## Intelligent Insulin Titration System for Artificial Pancreas
@@ -100,6 +100,64 @@ from iints.core.simulator import Simulator
 sim = Simulator(patient_model=patient, algorithm=algo, enable_profiling=True)
 results_df, safety_report = sim.run_batch(duration_minutes=1440)
 print(safety_report["performance_report"])
+```
+
+### Audit Trail + PDF Report
+Generate an audit trail (JSONL/CSV + summary) and a clean clinical PDF in one run:
+
+```bash
+python3 examples/audit_and_report.py
+```
+
+Notes:
+* The PDF includes a safety summary plus top intervention reasons for explainability.
+* The simulator stops automatically on sustained critical hypoglycemia (default: <40 mg/dL for 30 minutes).
+
+### Clinic-Safe Presets (Quickstart)
+Run a clinically safe preset with any algorithm:
+
+```bash
+iints presets list
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+Quickstart project in one command:
+
+```bash
+iints quickstart --project-name iints_quickstart
+```
+
+New presets:
+* `hypo_prone_night`
+* `hyper_challenge`
+* `pizza_paradox`
+* `midnight_crash`
+
+Generate your own clinic-safe preset scaffold:
+
+```bash
+iints presets create --name custom_safe --output-dir ./presets
+```
+### Report + Validate CLI
+Generate a report from a results CSV and validate scenarios before running:
+
+```bash
+iints report --results-csv results/data/sim_results_example.csv --output-path results/clinical_report.pdf
+iints validate --scenario-path scenarios/example_scenario.json
+```
+
+Full report bundle (PDF + plots + audit):
+
+```bash
+iints report --results-csv results/data/sim_results_example.csv --bundle-dir results/report_bundle
+```
+
+Baseline comparison (auto-run PID + standard pump) is enabled by default for `iints run` and `iints presets run`.
+
+Validate a patient config alongside a scenario:
+
+```bash
+iints validate --scenario-path scenarios/example_scenario.json --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
 ```
 
 ### Core Concepts

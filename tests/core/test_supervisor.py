@@ -13,8 +13,9 @@ def test_supervisor_caps_max_bolus():
         current_iob=0.0,
     )
 
-    assert result["approved_insulin"] == pytest.approx(5.0)
-    assert result["insulin_reduction"] == pytest.approx(7.0)
+    # 60-min cap (3.0U) should be enforced before max bolus
+    assert result["approved_insulin"] == pytest.approx(3.0)
+    assert result["insulin_reduction"] == pytest.approx(9.0)
     assert result["safety_level"] in (SafetyLevel.WARNING, SafetyLevel.CRITICAL)
 
 

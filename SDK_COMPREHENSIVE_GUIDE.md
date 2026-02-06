@@ -90,6 +90,7 @@ The central class for running simulations. It orchestrates the patient model, al
 *   `run_batch()`: Executes a full batch simulation and returns results + safety report.
 *   `add_stress_event()`: Adds predefined stress events (e.g., missed meal, exercise).
 *   `enable_profiling=True`: Records algorithm, supervisor, and step latency.
+*   `critical_glucose_threshold` / `critical_glucose_duration_minutes`: Automatically stops the simulation if glucose is critically low for too long (default: <40 mg/dL for 30 minutes).
 
 ### `iints.data.ingestor.DataIngestor`
 
@@ -219,6 +220,12 @@ python3 examples/main.py
 python3 examples/run_final_analysis.py
 ```
 
+Audit trail + PDF report example:
+
+```bash
+python3 examples/audit_and_report.py
+```
+
 ## 12. Development Workflow
 
 ### 12.1 Versioning
@@ -265,6 +272,87 @@ Helper scripts:
 ./scripts/run_lint.sh
 ./scripts/run_demo.sh
 ```
+
+## 13.1 Clinic-Safe Presets
+
+List and run built-in presets:
+
+```bash
+iints presets list
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+Quickstart project in one command:
+
+```bash
+iints quickstart --project-name iints_quickstart
+```
+
+New presets:
+* `hypo_prone_night`
+* `hyper_challenge`
+* `pizza_paradox`
+* `midnight_crash`
+
+Generate your own clinic-safe preset scaffold:
+
+```bash
+iints presets create --name custom_safe --output-dir ./presets
+```
+
+## 13.2 Report + Validate CLI
+
+Generate a report directly from a results CSV:
+
+```bash
+iints report --results-csv results/data/sim_results_example.csv --output-path results/clinical_report.pdf
+```
+
+Generate a full report bundle (PDF + plots + audit):
+
+```bash
+iints report --results-csv results/data/sim_results_example.csv --bundle-dir results/report_bundle
+```
+
+Baseline comparison (auto-run PID + standard pump) is enabled by default for `iints run` and `iints presets run`.
+
+Validate scenario files before running:
+
+```bash
+iints validate --scenario-path scenarios/example_scenario.json
+```
+
+Validate scenario + patient config together:
+
+```bash
+iints validate --scenario-path scenarios/example_scenario.json --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
+```
+
+## 16. Audit Trail Export
+
+Use the simulator to export audit trails and summaries:
+
+```python
+results_df, safety_report = sim.run_batch(duration_minutes=1440)
+paths = sim.export_audit_trail(results_df, output_dir="results/audit")
+print(paths)
+```
+
+## 17. Clinical PDF Reports
+
+Generate a professional PDF report:
+
+```python
+from iints.analysis.reporting import ClinicalReportGenerator
+
+generator = ClinicalReportGenerator()
+generator.generate_pdf(results_df, safety_report, "results/clinical_report.pdf")
+```
+
+The report includes:
+* Clinical metrics (TIR, time below/above range, CV, GMI)
+* Safety summary and top intervention reasons
+* Glucose and insulin delivery plots (insulin plot clamps at zero)
 
 ## 14. Troubleshooting
 

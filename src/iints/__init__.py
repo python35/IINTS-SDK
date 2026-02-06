@@ -3,7 +3,7 @@
 import pandas as pd # Required for type hints like pd.DataFrame
 from typing import Optional
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 # API Components for Algorithm Development
 from .api.base_algorithm import (
@@ -24,19 +24,18 @@ from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 # Data Handling
 from .data.ingestor import DataIngestor
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
+from .analysis.reporting import ClinicalReportGenerator
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
-def generate_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None) -> None:
+def generate_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]:
     """
-    Placeholder function to generate a simulation report.
-    (Detailed implementation to follow)
+    Generate a clinical PDF report from simulation results.
     """
-    print("Generating simulation report... (placeholder)")
-    if output_path:
-        print(f"Report would be saved to: {output_path}")
-    # In a real implementation, this would involve plotting, summarizing, etc.
-    pass
+    if output_path is None:
+        return None
+    generator = ClinicalReportGenerator()
+    return generator.generate_pdf(simulation_results, safety_report or {}, output_path)
 
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`
 __all__ = [
@@ -50,6 +49,7 @@ __all__ = [
     "DataIngestor",
     # Analysis Metrics
     "generate_benchmark_metrics",
+    "ClinicalReportGenerator",
     # Reporting
     "generate_report",
 ]

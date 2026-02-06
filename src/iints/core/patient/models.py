@@ -44,6 +44,7 @@ class CustomPatientModel:
         self.meal_mismatch_epsilon = meal_mismatch_epsilon
 
 
+        self.initial_glucose = initial_glucose
         self.current_glucose = initial_glucose
         self.insulin_on_board = 0.0 # Units of insulin still active
         self.carbs_on_board = 0.0   # Grams of carbs still being absorbed
@@ -58,7 +59,7 @@ class CustomPatientModel:
 
     def reset(self):
         """Resets the patient's state to initial conditions."""
-        self.current_glucose = 120.0 # Default starting glucose
+        self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
         self.carbs_on_board = 0.0
         self.active_insulin_doses = [] # List of {'amount': float, 'age': float}

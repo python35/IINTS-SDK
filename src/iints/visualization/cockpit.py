@@ -154,6 +154,19 @@ class ClinicalCockpit:
                 color=self.config.primary_color, 
                 linewidth=2, 
                 label='Glucose')
+
+        # Safety overrides timeline markers
+        if 'safety_triggered' in simulation_data.columns:
+            safety_mask = simulation_data['safety_triggered'].astype(bool)
+            if safety_mask.any():
+                ax.scatter(
+                    timestamps[safety_mask],
+                    glucose[safety_mask],
+                    color='red',
+                    s=20,
+                    label='Safety Override',
+                    zorder=3
+                )
         
         # Add predictions if provided
         if predictions is not None:
@@ -278,9 +291,9 @@ class ClinicalCockpit:
     
     def _create_safety_panel(self,
                              gs: GridSpec,
-                             safety_alerts: List[str],
+                             safety_timeline: List[Dict[str, Any]],
                              ax: Optional[plt.Axes] = None) -> plt.Axes:
-        """Create safety alerts panel"""
+        """Create safety alerts panel with timeline"""
         if ax is None:
             ax = plt.subplot(gs[1, 4:6])
         
@@ -289,12 +302,16 @@ class ClinicalCockpit:
         ax.axis('off')
         
         ax.set_title('Safety Monitor', fontsize=12, fontweight='bold', pad=10)
-        
-        if safety_alerts:
-            for i, alert in enumerate(safety_alerts[-6:]):
+
+        if safety_timeline:
+            recent = safety_timeline[-6:]
+            for i, entry in enumerate(recent):
                 y_pos = 8.5 - i * 1.2
-                alert_type = '🔴' if 'CRITICAL' in alert else '🟡' if 'WARNING' in alert else ''
-                ax.text(0.5, y_pos, f"{alert_type} {alert}", fontsize=8)
+                reason = entry.get('reason', 'UNKNOWN')
+                time_min = entry.get('time_min', 0)
+                marker = '🔴' if 'HYPO' in reason or 'EMERGENCY' in reason else '🟡'
+                ax.text(0.5, y_pos, f"{marker} t={time_min:.0f}m {reason}", fontsize=8)
+            ax.text(0.5, 1.0, f"Overrides: {len(safety_timeline)}", fontsize=9, fontweight='bold')
         else:
             ax.text(0.5, 5, "✅ No active alerts", fontsize=10, ha='center', color='green')
         
@@ -428,12 +445,15 @@ class ClinicalCockpit:
         metrics = metrics or {}
         self._create_metrics_panel(gs, metrics)
         
-        safety_alerts: List[str]
-        if 'safety_alerts' in simulation_data.columns:
-            safety_alerts = simulation_data['safety_alerts'].astype(str).tolist()
-        else:
-            safety_alerts = []
-        self._create_safety_panel(gs, safety_alerts)
+        safety_timeline: List[Dict[str, Any]] = []
+        if 'safety_triggered' in simulation_data.columns and 'safety_reason' in simulation_data.columns:
+            for _, row in simulation_data.iterrows():
+                if bool(row.get('safety_triggered', False)):
+                    safety_timeline.append({
+                        'time_min': row.get('time_minutes', 0),
+                        'reason': row.get('safety_reason', 'UNKNOWN')
+                    })
+        self._create_safety_panel(gs, safety_timeline)
         
         personality = personality or {}
         self._create_algorithm_personality_panel(gs, personality)
