@@ -1,5 +1,5 @@
 # IINTS-AF SDK (v0.1.3)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/quickstart_benchmark.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 [![Test Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/coverage.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
 [![Docs Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/docs.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
@@ -13,9 +13,10 @@ The framework is built around the **Dual-Guard Architecture**, ensuring that any
 ### Key Features
 *   **Universal Compatibility**: Designed to run on any environment supporting Python 3.8+, from high-performance workstations to resource-constrained edge devices.
 *   **Dual-Guard Safety**: Native integration of an `InputValidator` and `IndependentSupervisor` to mitigate AI hallucinations and prevent dangerous insulin dosing.
-*   **Algorithm Flexibility**: Built-in support and templates for both classical control (PID) and modern AI (LSTM) architectures.
-*   **Clinical Validation Tools**: Automated analysis of TIR (Time In Range) and other glycemic metrics using standardized research datasets like Ohio T1DM.
-*   **Extensible Data Pipeline**: Tools for ingesting, cleaning, and normalizing diverse patient data formats.
+*   **Clinic-Safe Presets**: Built-in scenarios and patient configs that produce realistic, stable traces for demos and research.
+*   **Audit + Explainability**: JSON/CSV audit trail plus top intervention reasons for clinical traceability.
+*   **Baseline Comparison**: Automatic PID + standard pump baselines to benchmark new algorithms.
+*   **Optional Deep Learning**: Torch support is optional (`pip install "iints[torch]"`) so CI remains fast.
 
 ### Installation
 
@@ -40,7 +41,7 @@ python3 -m pip install -e ".[dev]"
 The complete SDK guide is available in `SDK_COMPREHENSIVE_GUIDE.md`.
 
 ### Notebook Guide
-Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full workflow:
+Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full workflow (each is Colab-ready):
 
 * Quickstart end-to-end run
 * Presets + scenario validation
@@ -49,39 +50,40 @@ Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full work
 * Baseline comparison + clinical metrics
 * Sensor/pump models + human-in-the-loop
 * Optional Torch/LSTM usage
+* Ablation study (with/without Supervisor)
 
 ### Quick Start
 
-#### 1. Initialize a Project
-Create a new research workspace with standard templates and data:
+#### Option A: CLI (fastest)
+Create a ready-to-run project and execute a clinic-safe preset:
 
 ```bash
-iints init --project-name my_research
-cd my_research
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-#### 2. Execute a Basic Simulation
-Run a standard PID-controller simulation on an Ohio T1DM patient profile:
-
+#### Option B: Python (one-line API)
 ```python
 import iints
+from iints.core.algorithms.pid_controller import PIDController
 
-# Initialize simulator with independent supervisor
-sim = iints.Simulator(algo="PID", patient="ohio_559")
-sim.run(duration_minutes=1440) # Run for 24 hours
-
-# Generate clinical report
-sim.generate_report()
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/quick_run",
+)
 ```
 
-#### 2. Develop a Custom AI Algorithm
-Use the CLI to generate a new template:
-
+#### Create a New Algorithm Template
 ```bash
-iints new-algo MySmartAlgo.py
+iints new-algo --name MySmart --author "Your Name" --output-dir algorithms/
 ```
 
-Implement the logic within the `predict_insulin` method. The SDK automatically applies safety constraints such as IOB limits and maximum dose caps.
+Implement the logic inside `predict_insulin`. The SDK enforces IOB limits, max bolus caps, and rate-of-change protections automatically.
 
 ### Testing
 Run the automated test suite:
@@ -126,6 +128,7 @@ Notes:
 * The PDF includes a safety summary plus top intervention reasons for explainability.
 * The simulator stops automatically on sustained critical hypoglycemia (default: <40 mg/dL for 30 minutes).
 * When the limit is exceeded, `SimulationLimitError` is raised and the safety report marks `terminated_early`.
+* Maker Faire demo PDF: `iints.generate_demo_report(...)`
 
 ### Clinic-Safe Presets (Quickstart)
 Run a clinically safe preset with any algorithm:
@@ -179,7 +182,7 @@ iints validate --scenario-path scenarios/example_scenario.json --patient-config-
 Deterministic runs (seeded):
 
 ```bash
-iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json --seed 42
+iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json --patient-config-name default_patient --seed 42
 ```
 
 Optional deep learning support:
@@ -195,20 +198,11 @@ Mock algorithms (CI-safe, no Torch required):
 from iints import ConstantDoseAlgorithm, RandomDoseAlgorithm
 ```
 
-One-line Python API:
+Quickstart and demo PDF exports:
 
 ```python
-import iints
-from iints.core.algorithms.pid_controller import PIDController
-
-outputs = iints.run_simulation(
-    algorithm=PIDController(),
-    scenario="scenarios/example_scenario.json",
-    patient_config="default_patient",
-    duration_minutes=720,
-    seed=42,
-    output_dir="results/quick_run",
-)
+quickstart_pdf = iints.generate_quickstart_report(outputs["results"], "results/quickstart/quickstart_report.pdf", outputs["safety_report"])
+demo_pdf = iints.generate_demo_report(outputs["results"], "results/quickstart/demo_report.pdf", outputs["safety_report"])
 ```
 
 Metrics module (GMI, CV, LBGI, HBGI):
@@ -223,7 +217,7 @@ lbgi = metrics.calculate_lbgi(results_df["glucose_actual_mgdl"])
 Human-in-the-loop + sensor/pump models:
 
 ```python
-from iints.core.devices.models import SensorModel, PumpModel
+from iints import SensorModel, PumpModel
 from iints.core.simulator import Simulator
 
 sensor = SensorModel(noise_std=8.0, lag_minutes=5, dropout_prob=0.02, seed=42)

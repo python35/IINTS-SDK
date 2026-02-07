@@ -463,7 +463,7 @@ def presets_create(
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
-    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default' or 'patient_559_config')")] = "default",
+    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient' or 'patient_559_config')")] = "default_patient",
     scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file (e.g., scenarios/example_scenario.json)")] = None,
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
