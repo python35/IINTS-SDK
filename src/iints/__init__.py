@@ -66,6 +66,24 @@ def generate_quickstart_report(
         title="IINTS-AF Quickstart Report",
     )
 
+def generate_demo_report(
+    simulation_results: 'pd.DataFrame',
+    output_path: Optional[str] = None,
+    safety_report: Optional[dict] = None,
+) -> Optional[str]:
+    """
+    Generate a demo-friendly PDF with big visuals (Maker Faire style).
+    """
+    if output_path is None:
+        return None
+    generator = ClinicalReportGenerator()
+    return generator.generate_demo_pdf(
+        simulation_results,
+        safety_report or {},
+        output_path,
+        title="IINTS-AF Demo Report",
+    )
+
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`
 __all__ = [
     # API
@@ -87,6 +105,7 @@ __all__ = [
     # Reporting
     "generate_report",
     "generate_quickstart_report",
+    "generate_demo_report",
     # High-level API
     "run_simulation",
 ]

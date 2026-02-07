@@ -171,3 +171,91 @@ class ClinicalReportGenerator:
             pdf.output(str(output_file))
 
         return str(output_file)
+
+    def generate_demo_pdf(
+        self,
+        simulation_data: pd.DataFrame,
+        safety_report: Dict[str, Any],
+        output_path: str,
+        title: str = "IINTS-AF Demo Report",
+    ) -> str:
+        """
+        Generate a Maker Faire / demo-friendly PDF with bold visuals and minimal text.
+        """
+        output_file = Path(output_path)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        metrics = self.metrics_calculator.calculate(
+            glucose=simulation_data["glucose_actual_mgdl"],
+            duration_hours=(simulation_data["time_minutes"].max() / 60.0),
+        ).to_dict()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_dir_path = Path(tmp_dir)
+            glucose_plot = tmp_dir_path / "glucose.png"
+            insulin_plot = tmp_dir_path / "insulin.png"
+            self._plot_glucose(simulation_data, glucose_plot)
+            self._plot_insulin(simulation_data, insulin_plot)
+
+            pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=12)
+            pdf.add_page()
+
+            pdf.set_font("Helvetica", "B", 18)
+            pdf.cell(0, 12, title, ln=1)
+            pdf.set_font("Helvetica", "", 11)
+            pdf.cell(0, 7, f"Duration: {simulation_data['time_minutes'].max()/60:.1f} hours", ln=1)
+            pdf.ln(2)
+
+            # Metric tiles
+            tiles = [
+                ("TIR 70-180", f"{metrics.get('tir_70_180', 0):.1f}%"),
+                ("Time <70", f"{metrics.get('tir_below_70', 0):.1f}%"),
+                ("GMI", f"{metrics.get('gmi', 0):.1f}%"),
+                ("CV", f"{metrics.get('cv', 0):.1f}%"),
+                ("Overrides", str(safety_report.get("bolus_interventions_count", 0))),
+                ("Violations", str(safety_report.get("total_violations", 0))),
+            ]
+
+            tile_w = 60
+            tile_h = 20
+            start_x = pdf.l_margin
+            start_y = pdf.get_y() + 2
+            pdf.set_font("Helvetica", "B", 10)
+
+            for idx, (label, value) in enumerate(tiles):
+                row = idx // 3
+                col = idx % 3
+                x = start_x + col * (tile_w + 4)
+                y = start_y + row * (tile_h + 6)
+                pdf.set_fill_color(230, 244, 246)
+                pdf.rect(x, y, tile_w, tile_h, style="F")
+                pdf.set_xy(x + 2, y + 3)
+                pdf.cell(tile_w - 4, 5, label, ln=1)
+                pdf.set_font("Helvetica", "B", 13)
+                pdf.set_xy(x + 2, y + 9)
+                pdf.cell(tile_w - 4, 8, value, ln=1)
+                pdf.set_font("Helvetica", "B", 10)
+
+            pdf.ln(36)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(0, 8, "Glucose Trace", ln=1)
+            pdf.image(str(glucose_plot), w=180)
+
+            pdf.ln(4)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(0, 8, "Insulin Delivery", ln=1)
+            pdf.image(str(insulin_plot), w=180)
+
+            top_reasons = self._top_safety_reasons(simulation_data)
+            if top_reasons:
+                pdf.ln(4)
+                pdf.set_font("Helvetica", "B", 11)
+                pdf.cell(0, 7, "Top Safety Interventions", ln=1)
+                pdf.set_font("Helvetica", "", 10)
+                for reason, count in top_reasons.items():
+                    pdf.cell(0, 5, f"- {reason}: {count}", ln=1)
+
+            pdf.output(str(output_file))
+
+        return str(output_file)
