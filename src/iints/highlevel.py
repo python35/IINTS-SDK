@@ -17,6 +17,7 @@ from iints.validation import (
     scenario_to_payloads,
     validate_patient_config_dict,
     validate_scenario_dict,
+    load_patient_config_by_name,
 )
 
 
@@ -28,9 +29,7 @@ def _resolve_patient_config(patient_config: Union[str, Path, Dict[str, Any]]) ->
         data = yaml.safe_load(patient_config_path.read_text())
         return validate_patient_config_dict(data).model_dump()
     # Treat as a named config in the packaged directory.
-    named_path = Path(f"src/iints/data/virtual_patients/{patient_config}.yaml")
-    data = yaml.safe_load(named_path.read_text())
-    return validate_patient_config_dict(data).model_dump()
+    return load_patient_config_by_name(str(patient_config)).model_dump()
 
 
 def _resolve_scenario_payloads(

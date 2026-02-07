@@ -20,6 +20,7 @@ from iints.validation import (
     build_stress_events,
     format_validation_error,
     load_scenario,
+    load_patient_config_by_name,
     scenario_to_payloads,
     scenario_warnings,
     validate_patient_config_dict,
@@ -319,15 +320,9 @@ def presets_run(
     algorithm_instance = _load_algorithm_instance(algo, console)
     console.print(f"Loaded algorithm: [green]{algorithm_instance.get_algorithm_metadata().name}[/green]")
 
-    patient_config_name = preset.get("patient_config", "default_patient")
-    patient_config_path = Path(f"src/iints/data/virtual_patients/{patient_config_name}.yaml")
-    if not patient_config_path.is_file():
-        console.print(f"[bold red]Error: Patient configuration file '{patient_config_path}' not found.[/bold red]")
-        raise typer.Exit(code=1)
     try:
-        with open(patient_config_path, "r") as f:
-            patient_params = yaml.safe_load(f)
-        validated_patient_params = validate_patient_config_dict(patient_params).model_dump()
+        patient_config_name = preset.get("patient_config", "default_patient")
+        validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
         patient_model = iints.PatientModel(**validated_patient_params)
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
@@ -335,7 +330,7 @@ def presets_run(
             console.print(f"- {line}")
         raise typer.Exit(code=1)
     except Exception as e:
-        console.print(f"[bold red]Error loading patient config {patient_config_path}: {e}[/bold red]")
+        console.print(f"[bold red]Error loading patient config {patient_config_name}: {e}[/bold red]")
         raise typer.Exit(code=1)
 
     duration = int(preset.get("duration_minutes", 720))
@@ -524,29 +519,21 @@ def run(
     console.print(f"Using compute device: [blue]{device}[/blue]")
 
     # 3. Instantiate Patient Model
-    patient_config_path = Path(f"src/iints/data/virtual_patients/{patient_config_name}.yaml")
-    if not patient_config_path.is_file():
-        console.print(f"[bold red]Error: Patient configuration file '{patient_config_path}' not found.[/bold red]")
-        console.print(f"[bold red]Please ensure '{patient_config_name}.yaml' exists in src/iints/data/virtual_patients/[/bold red]")
-        raise typer.Exit(code=1)
-
     try:
-        with open(patient_config_path, 'r') as f:
-            patient_params = yaml.safe_load(f)
-        validated_patient_params = validate_patient_config_dict(patient_params).model_dump()
+        validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
         patient_model = iints.PatientModel(**validated_patient_params)
-        console.print(f"Using patient model: {patient_model.__class__.__name__} with config from [cyan]{patient_config_name}.yaml[/cyan]")
+        console.print(f"Using patient model: {patient_model.__class__.__name__} with config [cyan]{patient_config_name}[/cyan]")
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
         for line in format_validation_error(e):
             console.print(f"- {line}")
         raise typer.Exit(code=1)
-    except yaml.YAMLError as e:
-        console.print(f"[bold red]Error parsing patient configuration file {patient_config_path}: {e}[/bold red]")
-        raise typer.Exit(code=1)
     except TypeError as e:
-        console.print(f"[bold red]Error instantiating PatientModel with parameters from {patient_config_path}: {e}[/bold red]")
+        console.print(f"[bold red]Error instantiating PatientModel with parameters from {patient_config_name}: {e}[/bold red]")
         console.print("[bold red]Please check that patient configuration keys match PatientModel constructor arguments.[/bold red]")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        console.print(f"[bold red]Error loading patient config {patient_config_name}: {e}[/bold red]")
         raise typer.Exit(code=1)
 
 

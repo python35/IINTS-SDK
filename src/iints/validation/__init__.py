@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -92,6 +93,18 @@ def validate_patient_config_dict(data: Dict[str, Any]) -> PatientConfigModel:
 def load_patient_config(path: Union[str, Path]) -> PatientConfigModel:
     config_path = Path(path)
     data = yaml.safe_load(config_path.read_text())
+    return validate_patient_config_dict(data)
+
+
+def load_patient_config_by_name(name: str) -> PatientConfigModel:
+    filename = f"{name}.yaml" if not name.endswith(".yaml") else name
+    if sys.version_info >= (3, 9):
+        from importlib.resources import files
+        content = files("iints.data.virtual_patients").joinpath(filename).read_text()
+    else:
+        from importlib import resources
+        content = resources.read_text("iints.data.virtual_patients", filename)
+    data = yaml.safe_load(content)
     return validate_patient_config_dict(data)
 
 
