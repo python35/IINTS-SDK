@@ -48,6 +48,24 @@ def generate_report(simulation_results: 'pd.DataFrame', output_path: Optional[st
     generator = ClinicalReportGenerator()
     return generator.generate_pdf(simulation_results, safety_report or {}, output_path)
 
+def generate_quickstart_report(
+    simulation_results: 'pd.DataFrame',
+    output_path: Optional[str] = None,
+    safety_report: Optional[dict] = None,
+) -> Optional[str]:
+    """
+    Generate a concise Quickstart PDF report from simulation results.
+    """
+    if output_path is None:
+        return None
+    generator = ClinicalReportGenerator()
+    return generator.generate_pdf(
+        simulation_results,
+        safety_report or {},
+        output_path,
+        title="IINTS-AF Quickstart Report",
+    )
+
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`
 __all__ = [
     # API
@@ -68,6 +86,7 @@ __all__ = [
     "ClinicalReportGenerator",
     # Reporting
     "generate_report",
+    "generate_quickstart_report",
     # High-level API
     "run_simulation",
 ]

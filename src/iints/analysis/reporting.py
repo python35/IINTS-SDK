@@ -8,6 +8,7 @@ import pandas as pd
 from fpdf import FPDF
 
 from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.utils.plotting import apply_plot_style
 
 
 class ClinicalReportGenerator:
@@ -17,6 +18,7 @@ class ClinicalReportGenerator:
         self.metrics_calculator = ClinicalMetricsCalculator()
 
     def _plot_glucose(self, df: pd.DataFrame, output_path: Path) -> None:
+        apply_plot_style()
         plt.figure(figsize=(10, 4))
         plt.plot(df["time_minutes"], df["glucose_actual_mgdl"], color="#2e7d32", linewidth=1.8)
         plt.axhspan(70, 180, alpha=0.12, color="#4caf50", label="Target 70-180")
@@ -30,6 +32,7 @@ class ClinicalReportGenerator:
         plt.close()
 
     def _plot_insulin(self, df: pd.DataFrame, output_path: Path) -> None:
+        apply_plot_style()
         plt.figure(figsize=(10, 3))
         plt.bar(df["time_minutes"], df["delivered_insulin_units"], width=4, color="#1976d2", alpha=0.7)
         plt.ylim(bottom=0)
