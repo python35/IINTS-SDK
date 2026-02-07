@@ -168,6 +168,19 @@ Deterministic runs (seeded):
 iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json --seed 42
 ```
 
+Optional deep learning support:
+
+```bash
+pip install "iints[torch]"
+iints check-deps
+```
+
+Mock algorithms (CI-safe, no Torch required):
+
+```python
+from iints import ConstantDoseAlgorithm, RandomDoseAlgorithm
+```
+
 One-line Python API:
 
 ```python

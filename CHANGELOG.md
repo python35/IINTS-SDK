@@ -6,6 +6,8 @@
 - Added clinic-safe story presets (pizza paradox, midnight crash) and baseline comparison tables.
 - Added deterministic runs via CLI seed support and a one-line `run_simulation` API.
 - Added human-in-the-loop callbacks, sensor/pump error models, and simulation state serialization.
+- Made Torch optional with lazy-loading AI modules and added mock algorithms for CI.
+- Added `iints check-deps` for dependency readiness checks.
 
 ## v0.1.3
 

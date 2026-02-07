@@ -735,6 +735,32 @@ def validate(
     console.print("[green]Scenario validation passed.[/green]")
 
 
+@app.command("check-deps")
+def check_deps():
+    """Check optional dependencies and report readiness."""
+    console = Console()
+
+    def has(module: str) -> bool:
+        return importlib.util.find_spec(module) is not None
+
+    checks = [
+        ("Simulator", True, "Core simulation engine"),
+        ("Metrics", has("numpy") and has("pandas"), "Clinical metrics"),
+        ("Reporting", has("matplotlib") and has("fpdf"), "PDF reports"),
+        ("Validation", has("pydantic"), "Schema validation"),
+        ("Deep Learning", has("torch"), "AI models (install with `pip install iints[torch]`)"),
+    ]
+
+    table = Table(title="IINTS Dependency Check", show_lines=False)
+    table.add_column("Component", style="cyan")
+    table.add_column("Status", style="green")
+    table.add_column("Notes")
+
+    for name, ok, notes in checks:
+        status = "OK" if ok else "Missing"
+        table.add_row(name, status, notes)
+
+    console.print(table)
 @docs_app.command("algo")
 def docs_algo(
     algo_path: Annotated[Path, typer.Option(help="Path to the algorithm Python file to document")],

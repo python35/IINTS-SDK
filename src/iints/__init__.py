@@ -29,6 +29,7 @@ except Exception:  # pragma: no cover - fallback if torch/device manager import 
 from .core.safety import SafetySupervisor
 from .core.devices.models import SensorModel, PumpModel
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
+from .core.algorithms.mock_algorithms import ConstantDoseAlgorithm, RandomDoseAlgorithm
 
 # Data Handling
 from .data.ingestor import DataIngestor
@@ -57,6 +58,8 @@ __all__ = [
     "SensorModel",
     "PumpModel",
     "StandardPumpAlgorithm",
+    "ConstantDoseAlgorithm",
+    "RandomDoseAlgorithm",
     # Data
     "DataIngestor",
     # Analysis Metrics

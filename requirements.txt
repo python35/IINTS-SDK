@@ -3,7 +3,6 @@ numpy>=1.24.0
 pandas>=2.0.0
 pydantic>=2.0.0
 scipy>=1.9.0
-torch>=1.9.0
 
 # Visualisatie & Demo
 pygame>=2.5.0
