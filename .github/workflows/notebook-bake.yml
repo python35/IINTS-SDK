@@ -50,6 +50,8 @@ jobs:
           MPLCONFIGDIR: /tmp
         run: |
           jupyter nbconvert --execute --to notebook --inplace \
+            --ExecutePreprocessor.kernel_name=python3 \
+            --ExecutePreprocessor.cwd=${GITHUB_WORKSPACE} \
             --ExecutePreprocessor.timeout=600 \
             examples/notebooks/*.ipynb
 
