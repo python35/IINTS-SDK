@@ -37,6 +37,17 @@ python3 -m pip install -e ".[dev]"
 ### Full Manual
 The complete SDK guide is available in `SDK_COMPREHENSIVE_GUIDE.md`.
 
+### Notebook Guide
+Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full workflow:
+
+* Quickstart end-to-end run
+* Presets + scenario validation
+* Safety supervisor behavior
+* Audit trail + PDF report export
+* Baseline comparison + clinical metrics
+* Sensor/pump models + human-in-the-loop
+* Optional Torch/LSTM usage
+
 ### Quick Start
 
 #### 1. Initialize a Project
