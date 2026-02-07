@@ -17,7 +17,15 @@ from .api.base_algorithm import (
 # Core Simulation Components
 from .core.simulator import Simulator, StressEvent
 from .core.patient.models import PatientModel
-from .core.device_manager import DeviceManager
+try:
+    from .core.device_manager import DeviceManager
+except Exception:  # pragma: no cover - fallback if torch/device manager import fails
+    class DeviceManager:  # type: ignore
+        def __init__(self):
+            self._device = "cpu"
+
+        def get_device(self):
+            return self._device
 from .core.safety import SafetySupervisor
 from .core.devices.models import SensorModel, PumpModel
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
