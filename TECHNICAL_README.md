@@ -1,0 +1,195 @@
+# IINTS-AF SDK Technical README
+
+This document contains the full technical usage for the IINTS-AF SDK.
+
+## Installation
+
+### System Requirements
+* Python 3.8+
+* Works on Windows, macOS, and Linux
+
+### From TestPyPI
+```bash
+pip install -i https://test.pypi.org/simple/ iints-sdk-python35
+```
+
+### From Source (Development)
+```bash
+git clone https://github.com/python35/IINTS-SDK.git
+cd IINTS-SDK
+python3 -m pip install -e .
+python3 -m pip install -e ".[dev]"
+```
+
+## CLI Workflow
+
+### Initialize a Project
+```bash
+iints init --project-name my_research
+cd my_research
+```
+
+### Quickstart Project
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+### Run a Simulation
+```bash
+iints run --algo algorithms/example_algorithm.py \
+  --scenario-path scenarios/example_scenario.json \
+  --patient-config-name default_patient \
+  --seed 42
+```
+
+### Validate Scenario + Patient Config
+```bash
+iints validate --scenario-path scenarios/example_scenario.json \
+  --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
+```
+
+### Generate a Report from Results CSV
+```bash
+iints report --results-csv results/data/sim_results_example.csv \
+  --output-path results/clinical_report.pdf
+```
+
+### Dependency Check (Optional Torch)
+```bash
+pip install "iints[torch]"
+iints check-deps
+```
+
+## Python API
+
+### One-Line Runner
+```python
+import iints
+from iints.core.algorithms.pid_controller import PIDController
+
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/quick_run",
+)
+```
+
+### Quickstart & Demo PDF Exports
+```python
+quickstart_pdf = iints.generate_quickstart_report(
+    outputs["results"],
+    "results/quickstart/quickstart_report.pdf",
+    outputs["safety_report"],
+)
+
+demo_pdf = iints.generate_demo_report(
+    outputs["results"],
+    "results/quickstart/demo_report.pdf",
+    outputs["safety_report"],
+)
+```
+
+## Clinic-Safe Presets
+```bash
+iints presets list
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+New presets:
+* `hypo_prone_night`
+* `hyper_challenge`
+* `pizza_paradox`
+* `midnight_crash`
+
+Create a scaffold:
+```bash
+iints presets create --name custom_safe --output-dir ./presets
+```
+
+## Audit Trail + Report Bundle
+```bash
+python3 examples/audit_and_report.py
+```
+
+Notes:
+* The PDF includes top intervention reasons for explainability.
+* The simulator stops on sustained critical hypoglycemia (default: <40 mg/dL for 30 minutes).
+* When the limit is exceeded, `SimulationLimitError` is raised and the safety report marks `terminated_early`.
+
+## Metrics
+```python
+import iints.metrics as metrics
+
+gmi = metrics.calculate_gmi(results_df["glucose_actual_mgdl"])
+lbgi = metrics.calculate_lbgi(results_df["glucose_actual_mgdl"])
+```
+
+## Human-in-the-loop + Sensor/Pump Models
+```python
+from iints import SensorModel, PumpModel
+from iints.core.simulator import Simulator
+
+sensor = SensorModel(noise_std=8.0, lag_minutes=5, dropout_prob=0.02, seed=42)
+pump = PumpModel(max_units_per_step=0.25, quantization_units=0.05, dropout_prob=0.01, seed=42)
+
+def rescue_callback(ctx):
+    if ctx["glucose_actual_mgdl"] < 65:
+        return {"additional_carbs": 15, "note": "rescue carbs"}
+    return None
+
+sim = Simulator(patient_model=patient, algorithm=algo, sensor_model=sensor, pump_model=pump, on_step=rescue_callback)
+```
+
+## State Serialization (Time‑travel Debugging)
+```python
+state = sim.save_state()
+sim.load_state(state)
+```
+
+## Performance Profiling
+```python
+from iints.core.simulator import Simulator
+
+sim = Simulator(patient_model=patient, algorithm=algo, enable_profiling=True)
+results_df, safety_report = sim.run_batch(duration_minutes=1440)
+print(safety_report["performance_report"])
+```
+
+## Mock Algorithms (CI-Safe)
+```python
+from iints import ConstantDoseAlgorithm, RandomDoseAlgorithm
+```
+
+## Testing
+```bash
+pytest
+```
+
+## One-Command Dev Workflow
+```bash
+make dev
+make test
+make lint
+```
+
+## Helper Scripts
+```bash
+./scripts/run_tests.sh
+./scripts/run_lint.sh
+./scripts/run_demo.sh
+```
+
+## Safety Architecture
+* **IndependentSupervisor**: deterministic safety layer that caps insulin, blocks dangerous doses, and logs interventions.
+* **InputValidator**: filters CGM noise and blocks physiologically impossible glucose values.
+* **Deterministic Audit**: every decision is logged for accountability and explainability.
+
+## Roadmap
+* February 2026: Safety Engine hardening + documentation sprint
+* March 2026: Monte Carlo population studies + edge AI benchmarking
+* March 27, 2026: Official Launch & Live Expo Demo
