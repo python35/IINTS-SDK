@@ -36,7 +36,7 @@ jobs:
       - name: Generate coverage badge
         run: |
           mkdir -p badges
-          python -m genbadge coverage -i coverage.xml -o badges/coverage.svg
+          genbadge coverage -i coverage.xml -o badges/coverage.svg
 
       - name: Generate docs coverage badge
         run: |
