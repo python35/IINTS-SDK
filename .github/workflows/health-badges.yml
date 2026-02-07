@@ -64,7 +64,7 @@ jobs:
                   "--label",
                   "docs",
                   "--value",
-                  f\"{percent:.1f}\",
+                  f"{percent:.1f}",
                   "--suffix",
                   \"%\",
                   "--file",
