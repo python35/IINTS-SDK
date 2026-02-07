@@ -112,6 +112,7 @@ python3 examples/audit_and_report.py
 Notes:
 * The PDF includes a safety summary plus top intervention reasons for explainability.
 * The simulator stops automatically on sustained critical hypoglycemia (default: <40 mg/dL for 30 minutes).
+* When the limit is exceeded, `SimulationLimitError` is raised and the safety report marks `terminated_early`.
 
 ### Clinic-Safe Presets (Quickstart)
 Run a clinically safe preset with any algorithm:
@@ -195,6 +196,15 @@ outputs = iints.run_simulation(
     seed=42,
     output_dir="results/quick_run",
 )
+```
+
+Metrics module (GMI, CV, LBGI, HBGI):
+
+```python
+import iints.metrics as metrics
+
+gmi = metrics.calculate_gmi(results_df["glucose_actual_mgdl"])
+lbgi = metrics.calculate_lbgi(results_df["glucose_actual_mgdl"])
 ```
 
 Human-in-the-loop + sensor/pump models:

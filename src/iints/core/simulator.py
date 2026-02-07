@@ -14,6 +14,15 @@ import numpy as np
 
 logger = logging.getLogger("iints")
 
+class SimulationLimitError(RuntimeError):
+    """Raised when a simulation violates critical safety limits."""
+
+    def __init__(self, message: str, current_time: float, glucose_value: float, duration_minutes: float):
+        super().__init__(message)
+        self.current_time = current_time
+        self.glucose_value = glucose_value
+        self.duration_minutes = duration_minutes
+
 class StressEvent:
     """Represents a discrete event that can occur during a simulation for stress testing."""
     def __init__(self, start_time: int, event_type: str, value: Any = None, reported_value: Any = None, absorption_delay_minutes: int = 0, duration: int = 0) -> None:
@@ -90,6 +99,7 @@ class Simulator:
         self._critical_low_minutes = 0
         self._current_time = 0
         self._resume_state = False
+        self._termination_info: Optional[Dict[str, Any]] = None
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -133,9 +143,23 @@ class Simulator:
             Dict[str, Any]: A dictionary containing the safety report from the supervisor.
         """
         logger.info("Starting batch simulation for %d minutes...", duration_minutes)
-        all_records = list(self.run_live(duration_minutes))
+        all_records: List[Dict[str, Any]] = []
+        try:
+            for record in self.run_live(duration_minutes):
+                all_records.append(record)
+        except SimulationLimitError as err:
+            logger.error("Simulation terminated early: %s", err)
+            self._termination_info = {
+                "reason": str(err),
+                "current_time_minutes": err.current_time,
+                "glucose_value": err.glucose_value,
+                "duration_minutes": err.duration_minutes,
+            }
         simulation_results_df = pd.DataFrame(all_records)
         safety_report = self.supervisor.get_safety_report()
+        if self._termination_info:
+            safety_report["terminated_early"] = True
+            safety_report["termination_reason"] = self._termination_info
         if self.enable_profiling:
             safety_report["performance_report"] = self._build_performance_report()
         logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
@@ -180,6 +204,9 @@ class Simulator:
             "total_overrides": int(len(overrides)),
             "top_reasons": reasons,
         }
+        if self._termination_info:
+            summary["terminated_early"] = True
+            summary["termination_reason"] = self._termination_info
         with open(summary_path, "w") as f:
             json.dump(summary, f, indent=2)
 
@@ -210,6 +237,7 @@ class Simulator:
             self.meal_queue = [] # Reset meal queue for new run
             self._critical_low_minutes = 0
             self._current_time = 0
+            self._termination_info = None
         else:
             self._resume_state = False
         if self.enable_profiling:
@@ -419,12 +447,16 @@ class Simulator:
             if actual_glucose_reading < self.critical_glucose_threshold:
                 self._critical_low_minutes += self.time_step
                 if self._critical_low_minutes >= self.critical_glucose_duration_minutes:
-                    logger.error(
-                        "Critical failure: glucose < %.1f mg/dL for %d minutes. Stopping simulation.",
-                        self.critical_glucose_threshold,
-                        self._critical_low_minutes,
+                    message = (
+                        f"Critical failure: glucose < {self.critical_glucose_threshold:.1f} mg/dL "
+                        f"for {self._critical_low_minutes} minutes."
                     )
-                    break
+                    raise SimulationLimitError(
+                        message=message,
+                        current_time=current_time,
+                        glucose_value=actual_glucose_reading,
+                        duration_minutes=self._critical_low_minutes,
+                    )
             else:
                 self._critical_low_minutes = 0
 

@@ -365,6 +365,15 @@ outputs = iints.run_simulation(
 )
 ```
 
+Metrics module (GMI, CV, LBGI, HBGI):
+
+```python
+import iints.metrics as metrics
+
+gmi = metrics.calculate_gmi(results_df["glucose_actual_mgdl"])
+lbgi = metrics.calculate_lbgi(results_df["glucose_actual_mgdl"])
+```
+
 Human-in-the-loop + sensor/pump models:
 
 ```python

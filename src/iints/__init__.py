@@ -15,7 +15,7 @@ from .api.base_algorithm import (
 )
 
 # Core Simulation Components
-from .core.simulator import Simulator, StressEvent
+from .core.simulator import Simulator, StressEvent, SimulationLimitError
 from .core.patient.models import PatientModel
 try:
     from .core.device_manager import DeviceManager
@@ -54,6 +54,7 @@ __all__ = [
     "InsulinAlgorithm", "AlgorithmInput", "AlgorithmResult", "AlgorithmMetadata", "WhyLogEntry",
     # Core
     "Simulator", "StressEvent", "PatientModel", "DeviceManager",
+    "SimulationLimitError",
     "SafetySupervisor",
     "SensorModel",
     "PumpModel",
