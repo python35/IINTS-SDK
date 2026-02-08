@@ -1,0 +1,4 @@
+algorithm,tir_70_180,tir_below_70,tir_above_180,bolus_interventions,total_violations
+CorrectionBolus,28.57142857142857,71.42857142857143,0.0,13,13
+Standard PID,30.76923076923077,69.23076923076923,0.0,0,12
+Standard Pump,35.714285714285715,64.28571428571429,0.0,13,13

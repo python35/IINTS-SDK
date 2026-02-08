@@ -1,0 +1,14 @@
+{
+  "scenario_name": "Custom Breakfast",
+  "scenario_version": "1.0",
+  "description": "Small breakfast with delayed absorption",
+  "stress_events": [
+    {
+      "start_time": 30,
+      "event_type": "meal",
+      "value": 35,
+      "absorption_delay_minutes": 10,
+      "duration": 60
+    }
+  ]
+}

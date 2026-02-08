@@ -1,0 +1,29 @@
+{
+  "reference": "Standard PID",
+  "rows": [
+    {
+      "algorithm": "CorrectionBolus",
+      "tir_70_180": 28.57142857142857,
+      "tir_below_70": 71.42857142857143,
+      "tir_above_180": 0.0,
+      "bolus_interventions": 13,
+      "total_violations": 13
+    },
+    {
+      "algorithm": "Standard PID",
+      "tir_70_180": 30.76923076923077,
+      "tir_below_70": 69.23076923076923,
+      "tir_above_180": 0.0,
+      "bolus_interventions": 0,
+      "total_violations": 12
+    },
+    {
+      "algorithm": "Standard Pump",
+      "tir_70_180": 35.714285714285715,
+      "tir_below_70": 64.28571428571429,
+      "tir_above_180": 0.0,
+      "bolus_interventions": 13,
+      "total_violations": 13
+    }
+  ]
+}

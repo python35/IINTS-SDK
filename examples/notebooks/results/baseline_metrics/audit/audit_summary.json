@@ -1,0 +1,20 @@
+{
+  "total_steps": 14,
+  "total_overrides": 13,
+  "top_reasons": {
+    "HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected": 7,
+    "NEGATIVE_TREND_LIMIT: Glucose dropping at -4.21 mg/dL/min": 1,
+    "NEGATIVE_TREND_LIMIT: Glucose dropping at -3.90 mg/dL/min": 1,
+    "NEGATIVE_TREND_LIMIT: Glucose dropping at -3.33 mg/dL/min": 1,
+    "NEGATIVE_TREND_LIMIT: Glucose dropping at -2.84 mg/dL/min": 1,
+    "HYPO_CUTOFF: Glucose below safety cutoff; CRITICAL: Hypoglycemia - insulin limited; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.42 mg/dL/min": 1,
+    "HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.07 mg/dL/min": 1
+  },
+  "terminated_early": true,
+  "termination_reason": {
+    "reason": "Critical failure: glucose < 40.0 mg/dL for 30 minutes.",
+    "current_time_minutes": 65,
+    "glucose_value": 20,
+    "duration_minutes": 30
+  }
+}
