@@ -67,6 +67,7 @@ jobs:
                   f"{percent:.1f}",
                   "--suffix",
                   "%",
+                  "--overwrite",
                   "--file",
                   "badges/docs.svg",
               ]
