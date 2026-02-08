@@ -7,8 +7,12 @@ from .adapter import DataAdapter
 from .column_mapper import ColumnMapper, ColumnMapping
 from .importer import (
     ImportResult,
+    export_demo_csv,
     export_standard_csv,
+    guess_column_mapping,
     import_cgm_csv,
+    import_cgm_dataframe,
+    load_demo_dataframe,
     scenario_from_csv,
     scenario_from_dataframe,
 )
@@ -20,8 +24,12 @@ __all__ = [
     'ColumnMapper',
     'ColumnMapping',
     'ImportResult',
+    'export_demo_csv',
     'export_standard_csv',
+    'guess_column_mapping',
     'import_cgm_csv',
+    'import_cgm_dataframe',
+    'load_demo_dataframe',
     'scenario_from_csv',
     'scenario_from_dataframe',
     'DataQualityChecker',

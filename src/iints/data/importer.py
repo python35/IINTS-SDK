@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+import io
 import re
+import sys
 
 import pandas as pd
 
@@ -51,17 +53,26 @@ class ImportResult:
     scenario: Dict[str, Any]
 
 
-def import_cgm_csv(
-    path: Union[str, Path],
+def guess_column_mapping(columns: Iterable[str], data_format: str = "generic") -> Dict[str, Optional[str]]:
+    candidates = DEFAULT_MAPPINGS.get(data_format, DEFAULT_MAPPINGS["generic"])
+    return {
+        "timestamp": _find_column(columns, candidates.get("timestamp", [])),
+        "glucose": _find_column(columns, candidates.get("glucose", [])),
+        "carbs": _find_column(columns, candidates.get("carbs", [])),
+        "insulin": _find_column(columns, candidates.get("insulin", [])),
+    }
+
+
+def import_cgm_dataframe(
+    df: pd.DataFrame,
     data_format: str = "generic",
     column_map: Optional[Dict[str, str]] = None,
     time_unit: str = "minutes",
     source: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Import CGM data from CSV into the universal IINTS schema.
+    Import CGM data from an in-memory DataFrame into the universal IINTS schema.
     """
-    df = pd.read_csv(path)
     columns = list(df.columns)
     mapping = column_map or {}
     mapping = {k: v for k, v in mapping.items() if v}
@@ -119,6 +130,26 @@ def import_cgm_csv(
     ingestor = DataIngestor()
     ingestor._validate_schema(df, ingestor.UNIVERSAL_SCHEMA)
     return df[list(ingestor.UNIVERSAL_SCHEMA.keys())]
+
+
+def import_cgm_csv(
+    path: Union[str, Path],
+    data_format: str = "generic",
+    column_map: Optional[Dict[str, str]] = None,
+    time_unit: str = "minutes",
+    source: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Import CGM data from CSV into the universal IINTS schema.
+    """
+    df = pd.read_csv(path)
+    return import_cgm_dataframe(
+        df,
+        data_format=data_format,
+        column_map=column_map,
+        time_unit=time_unit,
+        source=source,
+    )
 
 
 def scenario_from_dataframe(
@@ -179,4 +210,24 @@ def export_standard_csv(df: pd.DataFrame, output_path: Union[str, Path]) -> str:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)
+    return str(output_path)
+
+
+def _read_demo_csv_text() -> str:
+    if sys.version_info >= (3, 9):
+        from importlib.resources import files
+        return files("iints.data.demo").joinpath("demo_cgm.csv").read_text()
+    from importlib import resources
+    return resources.read_text("iints.data.demo", "demo_cgm.csv")
+
+
+def load_demo_dataframe() -> pd.DataFrame:
+    text = _read_demo_csv_text()
+    return pd.read_csv(io.StringIO(text))
+
+
+def export_demo_csv(output_path: Union[str, Path]) -> str:
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(_read_demo_csv_text())
     return str(output_path)

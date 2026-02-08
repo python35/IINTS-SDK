@@ -36,14 +36,18 @@ from .core.algorithms.mock_algorithms import ConstantDoseAlgorithm, RandomDoseAl
 from .data.ingestor import DataIngestor
 from .data.importer import (
     ImportResult,
+    export_demo_csv,
     export_standard_csv,
+    guess_column_mapping,
     import_cgm_csv,
+    import_cgm_dataframe,
+    load_demo_dataframe,
     scenario_from_csv,
     scenario_from_dataframe,
 )
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
-from .highlevel import run_simulation
+from .highlevel import run_simulation, run_full
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
@@ -109,8 +113,12 @@ __all__ = [
     # Data
     "DataIngestor",
     "ImportResult",
+    "export_demo_csv",
     "export_standard_csv",
+    "guess_column_mapping",
     "import_cgm_csv",
+    "import_cgm_dataframe",
+    "load_demo_dataframe",
     "scenario_from_csv",
     "scenario_from_dataframe",
     # Analysis Metrics
@@ -122,4 +130,5 @@ __all__ = [
     "generate_demo_report",
     # High-level API
     "run_simulation",
+    "run_full",
 ]

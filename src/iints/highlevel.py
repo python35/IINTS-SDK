@@ -123,3 +123,29 @@ def run_simulation(
             outputs["report_pdf"] = str(report_path)
 
     return outputs
+
+
+def run_full(
+    algorithm: Union[InsulinAlgorithm, type],
+    scenario: Optional[Union[str, Path, Dict[str, Any]]] = None,
+    patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = "default_patient",
+    duration_minutes: int = 720,
+    time_step: int = 5,
+    seed: Optional[int] = None,
+    output_dir: Union[str, Path] = "results/run_full",
+) -> Dict[str, Any]:
+    """
+    One-line runner that always exports results + audit + PDF + baseline comparison.
+    """
+    return run_simulation(
+        algorithm=algorithm,
+        scenario=scenario,
+        patient_config=patient_config,
+        duration_minutes=duration_minutes,
+        time_step=time_step,
+        seed=seed,
+        output_dir=output_dir,
+        compare_baselines=True,
+        export_audit=True,
+        generate_report=True,
+    )

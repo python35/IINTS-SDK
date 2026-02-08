@@ -17,7 +17,15 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 import iints # Import the top-level SDK package
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.core.patient.profile import PatientProfile
-from iints.data.importer import scenario_from_csv, export_standard_csv
+from iints.data.importer import (
+    export_demo_csv,
+    export_standard_csv,
+    guess_column_mapping,
+    import_cgm_dataframe,
+    load_demo_dataframe,
+    scenario_from_csv,
+    scenario_from_dataframe,
+)
 from iints.validation import (
     build_stress_events,
     format_validation_error,
@@ -677,6 +685,54 @@ def run(
     iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
 
 
+@app.command("run-full")
+def run_full(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient')")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file")] = None,
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    output_dir: Annotated[Path, typer.Option(help="Directory to save results + audit + report")] = Path("./results/run_full"),
+    seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+):
+    """One-line runner: results CSV + audit + PDF + baseline comparison."""
+    console = Console()
+    algorithm_instance = _load_algorithm_instance(algo, console)
+
+    patient_config: Union[str, Path]
+    if patient_config_path:
+        if not patient_config_path.is_file():
+            console.print(f"[bold red]Error: Patient config file '{patient_config_path}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+        patient_config = patient_config_path
+    else:
+        patient_config = patient_config_name
+
+    outputs = iints.run_simulation(
+        algorithm=algorithm_instance,
+        scenario=str(scenario_path) if scenario_path else None,
+        patient_config=patient_config,
+        duration_minutes=duration,
+        time_step=time_step,
+        seed=seed,
+        output_dir=output_dir,
+        compare_baselines=True,
+        export_audit=True,
+        generate_report=True,
+    )
+
+    console.print("[green]Run complete.[/green]")
+    if "results_csv" in outputs:
+        console.print(f"Results CSV: {outputs['results_csv']}")
+    if "report_pdf" in outputs:
+        console.print(f"Report PDF: {outputs['report_pdf']}")
+    if "audit" in outputs:
+        console.print(f"Audit: {outputs['audit']}")
+    if "baseline_files" in outputs:
+        console.print(f"Baseline files: {outputs['baseline_files']}")
+
+
 @app.command()
 def report(
     results_csv: Annotated[Path, typer.Option(help="Path to a simulation results CSV")],
@@ -832,6 +888,91 @@ def import_data(
     console.print(f"[green]Scenario saved:[/green] {scenario_path}")
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
     console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
+
+
+@app.command("import-wizard")
+def import_wizard():
+    """Interactive wizard to import real-world CGM CSVs."""
+    console = Console()
+    input_csv = Path(typer.prompt("Path to CGM CSV"))
+    if not input_csv.is_file():
+        console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    data_format = typer.prompt("Data format (generic/dexcom/libre)", default="generic")
+
+    header = pd.read_csv(input_csv, nrows=1)
+    columns = list(header.columns)
+    guesses = guess_column_mapping(columns, data_format=data_format)
+
+    console.print(f"[bold]Detected columns:[/bold] {', '.join(columns)}")
+
+    ts_col = typer.prompt("Timestamp column", default=guesses.get("timestamp") or columns[0])
+    glucose_col = typer.prompt("Glucose column", default=guesses.get("glucose") or "")
+    carbs_col = typer.prompt("Carbs column (optional)", default=guesses.get("carbs") or "")
+    insulin_col = typer.prompt("Insulin column (optional)", default=guesses.get("insulin") or "")
+
+    mapping = {
+        "timestamp": ts_col.strip(),
+        "glucose": glucose_col.strip(),
+        "carbs": carbs_col.strip(),
+        "insulin": insulin_col.strip(),
+    }
+    mapping = {k: v for k, v in mapping.items() if v}
+
+    time_unit = typer.prompt("Timestamp unit (minutes/seconds)", default="minutes")
+    scenario_name = typer.prompt("Scenario name", default="Imported CGM Scenario")
+    output_dir = Path(typer.prompt("Output directory", default="results/imported"))
+
+    try:
+        result = scenario_from_csv(
+            input_csv,
+            scenario_name=scenario_name,
+            data_format=data_format,
+            column_map=mapping or None,
+            time_unit=time_unit,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Import failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = output_dir / "scenario.json"
+    data_path = output_dir / "cgm_standard.csv"
+
+    scenario_path.write_text(json.dumps(result.scenario, indent=2))
+    export_standard_csv(result.dataframe, data_path)
+
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+    console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
+
+
+@app.command("import-demo")
+def import_demo(
+    output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/demo_import"),
+    scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Demo CGM Scenario",
+    export_raw: Annotated[bool, typer.Option(help="Export the raw demo CSV into output dir")] = True,
+):
+    """Generate a ready-to-run scenario from the bundled demo CGM data pack."""
+    console = Console()
+    demo_df = load_demo_dataframe()
+    standard_df = import_cgm_dataframe(demo_df, data_format="generic", source="demo")
+    scenario = scenario_from_dataframe(standard_df, scenario_name=scenario_name)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = output_dir / "scenario.json"
+    data_path = output_dir / "cgm_standard.csv"
+
+    scenario_path.write_text(json.dumps(scenario, indent=2))
+    export_standard_csv(standard_df, data_path)
+    if export_raw:
+        export_demo_csv(output_dir / "demo_cgm.csv")
+
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+    if export_raw:
+        console.print(f"[green]Raw demo CSV saved:[/green] {output_dir / 'demo_cgm.csv'}")
 
 
 @app.command("check-deps")

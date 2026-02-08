@@ -44,6 +44,14 @@ iints run --algo algorithms/example_algorithm.py \
   --seed 42
 ```
 
+### One-Line Runner (CSV + audit + PDF + baseline)
+```bash
+iints run-full --algo algorithms/example_algorithm.py \
+  --scenario-path scenarios/example_scenario.json \
+  --patient-config-name default_patient \
+  --output-dir results/run_full
+```
+
 ### Validate Scenario + Patient Config
 ```bash
 iints validate --scenario-path scenarios/example_scenario.json \
@@ -53,6 +61,16 @@ iints validate --scenario-path scenarios/example_scenario.json \
 ### Import Real-World CGM Data
 ```bash
 iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
+```
+
+### Import Wizard (Interactive)
+```bash
+iints import-wizard
+```
+
+### Use the Demo Data Pack
+```bash
+iints import-demo --output-dir results/demo_import
 ```
 
 ### Create a Patient Profile (YAML)
@@ -95,6 +113,16 @@ outputs = iints.run_simulation(
     output_dir="results/quick_run",
 )
 
+# Full bundle in one call
+outputs = iints.run_full(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/run_full",
+)
+
 # Patient profile shortcut
 profile = PatientProfile(isf=45, icr=11, basal_rate=0.9, initial_glucose=130)
 outputs = iints.run_simulation(
@@ -134,6 +162,13 @@ result = iints.scenario_from_csv(
 
 result.dataframe.head()
 scenario = result.scenario
+```
+
+Demo data in Python:
+```python
+import iints
+
+demo_df = iints.load_demo_dataframe()
 ```
 
 ## Clinic-Safe Presets
