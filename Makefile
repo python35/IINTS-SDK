@@ -1,11 +1,13 @@
-.PHONY: help setup dev test lint typecheck clean build publish publish-test tag push-tag release
+.PHONY: help setup dev test lint typecheck clean build publish publish-test tag push-tag github-release release
 
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
 BUILD ?= $(PYTHON) -m build
 TWINE ?= $(PYTHON) -m twine
+GH ?= gh
 VERSION ?= $(shell $(PYTHON) -c "import re, pathlib; print(re.search(r'^version = \"(.*)\"$$', pathlib.Path('pyproject.toml').read_text(), re.M).group(1))")
 TAG ?= v$(VERSION)
+RELEASE_NOTES ?= docs/releases/v$(VERSION).md
 
 help:
 	@echo "Targets:"
@@ -20,6 +22,7 @@ help:
 	@echo "  publish-test Upload to TestPyPI"
 	@echo "  tag          Create git tag from pyproject version"
 	@echo "  push-tag     Push the tag to origin"
+	@echo "  github-release  Create a GitHub release (requires gh auth)"
 	@echo "  release      test + build + publish + tag + push-tag"
 
 setup:
@@ -57,6 +60,9 @@ tag:
 
 push-tag:
 	git push origin $(TAG)
+
+github-release:
+	$(GH) release create $(TAG) -F $(RELEASE_NOTES) --title "$(TAG)"
 
 release: test lint typecheck publish tag push-tag
 	@echo "Release $(TAG) complete."
