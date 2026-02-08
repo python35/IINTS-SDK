@@ -25,6 +25,11 @@ results/IINTS_Summary_*.xlsx
 results/matlab_analysis/control_analysis_*.mat
 results/clinical_reports/IINTS_Patient_*_*.pdf
 results/population_plots/*.png
+results/
+
+# Coverage
+.coverage
+coverage.xml
 
 # Temporary files
 *.tmp
