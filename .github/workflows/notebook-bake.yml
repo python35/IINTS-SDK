@@ -64,7 +64,9 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git fetch origin main
-            git rebase origin/main || (git rebase --abort && exit 1)
+            git stash push -u -m "notebook-bake"
+            git rebase origin/main || (git rebase --abort && git stash pop && exit 1)
+            git stash pop || (echo "Stash pop failed" && git status && exit 1)
             git add examples/notebooks
             git commit -m "chore: bake notebooks [skip notebook bake]"
             git push origin main
