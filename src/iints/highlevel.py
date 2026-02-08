@@ -8,6 +8,7 @@ import yaml
 
 from iints.api.base_algorithm import InsulinAlgorithm
 from iints.core.patient.models import PatientModel
+from iints.core.patient.profile import PatientProfile
 from iints.core.simulator import Simulator
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.reporting import ClinicalReportGenerator
@@ -21,7 +22,9 @@ from iints.validation import (
 )
 
 
-def _resolve_patient_config(patient_config: Union[str, Path, Dict[str, Any]]) -> Dict[str, Any]:
+def _resolve_patient_config(patient_config: Union[str, Path, Dict[str, Any], PatientProfile]) -> Dict[str, Any]:
+    if isinstance(patient_config, PatientProfile):
+        return validate_patient_config_dict(patient_config.to_patient_config()).model_dump()
     if isinstance(patient_config, dict):
         return validate_patient_config_dict(patient_config).model_dump()
     patient_config_path = Path(patient_config)

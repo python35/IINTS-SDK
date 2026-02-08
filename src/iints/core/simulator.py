@@ -400,7 +400,8 @@ class Simulator:
             self.patient_model.update(
                 time_step=self.time_step,
                 delivered_insulin=delivered_insulin,
-                carb_intake=patient_carb_intake_this_step # Use actual carbs for patient
+                carb_intake=patient_carb_intake_this_step, # Use actual carbs for patient
+                current_time=float(current_time),
             )
 
             # --- Record Data ---

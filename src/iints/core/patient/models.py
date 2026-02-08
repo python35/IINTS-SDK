@@ -18,7 +18,10 @@ class CustomPatientModel:
                  initial_glucose: float = 120.0, glucose_absorption_rate: float = 0.03,
                  insulin_action_duration: float = 300.0, # minutes, e.g., 5 hours
                  insulin_peak_time: float = 75.0, # minutes
-                 meal_mismatch_epsilon: float = 1.0): # Factor for meal mismatch
+                 meal_mismatch_epsilon: float = 1.0, # Factor for meal mismatch
+                 dawn_phenomenon_strength: float = 0.0, # mg/dL per hour
+                 dawn_start_hour: float = 4.0,
+                 dawn_end_hour: float = 8.0):
         """
         Initializes the patient model with simplified parameters.
 
@@ -42,6 +45,9 @@ class CustomPatientModel:
         self.insulin_action_duration = insulin_action_duration
         self.insulin_peak_time = insulin_peak_time
         self.meal_mismatch_epsilon = meal_mismatch_epsilon
+        self.dawn_phenomenon_strength = dawn_phenomenon_strength
+        self.dawn_start_hour = dawn_start_hour
+        self.dawn_end_hour = dawn_end_hour
 
 
         self.initial_glucose = initial_glucose
@@ -81,7 +87,7 @@ class CustomPatientModel:
         self.exercise_intensity = 0.0
         print("INFO: Patient stopped exercise.")
 
-    def update(self, time_step: float, delivered_insulin: float, carb_intake: float = 0.0, **kwargs) -> float:
+    def update(self, time_step: float, delivered_insulin: float, carb_intake: float = 0.0, current_time: float | None = None, **kwargs) -> float:
         """
         Updates the patient's glucose level over a given time step.
 
@@ -167,8 +173,17 @@ class CustomPatientModel:
         # --- Basal metabolic glucose production/consumption (simplified) ---
         basal_glucose_change = -self.glucose_decay_rate * self.current_glucose * time_step
 
+        # --- Dawn phenomenon effect ---
+        dawn_effect = 0.0
+        if current_time is not None and self.dawn_phenomenon_strength > 0:
+            minutes_in_day = current_time % 1440
+            dawn_start_min = self.dawn_start_hour * 60
+            dawn_end_min = self.dawn_end_hour * 60
+            if dawn_start_min <= minutes_in_day <= dawn_end_min:
+                dawn_effect = (self.dawn_phenomenon_strength / 60.0) * time_step
+
         # --- Update glucose ---
-        delta_glucose = carb_effect - insulin_effect - exercise_effect + basal_glucose_change
+        delta_glucose = carb_effect - insulin_effect - exercise_effect + basal_glucose_change + dawn_effect
         self.current_glucose = max(20, self.current_glucose + delta_glucose) # Prevent glucose from going too low (hypoglycemia)
 
         return self.current_glucose

@@ -50,6 +50,22 @@ iints validate --scenario-path scenarios/example_scenario.json \
   --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
 ```
 
+### Import Real-World CGM Data
+```bash
+iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
+```
+
+### Create a Patient Profile (YAML)
+```bash
+iints profiles create --name patient_john \
+  --isf 45 --icr 11 --basal-rate 0.9 --initial-glucose 130 \
+  --dawn-strength 8 --dawn-start 4 --dawn-end 8
+
+# Use it in a run:
+iints run --algo algorithms/example_algorithm.py \
+  --patient-config-path patient_profiles/patient_john.yaml
+```
+
 ### Generate a Report from Results CSV
 ```bash
 iints report --results-csv results/data/sim_results_example.csv \
@@ -68,6 +84,7 @@ iints check-deps
 ```python
 import iints
 from iints.core.algorithms.pid_controller import PIDController
+from iints.core.patient.profile import PatientProfile
 
 outputs = iints.run_simulation(
     algorithm=PIDController(),
@@ -76,6 +93,17 @@ outputs = iints.run_simulation(
     duration_minutes=720,
     seed=42,
     output_dir="results/quick_run",
+)
+
+# Patient profile shortcut
+profile = PatientProfile(isf=45, icr=11, basal_rate=0.9, initial_glucose=130)
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config=profile,
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/profile_run",
 )
 ```
 
@@ -92,6 +120,20 @@ demo_pdf = iints.generate_demo_report(
     "results/quickstart/demo_report.pdf",
     outputs["safety_report"],
 )
+```
+
+### Real-World Import (Python)
+```python
+import iints
+
+result = iints.scenario_from_csv(
+    "data/my_cgm.csv",
+    data_format="dexcom",
+    scenario_name="Patient A - Week 1",
+)
+
+result.dataframe.head()
+scenario = result.scenario
 ```
 
 ## Clinic-Safe Presets

@@ -59,9 +59,14 @@ class PatientConfigModel(BaseModel):
     insulin_action_duration: float = Field(default=300.0, ge=60.0, le=720.0)
     insulin_peak_time: float = Field(default=75.0, ge=15.0, le=240.0)
     meal_mismatch_epsilon: float = Field(default=1.0, ge=0.5, le=1.5)
+    dawn_phenomenon_strength: float = Field(default=0.0, ge=0.0, le=50.0)
+    dawn_start_hour: float = Field(default=4.0, ge=0.0, le=23.0)
+    dawn_end_hour: float = Field(default=8.0, ge=0.0, le=24.0)
 
     @model_validator(mode="after")
     def _check_peak_vs_duration(self) -> "PatientConfigModel":
         if self.insulin_peak_time >= self.insulin_action_duration:
             raise ValueError("insulin_peak_time must be less than insulin_action_duration")
+        if self.dawn_end_hour <= self.dawn_start_hour:
+            raise ValueError("dawn_end_hour must be greater than dawn_start_hour")
         return self

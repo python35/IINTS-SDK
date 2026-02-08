@@ -17,6 +17,7 @@ from .api.base_algorithm import (
 # Core Simulation Components
 from .core.simulator import Simulator, StressEvent, SimulationLimitError
 from .core.patient.models import PatientModel
+from .core.patient.profile import PatientProfile
 try:
     from .core.device_manager import DeviceManager
 except Exception:  # pragma: no cover - fallback if torch/device manager import fails
@@ -33,6 +34,13 @@ from .core.algorithms.mock_algorithms import ConstantDoseAlgorithm, RandomDoseAl
 
 # Data Handling
 from .data.ingestor import DataIngestor
+from .data.importer import (
+    ImportResult,
+    export_standard_csv,
+    import_cgm_csv,
+    scenario_from_csv,
+    scenario_from_dataframe,
+)
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
 from .highlevel import run_simulation
@@ -90,6 +98,7 @@ __all__ = [
     "InsulinAlgorithm", "AlgorithmInput", "AlgorithmResult", "AlgorithmMetadata", "WhyLogEntry",
     # Core
     "Simulator", "StressEvent", "PatientModel", "DeviceManager",
+    "PatientProfile",
     "SimulationLimitError",
     "SafetySupervisor",
     "SensorModel",
@@ -99,6 +108,11 @@ __all__ = [
     "RandomDoseAlgorithm",
     # Data
     "DataIngestor",
+    "ImportResult",
+    "export_standard_csv",
+    "import_cgm_csv",
+    "scenario_from_csv",
+    "scenario_from_dataframe",
     # Analysis Metrics
     "generate_benchmark_metrics",
     "ClinicalReportGenerator",

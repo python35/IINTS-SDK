@@ -16,10 +16,13 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.core.patient.profile import PatientProfile
+from iints.data.importer import scenario_from_csv, export_standard_csv
 from iints.validation import (
     build_stress_events,
     format_validation_error,
     load_scenario,
+    load_patient_config,
     load_patient_config_by_name,
     scenario_to_payloads,
     scenario_warnings,
@@ -31,8 +34,10 @@ from iints.validation import (
 app = typer.Typer(help="IINTS-AF SDK CLI - Intelligent Insulin Titration System for Artificial Pancreas research.")
 docs_app = typer.Typer(help="Generate documentation and technical summaries for IINTS-AF components.")
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
+profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
+app.add_typer(profiles_app, name="profiles")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     if not algo.is_file():
@@ -79,6 +84,22 @@ def _get_preset(name: str) -> Dict[str, Any]:
         if preset.get("name") == name:
             return preset
     raise KeyError(name)
+
+
+def _parse_column_mapping(items: List[str], console: Console) -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+    for item in items:
+        if "=" not in item:
+            console.print(f"[bold red]Invalid mapping '{item}'. Use key=value.[/bold red]")
+            raise typer.Exit(code=1)
+        key, value = item.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key or not value:
+            console.print(f"[bold red]Invalid mapping '{item}'. Use key=value.[/bold red]")
+            raise typer.Exit(code=1)
+        mapping[key] = value
+    return mapping
 
  
 
@@ -455,10 +476,45 @@ def presets_create(
     console.print(f"[green]Preset files created:[/green] {patient_yaml_path} , {scenario_path}")
     console.print("[bold]Add this preset to presets.json if you want it built-in:[/bold]")
     console.print_json(json.dumps(preset_snippet, indent=2))
+
+
+@profiles_app.command("create")
+def profiles_create(
+    name: Annotated[str, typer.Option(help="Profile name (file stem)")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the profile YAML")] = Path("./patient_profiles"),
+    isf: Annotated[float, typer.Option(help="Insulin Sensitivity Factor (mg/dL per unit)")] = 50.0,
+    icr: Annotated[float, typer.Option(help="Insulin-to-carb ratio (grams per unit)")] = 10.0,
+    basal_rate: Annotated[float, typer.Option(help="Basal insulin rate (U/hr)")] = 0.8,
+    initial_glucose: Annotated[float, typer.Option(help="Initial glucose (mg/dL)")] = 120.0,
+    dawn_strength: Annotated[float, typer.Option(help="Dawn phenomenon strength (mg/dL per hour)")] = 0.0,
+    dawn_start: Annotated[float, typer.Option(help="Dawn phenomenon start hour (0-23)")] = 4.0,
+    dawn_end: Annotated[float, typer.Option(help="Dawn phenomenon end hour (0-24)")] = 8.0,
+):
+    """Create a patient profile YAML you can pass to --patient-config-path."""
+    console = Console()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"{name}.yaml"
+
+    profile = PatientProfile(
+        isf=isf,
+        icr=icr,
+        basal_rate=basal_rate,
+        initial_glucose=initial_glucose,
+        dawn_phenomenon_strength=dawn_strength,
+        dawn_start_hour=dawn_start,
+        dawn_end_hour=dawn_end,
+    )
+    with output_path.open("w") as handle:
+        yaml.safe_dump(profile.to_patient_config(), handle, sort_keys=False)
+
+    console.print(f"[green]Patient profile saved:[/green] {output_path}")
+    console.print("Use it with:")
+    console.print(f"  iints run --algo algorithms/example_algorithm.py --patient-config-path {output_path}")
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient' or 'patient_559_config')")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
     scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file (e.g., scenarios/example_scenario.json)")] = None,
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
@@ -520,9 +576,18 @@ def run(
 
     # 3. Instantiate Patient Model
     try:
-        validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
+        if patient_config_path:
+            if not patient_config_path.is_file():
+                console.print(f"[bold red]Error: Patient config file '{patient_config_path}' not found.[/bold red]")
+                raise typer.Exit(code=1)
+            validated_patient_params = load_patient_config(patient_config_path).model_dump()
+            patient_label = patient_config_path.stem
+        else:
+            validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
+            patient_label = patient_config_name
+
         patient_model = iints.PatientModel(**validated_patient_params)
-        console.print(f"Using patient model: {patient_model.__class__.__name__} with config [cyan]{patient_config_name}[/cyan]")
+        console.print(f"Using patient model: {patient_model.__class__.__name__} with config [cyan]{patient_label}[/cyan]")
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
         for line in format_validation_error(e):
@@ -580,7 +645,7 @@ def run(
     algo_name_for_filename = algorithm_instance.get_algorithm_metadata().name.replace(' ', '_').lower()
     scenario_name_for_filename = Path(scenario_path).stem if scenario_path else 'no_scenario'
     
-    results_file = output_dir / f"sim_results_{algo_name_for_filename}_patient_{patient_config_name}_scenario_{scenario_name_for_filename}_duration_{duration}m.csv"
+    results_file = output_dir / f"sim_results_{algo_name_for_filename}_patient_{patient_label}_scenario_{scenario_name_for_filename}_duration_{duration}m.csv"
     
     simulation_results_df.to_csv(results_file, index=False)
     
@@ -720,6 +785,53 @@ def validate(
             raise typer.Exit(code=1)
 
     console.print("[green]Scenario validation passed.[/green]")
+
+
+@app.command("import-data")
+def import_data(
+    input_csv: Annotated[Path, typer.Option(help="Path to CGM CSV file")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + standard CSV")] = Path("./results/imported"),
+    data_format: Annotated[str, typer.Option(help="Data format preset: generic, dexcom, libre")] = "generic",
+    scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Imported CGM Scenario",
+    scenario_version: Annotated[str, typer.Option(help="Scenario version")] = "1.0",
+    time_unit: Annotated[str, typer.Option(help="Timestamp unit: minutes or seconds")] = "minutes",
+    carb_threshold: Annotated[float, typer.Option(help="Minimum carbs (g) to create a meal event")] = 0.1,
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Optional output scenario path")] = None,
+    data_path: Annotated[Optional[Path], typer.Option(help="Optional output standard CSV path")] = None,
+    mapping: Annotated[List[str], typer.Option("--map", help="Column mapping key=value (e.g., timestamp=Time, glucose=SGV)")] = [],
+):
+    """Import real-world CGM CSV into the IINTS standard schema + scenario JSON."""
+    console = Console()
+    if not input_csv.is_file():
+        console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    column_map = _parse_column_mapping(mapping, console)
+
+    try:
+        result = scenario_from_csv(
+            input_csv,
+            scenario_name=scenario_name,
+            scenario_version=scenario_version,
+            data_format=data_format,
+            column_map=column_map or None,
+            time_unit=time_unit,
+            carb_threshold=carb_threshold,
+        )
+    except Exception as e:
+        console.print(f"[bold red]Import failed: {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = scenario_path or output_dir / "scenario.json"
+    data_path = data_path or output_dir / "cgm_standard.csv"
+
+    scenario_path.write_text(json.dumps(result.scenario, indent=2))
+    export_standard_csv(result.dataframe, data_path)
+
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+    console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
 
 
 @app.command("check-deps")

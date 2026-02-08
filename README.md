@@ -8,8 +8,10 @@ IINTS-AF is a **safety-first simulation and validation platform** for insulin do
 
 **In one session you can**:
 * Run a clinic-safe preset and compare against PID and standard pump baselines
+* Import real-world CGM CSV into a standard schema + scenario JSON
 * Export a clean PDF report plus full audit trail (JSONL/CSV)
 * Stress-test sensor noise, pump limits, and human-in-the-loop interventions
+* Generate patient profiles with ISF/ICR + dawn phenomenon
 
 **Who it’s for**:
 * Diabetes researchers and clinicians validating new control strategies
@@ -21,6 +23,11 @@ IINTS-AF is a **safety-first simulation and validation platform** for insulin do
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+Import real-world CGM data:
+```bash
+iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
 ```
 
 ### Quick Start (Python)
