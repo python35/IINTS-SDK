@@ -73,6 +73,11 @@ iints import-wizard
 iints import-demo --output-dir results/demo_import
 ```
 
+### Demo Quickstart Workflow (Script)
+```bash
+python3 examples/demo_quickstart_flow.py
+```
+
 ### Create a Patient Profile (YAML)
 ```bash
 iints profiles create --name patient_john \

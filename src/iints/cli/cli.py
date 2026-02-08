@@ -906,6 +906,11 @@ def import_wizard():
     guesses = guess_column_mapping(columns, data_format=data_format)
 
     console.print(f"[bold]Detected columns:[/bold] {', '.join(columns)}")
+    try:
+        preview = pd.read_csv(input_csv, nrows=5)
+        console.print(Panel(preview.to_string(index=False), title="Preview (first 5 rows)"))
+    except Exception as exc:
+        console.print(f"[yellow]Preview unavailable:[/yellow] {exc}")
 
     ts_col = typer.prompt("Timestamp column", default=guesses.get("timestamp") or columns[0])
     glucose_col = typer.prompt("Glucose column", default=guesses.get("glucose") or "")

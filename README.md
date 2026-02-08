@@ -43,6 +43,11 @@ Try the bundled demo data pack:
 iints import-demo --output-dir results/demo_import
 ```
 
+Or run the full demo workflow (import + run + report) in one script:
+```bash
+python3 examples/demo_quickstart_flow.py
+```
+
 ### Quick Start (Python)
 ```python
 import iints
