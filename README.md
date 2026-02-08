@@ -79,6 +79,7 @@ Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full work
 * Product manual: `SDK_COMPREHENSIVE_GUIDE.md`
 * Notebook index: `examples/notebooks/README.md`
 * Technical README: `TECHNICAL_README.md`
+* API Stability: `API_STABILITY.md`
 
 ### Ethics & Safety
 This SDK is for **research and validation**. It is not a medical device and does not provide clinical dosing advice.

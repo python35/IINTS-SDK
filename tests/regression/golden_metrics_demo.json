@@ -1,0 +1,19 @@
+{
+  "cv": 12.563,
+  "data_coverage": 100,
+  "gmi": 6.345,
+  "hbgi": 0.094,
+  "hi": 0.0,
+  "lbgi": 0.007,
+  "mean_glucose": 126.896,
+  "median_glucose": 128.45,
+  "readings_per_day": 288.0,
+  "sd": 15.942,
+  "tir_70_110": 8.681,
+  "tir_70_140": 80.556,
+  "tir_70_180": 100.0,
+  "tir_above_180": 0.0,
+  "tir_above_250": 0.0,
+  "tir_below_54": 0.0,
+  "tir_below_70": 0.0
+}

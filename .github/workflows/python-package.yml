@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.9"]
+        python-version: ["3.9", "3.10", "3.11"]
 
     steps:
     - uses: actions/checkout@v4
@@ -24,8 +24,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build flake8 mypy pandas-stubs types-PyYAML simglucose==0.2.10 types-psutil
+        pip install build flake8 mypy pandas-stubs types-PyYAML types-psutil pytest-cov
         pip install -r requirements-dev.txt
+        pip install -e .
         # Install project dependencies for linting/type checking if applicable
         # If your project has a requirements.txt, uncomment the next line:
         # pip install -r requirements.txt
@@ -40,7 +41,7 @@ jobs:
 
     - name: Run tests with PyTest
       run: |
-        pytest
+        pytest --cov=src/iints --cov-report=xml
 
     - name: Build package
       run: |

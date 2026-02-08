@@ -80,6 +80,10 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
+            git fetch origin main
+            git stash push -u -m "health-badges"
+            git rebase origin/main || (git rebase --abort && git stash pop && exit 1)
+            git stash pop || (echo "Stash pop failed" && git status && exit 1)
             git add badges
             git commit -m "chore: update health badges [skip health badges]"
             git push origin main

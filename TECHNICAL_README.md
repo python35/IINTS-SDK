@@ -44,7 +44,7 @@ iints run --algo algorithms/example_algorithm.py \
   --seed 42
 ```
 
-### One-Line Runner (CSV + audit + PDF + baseline)
+### One-Line Runner (CSV + audit + PDF + baseline + profiling)
 ```bash
 iints run-full --algo algorithms/example_algorithm.py \
   --scenario-path scenarios/example_scenario.json \
@@ -275,3 +275,6 @@ make lint
 * February 2026: Safety Engine hardening + documentation sprint
 * March 2026: Monte Carlo population studies + edge AI benchmarking
 * March 27, 2026: Official Launch & Live Expo Demo
+
+## API Stability
+See `API_STABILITY.md` for semver and deprecation policy.

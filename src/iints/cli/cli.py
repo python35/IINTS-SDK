@@ -709,7 +709,7 @@ def run_full(
     else:
         patient_config = patient_config_name
 
-    outputs = iints.run_simulation(
+    outputs = iints.run_full(
         algorithm=algorithm_instance,
         scenario=str(scenario_path) if scenario_path else None,
         patient_config=patient_config,
@@ -717,9 +717,6 @@ def run_full(
         time_step=time_step,
         seed=seed,
         output_dir=output_dir,
-        compare_baselines=True,
-        export_audit=True,
-        generate_report=True,
     )
 
     console.print("[green]Run complete.[/green]")

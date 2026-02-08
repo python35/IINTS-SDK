@@ -133,19 +133,60 @@ def run_full(
     time_step: int = 5,
     seed: Optional[int] = None,
     output_dir: Union[str, Path] = "results/run_full",
+    enable_profiling: bool = True,
 ) -> Dict[str, Any]:
     """
     One-line runner that always exports results + audit + PDF + baseline comparison.
     """
-    return run_simulation(
-        algorithm=algorithm,
-        scenario=scenario,
-        patient_config=patient_config,
-        duration_minutes=duration_minutes,
+    algorithm_instance = algorithm() if isinstance(algorithm, type) else algorithm
+    patient_params = _resolve_patient_config(patient_config)
+    patient_model = PatientModel(**patient_params)
+
+    scenario_payload = _resolve_scenario_payloads(scenario)
+    stress_event_payloads = scenario_payload.get("stress_events", []) if scenario_payload else []
+
+    simulator = Simulator(
+        patient_model=patient_model,
+        algorithm=algorithm_instance,
         time_step=time_step,
         seed=seed,
-        output_dir=output_dir,
-        compare_baselines=True,
-        export_audit=True,
-        generate_report=True,
+        enable_profiling=enable_profiling,
     )
+    for event in build_stress_events(stress_event_payloads):
+        simulator.add_stress_event(event)
+
+    results_df, safety_report = simulator.run_batch(duration_minutes)
+
+    outputs: Dict[str, Any] = {
+        "results": results_df,
+        "safety_report": safety_report,
+    }
+
+    comparison = run_baseline_comparison(
+        patient_params=patient_params,
+        stress_event_payloads=stress_event_payloads,
+        duration=duration_minutes,
+        time_step=time_step,
+        primary_label=algorithm_instance.get_algorithm_metadata().name,
+        primary_results=results_df,
+        primary_safety=safety_report,
+        seed=seed,
+    )
+    safety_report["baseline_comparison"] = comparison
+    outputs["baseline_comparison"] = comparison
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    results_csv = output_path / "results.csv"
+    results_df.to_csv(results_csv, index=False)
+    outputs["results_csv"] = str(results_csv)
+
+    outputs["audit"] = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
+    outputs["baseline_files"] = write_baseline_comparison(comparison, output_path / "baseline")
+
+    report_path = output_path / "clinical_report.pdf"
+    generator = ClinicalReportGenerator()
+    generator.generate_pdf(results_df, safety_report, str(report_path))
+    outputs["report_pdf"] = str(report_path)
+
+    return outputs

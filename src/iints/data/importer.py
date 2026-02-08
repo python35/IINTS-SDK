@@ -46,6 +46,21 @@ DEFAULT_MAPPINGS: Dict[str, Dict[str, List[str]]] = {
     },
 }
 
+IMPORT_FORMAT_SCHEMAS: Dict[str, Dict[str, List[str]]] = {
+    "generic": {
+        "required": ["timestamp", "glucose"],
+        "optional": ["carbs", "insulin"],
+    },
+    "dexcom": {
+        "required": ["timestamp", "glucose"],
+        "optional": ["carbs", "insulin"],
+    },
+    "libre": {
+        "required": ["timestamp", "glucose"],
+        "optional": ["carbs", "insulin"],
+    },
+}
+
 
 @dataclass
 class ImportResult:
@@ -63,6 +78,30 @@ def guess_column_mapping(columns: Iterable[str], data_format: str = "generic") -
     }
 
 
+def validate_import_schema(
+    columns: Iterable[str],
+    data_format: str,
+    column_map: Optional[Dict[str, str]] = None,
+) -> None:
+    schema = IMPORT_FORMAT_SCHEMAS.get(data_format, IMPORT_FORMAT_SCHEMAS["generic"])
+    candidates = DEFAULT_MAPPINGS.get(data_format, DEFAULT_MAPPINGS["generic"])
+    mapping = column_map or {}
+
+    missing: List[str] = []
+    for key in schema["required"]:
+        if key in mapping:
+            continue
+        found = _find_column(columns, candidates.get(key, []))
+        if found is None:
+            missing.append(key)
+
+    if missing:
+        raise ValueError(
+            f"Missing required columns for format '{data_format}': {', '.join(missing)}. "
+            f"Columns: {list(columns)}"
+        )
+
+
 def import_cgm_dataframe(
     df: pd.DataFrame,
     data_format: str = "generic",
@@ -78,6 +117,8 @@ def import_cgm_dataframe(
     mapping = {k: v for k, v in mapping.items() if v}
 
     candidates = DEFAULT_MAPPINGS.get(data_format, DEFAULT_MAPPINGS["generic"])
+
+    validate_import_schema(columns, data_format=data_format, column_map=mapping)
 
     def resolve(key: str, required: bool = True) -> Optional[str]:
         if key in mapping:
@@ -107,24 +148,25 @@ def import_cgm_dataframe(
         df["insulin"] = 0.0
 
     # Parse timestamps
-    if pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
-        ts = df["timestamp"]
-    else:
-        # Try datetime parsing, fallback to numeric
-        ts = pd.to_datetime(df["timestamp"], errors="coerce")
-        if ts.isna().all():
-            ts = None
-        else:
-            df["timestamp"] = ts
-
-    if ts is not None:
-        df["timestamp"] = (ts - ts.iloc[0]).dt.total_seconds() / 60.0
-    else:
-        # Assume numeric
+    if pd.api.types.is_numeric_dtype(df["timestamp"]):
+        # Assume numeric (minutes or seconds)
         if time_unit == "seconds":
             df["timestamp"] = df["timestamp"].astype(float) / 60.0
         else:
             df["timestamp"] = df["timestamp"].astype(float)
+    elif pd.api.types.is_datetime64_any_dtype(df["timestamp"]):
+        ts = df["timestamp"]
+        df["timestamp"] = (ts - ts.iloc[0]).dt.total_seconds() / 60.0
+    else:
+        # Try datetime parsing, fallback to numeric
+        ts = pd.to_datetime(df["timestamp"], errors="coerce")
+        if ts.isna().all():
+            if time_unit == "seconds":
+                df["timestamp"] = df["timestamp"].astype(float) / 60.0
+            else:
+                df["timestamp"] = df["timestamp"].astype(float)
+        else:
+            df["timestamp"] = (ts - ts.iloc[0]).dt.total_seconds() / 60.0
 
     df["source"] = source or data_format
     ingestor = DataIngestor()
