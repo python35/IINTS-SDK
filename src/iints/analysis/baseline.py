@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 import json
 import pandas as pd
@@ -34,7 +34,7 @@ def run_baseline_comparison(
     primary_results: pd.DataFrame,
     primary_safety: Dict[str, Any],
     compare_standard_pump: bool = True,
-    seed: int | None = None,
+    seed: Optional[int] = None,
 ) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
 

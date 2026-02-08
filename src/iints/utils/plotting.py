@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 
 IINTS_BLUE = "#00798c"
@@ -14,7 +14,7 @@ IINTS_GOLD = "#e9c46a"
 def apply_plot_style(
     dpi: int = 150,
     font_scale: float = 1.1,
-    palette: Iterable[str] | None = None,
+    palette: Optional[Iterable[str]] = None,
 ) -> List[str]:
     """
     Apply IINTS paper-ready plotting defaults (Matplotlib/Seaborn).

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import re
 
 import pandas as pd
@@ -52,7 +52,7 @@ class ImportResult:
 
 
 def import_cgm_csv(
-    path: str | Path,
+    path: Union[str, Path],
     data_format: str = "generic",
     column_map: Optional[Dict[str, str]] = None,
     time_unit: str = "minutes",
@@ -152,7 +152,7 @@ def scenario_from_dataframe(
 
 
 def scenario_from_csv(
-    path: str | Path,
+    path: Union[str, Path],
     scenario_name: str = "Imported CGM Scenario",
     scenario_version: str = "1.0",
     data_format: str = "generic",
@@ -175,7 +175,7 @@ def scenario_from_csv(
     return ImportResult(dataframe=df, scenario=scenario)
 
 
-def export_standard_csv(df: pd.DataFrame, output_path: str | Path) -> str:
+def export_standard_csv(df: pd.DataFrame, output_path: Union[str, Path]) -> str:
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_path, index=False)

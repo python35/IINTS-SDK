@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # Use custom patient model as default to avoid simglucose dependency issues
 # from simglucose.simulation.env import T1DSimEnv
@@ -87,7 +87,7 @@ class CustomPatientModel:
         self.exercise_intensity = 0.0
         print("INFO: Patient stopped exercise.")
 
-    def update(self, time_step: float, delivered_insulin: float, carb_intake: float = 0.0, current_time: float | None = None, **kwargs) -> float:
+    def update(self, time_step: float, delivered_insulin: float, carb_intake: float = 0.0, current_time: Optional[float] = None, **kwargs) -> float:
         """
         Updates the patient's glucose level over a given time step.
 
