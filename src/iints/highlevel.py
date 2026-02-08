@@ -50,7 +50,7 @@ def _resolve_scenario_payloads(
 def run_simulation(
     algorithm: Union[InsulinAlgorithm, type],
     scenario: Optional[Union[str, Path, Dict[str, Any]]] = None,
-    patient_config: Union[str, Path, Dict[str, Any]] = "default_patient",
+    patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = "default_patient",
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
