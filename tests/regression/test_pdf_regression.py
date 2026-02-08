@@ -1,5 +1,8 @@
 import os
 from pathlib import Path
+import matplotlib
+matplotlib.use("Agg")
+
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp")
 
