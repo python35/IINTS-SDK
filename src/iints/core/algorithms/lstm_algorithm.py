@@ -133,3 +133,6 @@ else:
     class LSTMInsulinAlgorithm(InsulinAlgorithm):  # type: ignore
         def __init__(self, *args, **kwargs):
             raise ImportError("Torch is required for LSTMInsulinAlgorithm. Install with `pip install iints[torch]`.")
+
+        def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
+            raise ImportError("Torch is required for LSTMInsulinAlgorithm. Install with `pip install iints[torch]`.")
