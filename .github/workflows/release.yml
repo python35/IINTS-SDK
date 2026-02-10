@@ -1,0 +1,53 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build artifacts
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m build --no-isolation
+
+      - name: Resolve release notes
+        id: notes
+        run: |
+          NOTES="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTES" ]; then
+            echo "use_body_path=true" >> $GITHUB_OUTPUT
+            echo "body_path=$NOTES" >> $GITHUB_OUTPUT
+          else
+            echo "use_body_path=false" >> $GITHUB_OUTPUT
+            echo "body=Release ${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release (with notes file)
+        if: steps.notes.outputs.use_body_path == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: ${{ steps.notes.outputs.body_path }}
+          files: dist/*
+
+      - name: Create GitHub Release (fallback)
+        if: steps.notes.outputs.use_body_path != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.body }}
+          files: dist/*
