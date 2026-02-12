@@ -3,8 +3,8 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 
-<div align="center" style="margin: 0; padding: 0;">
-  <img src="Ontwerp zonder titel.png" alt="Beschrijving" style="display: block; margin: 0 auto; padding: 0;">
+<div style="text-align: center; margin-top: -10px; margin-bottom: -10px;">
+  <img src="Ontwerp zonder titel.png" alt="" style="display: block; margin: 0 auto;">
 </div>
 
 ## Intelligent Insulin Titration System for Artificial Pancreas
