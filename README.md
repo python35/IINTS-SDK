@@ -3,6 +3,10 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 
+<div align="center">
+  <img src="Ontwerp zonder titel.png">
+</div>
+
 ## Intelligent Insulin Titration System for Artificial Pancreas
 
 IINTS-AF is a **safety-first simulation and validation platform** for insulin dosing algorithms. It lets you test AI or classical controllers on virtual patients, enforce deterministic safety constraints, and generate audit-ready clinical reports before anything touches a real patient.
