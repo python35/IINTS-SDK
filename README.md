@@ -1,4 +1,5 @@
-# IINTS-AF SDK (v0.1.5)
+# IINTS-AF SDK
+[![PyPI version](https://badge.fury.io/py/iints-sdk-python35.svg)](https://badge.fury.io/py/iints-sdk-python35)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 
@@ -18,6 +19,14 @@ IINTS-AF is a **safety-first simulation and validation platform** for insulin do
 * Diabetes researchers and clinicians validating new control strategies
 * ML engineers benchmarking AI controllers with medical safety rails
 * Developers building decision-support systems for closed-loop insulin delivery
+
+## Installation
+
+Install the SDK directly via PyPI:
+
+```bash
+pip install iints-sdk-python35
+```
 
 ### Quick Start (CLI)
 ```bash
