@@ -1,15 +1,15 @@
 time_minutes,glucose_actual_mgdl,glucose_to_algo_mgdl,algo_recommended_insulin_units,delivered_insulin_units,safety_reason,safety_triggered,supervisor_latency_ms,sensor_status,pump_status,pump_reason,human_intervention
-0,135.0,135.0,0.7666666666666666,0.7666666666666666,APPROVED,False,0.010929999987752126,ok,ok,approved,False
-5,114.66481481481482,114.66481481481482,0.35996296296296304,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -4.07 mg/dL/min,True,0.01616099999068865,ok,ok,approved,False
-10,97.29472222222222,97.29472222222222,0.06666666666666667,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -3.77 mg/dL/min,True,0.010669999994661339,ok,ok,approved,False
-15,82.44495833333333,82.44495833333333,0.06666666666666667,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -3.22 mg/dL/min,True,0.010169000006499118,ok,ok,approved,False
-20,69.73747384259259,69.73747384259259,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; CRITICAL: Hypoglycemia - insulin limited; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.76 mg/dL/min,True,0.011572000005344307,ok,ok,approved,False
-25,58.85092684027778,58.85092684027778,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; CRITICAL: Hypoglycemia - insulin limited; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.36 mg/dL/min,True,0.009949000002507091,ok,ok,approved,False
-30,49.512176703125,49.512176703125,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.02 mg/dL/min,True,0.0164409999996451,ok,ok,approved,False
-35,41.48905390135995,41.48905390135995,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.0069430000024794936,ok,ok,approved,False
-40,34.58421433467448,34.58421433467448,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.00596099999938815,ok,ok,approved,False
-45,28.62991551780664,28.62991551780664,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.0057110000000193395,ok,ok,approved,False
-50,23.483576338283793,23.483576338283793,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.005639999997697487,ok,ok,approved,False
-55,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.00526000000888871,ok,ok,approved,False
-60,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.004958999994641999,ok,ok,approved,False
-65,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.007633999999256957,ok,ok,approved,False
+0,135.0,135.0,0.7666666666666666,0.7666666666666666,APPROVED,False,0.009594999994533282,ok,ok,approved,False
+5,114.66481481481482,114.66481481481482,0.35996296296296304,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -4.07 mg/dL/min,True,0.014472000003706853,ok,ok,approved,False
+10,97.29472222222222,97.29472222222222,0.06666666666666667,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -3.77 mg/dL/min,True,0.009765000001493718,ok,ok,approved,False
+15,82.44495833333333,82.44495833333333,0.06666666666666667,0.0,NEGATIVE_TREND_LIMIT: Glucose dropping at -3.22 mg/dL/min,True,0.008773000004680398,ok,ok,approved,False
+20,69.73747384259259,69.73747384259259,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; CRITICAL: Hypoglycemia - insulin limited; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.76 mg/dL/min,True,0.010385999999584783,ok,ok,approved,False
+25,58.85092684027778,58.85092684027778,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; CRITICAL: Hypoglycemia - insulin limited; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.36 mg/dL/min,True,0.008733000001370783,ok,ok,approved,False
+30,49.512176703125,49.512176703125,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected; NEGATIVE_TREND_LIMIT: Glucose dropping at -2.02 mg/dL/min,True,0.01621500000226206,ok,ok,approved,False
+35,41.48905390135995,41.48905390135995,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.006700000000137152,ok,ok,approved,False
+40,34.58421433467448,34.58421433467448,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.005779000005645685,ok,ok,approved,False
+45,28.62991551780664,28.62991551780664,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.004956999987371091,ok,ok,approved,False
+50,23.483576338283793,23.483576338283793,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.00486700000124074,ok,ok,approved,False
+55,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.004577000012773169,ok,ok,approved,False
+60,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.003986000010058888,ok,ok,approved,False
+65,20.0,20.0,0.06666666666666667,0.0,HYPO_CUTOFF: Glucose below safety cutoff; EMERGENCY_STOP: Severe hypoglycemia detected,True,0.006409999997458726,ok,ok,approved,False
