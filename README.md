@@ -77,7 +77,8 @@ outputs = iints.run_simulation(
 ```
 
 ### Notebook Guide
-Hands-on Jupyter notebooks live in `examples/notebooks/` and cover the full workflow (each is Colab-ready):
+Hands-on Jupyter notebooks live in [`examples/notebooks/`](examples/notebooks/)  
+
 
 * Quickstart end-to-end run
 * Presets + scenario validation
