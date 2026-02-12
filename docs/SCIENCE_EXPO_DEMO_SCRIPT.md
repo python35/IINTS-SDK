@@ -5,7 +5,7 @@
 
 ## Opening Statement (15 seconds)
 
-*"Mensen dragen slimme insulinepompen, maar begrijpen ze niet. IINTS-AF is geen nieuwe AI - het is een **röntgenapparaat voor algoritmes**. Ik maak onzichtbare medische beslissingen zichtbaar."*
+*"People wear smart insulin pumps, but don't understand them. IINTS-AF is not a new AI - it is an **X-ray machine for algorithms**. I make invisible medical decisions visible."*
 
 ---
 
@@ -22,9 +22,9 @@
 - AI uncertainty tracking
 
 **Key talking points**:
-- "Kijk naar de lijn - dikker betekent zekerder"
-- "Hier twijfelt de AI - Safety Supervisor neemt over"
-- "8.4ms inferentie - lokaal op een chip, geen cloud"
+- "Look at the line - thicker means more certain"
+- "Here the AI is unsure - Safety Supervisor takes over"
+- "8.4ms inference - local on a chip, no cloud"
 
 **Jury impact**: Visual wow-factor, shows real-time capability
 
@@ -41,10 +41,10 @@
 - Safety override events
 
 **Key talking points**:
-- "Dit is de X-ray: elke beslissing volledig uitgelegd"
-- "Algoritme persoonlijkheid: Hypo-aversie 0.85 - voorzichtig"
-- "What-if: 'Wat als ik had gesport?' - 40% minder insuline"
-- "Rode kruizen = Safety Supervisor blokkeert gevaarlijke beslissing"
+- "This is the X-ray: every decision fully explained"
+- "Algorithm personality: Hypo-aversion 0.85 - cautious"
+- "What-if: 'What if I had exercised?' - 40% less insulin"
+- "Red crosses = Safety Supervisor blocks dangerous decision"
 
 **Jury impact**: "This is not just AI - this is understanding AI"
 
@@ -60,10 +60,10 @@
 - TIR improvement: 93.9% vs 87.6%
 
 **Key talking points**:
-- "Niet alleen een algoritme - wetenschappelijk bewijs"
-- "15.7% verbetering over industrie standaard"
-- "Statistisch significant, p < 0.01"
-- "4 patiënten, reproduceerbare resultaten"
+- "Not just an algorithm - scientific proof"
+- "15.7% improvement over industry standard"
+- "Statistically significant, p < 0.01"
+- "4 patients, reproducible results"
 
 **Jury impact**: Academic credibility, rigorous validation
 
@@ -79,10 +79,10 @@
 - Bayesian neural network simulation
 
 **Key talking points**:
-- "AI die zegt 'ik weet het niet' is veiliger"
+- "AI that says 'I don't know' is safer"
 - "Monte Carlo Dropout - 1000 forward passes"
-- "94.2% beslissingen met >80% zekerheid"
-- "Universitair niveau machine learning"
+- "94.2% decisions with >80% certainty"
+- "University level machine learning"
 
 **Jury impact**: Technical depth, safety consciousness
 
@@ -90,7 +90,7 @@
 
 ### 5. Closing Statement (15 seconds)
 
-*"Mijn doel was niet alleen een algoritme maken, maar een verantwoordelijk systeem bouwen. Door onzekerheid meetbaar te maken en elk resultaat wetenschappelijk te benchmarken, bewijst IINTS-AF dat veilige, autonome diabeteszorg op de Edge vandaag al mogelijk is."*
+*"My goal was not just to make an algorithm, but to build a responsible system. By making uncertainty measurable and benchmarking every result scientifically, IINTS-AF proves that safe, autonomous diabetes care on the Edge is possible today."*
 
 **Hand them**: Jury Cheat Sheet (docs/JURY_CHEAT_SHEET.md printed)
 
@@ -100,23 +100,23 @@
 
 ### "Is dit veilig voor echte patiënten?"
 
-*"Nee - dit is een pre-klinisch onderzoeksinstrument. Zoals vliegtuigen eerst in simulators getest worden, test ik algoritmes in digitale patiënten. Geen enkel risico voor echte mensen."*
+*"No - this is a pre-clinical research instrument. Just as planes are tested in simulators first, I test algorithms in digital patients. No risk to real people."*
 
 ### "Wat maakt dit anders dan andere AI projecten?"
 
-*"Drie dingen: 1) Algorithm X-Ray - ik maak beslissingen begrijpelijk, 2) Wetenschappelijke benchmarking - statistisch bewijs, 3) Uncertainty Quantification - AI die zijn grenzen kent."*
+*"Three things: 1) Algorithm X-Ray - I make decisions understandable, 2) Scientific benchmarking - statistical proof, 3) Uncertainty Quantification - AI that knows its limits."*
 
 ### "Hoe weet je dat het werkt?"
 
-*"Comparative Benchmarking: 4 algoritmes, 4 patiënten, statistische tests. LSTM wint met p < 0.01. Plus: elke beslissing is traceerbaar via X-Ray systeem."*
+*"Comparative Benchmarking: 4 algorithms, 4 patients, statistical tests. LSTM wins with p < 0.01. Plus: every decision is traceable via X-Ray system."*
 
 ### "Wat is het innovatieve aspect?"
 
-*"Algorithm X-Ray - niemand maakt medische AI zo transparant. Plus: Edge deployment (lokaal op chip), Uncertainty Quantification (AI die twijfelt), en Safety Supervisor (harde grenzen)."*
+*"Algorithm X-Ray - no one makes medical AI this transparent. Plus: Edge deployment (local on chip), Uncertainty Quantification (AI that doubts), and Safety Supervisor (hard limits)."*
 
 ### "Kan dit internationaal concurreren?"
 
-*"Ja - universitair niveau ML (Bayesian networks), publicatie-waardige statistiek (p-values, paired tests), en professionele documentatie (Excel, PDF, MATLAB). Plus: unieke term 'Algorithm X-Ray'."*
+*"Yes - university level ML (Bayesian networks), publication-worthy statistics (p-values, paired tests), and professional documentation (Excel, PDF, MATLAB). Plus: unique term 'Algorithm X-Ray'."*
 
 ---
 
@@ -174,12 +174,12 @@
 
 ## Key Phrases to Memorize
 
-1. **"Röntgenapparaat voor algoritmes"** - Core concept
-2. **"Onzichtbare beslissingen zichtbaar"** - Value proposition
-3. **"8.4ms inferentie op Jetson Nano"** - Technical credibility
-4. **"15.7% verbetering, p < 0.01"** - Scientific proof
-5. **"AI die zegt 'ik weet het niet'"** - Safety consciousness
-6. **"Veilige autonome zorg op de Edge"** - Vision statement
+1. **"X-ray machine for algorithms"** - Core concept
+2. **"Invisible decisions visible"** - Value proposition
+3. **"8.4ms inference on Jetson Nano"** - Technical credibility
+4. **"15.7% improvement, p < 0.01"** - Scientific proof
+5. **"AI that says 'I don't know'"** - Safety consciousness
+6. **"Safe autonomous care on the Edge"** - Vision statement
 
 ---
 
@@ -197,8 +197,8 @@
 
 **Confidence booster**: You have 12 integrated modules, university-level ML, statistical validation, and a unique conceptual framework. This is internationally competitive.
 
-**Final thought**: "Ik maak onzichtbare medische beslissingen zichtbaar" - that's your one-liner. Own it.
+**Final thought**: "I make invisible medical decisions visible" - that's your one-liner. Own it.
 
 ---
 
-*Good luck! Je hebt dit.*
+*Good luck! You got this.*
