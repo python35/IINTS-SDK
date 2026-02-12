@@ -1,4 +1,4 @@
-name: GitHub Release
+name: GitHub Release & PyPI Publish
 
 on:
   push:
@@ -6,7 +6,8 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: write    # Nodig voor de GitHub Release
+  id-token: write    # CRUCIAAL voor Trusted Publishing op PyPI
 
 jobs:
   release:
@@ -38,16 +39,14 @@ jobs:
             echo "body=Release ${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create GitHub Release (with notes file)
-        if: steps.notes.outputs.use_body_path == 'true'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: ${{ steps.notes.outputs.body_path }}
+          body: ${{ steps.notes.outputs.use_body_path == 'true' && '' || steps.notes.outputs.body }}
+          body_path: ${{ steps.notes.outputs.use_body_path == 'true' && steps.notes.outputs.body_path || '' }}
           files: dist/*
 
-      - name: Create GitHub Release (fallback)
-        if: steps.notes.outputs.use_body_path != 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          body: ${{ steps.notes.outputs.body }}
-          files: dist/*
+      # DIT IS DE NIEUWE STAP VOOR PYPI
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Geen tokens nodig dankzij de 'id-token: write' toestemming!
