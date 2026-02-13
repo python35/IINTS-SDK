@@ -2,13 +2,14 @@
 
 ## Unreleased
 
-- Added Pydantic-based scenario and patient config validation with scenario versioning.
-- Added clinic-safe story presets (pizza paradox, midnight crash) and baseline comparison tables.
-- Added deterministic runs via CLI seed support and a one-line `run_simulation` API.
-- Added human-in-the-loop callbacks, sensor/pump error models, and simulation state serialization.
-- Made Torch optional with lazy-loading AI modules and added mock algorithms for CI.
-- Added `iints check-deps` for dependency readiness checks.
-- Added SimulationLimitError fail-safe termination and standalone metrics module.
+- (no entries)
+
+## v0.1.9
+
+- Refreshed notebooks with clearer walkthroughs and baked outputs.
+- Added branded logo support in PDF reports and notebooks.
+- Fixed CLI output path defaults and rich link formatting.
+- Cleaned repository by removing unused legacy folders.
 
 ## v0.1.3
 

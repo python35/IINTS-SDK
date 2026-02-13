@@ -13,43 +13,78 @@ class {{ALGO_NAME}}(InsulinAlgorithm):
         # Initialize any specific state or parameters for your algorithm here
 
     def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
-        # --- YOUR ALGORITHM LOGIC GOES HERE ---
-        # This is a basic placeholder. Implement your actual insulin prediction logic.
+        # --- SAFETY-FIRST STARTER LOGIC ---
+        # This template is intentionally conservative to avoid hypoglycemia.
 
-        # Example: Deliver 0.1 units if glucose is above 120 mg/dL
+        self.why_log = []
+
+        current_glucose = data.current_glucose
+        iob = data.insulin_on_board
+        carbs = data.carb_intake
+
+        previous_glucose = self.state.get("previous_glucose", current_glucose)
+        glucose_trend = (current_glucose - previous_glucose) / max(data.time_step, 1)
+        self.state["previous_glucose"] = current_glucose
+
         total_insulin = 0.0
         bolus_insulin = 0.0
         basal_insulin = 0.0
         correction_bolus = 0.0
         meal_bolus = 0.0
 
-        if data.current_glucose > 120:
-            correction_bolus = (data.current_glucose - 120) / self.isf / 5 # Example: 1 unit per 50 mg/dL above 120
-            total_insulin += correction_bolus
-            self._log_reason(f"Correcting high glucose", "glucose_level", data.current_glucose, f"Delivered {correction_bolus:.2f} units to reduce {data.current_glucose} mg/dL")
+        # Hard safety cutoff
+        if current_glucose < 90:
+            self._log_reason("Glucose below 90 mg/dL; holding insulin.", "safety_cutoff", current_glucose)
+            return {
+                "total_insulin_delivered": 0.0,
+                "bolus_insulin": 0.0,
+                "basal_insulin": 0.0,
+                "correction_bolus": 0.0,
+                "meal_bolus": 0.0,
+            }
 
-        if data.carb_intake > 0:
-            meal_bolus = data.carb_intake / self.icr
+        # If glucose is falling quickly, avoid correction bolus
+        if glucose_trend < -1.0:
+            self._log_reason(
+                f"Glucose dropping at {glucose_trend:.2f} mg/dL/min; skipping correction bolus.",
+                "safety_trend",
+                glucose_trend,
+            )
+        else:
+            # Conservative correction only if quite high
+            if current_glucose > 180:
+                correction_bolus = (current_glucose - 140) / self.isf
+                correction_bolus = min(max(correction_bolus, 0.0), 0.5)
+                total_insulin += correction_bolus
+                self._log_reason(
+                    f"Conservative correction bolus {correction_bolus:.2f} U.",
+                    "correction",
+                    current_glucose,
+                )
+
+        # Meal bolus (capped)
+        if carbs > 0:
+            meal_bolus = min(carbs / self.icr, 2.0)
             total_insulin += meal_bolus
-            self._log_reason(f"Meal intake detected", "carb_intake", data.carb_intake, f"Delivered {meal_bolus:.2f} units for {data.carb_intake}g carbs")
+            self._log_reason(
+                f"Meal bolus {meal_bolus:.2f} U for {carbs:.0f} g carbs.",
+                "meal_bolus",
+                carbs,
+            )
 
-        # Simulate basal rate (e.g., a continuous small delivery)
-        # For simplicity, let's assume a fixed basal delivery over the time step
-        # You might integrate this with your overall basal strategy
-        # basal_insulin = 0.01 * data.time_step # Example: 0.01 units per minute basal
-        # total_insulin += basal_insulin
-        self._log_reason(f"Maintaining basal rate", "basal", data.time_step, f"Delivered {basal_insulin:.2f} units basal")
+        # Optional: cap total insulin based on IOB
+        if iob > 2.0:
+            total_insulin = min(total_insulin, 0.2)
+            self._log_reason("High IOB; capping total insulin to 0.2 U.", "iob_cap", iob)
 
-
-        # Ensure no negative insulin delivery
         total_insulin = max(0.0, total_insulin)
+        bolus_insulin = total_insulin
 
-        # Store important decisions in the why_log for transparency
         self._log_reason(f"Final insulin decision: {total_insulin:.2f} units", "decision", total_insulin)
 
-        return { 
+        return {
             "total_insulin_delivered": total_insulin,
-            "bolus_insulin": bolus_insulin, # You might differentiate between meal and correction bolus here
+            "bolus_insulin": bolus_insulin,
             "basal_insulin": basal_insulin,
             "correction_bolus": correction_bolus,
             "meal_bolus": meal_bolus,
