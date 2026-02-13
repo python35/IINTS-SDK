@@ -54,6 +54,7 @@ iints = "iints.cli.cli:app"
 iints = [
   "templates/*.py",
   "templates/scenarios/*.json",
+  "assets/*.png",
   "data/virtual_patients/*.yaml",
   "data/demo/*.csv",
   "presets/*.json",

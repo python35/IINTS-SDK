@@ -21,6 +21,30 @@ class ClinicalReportGenerator:
     def __init__(self) -> None:
         self.metrics_calculator = ClinicalMetricsCalculator()
 
+    def _resolve_logo_path(self) -> Optional[Path]:
+        candidates = []
+        # Package asset (installed)
+        candidates.append(Path(__file__).resolve().parent.parent / "assets" / "iints_logo.png")
+        # Repo root img/ (dev)
+        candidates.append(Path(__file__).resolve().parents[3] / "img" / "iints_logo.png")
+        for path in candidates:
+            if path.exists():
+                return path
+        return None
+
+    def _render_logo(self, pdf: FPDF) -> None:
+        logo_path = self._resolve_logo_path()
+        if not logo_path:
+            return
+        try:
+            logo_width = 36
+            x_pos = pdf.w - pdf.r_margin - logo_width
+            y_pos = 6
+            pdf.image(str(logo_path), x=x_pos, y=y_pos, w=logo_width)
+        except Exception:
+            # Fallback silently if image fails to load
+            return
+
     def _plot_glucose(self, df: pd.DataFrame, output_path: Path) -> None:
         apply_plot_style()
         plt.figure(figsize=(10, 4))
@@ -108,6 +132,7 @@ class ClinicalReportGenerator:
             pdf = FPDF()
             pdf.set_auto_page_break(auto=True, margin=12)
             pdf.add_page()
+            self._render_logo(pdf)
 
             pdf.set_font("Helvetica", "B", 16)
             pdf.cell(0, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -252,6 +277,7 @@ class ClinicalReportGenerator:
             pdf = FPDF()
             pdf.set_auto_page_break(auto=True, margin=12)
             pdf.add_page()
+            self._render_logo(pdf)
 
             pdf.set_font("Helvetica", "B", 18)
             pdf.cell(0, 12, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)

@@ -398,7 +398,7 @@ def presets_run(
     algo_name = algorithm_instance.get_algorithm_metadata().name.replace(" ", "_").lower()
     results_file = output_dir / f"preset_{name}_{algo_name}.csv"
     results_df.to_csv(results_file, index=False)
-    console.print(f"Results saved to: [link file://{results_file}]{results_file}[/link]")
+    console.print(f"Results saved to: [link=file://{results_file}]{results_file}[/link]")
 
     audit_dir = output_dir / "audit"
     try:
@@ -424,7 +424,7 @@ def presets_run(
 
     report_path = output_dir / f"preset_{name}_{algo_name}.pdf"
     iints.generate_report(results_df, str(report_path), safety_report)
-    console.print(f"PDF report saved to: [link file://{report_path}]{report_path}[/link]")
+    console.print(f"PDF report saved to: [link=file://{report_path}]{report_path}[/link]")
 
 
 @presets_app.command("create")
@@ -657,7 +657,7 @@ def run(
     
     simulation_results_df.to_csv(results_file, index=False)
     
-    console.print(f"\nSimulation completed. Results saved to: [link file://{results_file}]{results_file}[/link]") # Formatted link
+    console.print(f"\nSimulation completed. Results saved to: [link=file://{results_file}]{results_file}[/link]") # Formatted link
     console.print("\n--- Safety Report ---")
     for key, value in safety_report.items():
         console.print(f"{key}: {value}")
@@ -761,7 +761,7 @@ def report(
         generator.export_plots(results_df, str(plots_dir))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     iints.generate_report(results_df, str(output_path), safety_report)
-    console.print(f"PDF report saved to: [link file://{output_path}]{output_path}[/link]")
+    console.print(f"PDF report saved to: [link=file://{output_path}]{output_path}[/link]")
 
     if audit_output_dir:
         audit_output_dir.mkdir(parents=True, exist_ok=True)
