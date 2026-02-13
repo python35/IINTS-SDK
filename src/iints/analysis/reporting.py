@@ -1,11 +1,15 @@
+import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 
 from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
 from iints.utils.plotting import apply_plot_style
@@ -106,42 +110,90 @@ class ClinicalReportGenerator:
             pdf.add_page()
 
             pdf.set_font("Helvetica", "B", 16)
-            pdf.cell(0, 10, title, ln=1)
+            pdf.cell(0, 10, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.set_font("Helvetica", "", 11)
-            pdf.cell(0, 7, f"Duration: {simulation_data['time_minutes'].max()/60:.1f} hours", ln=1)
-            pdf.cell(0, 7, f"Data points: {len(simulation_data)}", ln=1)
+            pdf.cell(
+                0,
+                7,
+                f"Duration: {simulation_data['time_minutes'].max()/60:.1f} hours",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(0, 7, f"Data points: {len(simulation_data)}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.ln(3)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Clinical Metrics", ln=1)
+            pdf.cell(0, 8, "Clinical Metrics", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_font("Helvetica", "", 10)
-            pdf.cell(0, 6, f"TIR (70-180): {metrics.get('tir_70_180', 0):.1f}%", ln=1)
-            pdf.cell(0, 6, f"Time <70: {metrics.get('tir_below_70', 0):.1f}%", ln=1)
-            pdf.cell(0, 6, f"Time >180: {metrics.get('tir_above_180', 0):.1f}%", ln=1)
-            pdf.cell(0, 6, f"CV: {metrics.get('cv', 0):.1f}%", ln=1)
-            pdf.cell(0, 6, f"GMI: {metrics.get('gmi', 0):.1f}%", ln=1)
+            pdf.cell(
+                0,
+                6,
+                f"TIR (70-180): {metrics.get('tir_70_180', 0):.1f}%",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(
+                0,
+                6,
+                f"Time <70: {metrics.get('tir_below_70', 0):.1f}%",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(
+                0,
+                6,
+                f"Time >180: {metrics.get('tir_above_180', 0):.1f}%",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(
+                0,
+                6,
+                f"CV: {metrics.get('cv', 0):.1f}%",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(
+                0,
+                6,
+                f"GMI: {metrics.get('gmi', 0):.1f}%",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
 
             pdf.ln(2)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Safety Summary", ln=1)
+            pdf.cell(0, 8, "Safety Summary", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_font("Helvetica", "", 10)
-            pdf.cell(0, 6, f"Total violations: {safety_report.get('total_violations', 0)}", ln=1)
-            pdf.cell(0, 6, f"Bolus interventions: {safety_report.get('bolus_interventions_count', 0)}", ln=1)
+            pdf.cell(
+                0,
+                6,
+                f"Total violations: {safety_report.get('total_violations', 0)}",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+            pdf.cell(
+                0,
+                6,
+                f"Bolus interventions: {safety_report.get('bolus_interventions_count', 0)}",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
             top_reasons = self._top_safety_reasons(simulation_data)
             if top_reasons:
                 pdf.ln(1)
                 pdf.set_font("Helvetica", "B", 10)
-                pdf.cell(0, 6, "Top intervention reasons:", ln=1)
+                pdf.cell(0, 6, "Top intervention reasons:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 for reason, count in top_reasons.items():
-                    pdf.cell(0, 5, f"- {reason}: {count}", ln=1)
+                    pdf.cell(0, 5, f"- {reason}: {count}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             baseline = safety_report.get("baseline_comparison")
             if baseline and baseline.get("rows"):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(0, 7, "Head-to-Head Comparison", ln=1)
+                pdf.cell(0, 7, "Head-to-Head Comparison", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "B", 9)
                 col_widths = [52, 26, 26, 26, 30]
                 headers = ["Algorithm", "TIR 70-180", "Time <70", "Time >180", "Safety Overrides"]
@@ -160,12 +212,12 @@ class ClinicalReportGenerator:
 
             pdf.ln(4)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Glucose Trace", ln=1)
+            pdf.cell(0, 8, "Glucose Trace", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.image(str(glucose_plot), w=180)
 
             pdf.ln(4)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Insulin Delivery", ln=1)
+            pdf.cell(0, 8, "Insulin Delivery", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.image(str(insulin_plot), w=180)
 
             pdf.output(str(output_file))
@@ -202,9 +254,15 @@ class ClinicalReportGenerator:
             pdf.add_page()
 
             pdf.set_font("Helvetica", "B", 18)
-            pdf.cell(0, 12, title, ln=1)
+            pdf.cell(0, 12, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.set_font("Helvetica", "", 11)
-            pdf.cell(0, 7, f"Duration: {simulation_data['time_minutes'].max()/60:.1f} hours", ln=1)
+            pdf.cell(
+                0,
+                7,
+                f"Duration: {simulation_data['time_minutes'].max()/60:.1f} hours",
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
             pdf.ln(2)
 
             # Metric tiles
@@ -231,30 +289,30 @@ class ClinicalReportGenerator:
                 pdf.set_fill_color(230, 244, 246)
                 pdf.rect(x, y, tile_w, tile_h, style="F")
                 pdf.set_xy(x + 2, y + 3)
-                pdf.cell(tile_w - 4, 5, label, ln=1)
+                pdf.cell(tile_w - 4, 5, label, new_x=XPos.LEFT, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "B", 13)
                 pdf.set_xy(x + 2, y + 9)
-                pdf.cell(tile_w - 4, 8, value, ln=1)
+                pdf.cell(tile_w - 4, 8, value, new_x=XPos.LEFT, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "B", 10)
 
             pdf.ln(36)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Glucose Trace", ln=1)
+            pdf.cell(0, 8, "Glucose Trace", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.image(str(glucose_plot), w=180)
 
             pdf.ln(4)
             pdf.set_font("Helvetica", "B", 12)
-            pdf.cell(0, 8, "Insulin Delivery", ln=1)
+            pdf.cell(0, 8, "Insulin Delivery", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.image(str(insulin_plot), w=180)
 
             top_reasons = self._top_safety_reasons(simulation_data)
             if top_reasons:
                 pdf.ln(4)
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 7, "Top Safety Interventions", ln=1)
+                pdf.cell(0, 7, "Top Safety Interventions", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 pdf.set_font("Helvetica", "", 10)
                 for reason, count in top_reasons.items():
-                    pdf.cell(0, 5, f"- {reason}: {count}", ln=1)
+                    pdf.cell(0, 5, f"- {reason}: {count}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.output(str(output_file))
 

@@ -4,12 +4,19 @@ IINTS-AF Clinical Report Generator
 Professional PDF reports in Medtronic CareLink style
 """
 
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
+
+import matplotlib
+matplotlib.use("Agg")
+
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from fpdf import FPDF
+from fpdf.enums import XPos, YPos
 import seaborn as sns
 from pathlib import Path
 import sys
@@ -21,10 +28,50 @@ sys.path.insert(0, str(project_root))
 
 class ClinicalReportPDF(FPDF):
     """Professional clinical report PDF generator"""
-    
+
     def __init__(self):
         super().__init__()
         self.set_auto_page_break(auto=True, margin=15)
+
+    def cell(
+        self,
+        w,
+        h=0,
+        txt="",
+        border=0,
+        ln=0,
+        align="",
+        fill=False,
+        link="",
+        new_x=None,
+        new_y=None,
+    ):
+        """Backward-compatible cell() that avoids deprecated ln usage."""
+        if new_x is not None or new_y is not None:
+            return super().cell(
+                w,
+                h,
+                txt,
+                border=border,
+                align=align,
+                fill=fill,
+                link=link,
+                new_x=new_x if new_x is not None else XPos.RIGHT,
+                new_y=new_y if new_y is not None else YPos.TOP,
+            )
+        if ln:
+            return super().cell(
+                w,
+                h,
+                txt,
+                border=border,
+                align=align,
+                fill=fill,
+                link=link,
+                new_x=XPos.LMARGIN,
+                new_y=YPos.NEXT,
+            )
+        return super().cell(w, h, txt, border=border, align=align, fill=fill, link=link)
         
     def header(self):
         """Add header with PROMINENT IINTS logo and branding"""
@@ -36,7 +83,7 @@ class ClinicalReportPDF(FPDF):
         else:
             # Fallback: Create text-based logo
             self.set_xy(10, 10)
-            self.set_font('Arial', 'B', 18)
+            self.set_font('Helvetica', 'B', 18)
             self.set_text_color(34, 139, 34)  # Forest green
             self.cell(30, 12, 'IINTS-AF', 0, 0, 'C', fill=True)
             self.set_fill_color(34, 139, 34)
@@ -44,12 +91,12 @@ class ClinicalReportPDF(FPDF):
         
         # Title next to logo - PROMINENT BRANDING
         self.set_xy(logo_x, 10)
-        self.set_font('Arial', 'B', 16)
+        self.set_font('Helvetica', 'B', 16)
         self.set_text_color(34, 139, 34)  # Consistent green branding
         self.cell(0, 8, 'IINTS-AF Clinical Validation Report', 0, 1, 'L')
         
         self.set_xy(logo_x, 18)
-        self.set_font('Arial', '', 11)
+        self.set_font('Helvetica', '', 11)
         self.set_text_color(0, 0, 0)
         self.cell(0, 6, 'AI-Powered Glucose Control Analysis', 0, 1, 'L')
         
@@ -64,7 +111,7 @@ class ClinicalReportPDF(FPDF):
     def footer(self):
         """Add footer with page number"""
         self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
+        self.set_font('Helvetica', 'I', 8)
         self.set_text_color(128, 128, 128)
         self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
         
@@ -74,18 +121,18 @@ class ClinicalReportPDF(FPDF):
         
         # Large title
         self.ln(40)
-        self.set_font('Arial', 'B', 24)
+        self.set_font('Helvetica', 'B', 24)
         self.set_text_color(34, 139, 34)
         self.cell(0, 20, 'IINTS-AF', 0, 1, 'C')
         
-        self.set_font('Arial', 'B', 18)
+        self.set_font('Helvetica', 'B', 18)
         self.set_text_color(0, 0, 0)
         self.cell(0, 15, 'Learning-Enhanced Clinical Report', 0, 1, 'C')
         
         self.ln(20)
         
         # Session info
-        self.set_font('Arial', '', 14)
+        self.set_font('Helvetica', '', 14)
         self.cell(0, 10, f'Session ID: {session_id}', 0, 1, 'C')
         self.cell(0, 10, f'Patient ID: {patient_id}', 0, 1, 'C')
         self.cell(0, 10, f'Learning Status: Neural Weight Adaptation Complete', 0, 1, 'C')
@@ -98,10 +145,10 @@ class ClinicalReportPDF(FPDF):
         self.rect(20, self.get_y(), 170, 80, 'F')
         
         self.ln(10)
-        self.set_font('Arial', 'B', 12)
+        self.set_font('Helvetica', 'B', 12)
         self.cell(0, 10, 'LEARNING EVOLUTION SUMMARY', 0, 1, 'C')
         
-        self.set_font('Arial', '', 10)
+        self.set_font('Helvetica', '', 10)
         
         if learning_data.get('parameters_adapted'):
             self.cell(0, 8, 'NEURAL WEIGHT ADAPTATION SUCCESSFUL', 0, 1, 'C')
@@ -122,14 +169,14 @@ class ClinicalReportPDF(FPDF):
         self.add_page()
         
         # Title
-        self.set_font('Arial', 'B', 16)
+        self.set_font('Helvetica', 'B', 16)
         self.set_text_color(34, 139, 34)
         self.cell(0, 15, 'NEURAL LEARNING ANALYSIS', 0, 1, 'L')
         self.set_text_color(0, 0, 0)
         
         # Learning metrics
         self.ln(10)
-        self.set_font('Arial', 'B', 12)
+        self.set_font('Helvetica', 'B', 12)
         self.cell(0, 10, 'Learning Performance Metrics', 0, 1, 'L')
         
         learning_curve = learning_data.get('learning_curve', [])
@@ -138,7 +185,7 @@ class ClinicalReportPDF(FPDF):
             final_loss = learning_curve[-1]
             improvement = ((initial_loss - final_loss) / initial_loss) * 100
             
-            self.set_font('Arial', '', 10)
+            self.set_font('Helvetica', '', 10)
             self.cell(0, 8, f'Initial Model Loss: {initial_loss:.3f}', 0, 1, 'L')
             self.cell(0, 8, f'Final Model Loss: {final_loss:.3f}', 0, 1, 'L')
             self.cell(0, 8, f'Learning Improvement: {improvement:.1f}%', 0, 1, 'L')
@@ -146,10 +193,10 @@ class ClinicalReportPDF(FPDF):
         
         # Safety validation
         self.ln(10)
-        self.set_font('Arial', 'B', 12)
+        self.set_font('Helvetica', 'B', 12)
         self.cell(0, 10, 'Safety Validation Results', 0, 1, 'L')
         
-        self.set_font('Arial', '', 10)
+        self.set_font('Helvetica', '', 10)
         if learning_data.get('safety_validated'):
             self.cell(0, 8, 'All safety constraints satisfied', 0, 1, 'L')
             self.cell(0, 8, 'Neural weights within therapeutic bounds', 0, 1, 'L')
@@ -163,21 +210,21 @@ class ClinicalReportPDF(FPDF):
         self.add_page()
         
         # Title with IINTS branding
-        self.set_font('Arial', 'B', 16)
+        self.set_font('Helvetica', 'B', 16)
         self.set_text_color(34, 139, 34)  # IINTS green
         self.cell(0, 15, 'ALGORITHMIC PERFORMANCE ANALYSIS', 0, 1, 'L')
         self.set_text_color(0, 0, 0)  # Reset to black
         
         # Section titles with IINTS branding
         self.ln(5)
-        self.set_font('Arial', 'B', 12)
+        self.set_font('Helvetica', 'B', 12)
         self.set_text_color(34, 139, 34)  # IINTS green
         self.cell(0, 10, 'Time in Range Comparison', 0, 1, 'L')
         self.set_text_color(0, 0, 0)  # Reset
         
         # Original performance
         original_tir = results['original_performance']['tir_70_180']
-        self.set_font('Arial', '', 10)
+        self.set_font('Helvetica', '', 10)
         self.cell(50, 8, 'Original Patient:', 0, 0, 'L')
         self.set_fill_color(255, 200, 200)  # Light red
         bar_width = int(original_tir * 1.2)  # Scale for visual
@@ -196,20 +243,20 @@ class ClinicalReportPDF(FPDF):
         # Add TIR comparison chart FIRST
         if 'tir_comparison' in plot_paths:
             self.ln(5)
-            self.set_font('Arial', 'B', 12)
+            self.set_font('Helvetica', 'B', 12)
             self.cell(0, 10, 'Time in Range Analysis', 0, 1, 'L')
             self.image(plot_paths['tir_comparison'], x=10, y=None, w=190)
         
         # Add glucose pattern chart
         if 'glucose_pattern' in plot_paths:
             self.ln(10)
-            self.set_font('Arial', 'B', 12)
+            self.set_font('Helvetica', 'B', 12)
             self.cell(0, 10, 'Glucose Pattern Analysis', 0, 1, 'L')
             self.image(plot_paths['glucose_pattern'], x=10, y=None, w=190)
         
         # Clinical metrics table with IINTS GREEN headers
         self.ln(10)
-        self.set_font('Arial', 'B', 12)
+        self.set_font('Helvetica', 'B', 12)
         self.set_text_color(34, 139, 34)  # IINTS green
         self.cell(0, 10, 'Clinical Metrics Summary', 0, 1, 'L')
         self.set_text_color(0, 0, 0)  # Reset
@@ -218,7 +265,7 @@ class ClinicalReportPDF(FPDF):
         col_widths = [30, 30, 30, 30, 70] # Adjusted width for Clinical Impact
         header_height = 10 # Fixed height for header row
         
-        self.set_font('Arial', 'B', 9)
+        self.set_font('Helvetica', 'B', 9)
         self.set_fill_color(34, 139, 34)
         self.set_text_color(255, 255, 255)
         self.set_draw_color(34, 139, 34)
@@ -237,7 +284,7 @@ class ClinicalReportPDF(FPDF):
         self.set_draw_color(0, 0, 0)
 
         # Table rows content
-        self.set_font('Arial', '', 9)
+        self.set_font('Helvetica', '', 9)
         original_cv = 34.2
         ai_cv = 28.4
         
@@ -697,20 +744,20 @@ class ClinicalReportGenerator:
         pdf.add_page()
 
         # Title
-        pdf.set_font('Arial', 'B', 20)
+        pdf.set_font('Helvetica', 'B', 20)
         pdf.set_text_color(34, 139, 34)
         pdf.cell(0, 15, 'Executive Summary - Algorithm Battle Report', 0, 1, 'C')
         pdf.set_text_color(0, 0, 0)
         pdf.ln(10)
 
         # Battle Summary
-        pdf.set_font('Arial', 'B', 14)
+        pdf.set_font('Helvetica', 'B', 14)
         pdf.cell(0, 10, f"Battle Name: {battle_report.get('battle_name', 'N/A')}", 0, 1, 'L')
         pdf.cell(0, 10, f"Winner: {battle_report.get('winner', 'N/A')}", 0, 1, 'L')
         pdf.ln(10)
 
         # Rankings Table
-        pdf.set_font('Arial', 'B', 10)
+        pdf.set_font('Helvetica', 'B', 10)
         pdf.set_fill_color(34, 139, 34)
         pdf.set_text_color(255, 255, 255)
         pdf.set_draw_color(34, 139, 34)
@@ -727,7 +774,7 @@ class ClinicalReportGenerator:
         pdf.set_text_color(0, 0, 0)
         pdf.set_fill_color(255, 255, 255)
         pdf.set_draw_color(0, 0, 0)
-        pdf.set_font('Arial', '', 9)
+        pdf.set_font('Helvetica', '', 9)
 
         for rank in battle_report.get('rankings', []):
             pdf.cell(col_widths[0], 10, rank['participant'], 1, 0, 'L')
@@ -738,7 +785,7 @@ class ClinicalReportGenerator:
             pdf.cell(col_widths[5], 10, f"{rank.get('bolus_interventions_count', 0)}", 1, 1, 'C')
 
         pdf.ln(10)
-        pdf.set_font('Arial', '', 10)
+        pdf.set_font('Helvetica', '', 10)
         pdf.multi_cell(0, 5, "This report summarizes the performance of different insulin algorithms in a simulated clinical battle. Metrics such as Time-in-Range (TIR), Glucose Management Indicator (GMI), and Coefficient of Variation (CV) are used to evaluate glycemic control and stability. A lower Uncertainty Score indicates higher confidence in the algorithm's predictions.", 0, 'L')
 
         # --- Plotting Section ---
@@ -755,7 +802,7 @@ class ClinicalReportGenerator:
             comparison_plot_path = self.create_algorithm_comparison_plot(detailed_sim_data_dfs, scenario_name)
             if comparison_plot_path:
                 pdf.ln(10)
-                pdf.set_font('Arial', 'B', 12)
+                pdf.set_font('Helvetica', 'B', 12)
                 pdf.cell(0, 10, 'Glucose Response Overlay', 0, 1, 'L')
                 pdf.image(comparison_plot_path, x=10, y=None, w=190)
 
@@ -763,13 +810,13 @@ class ClinicalReportGenerator:
             iob_plot_path = self.create_iob_plot(detailed_sim_data_dfs, scenario_name)
             if iob_plot_path:
                 pdf.ln(10)
-                pdf.set_font('Arial', 'B', 12)
+                pdf.set_font('Helvetica', 'B', 12)
                 pdf.cell(0, 10, 'Insulin-on-Board (IOB) Comparison', 0, 1, 'L')
                 pdf.image(iob_plot_path, x=10, y=None, w=190)
 
         # Critical Decision Audit
         pdf.add_page()
-        pdf.set_font('Arial', 'B', 16)
+        pdf.set_font('Helvetica', 'B', 16)
         pdf.set_text_color(34, 139, 34)
         pdf.cell(0, 15, 'Critical Decision Audit - Winner\'s Reasoning', 0, 1, 'L')
         pdf.set_text_color(0, 0, 0)
@@ -798,9 +845,9 @@ class ClinicalReportGenerator:
                 critical_moments.append(('Max Safety Intervention', max_reduction_row))
             
             for moment_name, row in critical_moments:
-                pdf.set_font('Arial', 'B', 12)
+                pdf.set_font('Helvetica', 'B', 12)
                 pdf.cell(0, 10, f"{moment_name} at {row['time_minutes']} min (Glucose: {row['glucose_actual_mgdl']:.0f} mg/dL)", 0, 1, 'L')
-                pdf.set_font('Arial', '', 9)
+                pdf.set_font('Helvetica', '', 9)
                 
                 # Supervisor actions
                 if pd.notna(row['safety_actions']) and row['safety_actions']:
@@ -827,7 +874,7 @@ class ClinicalReportGenerator:
                     pdf.multi_cell(0, 5, "No specific algorithm reasoning logged for this moment.", 0, 'L')
                 pdf.ln(5)
         else:
-            pdf.set_font('Arial', '', 10)
+            pdf.set_font('Helvetica', '', 10)
             pdf.multi_cell(0, 5, "Detailed simulation data not available for critical decision audit.", 0, 'L')
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
