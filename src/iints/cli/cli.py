@@ -334,7 +334,7 @@ def presets_show(
 def presets_run(
     name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
-    output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("./results/presets"),
+    output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save outputs")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
 ):
@@ -392,6 +392,13 @@ def presets_run(
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
 
+    if output_dir is None:
+        output_dir = algo.parent / "results" / "presets"
+    output_dir = output_dir.expanduser()
+    if not output_dir.is_absolute():
+        output_dir = (Path.cwd() / output_dir).resolve()
+    else:
+        output_dir = output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
     results_df, safety_report = simulator.run_batch(duration)
 
