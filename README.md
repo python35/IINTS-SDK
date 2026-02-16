@@ -70,6 +70,22 @@ Offline sample dataset (no download required):
 iints data fetch sample --output-dir data_packs/sample
 ```
 
+Nightscout import (optional dependency):
+```bash
+pip install iints-sdk-python35[nightscout]
+iints import-nightscout --url https://your-nightscout.example --output-dir results/nightscout_import
+```
+
+Scenario generator:
+```bash
+iints scenarios generate --name "Random Stress Test" --output-path scenarios/generated_scenario.json
+```
+
+Parallel batch runs:
+```bash
+iints run-parallel --algo algorithms/example_algorithm.py --scenarios-dir scenarios --output-dir results/batch
+```
+
 Or run the full demo workflow (import + run + report) in one script:
 ```bash
 python3 examples/demo_quickstart_flow.py
@@ -108,6 +124,13 @@ Hands-on Jupyter notebooks live in [`examples/notebooks/`](examples/notebooks/)
 * Notebook index: `examples/notebooks/README.md`
 * Technical README: `TECHNICAL_README.md`
 * API Stability: `API_STABILITY.md`
+
+### Related Work & Inspiration
+We borrow techniques from the broader CGM/APS ecosystem, while differentiating with a safety‑first, audit‑ready workflow:
+* [simglucose (UVA/Padova)](https://github.com/jxx123/simglucose): gymnasium‑style interfaces and parallel batch execution concepts.
+* [OpenAPS / oref0](https://github.com/openaps/oref0): gold‑standard IOB logic and safety‑oriented control patterns.
+* [Nightscout](https://github.com/nightscout/cgm-remote-monitor) + [py-nightscout](https://pypi.org/project/py-nightscout/): reference for human‑in‑the‑loop CGM ingest (planned connector).
+* [Tidepool OpenAPI](https://developer.tidepool.org/TidepoolApi/): basis for a future cloud import client skeleton.
 
 ### Ethics & Safety
 This SDK is for **research and validation**. It is not a medical device and does not provide clinical dosing advice.

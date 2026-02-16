@@ -43,6 +43,9 @@ dev = [
 torch = [
   "torch>=1.9.0",
 ]
+nightscout = [
+  "py-nightscout",
+]
 
 [project.scripts]
 iints = "iints.cli.cli:app"

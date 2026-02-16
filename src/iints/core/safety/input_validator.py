@@ -1,5 +1,7 @@
 from typing import Optional
 
+from iints.core.safety.config import SafetyConfig
+
 class InputValidator:
     """
     A biological validation filter for sensor inputs to ensure they are
@@ -9,7 +11,8 @@ class InputValidator:
     def __init__(self,
                  min_glucose: float = 20.0,
                  max_glucose: float = 600.0,
-                 max_glucose_delta_per_5_min: float = 35.0):
+                 max_glucose_delta_per_5_min: float = 35.0,
+                 safety_config: Optional[SafetyConfig] = None):
         """
         Initializes the validator with plausible biological limits.
 
@@ -19,6 +22,11 @@ class InputValidator:
             max_glucose_delta_per_5_min (float): The maximum plausible change in glucose
                                                  over a 5-minute period (mg/dL).
         """
+        if safety_config is not None:
+            min_glucose = safety_config.min_glucose
+            max_glucose = safety_config.max_glucose
+            max_glucose_delta_per_5_min = safety_config.max_glucose_delta_per_5_min
+
         self.min_glucose = min_glucose
         self.max_glucose = max_glucose
         self.max_glucose_delta_per_5_min = max_glucose_delta_per_5_min

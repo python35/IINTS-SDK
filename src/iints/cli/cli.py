@@ -1,4 +1,5 @@
 import typer  # type: ignore
+import concurrent.futures
 from pathlib import Path
 from typing import Dict, Any, Union, List, Tuple, Optional
 from typing_extensions import Annotated
@@ -17,6 +18,10 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 import iints # Import the top-level SDK package
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.core.patient.profile import PatientProfile
+from iints.core.safety import SafetyConfig
+from iints.scenarios import ScenarioGeneratorConfig, generate_random_scenario
+from iints.data.nightscout import NightscoutConfig, import_nightscout
+from iints.data.tidepool import TidepoolClient
 from iints.data.importer import (
     export_demo_csv,
     export_standard_csv,
@@ -51,10 +56,12 @@ docs_app = typer.Typer(help="Generate documentation and technical summaries for 
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 data_app = typer.Typer(help="Official datasets and data packs.")
+scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
+app.add_typer(scenarios_app, name="scenarios")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     if not algo.is_file():
@@ -85,6 +92,26 @@ def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgor
 
     console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo}[/bold red]")
     raise typer.Exit(code=1)
+
+
+def _load_algorithm_instance_silent(algo: Path) -> iints.InsulinAlgorithm:
+    if not algo.is_file():
+        raise FileNotFoundError(f"Algorithm file '{algo}' not found.")
+    module_name = algo.stem
+    spec = importlib.util.spec_from_file_location(module_name, algo)
+    if spec is None:
+        raise ImportError(f"Could not load module spec for {algo}")
+    module = importlib.util.module_from_spec(spec)
+    module.iints = iints  # type: ignore
+    sys.modules[module_name] = module
+    if spec.loader:
+        spec.loader.exec_module(module)
+    else:
+        raise ImportError(f"Could not load module loader for {algo}")
+    for _, obj in module.__dict__.items():
+        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
+            return obj()
+    raise ImportError(f"No subclass of InsulinAlgorithm found in {algo}")
 
 def _load_presets() -> List[Dict[str, Any]]:
     if sys.version_info >= (3, 9):
@@ -118,7 +145,59 @@ def _parse_column_mapping(items: List[str], console: Console) -> Dict[str, str]:
         mapping[key] = value
     return mapping
 
- 
+
+def _build_safety_config_from_options(**kwargs: Any) -> Optional[SafetyConfig]:
+    if all(value is None for value in kwargs.values()):
+        return None
+    config = SafetyConfig()
+    for key, value in kwargs.items():
+        if value is not None:
+            setattr(config, key, value)
+    return config
+
+
+def _build_safety_config_from_dict(values: Optional[Dict[str, Any]]) -> Optional[SafetyConfig]:
+    if not values:
+        return None
+    config = SafetyConfig()
+    for key, value in values.items():
+        setattr(config, key, value)
+    return config
+
+
+def _run_parallel_job(job: Dict[str, Any]) -> Dict[str, Any]:
+    algo_path = Path(job["algo"])
+    scenario_path = Path(job["scenario_path"])
+    output_dir = Path(job["output_dir"])
+    patient_config = job["patient_config"]
+    safety_config = _build_safety_config_from_dict(job.get("safety_overrides"))
+    algorithm_instance = _load_algorithm_instance_silent(algo_path)
+
+    outputs = iints.run_simulation(
+        algorithm=algorithm_instance,
+        scenario=str(scenario_path),
+        patient_config=patient_config,
+        duration_minutes=int(job["duration_minutes"]),
+        time_step=int(job["time_step"]),
+        seed=job.get("seed"),
+        output_dir=output_dir,
+        compare_baselines=bool(job.get("compare_baselines")),
+        export_audit=bool(job.get("export_audit")),
+        generate_report=bool(job.get("generate_report")),
+        safety_config=safety_config,
+    )
+    outputs.pop("results", None)
+    safety_report = outputs.get("safety_report", {})
+    return {
+        "scenario": scenario_path.stem,
+        "patient": job["patient_label"],
+        "output_dir": str(output_dir),
+        "results_csv": outputs.get("results_csv"),
+        "report_pdf": outputs.get("report_pdf"),
+        "terminated_early": safety_report.get("terminated_early", False),
+        "total_violations": safety_report.get("total_violations", 0),
+        "error": "",
+    }
 
 @app.command()
 def init(
@@ -346,6 +425,20 @@ def presets_run(
     output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save outputs")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+    safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
+    safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
+    safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min", help="Max glucose delta per 5 min (mg/dL)")] = None,
+    safety_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hypo-threshold", help="Hypoglycemia threshold (mg/dL)")] = None,
+    safety_severe_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-severe-hypo-threshold", help="Severe hypoglycemia threshold (mg/dL)")] = None,
+    safety_hyperglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hyper-threshold", help="Hyperglycemia threshold (mg/dL)")] = None,
+    safety_max_insulin_per_bolus: Annotated[Optional[float], typer.Option("--safety-max-bolus", help="Max insulin per bolus (U)")] = None,
+    safety_glucose_rate_alarm: Annotated[Optional[float], typer.Option("--safety-glucose-rate-alarm", help="Glucose rate alarm (mg/dL/min)")] = None,
+    safety_max_insulin_per_hour: Annotated[Optional[float], typer.Option("--safety-max-insulin-per-hour", help="Max insulin per 60 min (U)")] = None,
+    safety_max_iob: Annotated[Optional[float], typer.Option("--safety-max-iob", help="Max insulin on board (U)")] = None,
+    safety_trend_stop: Annotated[Optional[float], typer.Option("--safety-trend-stop", help="Negative trend cutoff (mg/dL/min)")] = None,
+    safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
+    safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
+    safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
 ):
     """Run a clinic-safe preset with an algorithm and generate outputs."""
     console = Console()
@@ -373,17 +466,38 @@ def presets_run(
 
     duration = int(preset.get("duration_minutes", 720))
     time_step = int(preset.get("time_step_minutes", 5))
+    safety_config = _build_safety_config_from_options(
+        min_glucose=safety_min_glucose,
+        max_glucose=safety_max_glucose,
+        max_glucose_delta_per_5_min=safety_max_glucose_delta_per_5_min,
+        hypoglycemia_threshold=safety_hypoglycemia_threshold,
+        severe_hypoglycemia_threshold=safety_severe_hypoglycemia_threshold,
+        hyperglycemia_threshold=safety_hyperglycemia_threshold,
+        max_insulin_per_bolus=safety_max_insulin_per_bolus,
+        glucose_rate_alarm=safety_glucose_rate_alarm,
+        max_insulin_per_hour=safety_max_insulin_per_hour,
+        max_iob=safety_max_iob,
+        trend_stop=safety_trend_stop,
+        hypo_cutoff=safety_hypo_cutoff,
+        critical_glucose_threshold=safety_critical_glucose_threshold,
+        critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+    )
+
     simulator_kwargs: Dict[str, Any] = {
         "patient_model": patient_model,
         "algorithm": algorithm_instance,
         "time_step": time_step,
+        "safety_config": safety_config,
     }
     if seed is not None:
         simulator_kwargs["seed"] = seed
-    if "critical_glucose_threshold" in preset:
-        simulator_kwargs["critical_glucose_threshold"] = float(preset["critical_glucose_threshold"])
-    if "critical_glucose_duration_minutes" in preset:
-        simulator_kwargs["critical_glucose_duration_minutes"] = int(preset["critical_glucose_duration_minutes"])
+    if safety_config is None:
+        safety_config = SafetyConfig()
+        if "critical_glucose_threshold" in preset:
+            safety_config.critical_glucose_threshold = float(preset["critical_glucose_threshold"])
+        if "critical_glucose_duration_minutes" in preset:
+            safety_config.critical_glucose_duration_minutes = int(preset["critical_glucose_duration_minutes"])
+        simulator_kwargs["safety_config"] = safety_config
     simulator = iints.Simulator(**simulator_kwargs)
 
     scenario_payload = preset.get("scenario", {})
@@ -534,6 +648,62 @@ def profiles_create(
     console.print(f"[green]Patient profile saved:[/green] {output_path}")
     console.print("Use it with:")
     console.print(f"  iints run --algo algorithms/example_algorithm.py --patient-config-path {output_path}")
+
+
+@scenarios_app.command("generate")
+def scenarios_generate(
+    name: Annotated[str, typer.Option(help="Scenario name")] = "Generated Scenario",
+    output_path: Annotated[Path, typer.Option(help="Output JSON path")] = Path("./scenarios/generated_scenario.json"),
+    duration_minutes: Annotated[int, typer.Option(help="Scenario duration in minutes")] = 1440,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed")] = None,
+    meal_count: Annotated[int, typer.Option(help="Number of meal events")] = 3,
+    meal_min_grams: Annotated[float, typer.Option(help="Min meal size (g carbs)")] = 30.0,
+    meal_max_grams: Annotated[float, typer.Option(help="Max meal size (g carbs)")] = 80.0,
+    exercise_count: Annotated[int, typer.Option(help="Number of exercise events")] = 0,
+    sensor_error_count: Annotated[int, typer.Option(help="Number of sensor error events")] = 0,
+):
+    """Generate a random stress-test scenario JSON."""
+    config = ScenarioGeneratorConfig(
+        name=name,
+        duration_minutes=duration_minutes,
+        seed=seed,
+        meal_count=meal_count,
+        meal_min_grams=meal_min_grams,
+        meal_max_grams=meal_max_grams,
+        exercise_count=exercise_count,
+        sensor_error_count=sensor_error_count,
+    )
+    scenario = generate_random_scenario(config)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(scenario, indent=2))
+    typer.echo(f"Scenario saved: {output_path}")
+
+
+@scenarios_app.command("wizard")
+def scenarios_wizard():
+    """Interactive scenario generator."""
+    name = typer.prompt("Scenario name", default="Generated Scenario")
+    duration_minutes = int(typer.prompt("Duration (minutes)", default="1440"))
+    meal_count = int(typer.prompt("Meal events", default="3"))
+    meal_min = float(typer.prompt("Meal min grams", default="30"))
+    meal_max = float(typer.prompt("Meal max grams", default="80"))
+    exercise_count = int(typer.prompt("Exercise events", default="0"))
+    sensor_error_count = int(typer.prompt("Sensor error events", default="0"))
+    output_path = Path(typer.prompt("Output JSON path", default="scenarios/generated_scenario.json"))
+
+    config = ScenarioGeneratorConfig(
+        name=name,
+        duration_minutes=duration_minutes,
+        meal_count=meal_count,
+        meal_min_grams=meal_min,
+        meal_max_grams=meal_max,
+        exercise_count=exercise_count,
+        sensor_error_count=sensor_error_count,
+    )
+    scenario = generate_random_scenario(config)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(scenario, indent=2))
+    typer.echo(f"Scenario saved: {output_path}")
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
@@ -545,6 +715,20 @@ def run(
     output_dir: Annotated[Path, typer.Option(help="Directory to save simulation results")] = Path("./results/data"),
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+    safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
+    safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
+    safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min", help="Max glucose delta per 5 min (mg/dL)")] = None,
+    safety_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hypo-threshold", help="Hypoglycemia threshold (mg/dL)")] = None,
+    safety_severe_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-severe-hypo-threshold", help="Severe hypoglycemia threshold (mg/dL)")] = None,
+    safety_hyperglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hyper-threshold", help="Hyperglycemia threshold (mg/dL)")] = None,
+    safety_max_insulin_per_bolus: Annotated[Optional[float], typer.Option("--safety-max-bolus", help="Max insulin per bolus (U)")] = None,
+    safety_glucose_rate_alarm: Annotated[Optional[float], typer.Option("--safety-glucose-rate-alarm", help="Glucose rate alarm (mg/dL/min)")] = None,
+    safety_max_insulin_per_hour: Annotated[Optional[float], typer.Option("--safety-max-insulin-per-hour", help="Max insulin per 60 min (U)")] = None,
+    safety_max_iob: Annotated[Optional[float], typer.Option("--safety-max-iob", help="Max insulin on board (U)")] = None,
+    safety_trend_stop: Annotated[Optional[float], typer.Option("--safety-trend-stop", help="Negative trend cutoff (mg/dL/min)")] = None,
+    safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
+    safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
+    safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
 ):
     """
     Run an IINTS-AF simulation using a specified algorithm and patient configuration.
@@ -650,11 +834,29 @@ def run(
             raise typer.Exit(code=1)
     
     # 5. Run Simulation
+    safety_config = _build_safety_config_from_options(
+        min_glucose=safety_min_glucose,
+        max_glucose=safety_max_glucose,
+        max_glucose_delta_per_5_min=safety_max_glucose_delta_per_5_min,
+        hypoglycemia_threshold=safety_hypoglycemia_threshold,
+        severe_hypoglycemia_threshold=safety_severe_hypoglycemia_threshold,
+        hyperglycemia_threshold=safety_hyperglycemia_threshold,
+        max_insulin_per_bolus=safety_max_insulin_per_bolus,
+        glucose_rate_alarm=safety_glucose_rate_alarm,
+        max_insulin_per_hour=safety_max_insulin_per_hour,
+        max_iob=safety_max_iob,
+        trend_stop=safety_trend_stop,
+        hypo_cutoff=safety_hypo_cutoff,
+        critical_glucose_threshold=safety_critical_glucose_threshold,
+        critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+    )
+
     simulator = iints.Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
         time_step=time_step,
         seed=seed,
+        safety_config=safety_config,
     )
     
     for event in stress_events:
@@ -711,6 +913,20 @@ def run_full(
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Path, typer.Option(help="Directory to save results + audit + report")] = Path("./results/run_full"),
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+    safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
+    safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
+    safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min", help="Max glucose delta per 5 min (mg/dL)")] = None,
+    safety_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hypo-threshold", help="Hypoglycemia threshold (mg/dL)")] = None,
+    safety_severe_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-severe-hypo-threshold", help="Severe hypoglycemia threshold (mg/dL)")] = None,
+    safety_hyperglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hyper-threshold", help="Hyperglycemia threshold (mg/dL)")] = None,
+    safety_max_insulin_per_bolus: Annotated[Optional[float], typer.Option("--safety-max-bolus", help="Max insulin per bolus (U)")] = None,
+    safety_glucose_rate_alarm: Annotated[Optional[float], typer.Option("--safety-glucose-rate-alarm", help="Glucose rate alarm (mg/dL/min)")] = None,
+    safety_max_insulin_per_hour: Annotated[Optional[float], typer.Option("--safety-max-insulin-per-hour", help="Max insulin per 60 min (U)")] = None,
+    safety_max_iob: Annotated[Optional[float], typer.Option("--safety-max-iob", help="Max insulin on board (U)")] = None,
+    safety_trend_stop: Annotated[Optional[float], typer.Option("--safety-trend-stop", help="Negative trend cutoff (mg/dL/min)")] = None,
+    safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
+    safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
+    safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
 ):
     """One-line runner: results CSV + audit + PDF + baseline comparison."""
     console = Console()
@@ -725,6 +941,23 @@ def run_full(
     else:
         patient_config = patient_config_name
 
+    safety_config = _build_safety_config_from_options(
+        min_glucose=safety_min_glucose,
+        max_glucose=safety_max_glucose,
+        max_glucose_delta_per_5_min=safety_max_glucose_delta_per_5_min,
+        hypoglycemia_threshold=safety_hypoglycemia_threshold,
+        severe_hypoglycemia_threshold=safety_severe_hypoglycemia_threshold,
+        hyperglycemia_threshold=safety_hyperglycemia_threshold,
+        max_insulin_per_bolus=safety_max_insulin_per_bolus,
+        glucose_rate_alarm=safety_glucose_rate_alarm,
+        max_insulin_per_hour=safety_max_insulin_per_hour,
+        max_iob=safety_max_iob,
+        trend_stop=safety_trend_stop,
+        hypo_cutoff=safety_hypo_cutoff,
+        critical_glucose_threshold=safety_critical_glucose_threshold,
+        critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+    )
+
     outputs = iints.run_full(
         algorithm=algorithm_instance,
         scenario=str(scenario_path) if scenario_path else None,
@@ -733,6 +966,7 @@ def run_full(
         time_step=time_step,
         seed=seed,
         output_dir=output_dir,
+        safety_config=safety_config,
     )
 
     console.print("[green]Run complete.[/green]")
@@ -745,6 +979,143 @@ def run_full(
     if "baseline_files" in outputs:
         console.print(f"Baseline files: {outputs['baseline_files']}")
 
+
+@app.command("run-parallel")
+def run_parallel(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    scenarios_dir: Annotated[Optional[Path], typer.Option(help="Directory with scenario JSON files")] = None,
+    scenario_paths: Annotated[List[Path], typer.Option("--scenario-path", help="Scenario JSON path (repeatable)")] = [],
+    patient_config_name: Annotated[str, typer.Option(help="Patient config name")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Patient config YAML path")] = None,
+    patient_configs_dir: Annotated[Optional[Path], typer.Option(help="Directory of patient YAML configs")] = None,
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    output_dir: Annotated[Path, typer.Option(help="Root directory for batch outputs")] = Path("./results/batch"),
+    max_workers: Annotated[Optional[int], typer.Option(help="Max parallel workers")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Base seed for deterministic runs")] = None,
+    compare_baselines: Annotated[bool, typer.Option(help="Run PID + standard pump baselines")] = False,
+    export_audit: Annotated[bool, typer.Option(help="Export audit trails")] = False,
+    generate_report: Annotated[bool, typer.Option(help="Generate PDF reports")] = False,
+    safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose")] = None,
+    safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose")] = None,
+    safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min")] = None,
+    safety_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hypo-threshold")] = None,
+    safety_severe_hypoglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-severe-hypo-threshold")] = None,
+    safety_hyperglycemia_threshold: Annotated[Optional[float], typer.Option("--safety-hyper-threshold")] = None,
+    safety_max_insulin_per_bolus: Annotated[Optional[float], typer.Option("--safety-max-bolus")] = None,
+    safety_glucose_rate_alarm: Annotated[Optional[float], typer.Option("--safety-glucose-rate-alarm")] = None,
+    safety_max_insulin_per_hour: Annotated[Optional[float], typer.Option("--safety-max-insulin-per-hour")] = None,
+    safety_max_iob: Annotated[Optional[float], typer.Option("--safety-max-iob")] = None,
+    safety_trend_stop: Annotated[Optional[float], typer.Option("--safety-trend-stop")] = None,
+    safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff")] = None,
+    safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose")] = None,
+    safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration")] = None,
+):
+    """Run many scenarios in parallel across CPU cores."""
+    console = Console()
+    if scenarios_dir is None and not scenario_paths:
+        console.print("[bold red]Provide --scenarios-dir or at least one --scenario-path.[/bold red]")
+        raise typer.Exit(code=1)
+
+    scenarios: List[Path] = []
+    if scenarios_dir:
+        if not scenarios_dir.is_dir():
+            console.print(f"[bold red]Scenarios directory not found: {scenarios_dir}[/bold red]")
+            raise typer.Exit(code=1)
+        scenarios.extend(sorted(scenarios_dir.glob("*.json")))
+    scenarios.extend(scenario_paths)
+    scenarios = [path for path in scenarios if path.is_file()]
+    if not scenarios:
+        console.print("[bold red]No scenario JSON files found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    patient_configs: List[Union[str, Path]] = []
+    patient_labels: List[str] = []
+    if patient_configs_dir:
+        if not patient_configs_dir.is_dir():
+            console.print(f"[bold red]Patient config directory not found: {patient_configs_dir}[/bold red]")
+            raise typer.Exit(code=1)
+        for path in sorted(patient_configs_dir.glob("*.yaml")):
+            patient_configs.append(path)
+            patient_labels.append(path.stem)
+    elif patient_config_path:
+        if not patient_config_path.is_file():
+            console.print(f"[bold red]Patient config file not found: {patient_config_path}[/bold red]")
+            raise typer.Exit(code=1)
+        patient_configs.append(patient_config_path)
+        patient_labels.append(patient_config_path.stem)
+    else:
+        patient_configs.append(patient_config_name)
+        patient_labels.append(patient_config_name)
+
+    safety_overrides = {
+        "min_glucose": safety_min_glucose,
+        "max_glucose": safety_max_glucose,
+        "max_glucose_delta_per_5_min": safety_max_glucose_delta_per_5_min,
+        "hypoglycemia_threshold": safety_hypoglycemia_threshold,
+        "severe_hypoglycemia_threshold": safety_severe_hypoglycemia_threshold,
+        "hyperglycemia_threshold": safety_hyperglycemia_threshold,
+        "max_insulin_per_bolus": safety_max_insulin_per_bolus,
+        "glucose_rate_alarm": safety_glucose_rate_alarm,
+        "max_insulin_per_hour": safety_max_insulin_per_hour,
+        "max_iob": safety_max_iob,
+        "trend_stop": safety_trend_stop,
+        "hypo_cutoff": safety_hypo_cutoff,
+        "critical_glucose_threshold": safety_critical_glucose_threshold,
+        "critical_glucose_duration_minutes": safety_critical_glucose_duration_minutes,
+    }
+    safety_overrides = {k: v for k, v in safety_overrides.items() if v is not None}
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    jobs: List[Dict[str, Any]] = []
+    idx = 0
+    for scenario in scenarios:
+        for patient_config, patient_label in zip(patient_configs, patient_labels):
+            job_seed = (seed + idx) if seed is not None else None
+            run_output_dir = output_dir / f"{scenario.stem}__{patient_label}"
+            jobs.append(
+                {
+                    "algo": str(algo),
+                    "scenario_path": str(scenario),
+                    "patient_config": patient_config,
+                    "patient_label": patient_label,
+                    "output_dir": str(run_output_dir),
+                    "duration_minutes": duration,
+                    "time_step": time_step,
+                    "seed": job_seed,
+                    "compare_baselines": compare_baselines,
+                    "export_audit": export_audit,
+                    "generate_report": generate_report,
+                    "safety_overrides": safety_overrides,
+                }
+            )
+            idx += 1
+
+    console.print(f"Launching {len(jobs)} parallel jobs...")
+    results: List[Dict[str, Any]] = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        future_map = {executor.submit(_run_parallel_job, job): job for job in jobs}
+        for future in concurrent.futures.as_completed(future_map):
+            job = future_map[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                result = {
+                    "scenario": Path(job["scenario_path"]).stem,
+                    "patient": job["patient_label"],
+                    "output_dir": job["output_dir"],
+                    "results_csv": "",
+                    "report_pdf": "",
+                    "terminated_early": False,
+                    "total_violations": 0,
+                    "error": str(exc),
+                }
+            results.append(result)
+
+    summary_df = pd.DataFrame(results)
+    summary_path = output_dir / "batch_summary.csv"
+    summary_df.to_csv(summary_path, index=False)
+    console.print(f"[green]Batch summary saved:[/green] {summary_path}")
 
 @app.command()
 def report(
@@ -1077,6 +1448,60 @@ def import_demo(
     if export_raw:
         console.print(f"[green]Raw demo CSV saved:[/green] {output_dir / 'demo_cgm.csv'}")
 
+
+@app.command("import-nightscout")
+def import_nightscout_cmd(
+    url: Annotated[str, typer.Option(help="Nightscout base URL")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/nightscout_import"),
+    api_secret: Annotated[Optional[str], typer.Option(help="API secret (if required)")] = None,
+    token: Annotated[Optional[str], typer.Option(help="API token (if required)")] = None,
+    start: Annotated[Optional[str], typer.Option(help="Start time (ISO string)")] = None,
+    end: Annotated[Optional[str], typer.Option(help="End time (ISO string)")] = None,
+    limit: Annotated[Optional[int], typer.Option(help="Limit number of entries")] = None,
+    scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Nightscout Import",
+):
+    """Import CGM entries from Nightscout into a scenario + standard CSV."""
+    console = Console()
+    config = NightscoutConfig(
+        url=url,
+        api_secret=api_secret,
+        token=token,
+        start=start,
+        end=end,
+        limit=limit,
+    )
+    try:
+        result = import_nightscout(config, scenario_name=scenario_name)
+    except ImportError as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Nightscout import failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = output_dir / "scenario.json"
+    data_path = output_dir / "cgm_standard.csv"
+    scenario_path.write_text(json.dumps(result.scenario, indent=2))
+    export_standard_csv(result.dataframe, data_path)
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+
+
+@app.command("import-tidepool")
+def import_tidepool_cmd(
+    base_url: Annotated[str, typer.Option(help="Tidepool API base URL")] = "https://api.tidepool.org",
+    token: Annotated[Optional[str], typer.Option(help="Bearer token")] = None,
+):
+    """Skeleton Tidepool client for future cloud imports."""
+    console = Console()
+    client = TidepoolClient(base_url=base_url, token=token)
+    try:
+        _ = client._headers()
+    except Exception as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+    console.print("[yellow]Tidepool client skeleton is initialized. Auth flow and endpoints are TODO.[/yellow]")
 
 @app.command("check-deps")
 def check_deps():

@@ -1,5 +1,7 @@
 import numpy as np
 from typing import Dict, Any, Optional, List
+
+from iints.core.safety.config import SafetyConfig
 from dataclasses import dataclass
 from enum import Enum
 
@@ -42,8 +44,20 @@ class IndependentSupervisor:
                  max_60min=3.0,                  # Units per 60 minutes
                  max_iob=4.0,                    # Units
                  trend_stop=-2.0,                # mg/dL per minute
-                 hypo_cutoff=70.0):              # mg/dL
+                 hypo_cutoff=70.0,               # mg/dL
+                 safety_config: Optional["SafetyConfig"] = None):
         
+        if safety_config is not None:
+            hypoglycemia_threshold = safety_config.hypoglycemia_threshold
+            severe_hypoglycemia_threshold = safety_config.severe_hypoglycemia_threshold
+            hyperglycemia_threshold = safety_config.hyperglycemia_threshold
+            max_insulin_per_bolus = safety_config.max_insulin_per_bolus
+            glucose_rate_alarm = safety_config.glucose_rate_alarm
+            max_60min = safety_config.max_insulin_per_hour
+            max_iob = safety_config.max_iob
+            trend_stop = safety_config.trend_stop
+            hypo_cutoff = safety_config.hypo_cutoff
+
         self.hypoglycemia_threshold = hypoglycemia_threshold
         self.severe_hypoglycemia_threshold = severe_hypoglycemia_threshold
         self.hyperglycemia_threshold = hyperglycemia_threshold

@@ -19,6 +19,8 @@ from .importer import (
 from .quality_checker import DataQualityChecker, QualityReport, DataGap, DataAnomaly
 from .universal_parser import UniversalParser, StandardDataPack, ParseResult
 from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
+from .nightscout import NightscoutConfig, import_nightscout
+from .tidepool import TidepoolClient, load_openapi_spec
 
 __all__ = [
     'DataAdapter',
@@ -44,4 +46,8 @@ __all__ = [
     'get_dataset',
     'list_dataset_ids',
     'fetch_dataset',
+    'NightscoutConfig',
+    'import_nightscout',
+    'TidepoolClient',
+    'load_openapi_spec',
 ]

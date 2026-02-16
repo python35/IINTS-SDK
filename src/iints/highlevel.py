@@ -10,6 +10,7 @@ from iints.api.base_algorithm import InsulinAlgorithm
 from iints.core.patient.models import PatientModel
 from iints.core.patient.profile import PatientProfile
 from iints.core.simulator import Simulator
+from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.reporting import ClinicalReportGenerator
 from iints.validation import (
@@ -58,6 +59,7 @@ def run_simulation(
     compare_baselines: bool = True,
     export_audit: bool = True,
     generate_report: bool = True,
+    safety_config: Optional[SafetyConfig] = None,
 ) -> Dict[str, Any]:
     """
     One-line simulation runner with audit + report + baseline comparison.
@@ -74,6 +76,7 @@ def run_simulation(
         algorithm=algorithm_instance,
         time_step=time_step,
         seed=seed,
+        safety_config=safety_config,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -134,6 +137,7 @@ def run_full(
     seed: Optional[int] = None,
     output_dir: Union[str, Path] = "results/run_full",
     enable_profiling: bool = True,
+    safety_config: Optional[SafetyConfig] = None,
 ) -> Dict[str, Any]:
     """
     One-line runner that always exports results + audit + PDF + baseline comparison.
@@ -151,6 +155,7 @@ def run_full(
         time_step=time_step,
         seed=seed,
         enable_profiling=enable_profiling,
+        safety_config=safety_config,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)

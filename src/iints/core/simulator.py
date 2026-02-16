@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple, Generator
 from iints.core.patient.models import PatientModel
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
-from iints.core.safety import InputValidator
+from iints.core.safety import InputValidator, SafetyConfig
 from iints.core.devices.models import SensorModel, PumpModel
 import numpy as np
 
@@ -66,6 +66,7 @@ class Simulator:
         on_step: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
         critical_glucose_threshold: float = 40.0,
         critical_glucose_duration_minutes: int = 30,
+        safety_config: Optional[SafetyConfig] = None,
     ) -> None:
         """
         Initializes the simulator.
@@ -86,14 +87,19 @@ class Simulator:
         if self.seed is not None:
             np.random.seed(self.seed) # Set numpy seed for reproducibility
             # Potentially set other seeds here if other random modules are used (e.g., random.seed(self.seed))
-        self.supervisor = IndependentSupervisor()
-        self.input_validator = InputValidator()
+        if safety_config is None:
+            safety_config = SafetyConfig()
+        self.supervisor = IndependentSupervisor(safety_config=safety_config)
+        self.input_validator = InputValidator(safety_config=safety_config)
         self.sensor_model = sensor_model or SensorModel(seed=seed)
         self.pump_model = pump_model or PumpModel(seed=seed)
         self.on_step = on_step
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
         self.enable_profiling = enable_profiling
+        if safety_config is not None:
+            critical_glucose_threshold = safety_config.critical_glucose_threshold
+            critical_glucose_duration_minutes = safety_config.critical_glucose_duration_minutes
         self.critical_glucose_threshold = critical_glucose_threshold
         self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
         self._critical_low_minutes = 0

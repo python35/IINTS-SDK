@@ -27,7 +27,7 @@ except Exception:  # pragma: no cover - fallback if torch/device manager import 
 
         def get_device(self):
             return self._device
-from .core.safety import SafetySupervisor
+from .core.safety import SafetyConfig, SafetySupervisor
 from .core.devices.models import SensorModel, PumpModel
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 from .core.algorithms.mock_algorithms import ConstantDoseAlgorithm, RandomDoseAlgorithm
@@ -45,9 +45,12 @@ from .data.importer import (
     scenario_from_csv,
     scenario_from_dataframe,
 )
+from .data.nightscout import NightscoutConfig, import_nightscout
+from .data.tidepool import TidepoolClient, load_openapi_spec
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
 from .highlevel import run_simulation, run_full
+from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
@@ -105,6 +108,7 @@ __all__ = [
     "PatientProfile",
     "SimulationLimitError",
     "SafetySupervisor",
+    "SafetyConfig",
     "SensorModel",
     "PumpModel",
     "StandardPumpAlgorithm",
@@ -121,6 +125,10 @@ __all__ = [
     "load_demo_dataframe",
     "scenario_from_csv",
     "scenario_from_dataframe",
+    "NightscoutConfig",
+    "import_nightscout",
+    "TidepoolClient",
+    "load_openapi_spec",
     # Analysis Metrics
     "generate_benchmark_metrics",
     "ClinicalReportGenerator",
@@ -131,4 +139,6 @@ __all__ = [
     # High-level API
     "run_simulation",
     "run_full",
+    "ScenarioGeneratorConfig",
+    "generate_random_scenario",
 ]
