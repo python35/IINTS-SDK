@@ -26,6 +26,13 @@ from iints.data.importer import (
     scenario_from_csv,
     scenario_from_dataframe,
 )
+from iints.data.registry import (
+    load_dataset_registry,
+    get_dataset,
+    fetch_dataset,
+    DatasetFetchError,
+    DatasetRegistryError,
+)
 from iints.validation import (
     build_stress_events,
     format_validation_error,
@@ -43,9 +50,11 @@ app = typer.Typer(help="IINTS-AF SDK CLI - Intelligent Insulin Titration System 
 docs_app = typer.Typer(help="Generate documentation and technical summaries for IINTS-AF components.")
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
+data_app = typer.Typer(help="Official datasets and data packs.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
+app.add_typer(data_app, name="data")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     if not algo.is_file():
@@ -845,6 +854,80 @@ def validate(
             raise typer.Exit(code=1)
 
     console.print("[green]Scenario validation passed.[/green]")
+
+
+@data_app.command("list")
+def data_list():
+    """List official datasets and access requirements."""
+    console = Console()
+    datasets = load_dataset_registry()
+    table = Table(title="IINTS-AF Official Datasets", show_header=True, header_style="bold cyan")
+    table.add_column("ID", style="green")
+    table.add_column("Name", style="white")
+    table.add_column("Access", style="magenta")
+    table.add_column("Source", style="yellow")
+    for entry in datasets:
+        table.add_row(
+            entry.get("id", ""),
+            entry.get("name", ""),
+            entry.get("access", ""),
+            entry.get("source", ""),
+        )
+    console.print(table)
+
+
+@data_app.command("info")
+def data_info(
+    dataset_id: Annotated[str, typer.Option(help="Dataset id (see `iints data list`)")],
+):
+    """Show metadata and access info for a dataset."""
+    console = Console()
+    try:
+        dataset = get_dataset(dataset_id)
+    except DatasetRegistryError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+        raise typer.Exit(code=1)
+    console.print_json(json.dumps(dataset, indent=2))
+
+
+@data_app.command("fetch")
+def data_fetch(
+    dataset_id: Annotated[str, typer.Option(help="Dataset id (see `iints data list`)")],
+    output_dir: Annotated[Optional[Path], typer.Option(help="Output directory (default: data_packs/official/<id>)")] = None,
+    extract: Annotated[bool, typer.Option(help="Extract zip files if present")] = True,
+):
+    """Download a dataset (public-download only)."""
+    console = Console()
+    try:
+        dataset = get_dataset(dataset_id)
+    except DatasetRegistryError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+        raise typer.Exit(code=1)
+
+    if output_dir is None:
+        output_dir = Path("data_packs") / "official" / dataset_id
+    output_dir = output_dir.expanduser()
+    if not output_dir.is_absolute():
+        output_dir = (Path.cwd() / output_dir).resolve()
+    else:
+        output_dir = output_dir.resolve()
+
+    access = dataset.get("access", "manual")
+    landing = dataset.get("landing_page", "")
+    if access in {"request", "manual"}:
+        console.print("[yellow]Manual download required for this dataset.[/yellow]")
+        if landing:
+            console.print(f"Source: {landing}")
+        console.print("After downloading, place files in:")
+        console.print(f"  {output_dir}")
+        return
+
+    try:
+        downloaded = fetch_dataset(dataset_id, output_dir=output_dir, extract=extract)
+        console.print(f"[green]Downloaded {len(downloaded)} file(s) to {output_dir}[/green]")
+    except DatasetFetchError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+        raise typer.Exit(code=1)
 
 
 @app.command("import-data")

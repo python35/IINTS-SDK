@@ -1,0 +1,80 @@
+[
+  {
+    "id": "aide_t1d",
+    "name": "AIDE T1D Public Dataset",
+    "source": "Jaeb Center for Health Research",
+    "access": "public-download",
+    "license": "Public dataset (see Jaeb public datasets page)",
+    "description": "AID-enabled T1D real-world CGM and insulin data.",
+    "landing_page": "https://public.jaeb.org/datasets/",
+    "download_urls": [
+      "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/AIDET1D_Public_Dataset.zip"
+    ]
+  },
+  {
+    "id": "pedap",
+    "name": "PEDAP Public Dataset",
+    "source": "Jaeb Center for Health Research",
+    "access": "public-download",
+    "license": "Public dataset (see Jaeb public datasets page)",
+    "description": "Pediatric diabetes data with CGM traces.",
+    "landing_page": "https://public.jaeb.org/datasets/",
+    "download_urls": [
+      "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/PEDAP%20Public%20Dataset%20-%20Release%205%20-%202025-05-12.zip"
+    ]
+  },
+  {
+    "id": "azt1d",
+    "name": "AZT1D Dataset",
+    "source": "Mendeley Data",
+    "access": "manual",
+    "license": "CC BY 4.0",
+    "description": "Real-world type 1 diabetes dataset (CGM + events).",
+    "landing_page": "https://data.mendeley.com/datasets/7w9pt8y74x/1"
+  },
+  {
+    "id": "hupa_ucm",
+    "name": "HUPA-UCM Dataset",
+    "source": "Mendeley Data",
+    "access": "manual",
+    "license": "CC BY 4.0",
+    "description": "Free-living T1D dataset with CGM and treatment data.",
+    "landing_page": "https://data.mendeley.com/datasets/kn9tr5k7z7/2"
+  },
+  {
+    "id": "openaps_data_commons",
+    "name": "OpenAPS Data Commons",
+    "source": "OpenAPS",
+    "access": "request",
+    "license": "Data use agreement (see OpenAPS)",
+    "description": "Community-contributed open APS data commons.",
+    "landing_page": "https://openaps.org/data-commons/"
+  },
+  {
+    "id": "tidepool_bigdata",
+    "name": "Tidepool Big Data Donation",
+    "source": "Tidepool",
+    "access": "request",
+    "license": "Research collaboration / approval required",
+    "description": "Large-scale real-world diabetes data donation program.",
+    "landing_page": "https://www.tidepool.org/big-data-donation"
+  },
+  {
+    "id": "niddk_central",
+    "name": "NIDDK Central Repository",
+    "source": "NIDDK",
+    "access": "request",
+    "license": "Repository access agreement",
+    "description": "NIH/NIDDK centralized repository of clinical diabetes studies.",
+    "landing_page": "https://repository.niddk.nih.gov/"
+  },
+  {
+    "id": "t1d_exchange",
+    "name": "T1D Exchange Clinic Registry",
+    "source": "Jaeb Center / T1D Exchange",
+    "access": "request",
+    "license": "Data request / approval required",
+    "description": "Large clinical registry for type 1 diabetes research.",
+    "landing_page": "https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf"
+  }
+]

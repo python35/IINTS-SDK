@@ -56,6 +56,14 @@ Try the bundled demo data pack:
 iints import-demo --output-dir results/demo_import
 ```
 
+Official real-world datasets (download on demand):
+```bash
+iints data list
+iints data info --dataset-id aide_t1d
+iints data fetch --dataset-id aide_t1d
+```
+Some datasets require approval and are marked as `request` in the registry.
+
 Or run the full demo workflow (import + run + report) in one script:
 ```bash
 python3 examples/demo_quickstart_flow.py

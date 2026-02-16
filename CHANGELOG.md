@@ -10,6 +10,7 @@
 - Added branded logo support in PDF reports and notebooks.
 - Fixed CLI output path defaults and rich link formatting.
 - Cleaned repository by removing unused legacy folders.
+- Added official dataset registry with CLI discovery and fetch helpers.
 
 ## v0.1.3
 

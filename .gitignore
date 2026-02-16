@@ -27,6 +27,9 @@ results/clinical_reports/IINTS_Patient_*_*.pdf
 results/population_plots/*.png
 results/
 
+# Official datasets (downloaded locally)
+data_packs/official/
+
 # Coverage
 .coverage
 coverage.xml

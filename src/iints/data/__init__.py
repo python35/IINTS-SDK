@@ -18,6 +18,7 @@ from .importer import (
 )
 from .quality_checker import DataQualityChecker, QualityReport, DataGap, DataAnomaly
 from .universal_parser import UniversalParser, StandardDataPack, ParseResult
+from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
 
 __all__ = [
     'DataAdapter',
@@ -38,5 +39,9 @@ __all__ = [
     'DataAnomaly',
     'UniversalParser',
     'StandardDataPack',
-    'ParseResult'
+    'ParseResult',
+    'load_dataset_registry',
+    'get_dataset',
+    'list_dataset_ids',
+    'fetch_dataset',
 ]

@@ -55,6 +55,7 @@ iints = [
   "templates/*.py",
   "templates/scenarios/*.json",
   "assets/*.png",
+  "data/*.json",
   "data/virtual_patients/*.yaml",
   "data/demo/*.csv",
   "presets/*.json",
