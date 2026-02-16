@@ -4,6 +4,11 @@
 
 - (no entries)
 
+## v0.1.10
+
+- Dataset registry and CLI improvements (sample dataset, citations, integrity checks).
+- PyPI auto-publish workflow for trusted publishing.
+
 ## v0.1.9
 
 - Refreshed notebooks with clearer walkthroughs and baked outputs.
