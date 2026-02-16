@@ -1,15 +1,35 @@
 [
   {
+    "id": "sample",
+    "name": "IINTS Sample CGM (Bundled)",
+    "source": "IINTS-AF",
+    "access": "bundled",
+    "license": "Demo-only (bundled with SDK)",
+    "description": "Tiny CGM sample for quickstart and offline demos.",
+    "bundled_path": "data/demo/demo_cgm.csv",
+    "sha256": "e869e033887e595ab4c41cb14cde6f2328cc9d55e0fb2c741e7fbe3e0ae3af96",
+    "citation": {
+      "text": "IINTS-AF Team. IINTS Sample CGM (bundled). Accessed 2026-02-16.",
+      "bibtex": "@misc{iints_sample_cgm, title={IINTS Sample CGM (bundled)}, author={IINTS-AF Team}, year={2026}, note={Bundled with IINTS-AF SDK, accessed 2026-02-16}}"
+    }
+  },
+  {
     "id": "aide_t1d",
     "name": "AIDE T1D Public Dataset",
     "source": "Jaeb Center for Health Research",
     "access": "public-download",
     "license": "Public dataset (see Jaeb public datasets page)",
-    "description": "AID-enabled T1D real-world CGM and insulin data.",
+    "description": "Automated Insulin Delivery in Elderly with Type 1 Diabetes (AIDE T1D) public dataset.",
     "landing_page": "https://public.jaeb.org/datasets/",
     "download_urls": [
       "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/AIDET1D_Public_Dataset.zip"
-    ]
+    ],
+    "sha256": null,
+    "sha256_note": "Checksum not published by source; SHA256SUMS.txt will be generated after download.",
+    "citation": {
+      "text": "Jaeb Center for Health Research. Automated Insulin Delivery in Elderly with Type 1 Diabetes (AIDE T1D) Public Dataset. Public Study Websites. Accessed 2026-02-16. https://public.jaeb.org/datasets/",
+      "bibtex": "@misc{jaeb_aide_t1d, title={Automated Insulin Delivery in Elderly with Type 1 Diabetes (AIDE T1D) Public Dataset}, author={Jaeb Center for Health Research}, howpublished={Public Study Websites}, note={Accessed 2026-02-16}, url={https://public.jaeb.org/datasets/}}"
+    }
   },
   {
     "id": "pedap",
@@ -17,29 +37,45 @@
     "source": "Jaeb Center for Health Research",
     "access": "public-download",
     "license": "Public dataset (see Jaeb public datasets page)",
-    "description": "Pediatric diabetes data with CGM traces.",
+    "description": "Pediatric Artificial Pancreas (PEDAP) public dataset (Release 5).",
     "landing_page": "https://public.jaeb.org/datasets/",
     "download_urls": [
       "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/PEDAP%20Public%20Dataset%20-%20Release%205%20-%202025-05-12.zip"
-    ]
+    ],
+    "sha256": null,
+    "sha256_note": "Checksum not published by source; SHA256SUMS.txt will be generated after download.",
+    "citation": {
+      "text": "Jaeb Center for Health Research. Pediatric Artificial Pancreas (PEDAP) Public Dataset, Release 5. Public Study Websites. Accessed 2026-02-16. https://public.jaeb.org/datasets/",
+      "bibtex": "@misc{jaeb_pedap_2025, title={Pediatric Artificial Pancreas (PEDAP) Public Dataset, Release 5}, author={Jaeb Center for Health Research}, howpublished={Public Study Websites}, note={Accessed 2026-02-16}, url={https://public.jaeb.org/datasets/}}"
+    }
   },
   {
     "id": "azt1d",
-    "name": "AZT1D Dataset",
+    "name": "AZT1D: A Real-World Dataset for Type 1 Diabetes",
     "source": "Mendeley Data",
     "access": "manual",
     "license": "CC BY 4.0",
-    "description": "Real-world type 1 diabetes dataset (CGM + events).",
-    "landing_page": "https://data.mendeley.com/datasets/7w9pt8y74x/1"
+    "description": "Real-world T1D dataset (CGM + insulin + meals) from 25 individuals on AID systems.",
+    "landing_page": "https://data.mendeley.com/datasets/gk9m674wcx/1",
+    "doi": "10.17632/gk9m674wcx.1",
+    "citation": {
+      "text": "Khamesian S, Arefeen A, Thompson BM, Grando A, Ghasemzadeh H. AZT1D: A Real-World Dataset for Type 1 Diabetes. Mendeley Data, v1, 2025. doi:10.17632/gk9m674wcx.1",
+      "bibtex": "@misc{azt1d_2025, title={AZT1D: A Real-World Dataset for Type 1 Diabetes}, author={Khamesian, Saman and Arefeen, Asiful and Thompson, Bithika M. and Grando, Adela and Ghasemzadeh, Hassan}, year={2025}, doi={10.17632/gk9m674wcx.1}, publisher={Mendeley Data}}"
+    }
   },
   {
     "id": "hupa_ucm",
-    "name": "HUPA-UCM Dataset",
+    "name": "HUPA-UCM Diabetes Dataset",
     "source": "Mendeley Data",
     "access": "manual",
     "license": "CC BY 4.0",
-    "description": "Free-living T1D dataset with CGM and treatment data.",
-    "landing_page": "https://data.mendeley.com/datasets/kn9tr5k7z7/2"
+    "description": "Free-living T1D dataset with CGM, insulin, meals, and activity data.",
+    "landing_page": "https://data.mendeley.com/datasets/3hbcscwz44/1",
+    "doi": "10.17632/3hbcscwz44.1",
+    "citation": {
+      "text": "Hidalgo JI, Alvarado J, Botella M, Aramendi A, Velasco JM, Garnica O. HUPA-UCM Diabetes Dataset. Mendeley Data, v1, 2024. doi:10.17632/3hbcscwz44.1",
+      "bibtex": "@misc{hupa_ucm_2024, title={HUPA-UCM Diabetes Dataset}, author={Hidalgo, J. Ignacio and Alvarado, Jorge and Botella, Marta and Aramendi, Aranzazu and Velasco, J. Manuel and Garnica, Oscar}, year={2024}, doi={10.17632/3hbcscwz44.1}, publisher={Mendeley Data}}"
+    }
   },
   {
     "id": "openaps_data_commons",
@@ -48,7 +84,11 @@
     "access": "request",
     "license": "Data use agreement (see OpenAPS)",
     "description": "Community-contributed open APS data commons.",
-    "landing_page": "https://openaps.org/data-commons/"
+    "landing_page": "https://openaps.org/outcomes/data-commons/",
+    "citation": {
+      "text": "OpenAPS. OpenAPS Data Commons. Accessed 2026-02-16. https://openaps.org/outcomes/data-commons/",
+      "bibtex": "@misc{openaps_datacommons, title={OpenAPS Data Commons}, author={OpenAPS}, note={Accessed 2026-02-16}, url={https://openaps.org/outcomes/data-commons/}}"
+    }
   },
   {
     "id": "tidepool_bigdata",
@@ -57,7 +97,11 @@
     "access": "request",
     "license": "Research collaboration / approval required",
     "description": "Large-scale real-world diabetes data donation program.",
-    "landing_page": "https://www.tidepool.org/big-data-donation"
+    "landing_page": "https://www.tidepool.org/bigdata",
+    "citation": {
+      "text": "Tidepool. Big Data Donation Project. Accessed 2026-02-16. https://www.tidepool.org/bigdata",
+      "bibtex": "@misc{tidepool_bddp, title={Big Data Donation Project}, author={Tidepool}, note={Accessed 2026-02-16}, url={https://www.tidepool.org/bigdata}}"
+    }
   },
   {
     "id": "niddk_central",
@@ -66,7 +110,11 @@
     "access": "request",
     "license": "Repository access agreement",
     "description": "NIH/NIDDK centralized repository of clinical diabetes studies.",
-    "landing_page": "https://repository.niddk.nih.gov/"
+    "landing_page": "https://repository.niddk.nih.gov/",
+    "citation": {
+      "text": "NIDDK Central Repository. Accessed 2026-02-16. https://repository.niddk.nih.gov/",
+      "bibtex": "@misc{niddk_central_repo, title={NIDDK Central Repository}, author={NIDDK}, note={Accessed 2026-02-16}, url={https://repository.niddk.nih.gov/}}"
+    }
   },
   {
     "id": "t1d_exchange",
@@ -75,6 +123,10 @@
     "access": "request",
     "license": "Data request / approval required",
     "description": "Large clinical registry for type 1 diabetes research.",
-    "landing_page": "https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf"
+    "landing_page": "https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf",
+    "citation": {
+      "text": "T1D Exchange Clinic Registry (data catalog). Accessed 2026-02-16. https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf",
+      "bibtex": "@misc{t1d_exchange_registry, title={T1D Exchange Clinic Registry (Data Catalog)}, author={Jaeb Center for Health Research / T1D Exchange}, note={Accessed 2026-02-16}, url={https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf}}"
+    }
   }
 ]

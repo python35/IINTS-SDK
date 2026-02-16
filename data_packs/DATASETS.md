@@ -8,6 +8,7 @@ This SDK supports **official real-world datasets** via the `iints data` CLI.
 iints data list
 iints data info aide_t1d
 iints data fetch aide_t1d
+iints data fetch sample --output-dir data_packs/sample
 ```
 
 ## Notes
@@ -15,6 +16,7 @@ iints data fetch aide_t1d
 - Datasets marked **request** require approval from the data owner.
 - We do **not** ship full datasets in the repo; download them into `data_packs/official/<dataset>`.
 - All datasets are converted into the IINTS universal schema via `iints import-data` or `iints import-wizard`.
+- For public downloads, the CLI writes `SHA256SUMS.txt` after download when the source doesn't publish a checksum.
 
 ## Registry
 

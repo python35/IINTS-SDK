@@ -888,6 +888,16 @@ def data_info(
         console.print(f"[bold red]{e}[/bold red]")
         raise typer.Exit(code=1)
     console.print_json(json.dumps(dataset, indent=2))
+    citation = dataset.get("citation", {})
+    if citation:
+        text = citation.get("text")
+        bibtex = citation.get("bibtex")
+        if text:
+            console.print("\n[bold]Citation (text)[/bold]")
+            console.print(text)
+        if bibtex:
+            console.print("\n[bold]Citation (BibTeX)[/bold]")
+            console.print(bibtex)
 
 
 @data_app.command("fetch")
@@ -895,6 +905,7 @@ def data_fetch(
     dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
     output_dir: Annotated[Optional[Path], typer.Option(help="Output directory (default: data_packs/official/<id>)")] = None,
     extract: Annotated[bool, typer.Option(help="Extract zip files if present")] = True,
+    verify: Annotated[bool, typer.Option(help="Verify SHA-256 if available and emit SHA256SUMS.txt")] = True,
 ):
     """Download a dataset (public-download only)."""
     console = Console()
@@ -923,7 +934,7 @@ def data_fetch(
         return
 
     try:
-        downloaded = fetch_dataset(dataset_id, output_dir=output_dir, extract=extract)
+        downloaded = fetch_dataset(dataset_id, output_dir=output_dir, extract=extract, verify=verify)
         console.print(f"[green]Downloaded {len(downloaded)} file(s) to {output_dir}[/green]")
     except DatasetFetchError as e:
         console.print(f"[bold red]{e}[/bold red]")

@@ -64,6 +64,11 @@ iints data fetch aide_t1d
 ```
 Some datasets require approval and are marked as `request` in the registry.
 
+Offline sample dataset (no download required):
+```bash
+iints data fetch sample --output-dir data_packs/sample
+```
+
 Or run the full demo workflow (import + run + report) in one script:
 ```bash
 python3 examples/demo_quickstart_flow.py

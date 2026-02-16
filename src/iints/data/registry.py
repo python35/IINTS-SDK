@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import urllib.request
 import zipfile
+import hashlib
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -53,6 +55,25 @@ def _download_file(url: str, output_path: Path) -> Path:
     return output_path
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(8192), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _get_expected_hash(dataset: Dict[str, Any], index: int = 0) -> Optional[str]:
+    expected = dataset.get("sha256")
+    if isinstance(expected, list):
+        if index < len(expected):
+            return expected[index] or None
+        return None
+    if isinstance(expected, str):
+        return expected or None
+    return None
+
+
 def _maybe_extract_zip(path: Path, output_dir: Path) -> None:
     if path.suffix.lower() != ".zip":
         return
@@ -63,19 +84,55 @@ def _maybe_extract_zip(path: Path, output_dir: Path) -> None:
         raise DatasetFetchError(f"Failed to extract {path.name}: {exc}") from exc
 
 
-def fetch_dataset(dataset_id: str, output_dir: Path, extract: bool = True) -> List[Path]:
+def fetch_dataset(
+    dataset_id: str,
+    output_dir: Path,
+    extract: bool = True,
+    verify: bool = True,
+) -> List[Path]:
     dataset = get_dataset(dataset_id)
     urls = dataset.get("download_urls") or []
+    access = dataset.get("access", "manual")
+
+    if access == "bundled":
+        bundled_path = dataset.get("bundled_path")
+        if not bundled_path:
+            raise DatasetFetchError("Bundled dataset missing bundled_path entry.")
+        try:
+            source_path = files("iints.data").joinpath(bundled_path)  # type: ignore[attr-defined]
+        except Exception as exc:
+            raise DatasetFetchError(f"Unable to locate bundled dataset: {exc}") from exc
+        output_dir.mkdir(parents=True, exist_ok=True)
+        target = output_dir / Path(bundled_path).name
+        shutil.copyfile(source_path, target)
+        expected = _get_expected_hash(dataset, 0)
+        if verify and expected:
+            actual = _sha256(target)
+            if actual != expected:
+                raise DatasetFetchError(f"SHA-256 mismatch for {target.name}. Expected {expected}, got {actual}.")
+        return [target]
+
     if not urls:
         raise DatasetFetchError(
             "This dataset requires manual download or approval. Use 'iints data info' for instructions."
         )
     output_dir.mkdir(parents=True, exist_ok=True)
     downloaded: List[Path] = []
-    for url in urls:
+    for idx, url in enumerate(urls):
         filename = url.split("/")[-1]
         target = output_dir / filename
         downloaded.append(_download_file(url, target))
+        expected = _get_expected_hash(dataset, idx)
+        if verify and expected:
+            actual = _sha256(target)
+            if actual != expected:
+                raise DatasetFetchError(f"SHA-256 mismatch for {target.name}. Expected {expected}, got {actual}.")
+        elif verify and expected is None:
+            # If no hash is provided, at least emit the computed hash for user reference.
+            actual = _sha256(target)
+            checksum_path = output_dir / "SHA256SUMS.txt"
+            with checksum_path.open("a") as handle:
+                handle.write(f\"{actual}  {target.name}\\n\")
         if extract:
             _maybe_extract_zip(target, output_dir)
     return downloaded

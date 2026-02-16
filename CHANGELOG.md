@@ -11,6 +11,7 @@
 - Fixed CLI output path defaults and rich link formatting.
 - Cleaned repository by removing unused legacy folders.
 - Added official dataset registry with CLI discovery and fetch helpers.
+- Added bundled sample dataset, SHA-256 checks, and dataset citations.
 
 ## v0.1.3
 
