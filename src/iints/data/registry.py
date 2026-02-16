@@ -8,12 +8,12 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from importlib.abc import Traversable
 
 try:  # Python 3.9+
-    from importlib.resources import files
+    from importlib.resources import files, Traversable
 except Exception:  # pragma: no cover
     from importlib import resources as files  # type: ignore
+    from importlib.abc import Traversable  # type: ignore
 
 
 class DatasetRegistryError(RuntimeError):
