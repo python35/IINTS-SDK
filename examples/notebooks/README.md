@@ -20,3 +20,5 @@ Recommended order (each has a Colab button inside):
    [Open in Colab](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/06_Optional_Torch_LSTM.ipynb)
 8. `07_Ablation_Supervisor.ipynb`
    [Open in Colab](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/07_Ablation_Supervisor.ipynb)
+9. `08_Data_Registry_and_Import.ipynb`
+   [Open in Colab](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/08_Data_Registry_and_Import.ipynb)
