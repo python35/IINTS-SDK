@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from iints.core.safety.config import SafetyConfig
 from dataclasses import dataclass
@@ -69,8 +69,8 @@ class IndependentSupervisor:
         self.hypo_cutoff = hypo_cutoff
         
         # State tracking
-        self.glucose_history = []
-        self.violations = []
+        self.glucose_history: List[Tuple[float, float]] = []
+        self.violations: List[SafetyViolation] = []
         self.emergency_mode = False
         self.last_iob = 0.0
         self.dose_history: List[tuple] = []
