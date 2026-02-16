@@ -6,8 +6,8 @@ This SDK supports **official real-world datasets** via the `iints data` CLI.
 
 ```bash
 iints data list
-iints data info --dataset-id aide_t1d
-iints data fetch --dataset-id aide_t1d
+iints data info aide_t1d
+iints data fetch aide_t1d
 ```
 
 ## Notes

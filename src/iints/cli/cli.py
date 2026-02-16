@@ -878,7 +878,7 @@ def data_list():
 
 @data_app.command("info")
 def data_info(
-    dataset_id: Annotated[str, typer.Option(help="Dataset id (see `iints data list`)")],
+    dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
 ):
     """Show metadata and access info for a dataset."""
     console = Console()
@@ -892,7 +892,7 @@ def data_info(
 
 @data_app.command("fetch")
 def data_fetch(
-    dataset_id: Annotated[str, typer.Option(help="Dataset id (see `iints data list`)")],
+    dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
     output_dir: Annotated[Optional[Path], typer.Option(help="Output directory (default: data_packs/official/<id>)")] = None,
     extract: Annotated[bool, typer.Option(help="Extract zip files if present")] = True,
 ):

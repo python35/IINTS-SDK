@@ -59,8 +59,8 @@ iints import-demo --output-dir results/demo_import
 Official real-world datasets (download on demand):
 ```bash
 iints data list
-iints data info --dataset-id aide_t1d
-iints data fetch --dataset-id aide_t1d
+iints data info aide_t1d
+iints data fetch aide_t1d
 ```
 Some datasets require approval and are marked as `request` in the registry.
 
