@@ -123,10 +123,10 @@
     "access": "request",
     "license": "Data request / approval required",
     "description": "Large clinical registry for type 1 diabetes research.",
-    "landing_page": "https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf",
+    "landing_page": "https://datacatalog.med.nyu.edu/dataset/10129",
     "citation": {
-      "text": "T1D Exchange Clinic Registry (data catalog). Accessed 2026-02-16. https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf",
-      "bibtex": "@misc{t1d_exchange_registry, title={T1D Exchange Clinic Registry (Data Catalog)}, author={Jaeb Center for Health Research / T1D Exchange}, note={Accessed 2026-02-16}, url={https://data-nyu-edu.s3.amazonaws.com/data-catalog/Jaeb_Center_for_Health_Research-T1D_Exchange_Clinic_Registry.pdf}}"
+      "text": "NYU Data Catalog. T1D Exchange Clinic Registry. Accessed 2026-02-16. https://datacatalog.med.nyu.edu/dataset/10129",
+      "bibtex": "@misc{t1d_exchange_registry, title={T1D Exchange Clinic Registry}, author={NYU Data Catalog}, note={Accessed 2026-02-16}, url={https://datacatalog.med.nyu.edu/dataset/10129}}"
     }
   }
 ]

@@ -63,6 +63,7 @@ iints data info aide_t1d
 iints data fetch aide_t1d
 ```
 Some datasets require approval and are marked as `request` in the registry.
+`iints data info` prints BibTeX + citation text for easy referencing.
 
 Offline sample dataset (no download required):
 ```bash

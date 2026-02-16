@@ -17,6 +17,7 @@ iints data fetch sample --output-dir data_packs/sample
 - We do **not** ship full datasets in the repo; download them into `data_packs/official/<dataset>`.
 - All datasets are converted into the IINTS universal schema via `iints import-data` or `iints import-wizard`.
 - For public downloads, the CLI writes `SHA256SUMS.txt` after download when the source doesn't publish a checksum.
+- `iints data info <dataset>` prints BibTeX + citation text.
 
 ## Registry
 
