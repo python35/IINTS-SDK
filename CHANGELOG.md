@@ -4,6 +4,10 @@
 
 - (no entries)
 
+## v0.1.11
+
+- Hotfix release for PyPI publishing (no functional changes).
+
 ## v0.1.10
 
 - Dataset registry and CLI improvements (sample dataset, citations, integrity checks).
