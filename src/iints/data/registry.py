@@ -8,6 +8,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from importlib.abc import Traversable
 
 try:  # Python 3.9+
     from importlib.resources import files
@@ -23,7 +24,7 @@ class DatasetFetchError(RuntimeError):
     pass
 
 
-def _registry_path() -> Path:
+def _registry_path() -> Traversable:
     try:
         return files("iints.data").joinpath("datasets.json")  # type: ignore[attr-defined]
     except Exception as exc:
@@ -43,7 +44,12 @@ def get_dataset(dataset_id: str) -> Dict[str, Any]:
 
 
 def list_dataset_ids() -> List[str]:
-    return [entry.get("id") for entry in load_dataset_registry()]
+    ids: List[str] = []
+    for entry in load_dataset_registry():
+        dataset_id = entry.get("id")
+        if isinstance(dataset_id, str) and dataset_id:
+            ids.append(dataset_id)
+    return ids
 
 
 def _download_file(url: str, output_path: Path) -> Path:
@@ -104,7 +110,9 @@ def fetch_dataset(
             raise DatasetFetchError(f"Unable to locate bundled dataset: {exc}") from exc
         output_dir.mkdir(parents=True, exist_ok=True)
         target = output_dir / Path(bundled_path).name
-        shutil.copyfile(source_path, target)
+        # Traversable may not be a real filesystem path; stream bytes instead.
+        with source_path.open("rb") as src, target.open("wb") as dst:
+            shutil.copyfileobj(src, dst)
         expected = _get_expected_hash(dataset, 0)
         if verify and expected:
             actual = _sha256(target)
@@ -132,7 +140,7 @@ def fetch_dataset(
             actual = _sha256(target)
             checksum_path = output_dir / "SHA256SUMS.txt"
             with checksum_path.open("a") as handle:
-                handle.write(f\"{actual}  {target.name}\\n\")
+                handle.write(f"{actual}  {target.name}\n")
         if extract:
             _maybe_extract_zip(target, output_dir)
     return downloaded
