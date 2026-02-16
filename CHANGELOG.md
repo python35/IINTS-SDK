@@ -4,6 +4,10 @@
 
 - (no entries)
 
+## v0.1.14
+
+- Added missing type annotations for supervisor state (mypy clean).
+
 ## v0.1.13
 
 - Added SafetyConfig and CLI wiring for tunable safety limits.
