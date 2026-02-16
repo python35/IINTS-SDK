@@ -516,7 +516,7 @@ def presets_run(
         simulator.add_stress_event(event)
 
     if output_dir is None:
-        output_dir = algo.parent / "results" / "presets"
+        output_dir = Path.cwd() / "results" / "presets"
     output_dir = output_dir.expanduser()
     if not output_dir.is_absolute():
         output_dir = (Path.cwd() / output_dir).resolve()
@@ -528,7 +528,8 @@ def presets_run(
     algo_name = algorithm_instance.get_algorithm_metadata().name.replace(" ", "_").lower()
     results_file = output_dir / f"preset_{name}_{algo_name}.csv"
     results_df.to_csv(results_file, index=False)
-    console.print(f"Results saved to: [link=file://{results_file}]{results_file}[/link]")
+    results_link = results_file.as_uri()
+    console.print(f"Results saved to: [link={results_link}]{results_file}[/link]")
 
     audit_dir = output_dir / "audit"
     try:
@@ -554,7 +555,8 @@ def presets_run(
 
     report_path = output_dir / f"preset_{name}_{algo_name}.pdf"
     iints.generate_report(results_df, str(report_path), safety_report)
-    console.print(f"PDF report saved to: [link=file://{report_path}]{report_path}[/link]")
+    report_link = report_path.as_uri()
+    console.print(f"PDF report saved to: [link={report_link}]{report_path}[/link]")
 
 
 @presets_app.command("create")

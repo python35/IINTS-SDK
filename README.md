@@ -2,6 +2,8 @@
 [![PyPI version](https://badge.fury.io/py/iints-sdk-python35.svg)](https://badge.fury.io/py/iints-sdk-python35)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
+[![Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/coverage.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
+[![Docs Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/docs.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
 
 <div style="text-align:center;">
   <img src="Ontwerp zonder titel.png" alt="" style="display:block; margin:0 auto;">

@@ -4,6 +4,12 @@
 
 - (no entries)
 
+## v0.1.15
+
+- Hardened dataset registry resource loading for Python 3.14+.
+- Refreshed notebooks for 3.9 compatibility and clearer data registry flow.
+- Preset CLI now defaults output paths to the working directory and fixes file links.
+
 ## v0.1.14
 
 - Added missing type annotations for supervisor state (mypy clean).

@@ -52,6 +52,19 @@ iints run-full --algo algorithms/example_algorithm.py \
   --output-dir results/run_full
 ```
 
+### Parallel Batch Runner
+```bash
+iints run-parallel --algo algorithms/example_algorithm.py \
+  --scenarios-dir scenarios \
+  --output-dir results/batch
+```
+
+### Scenario Generator
+```bash
+iints scenarios generate --name "Random Stress Test" \
+  --output-path scenarios/generated_scenario.json
+```
+
 ### Validate Scenario + Patient Config
 ```bash
 iints validate --scenario-path scenarios/example_scenario.json \
@@ -71,6 +84,18 @@ iints import-wizard
 ### Use the Demo Data Pack
 ```bash
 iints import-demo --output-dir results/demo_import
+```
+
+### Nightscout Import (Optional Dependency)
+```bash
+pip install iints-sdk-python35[nightscout]
+iints import-nightscout --url https://your-nightscout.example \
+  --output-dir results/nightscout_import
+```
+
+### Tidepool Client Skeleton (Future Cloud Imports)
+```bash
+iints import-tidepool --base-url https://api.tidepool.org --token YOUR_TOKEN
 ```
 
 ### Demo Quickstart Workflow (Script)
@@ -137,6 +162,19 @@ outputs = iints.run_simulation(
     duration_minutes=720,
     seed=42,
     output_dir="results/profile_run",
+)
+
+# SafetyConfig override
+from iints.core.safety import SafetyConfig
+safe = SafetyConfig(max_insulin_per_bolus=2.0, hypo_cutoff=80.0)
+outputs = iints.run_full(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/safe_run",
+    safety_config=safe,
 )
 ```
 

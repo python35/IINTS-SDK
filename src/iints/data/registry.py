@@ -5,20 +5,16 @@ import urllib.request
 import zipfile
 import hashlib
 import shutil
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, IO, cast
 
 try:  # Python 3.9+
     from importlib.resources import files
-    from importlib.resources.abc import Traversable
 except Exception:  # pragma: no cover
-    from importlib import resources as files  # type: ignore
-    try:
-        from importlib.abc import Traversable  # type: ignore
-    except Exception:  # Python 3.14 moved Traversable
-        class Traversable:  # type: ignore
-            pass
+    files = None  # type: ignore
+    from importlib import resources
+else:
+    from importlib import resources
 
 
 class DatasetRegistryError(RuntimeError):
@@ -29,16 +25,17 @@ class DatasetFetchError(RuntimeError):
     pass
 
 
-def _registry_path() -> Traversable:
+def _read_registry_text() -> str:
     try:
-        return files("iints.data").joinpath("datasets.json")  # type: ignore[attr-defined]
+        if files is not None:
+            return files("iints.data").joinpath("datasets.json").read_text()  # type: ignore[call-arg]
+        return resources.read_text("iints.data", "datasets.json")
     except Exception as exc:
         raise DatasetRegistryError(f"Unable to locate datasets.json: {exc}") from exc
 
 
 def load_dataset_registry() -> List[Dict[str, Any]]:
-    registry_path = _registry_path()
-    return json.loads(registry_path.read_text())
+    return json.loads(_read_registry_text())
 
 
 def get_dataset(dataset_id: str) -> Dict[str, Any]:
@@ -95,6 +92,17 @@ def _maybe_extract_zip(path: Path, output_dir: Path) -> None:
         raise DatasetFetchError(f"Failed to extract {path.name}: {exc}") from exc
 
 
+def _open_bundled_binary(bundled_path: str) -> IO[bytes]:
+    if files is not None:
+        return cast(IO[bytes], files("iints.data").joinpath(bundled_path).open("rb"))  # type: ignore[call-arg]
+    parts = bundled_path.split("/")
+    if len(parts) > 1:
+        package = ".".join(["iints", "data", *parts[:-1]])
+        resource = parts[-1]
+        return cast(IO[bytes], resources.open_binary(package, resource))
+    return cast(IO[bytes], resources.open_binary("iints.data", bundled_path))
+
+
 def fetch_dataset(
     dataset_id: str,
     output_dir: Path,
@@ -109,15 +117,14 @@ def fetch_dataset(
         bundled_path = dataset.get("bundled_path")
         if not bundled_path:
             raise DatasetFetchError("Bundled dataset missing bundled_path entry.")
-        try:
-            source_path = files("iints.data").joinpath(bundled_path)  # type: ignore[attr-defined]
-        except Exception as exc:
-            raise DatasetFetchError(f"Unable to locate bundled dataset: {exc}") from exc
         output_dir.mkdir(parents=True, exist_ok=True)
         target = output_dir / Path(bundled_path).name
         # Traversable may not be a real filesystem path; stream bytes instead.
-        with source_path.open("rb") as src, target.open("wb") as dst:
-            shutil.copyfileobj(src, dst)
+        try:
+            with _open_bundled_binary(bundled_path) as src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+        except Exception as exc:
+            raise DatasetFetchError(f"Unable to locate bundled dataset: {exc}") from exc
         expected = _get_expected_hash(dataset, 0)
         if verify and expected:
             actual = _sha256(target)

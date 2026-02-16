@@ -137,7 +137,44 @@ iints run \
   --output-dir ./results/data
 ```
 
-4. `benchmark`  
+4. `run-full`  
+One-line runner that always exports results + audit + baseline + PDF.  
+```bash
+iints run-full --algo algorithms/my_algo.py \
+  --scenario-path scenarios/example_scenario.json \
+  --output-dir ./results/run_full
+```
+
+5. `run-parallel`  
+Parallel batch runner for large scenario suites.  
+```bash
+iints run-parallel --algo algorithms/my_algo.py \
+  --scenarios-dir scenarios \
+  --output-dir ./results/batch
+```
+
+6. `scenarios generate` / `scenarios wizard`  
+Random/custom scenario generator.  
+```bash
+iints scenarios generate --name "Random Stress Test" \
+  --output-path scenarios/generated_scenario.json
+```
+
+7. `import-nightscout`  
+Pull CGM data from Nightscout into a scenario + standard CSV (optional dependency).  
+```bash
+pip install iints-sdk-python35[nightscout]
+iints import-nightscout --url https://your-nightscout.example \
+  --output-dir results/nightscout_import
+```
+
+8. `import-tidepool`  
+Initial Tidepool client skeleton (auth flow is TODO).  
+```bash
+iints import-tidepool --base-url https://api.tidepool.org --token YOUR_TOKEN
+```
+
+9. `benchmark`  
 Benchmarks one AI algorithm against the standard pump across patient configs and scenarios.  
 
 ```bash
@@ -186,12 +223,16 @@ print(safety_report.get("performance_report", {}))
 
 The SDK expects patient data in a standardized format, often managed through `iints.data.ingestor.DataIngestor` and `iints.data.universal_parser.UniversalParser`. Key data points typically include timestamps, glucose readings, insulin doses, and carbohydrate intake. Specific details can be found in `data_packs/DATA_SCHEMA.md`.
 
+Nightscout imports are supported via `iints import-nightscout` (requires the optional `nightscout` extra).
+
 ## 9. Safety & Clinical Guardrails
 
 The SDK enforces safety constraints through two layers:
 
 1. **InputValidator**: Filters biologically implausible glucose values and unsafe insulin requests.
 2. **IndependentSupervisor**: Applies deterministic caps and overrides based on IOB and glucose state.
+
+All safety limits are now centralized in `SafetyConfig` and can be set via CLI flags or Python API.
 
 The safety report includes:
 - Violation counts and breakdown
