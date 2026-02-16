@@ -6,7 +6,7 @@
     "access": "bundled",
     "license": "Demo-only (bundled with SDK)",
     "description": "Tiny CGM sample for quickstart and offline demos.",
-    "bundled_path": "data/demo/demo_cgm.csv",
+    "bundled_path": "demo/demo_cgm.csv",
     "sha256": "e869e033887e595ab4c41cb14cde6f2328cc9d55e0fb2c741e7fbe3e0ae3af96",
     "citation": {
       "text": "IINTS-AF Team. IINTS Sample CGM (bundled). Accessed 2026-02-16.",
