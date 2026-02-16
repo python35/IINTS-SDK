@@ -10,10 +10,15 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 try:  # Python 3.9+
-    from importlib.resources import files, Traversable
+    from importlib.resources import files
+    from importlib.resources.abc import Traversable
 except Exception:  # pragma: no cover
     from importlib import resources as files  # type: ignore
-    from importlib.abc import Traversable  # type: ignore
+    try:
+        from importlib.abc import Traversable  # type: ignore
+    except Exception:  # Python 3.14 moved Traversable
+        class Traversable:  # type: ignore
+            pass
 
 
 class DatasetRegistryError(RuntimeError):
