@@ -4,6 +4,10 @@
 
 - (no entries)
 
+## v0.1.12
+
+- Use dedicated publish workflow for PyPI (release workflow now GitHub‑release only).
+
 ## v0.1.11
 
 - Hotfix release for PyPI publishing (no functional changes).
