@@ -22,20 +22,28 @@ class NightscoutConfig:
 def _require_nightscout():
     try:
         import py_nightscout as nightscout  # type: ignore
-    except Exception as exc:  # pragma: no cover - optional dependency
-        raise ImportError(
-            "py-nightscout is required. Install with `pip install iints-sdk-python35[nightscout]`."
-        ) from exc
-    return nightscout
+        return nightscout
+    except Exception:
+        try:
+            import nightscout as nightscout  # type: ignore
+            return nightscout
+        except Exception as exc:  # pragma: no cover - optional dependency
+            raise ImportError(
+                "py-nightscout is required. Install with `pip install iints-sdk-python35[nightscout]`."
+            ) from exc
 
 
 async def _fetch_entries_async(config: NightscoutConfig) -> List[Any]:
     nightscout = _require_nightscout()
-    api = nightscout.Api(
+    if not hasattr(nightscout, "Api"):
+        raise RuntimeError("py-nightscout API wrapper missing 'Api' class.")
+    api = nightscout.Api(  # type: ignore[attr-defined]
         config.url,
         api_secret=config.api_secret,
         token=config.token,
     )
+    if not hasattr(api, "get_sgvs"):
+        raise RuntimeError("py-nightscout client missing 'get_sgvs' method.")
     entries = await api.get_sgvs()
     return list(entries or [])
 
