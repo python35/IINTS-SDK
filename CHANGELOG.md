@@ -4,6 +4,13 @@
 
 - (no entries)
 
+## v0.1.13
+
+- Added SafetyConfig and CLI wiring for tunable safety limits.
+- Added parallel batch runner and scenario generator tooling.
+- Added Nightscout import connector (optional dependency) and Tidepool client skeleton.
+- Added tests covering safety config, generator, and Nightscout dependency handling.
+
 ## v0.1.12
 
 - Use dedicated publish workflow for PyPI (release workflow now GitHub‑release only).

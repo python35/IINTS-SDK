@@ -3,7 +3,7 @@
 import pandas as pd # Required for type hints like pd.DataFrame
 from typing import Optional
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"
 
 # API Components for Algorithm Development
 from .api.base_algorithm import (
