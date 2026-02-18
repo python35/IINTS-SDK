@@ -1,0 +1,23 @@
+predictor:
+  history_minutes: 240
+  horizon_minutes: 60
+  time_step_minutes: 5
+  feature_columns:
+    - glucose_actual_mgdl
+    - patient_iob_units
+    - patient_cob_grams
+    - effective_isf
+    - effective_icr
+    - effective_basal_rate_u_per_hr
+    - glucose_trend_mgdl_min
+  target_column: glucose_actual_mgdl
+
+training:
+  epochs: 20
+  batch_size: 128
+  learning_rate: 0.001
+  hidden_size: 64
+  num_layers: 2
+  dropout: 0.1
+  validation_split: 0.1
+  seed: 42

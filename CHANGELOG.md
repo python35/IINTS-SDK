@@ -9,6 +9,7 @@
 - Dataset manager adds `iints data cite` and always writes SHA256SUMS.txt.
 - Algorithm plugin registry with `iints algorithms list/info` + entry points.
 - CI now includes SBOM generation + `pip-audit`, and Python 3.12 in the test matrix.
+- Added AI research track scaffolding (predictor model, datasets, training/eval scripts).
 
 ## v0.1.16
 

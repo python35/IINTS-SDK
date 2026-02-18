@@ -24,6 +24,7 @@ This document is the public, single‑entry documentation index for the IINTS‑
 - **Quickstart**: `README.md`
 - **Notebooks**: `examples/notebooks/` (step‑by‑step walkthroughs)
 - **Presets**: `src/iints/presets/presets.json`
+- **AI Research Track**: `research/README.md`
 
 ### Research Checklist (Recommended)
 - Use a fixed `seed` for every run (or record the auto‑seed in `run_metadata.json`).

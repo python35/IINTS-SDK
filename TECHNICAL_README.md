@@ -128,6 +128,16 @@ iints report --results-csv results/data/sim_results_example.csv \
   --output-path results/clinical_report.pdf
 ```
 
+## Research Track (AI Predictor)
+See `research/README.md` for training and evaluation scripts.
+
+Quick start:
+```bash
+pip install iints-sdk-python35[research]
+python research/synthesize_dataset.py --runs 10 --output data/synthetic.parquet
+python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
+```
+
 ### Dependency Check (Optional Torch)
 ```bash
 pip install "iints[torch]"

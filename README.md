@@ -140,6 +140,7 @@ Hands-on Jupyter notebooks live in [`examples/notebooks/`](examples/notebooks/)
 * Notebook index: `examples/notebooks/README.md`
 * Technical README: `TECHNICAL_README.md`
 * API Stability: `API_STABILITY.md`
+* Research track: `research/README.md`
 
 ### Related Work & Inspiration
 We borrow techniques from the broader CGM/APS ecosystem, while differentiating with a safety‑first, audit‑ready workflow:

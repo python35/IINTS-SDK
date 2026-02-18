@@ -47,6 +47,11 @@ torch = [
 nightscout = [
   "py-nightscout",
 ]
+research = [
+  "torch>=2.0.0",
+  "pyarrow>=12.0.0",
+  "h5py>=3.10.0",
+]
 
 [project.scripts]
 iints = "iints.cli.cli:app"
