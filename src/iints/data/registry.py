@@ -71,6 +71,12 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _append_checksum(output_dir: Path, filename: str, digest: str) -> None:
+    checksum_path = output_dir / "SHA256SUMS.txt"
+    with checksum_path.open("a") as handle:
+        handle.write(f"{digest}  {filename}\n")
+
+
 def _get_expected_hash(dataset: Dict[str, Any], index: int = 0) -> Optional[str]:
     expected = dataset.get("sha256")
     if isinstance(expected, list):
@@ -130,6 +136,10 @@ def fetch_dataset(
             actual = _sha256(target)
             if actual != expected:
                 raise DatasetFetchError(f"SHA-256 mismatch for {target.name}. Expected {expected}, got {actual}.")
+            _append_checksum(output_dir, target.name, actual)
+        elif verify and expected is None:
+            actual = _sha256(target)
+            _append_checksum(output_dir, target.name, actual)
         return [target]
 
     if not urls:
@@ -147,12 +157,10 @@ def fetch_dataset(
             actual = _sha256(target)
             if actual != expected:
                 raise DatasetFetchError(f"SHA-256 mismatch for {target.name}. Expected {expected}, got {actual}.")
+            _append_checksum(output_dir, target.name, actual)
         elif verify and expected is None:
-            # If no hash is provided, at least emit the computed hash for user reference.
             actual = _sha256(target)
-            checksum_path = output_dir / "SHA256SUMS.txt"
-            with checksum_path.open("a") as handle:
-                handle.write(f"{actual}  {target.name}\n")
+            _append_checksum(output_dir, target.name, actual)
         if extract:
             _maybe_extract_zip(target, output_dir)
     return downloaded

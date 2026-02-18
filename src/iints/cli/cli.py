@@ -2,6 +2,7 @@ import typer  # type: ignore
 import concurrent.futures
 from pathlib import Path
 from typing import Dict, Any, Union, List, Tuple, Optional
+from dataclasses import asdict
 from typing_extensions import Annotated
 from pydantic import ValidationError
 import os
@@ -37,6 +38,13 @@ from iints.data.registry import (
     fetch_dataset,
     DatasetFetchError,
     DatasetRegistryError,
+)
+from iints.utils.run_io import (
+    build_run_metadata,
+    generate_run_id,
+    resolve_output_dir,
+    resolve_seed,
+    write_json,
 )
 from iints.validation import (
     build_stress_events,
@@ -466,6 +474,9 @@ def presets_run(
     algorithm_instance = _load_algorithm_instance(algo, console)
     console.print(f"Loaded algorithm: [green]{algorithm_instance.get_algorithm_metadata().name}[/green]")
 
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+
     try:
         patient_config_name = preset.get("patient_config", "default_patient")
         validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
@@ -504,8 +515,7 @@ def presets_run(
         "time_step": time_step,
         "safety_config": safety_config,
     }
-    if seed is not None:
-        simulator_kwargs["seed"] = seed
+    simulator_kwargs["seed"] = resolved_seed
     if safety_config is None:
         safety_config = SafetyConfig()
         if "critical_glucose_threshold" in preset:
@@ -530,21 +540,36 @@ def presets_run(
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
 
-    if output_dir is None:
-        output_dir = Path.cwd() / "results" / "presets"
-    output_dir = output_dir.expanduser()
-    if not output_dir.is_absolute():
-        output_dir = (Path.cwd() / output_dir).resolve()
-    else:
-        output_dir = output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = resolve_output_dir(output_dir, run_id)
     results_df, safety_report = simulator.run_batch(duration)
 
-    algo_name = algorithm_instance.get_algorithm_metadata().name.replace(" ", "_").lower()
-    results_file = output_dir / f"preset_{name}_{algo_name}.csv"
+    config_payload: Dict[str, Any] = {
+        "run_type": "preset",
+        "preset_name": name,
+        "algorithm": {
+            "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
+            "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
+        },
+        "patient_config": validated_patient_params,
+        "scenario": scenario_payload,
+        "duration_minutes": duration,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+        "compare_baselines": compare_baselines,
+        "export_audit": True,
+        "generate_report": True,
+        "safety_config": asdict(safety_config),
+    }
+    config_path = output_dir / "config.json"
+    write_json(config_path, config_payload)
+    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_dir)
+    run_metadata_path = output_dir / "run_metadata.json"
+    write_json(run_metadata_path, run_metadata)
+
+    results_file = output_dir / "results.csv"
     results_df.to_csv(results_file, index=False)
-    results_link = results_file.as_uri()
-    console.print(f"Results saved to: [link={results_link}]{results_file}[/link]")
+    console.print(f"Results saved to: {results_file}")
+    console.print(f"Run metadata: {run_metadata_path}")
 
     audit_dir = output_dir / "audit"
     try:
@@ -562,16 +587,15 @@ def presets_run(
             primary_label=algorithm_instance.get_algorithm_metadata().name,
             primary_results=results_df,
             primary_safety=safety_report,
-            seed=seed,
+            seed=resolved_seed,
         )
         safety_report["baseline_comparison"] = comparison
         baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
         console.print(f"Baseline comparison saved to: {baseline_paths}")
 
-    report_path = output_dir / f"preset_{name}_{algo_name}.pdf"
+    report_path = output_dir / "report.pdf"
     iints.generate_report(results_df, str(report_path), safety_report)
-    report_link = report_path.as_uri()
-    console.print(f"PDF report saved to: [link={report_link}]{report_path}[/link]")
+    console.print(f"PDF report saved to: {report_path}")
 
 
 @presets_app.command("create")
@@ -736,7 +760,7 @@ def run(
     ] = None,
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
-    output_dir: Annotated[Path, typer.Option(help="Directory to save simulation results")] = Path("./results/data"),
+    output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save simulation results")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
     safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
@@ -837,6 +861,7 @@ def run(
     # 4. Load Scenario Data (if provided)
     stress_events = []
     stress_event_payloads: List[Dict[str, Any]] = []
+    scenario_model = None
     if scenario_path:
         if not scenario_path.is_file():
             console.print(f"[bold red]Error: Scenario file '{scenario_path}' not found.[/bold red]")
@@ -875,12 +900,17 @@ def run(
         critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
     )
 
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    output_dir = resolve_output_dir(output_dir, run_id)
+
+    effective_safety_config = safety_config or SafetyConfig()
     simulator = iints.Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
         time_step=time_step,
-        seed=seed,
-        safety_config=safety_config,
+        seed=resolved_seed,
+        safety_config=effective_safety_config,
     )
     
     for event in stress_events:
@@ -889,17 +919,34 @@ def run(
     simulation_results_df, safety_report = simulator.run_batch(duration)
     
     # 6. Output Results
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Construct a more robust filename
-    algo_name_for_filename = algorithm_instance.get_algorithm_metadata().name.replace(' ', '_').lower()
-    scenario_name_for_filename = Path(scenario_path).stem if scenario_path else 'no_scenario'
-    
-    results_file = output_dir / f"sim_results_{algo_name_for_filename}_patient_{patient_label}_scenario_{scenario_name_for_filename}_duration_{duration}m.csv"
+    config_payload: Dict[str, Any] = {
+        "run_type": "single",
+        "algorithm": {
+            "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
+            "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
+        },
+        "patient_config": validated_patient_params,
+        "scenario": scenario_model.model_dump() if scenario_path else None,
+        "duration_minutes": duration,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+        "compare_baselines": compare_baselines,
+        "export_audit": False,
+        "generate_report": True,
+        "safety_config": asdict(effective_safety_config),
+    }
+    config_path = output_dir / "config.json"
+    write_json(config_path, config_payload)
+    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_dir)
+    run_metadata_path = output_dir / "run_metadata.json"
+    write_json(run_metadata_path, run_metadata)
+
+    results_file = output_dir / "results.csv"
     
     simulation_results_df.to_csv(results_file, index=False)
     
-    console.print(f"\nSimulation completed. Results saved to: [link=file://{results_file}]{results_file}[/link]") # Formatted link
+    console.print(f"\nSimulation completed. Results saved to: {results_file}")
+    console.print(f"Run metadata: {run_metadata_path}")
     console.print("\n--- Safety Report ---")
     for key, value in safety_report.items():
         console.print(f"{key}: {value}")
@@ -916,14 +963,14 @@ def run(
             primary_label=algorithm_instance.get_algorithm_metadata().name,
             primary_results=simulation_results_df,
             primary_safety=safety_report,
-            seed=seed,
+            seed=resolved_seed,
         )
         safety_report["baseline_comparison"] = comparison
         baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
         console.print(f"Baseline comparison saved to: {baseline_paths}")
 
     # Generate full report (using the new iints.generate_report function)
-    report_output_path = output_dir / f"sim_report_{algo_name_for_filename}_patient_{patient_config_name}_scenario_{scenario_name_for_filename}_duration_{duration}m.pdf"
+    report_output_path = output_dir / "report.pdf"
     iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
 
 
@@ -935,7 +982,7 @@ def run_full(
     scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file")] = None,
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
-    output_dir: Annotated[Path, typer.Option(help="Directory to save results + audit + report")] = Path("./results/run_full"),
+    output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save results + audit + report")] = None,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
     safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
     safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
@@ -1002,6 +1049,8 @@ def run_full(
         console.print(f"Audit: {outputs['audit']}")
     if "baseline_files" in outputs:
         console.print(f"Baseline files: {outputs['baseline_files']}")
+    if "run_metadata_path" in outputs:
+        console.print(f"Run metadata: {outputs['run_metadata_path']}")
 
 
 @app.command("run-parallel")
@@ -1037,6 +1086,7 @@ def run_parallel(
 ):
     """Run many scenarios in parallel across CPU cores."""
     console = Console()
+    base_seed = resolve_seed(seed)
     if scenarios_dir is None and not scenario_paths:
         console.print("[bold red]Provide --scenarios-dir or at least one --scenario-path.[/bold red]")
         raise typer.Exit(code=1)
@@ -1095,7 +1145,7 @@ def run_parallel(
     idx = 0
     for scenario in scenarios:
         for patient_config, patient_label in zip(patient_configs, patient_labels):
-            job_seed = (seed + idx) if seed is not None else None
+            job_seed = base_seed + idx
             run_output_dir = output_dir / f"{scenario.stem}__{patient_label}"
             jobs.append(
                 {
@@ -1293,6 +1343,29 @@ def data_info(
         if bibtex:
             console.print("\n[bold]Citation (BibTeX)[/bold]")
             console.print(bibtex)
+
+
+@data_app.command("cite")
+def data_cite(
+    dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
+):
+    """Print BibTeX citation for a dataset."""
+    console = Console()
+    try:
+        dataset = get_dataset(dataset_id)
+    except DatasetRegistryError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+        raise typer.Exit(code=1)
+    citation = dataset.get("citation", {})
+    bibtex = citation.get("bibtex")
+    text = citation.get("text")
+    if bibtex:
+        console.print(bibtex)
+        return
+    if text:
+        console.print(text)
+        return
+    console.print("[yellow]No citation available for this dataset.[/yellow]")
 
 
 @data_app.command("fetch")

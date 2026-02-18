@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from dataclasses import asdict
 from typing import Any, Dict, Optional, Union
 
 import pandas as pd
@@ -20,6 +21,13 @@ from iints.validation import (
     validate_patient_config_dict,
     validate_scenario_dict,
     load_patient_config_by_name,
+)
+from iints.utils.run_io import (
+    build_run_metadata,
+    generate_run_id,
+    resolve_output_dir,
+    resolve_seed,
+    write_json,
 )
 
 
@@ -65,18 +73,23 @@ def run_simulation(
     One-line simulation runner with audit + report + baseline comparison.
     """
     algorithm_instance = algorithm() if isinstance(algorithm, type) else algorithm
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    output_path = resolve_output_dir(output_dir, run_id)
+
     patient_params = _resolve_patient_config(patient_config)
     patient_model = PatientModel(**patient_params)
 
     scenario_payload = _resolve_scenario_payloads(scenario)
     stress_event_payloads = scenario_payload.get("stress_events", []) if scenario_payload else []
+    effective_safety_config = safety_config or SafetyConfig()
 
     simulator = Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
         time_step=time_step,
-        seed=seed,
-        safety_config=safety_config,
+        seed=resolved_seed,
+        safety_config=effective_safety_config,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -86,6 +99,8 @@ def run_simulation(
     outputs: Dict[str, Any] = {
         "results": results_df,
         "safety_report": safety_report,
+        "run_id": run_id,
+        "output_dir": str(output_path),
     }
 
     if compare_baselines:
@@ -102,28 +117,49 @@ def run_simulation(
         safety_report["baseline_comparison"] = comparison
         outputs["baseline_comparison"] = comparison
 
-    if output_dir:
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-        results_csv = output_path / "results.csv"
-        results_df.to_csv(results_csv, index=False)
-        outputs["results_csv"] = str(results_csv)
+    config_payload: Dict[str, Any] = {
+        "algorithm": {
+            "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
+            "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
+        },
+        "patient_config": patient_params,
+        "scenario": scenario_payload,
+        "duration_minutes": duration_minutes,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+        "compare_baselines": compare_baselines,
+        "export_audit": export_audit,
+        "generate_report": generate_report,
+        "safety_config": asdict(effective_safety_config),
+    }
+    config_path = output_path / "config.json"
+    write_json(config_path, config_payload)
+    outputs["config_path"] = str(config_path)
 
-        if export_audit:
-            audit_paths = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
-            outputs["audit"] = audit_paths
+    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_path)
+    run_metadata_path = output_path / "run_metadata.json"
+    write_json(run_metadata_path, run_metadata)
+    outputs["run_metadata_path"] = str(run_metadata_path)
 
-        if compare_baselines:
-            outputs["baseline_files"] = write_baseline_comparison(
-                safety_report.get("baseline_comparison", {}),
-                output_path / "baseline",
-            )
+    results_csv = output_path / "results.csv"
+    results_df.to_csv(results_csv, index=False)
+    outputs["results_csv"] = str(results_csv)
 
-        if generate_report:
-            report_path = output_path / "clinical_report.pdf"
-            generator = ClinicalReportGenerator()
-            generator.generate_pdf(results_df, safety_report, str(report_path))
-            outputs["report_pdf"] = str(report_path)
+    if export_audit:
+        audit_paths = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
+        outputs["audit"] = audit_paths
+
+    if compare_baselines:
+        outputs["baseline_files"] = write_baseline_comparison(
+            safety_report.get("baseline_comparison", {}),
+            output_path / "baseline",
+        )
+
+    if generate_report:
+        report_path = output_path / "clinical_report.pdf"
+        generator = ClinicalReportGenerator()
+        generator.generate_pdf(results_df, safety_report, str(report_path))
+        outputs["report_pdf"] = str(report_path)
 
     return outputs
 
@@ -143,19 +179,24 @@ def run_full(
     One-line runner that always exports results + audit + PDF + baseline comparison.
     """
     algorithm_instance = algorithm() if isinstance(algorithm, type) else algorithm
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    output_path = resolve_output_dir(output_dir, run_id)
+
     patient_params = _resolve_patient_config(patient_config)
     patient_model = PatientModel(**patient_params)
 
     scenario_payload = _resolve_scenario_payloads(scenario)
     stress_event_payloads = scenario_payload.get("stress_events", []) if scenario_payload else []
+    effective_safety_config = safety_config or SafetyConfig()
 
     simulator = Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
         time_step=time_step,
-        seed=seed,
+        seed=resolved_seed,
         enable_profiling=enable_profiling,
-        safety_config=safety_config,
+        safety_config=effective_safety_config,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -165,6 +206,8 @@ def run_full(
     outputs: Dict[str, Any] = {
         "results": results_df,
         "safety_report": safety_report,
+        "run_id": run_id,
+        "output_dir": str(output_path),
     }
 
     comparison = run_baseline_comparison(
@@ -180,8 +223,31 @@ def run_full(
     safety_report["baseline_comparison"] = comparison
     outputs["baseline_comparison"] = comparison
 
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
+    config_payload: Dict[str, Any] = {
+        "algorithm": {
+            "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
+            "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
+        },
+        "patient_config": patient_params,
+        "scenario": scenario_payload,
+        "duration_minutes": duration_minutes,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+        "compare_baselines": True,
+        "export_audit": True,
+        "generate_report": True,
+        "enable_profiling": enable_profiling,
+        "safety_config": asdict(effective_safety_config),
+    }
+    config_path = output_path / "config.json"
+    write_json(config_path, config_payload)
+    outputs["config_path"] = str(config_path)
+
+    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_path)
+    run_metadata_path = output_path / "run_metadata.json"
+    write_json(run_metadata_path, run_metadata)
+    outputs["run_metadata_path"] = str(run_metadata_path)
+
     results_csv = output_path / "results.csv"
     results_df.to_csv(results_csv, index=False)
     outputs["results_csv"] = str(results_csv)
