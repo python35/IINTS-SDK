@@ -12,3 +12,4 @@ rich>=12.0.0
 
 # Rapportage
 fpdf2>=2.8.0
+pillow>=12.1.1
