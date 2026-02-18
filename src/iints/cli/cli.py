@@ -1011,6 +1011,7 @@ def run(
     simulation_results_df, safety_report = simulator.run_batch(duration)
     
     # 6. Output Results
+    scenario_payload = scenario_model.model_dump() if scenario_model else None
     config_payload: Dict[str, Any] = {
         "run_type": "single",
         "algorithm": {

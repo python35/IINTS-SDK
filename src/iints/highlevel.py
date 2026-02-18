@@ -203,7 +203,7 @@ def run_full(
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
-    output_dir: Union[str, Path] = "results/run_full",
+    output_dir: Optional[Union[str, Path]] = None,
     enable_profiling: bool = True,
     safety_config: Optional[SafetyConfig] = None,
 ) -> Dict[str, Any]:

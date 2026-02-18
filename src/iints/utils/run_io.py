@@ -46,7 +46,7 @@ def resolve_output_dir(output_dir: Optional[Union[str, Path]], run_id: str) -> P
 
 
 def _serialize_payload(payload: Any) -> Any:
-    if is_dataclass(payload):
+    if is_dataclass(payload) and not isinstance(payload, type):
         return asdict(payload)
     if isinstance(payload, Path):
         return str(payload)
