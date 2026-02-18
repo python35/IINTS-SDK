@@ -50,7 +50,7 @@ jobs:
 
     - name: Generate SBOM (CycloneDX)
       run: |
-        cyclonedx-bom -o sbom.json
+        python -m cyclonedx_bom -o sbom.json
 
     - name: Build package
       run: |
