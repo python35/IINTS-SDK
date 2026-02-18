@@ -1,7 +1,7 @@
-# Comprehensive Guide
+# Comprehensive Guide (v0.1.15)
 
-The authoritative, up-to-date guide lives at:
+The authoritative, up‑to‑date guide lives at:
 
 - `SDK_COMPREHENSIVE_GUIDE.md`
 
-This file is kept as a pointer to avoid duplication.
+This file remains a pointer to avoid duplication.

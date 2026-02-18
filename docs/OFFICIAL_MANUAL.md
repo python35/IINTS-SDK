@@ -1,7 +1,7 @@
-# IINTS-AF SDK: Official Manual
+# IINTS-AF SDK: Official Manual (v0.1.15)
 
-The authoritative, up-to-date manual lives at:
+The authoritative, up‑to‑date manual lives at:
 
 - `SDK_COMPREHENSIVE_GUIDE.md`
 
-This file is kept as a pointer to avoid duplication.
+This file remains a pointer to avoid duplication.
