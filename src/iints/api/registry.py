@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Mapping, Sequence, cast
 import importlib
 
 try:
@@ -89,7 +89,11 @@ def list_algorithm_plugins() -> List[AlgorithmListing]:
     # Entry points
     try:
         eps = importlib_metadata.entry_points()
-        group = eps.select(group="iints.algorithms") if hasattr(eps, "select") else eps.get("iints.algorithms", [])
+        if hasattr(eps, "select"):
+            group = eps.select(group="iints.algorithms")
+        else:
+            eps_mapping = cast(Mapping[str, Sequence[object]], eps)
+            group = eps_mapping.get("iints.algorithms", ())
         for ep in group:
             listings.append(_load_entry_point(ep))
     except Exception:

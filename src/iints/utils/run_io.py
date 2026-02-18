@@ -11,6 +11,7 @@ import uuid
 import subprocess
 import os
 from importlib import metadata as importlib_metadata
+from typing import Mapping, cast
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -71,7 +72,8 @@ def build_run_metadata(run_id: str, seed: int, config: Dict[str, Any], output_di
     dependencies = []
     try:
         for dist in importlib_metadata.distributions():
-            name = dist.metadata.get("Name") or dist.metadata.get("Summary") or dist.metadata.get("name")
+            metadata = cast(Mapping[str, str], dist.metadata)
+            name = metadata.get("Name") or metadata.get("Summary") or metadata.get("name")
             if name:
                 dependencies.append({"name": name, "version": dist.version})
         dependencies = sorted(dependencies, key=lambda item: item["name"].lower())
@@ -120,7 +122,7 @@ def build_run_manifest(output_dir: Path, files: Dict[str, Path]) -> Dict[str, An
         "files": {},
     }
     for label, path in files.items():
-        entry = {"path": str(path)}
+        entry: Dict[str, Any] = {"path": str(path)}
         if path.exists():
             entry["sha256"] = compute_sha256(path)
             entry["size_bytes"] = path.stat().st_size
