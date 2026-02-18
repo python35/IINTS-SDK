@@ -32,13 +32,19 @@ class FixedBasalBolus(InsulinAlgorithm):
         Returns:
             Dict[str, Any]: Contains 'basal_insulin' and 'bolus_insulin' for the time step.
         """
-        basal_rate_units_per_minute = self.settings["fixed_basal_rate"] / 60.0
+        basal_rate = self.settings["fixed_basal_rate"]
+        if data.basal_rate_u_per_hr is not None:
+            basal_rate = float(data.basal_rate_u_per_hr)
+        basal_rate_units_per_minute = basal_rate / 60.0
         basal_insulin = basal_rate_units_per_minute * data.time_step
 
         carb_intake = data.carb_intake
         bolus_insulin = 0.0
         if carb_intake > 0:
-            bolus_insulin = carb_intake / self.settings["carb_ratio"]
+            carb_ratio = self.settings["carb_ratio"]
+            if data.icr is not None:
+                carb_ratio = float(data.icr)
+            bolus_insulin = carb_intake / carb_ratio
 
         return {
             "basal_insulin": basal_insulin,

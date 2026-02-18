@@ -23,6 +23,9 @@ class SafetyConfig:
     max_iob: float = 4.0
     trend_stop: float = -2.0
     hypo_cutoff: float = 70.0
+    max_basal_multiplier: float = 3.0
+    predicted_hypoglycemia_threshold: float = 60.0
+    predicted_hypoglycemia_horizon_minutes: int = 30
 
     # Simulation termination limits
     critical_glucose_threshold: float = 40.0

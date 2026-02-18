@@ -28,15 +28,21 @@ class CorrectionBolus(InsulinAlgorithm):
     def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
         self.why_log = [] # Clear the log for this prediction cycle
 
-        basal_rate_units_per_minute = self.settings["fixed_basal_rate"] / 60.0
+        basal_rate = self.settings["fixed_basal_rate"]
+        if data.basal_rate_u_per_hr is not None:
+            basal_rate = float(data.basal_rate_u_per_hr)
+        basal_rate_units_per_minute = basal_rate / 60.0
         basal_insulin = basal_rate_units_per_minute * data.time_step
-        self._log_reason(f"Basal insulin calculated ({self.settings['fixed_basal_rate']} U/hr)", "basal_delivery", basal_insulin)
+        self._log_reason(f"Basal insulin calculated ({basal_rate} U/hr)", "basal_delivery", basal_insulin)
 
         carb_intake = data.carb_intake
         meal_bolus = 0.0
         if carb_intake > 0:
-            meal_bolus = carb_intake / self.settings["carb_ratio"]
-            self._log_reason(f"Meal bolus calculated for {carb_intake:.0f}g carbs (CR: {self.settings['carb_ratio']})", "meal_response", meal_bolus)
+            carb_ratio = self.settings["carb_ratio"]
+            if data.icr is not None:
+                carb_ratio = float(data.icr)
+            meal_bolus = carb_intake / carb_ratio
+            self._log_reason(f"Meal bolus calculated for {carb_intake:.0f}g carbs (CR: {carb_ratio})", "meal_response", meal_bolus)
         else:
             self._log_reason("No meal bolus needed (no carb intake)", "meal_response", 0.0)
 
@@ -44,8 +50,11 @@ class CorrectionBolus(InsulinAlgorithm):
         correction_bolus = 0.0
         if data.current_glucose > self.settings["target_glucose"]:
             glucose_deviation = data.current_glucose - self.settings["target_glucose"]
-            correction_bolus = glucose_deviation / self.settings["insulin_sensitivity_factor"]
-            self._log_reason(f"Correction bolus calculated for high glucose (Current: {data.current_glucose:.0f}mg/dL, Target: {self.settings['target_glucose']:.0f}mg/dL, ISF: {self.settings['insulin_sensitivity_factor']})", "glucose_correction", correction_bolus)
+            isf = self.settings["insulin_sensitivity_factor"]
+            if data.isf is not None:
+                isf = float(data.isf)
+            correction_bolus = glucose_deviation / isf
+            self._log_reason(f"Correction bolus calculated for high glucose (Current: {data.current_glucose:.0f}mg/dL, Target: {self.settings['target_glucose']:.0f}mg/dL, ISF: {isf})", "glucose_correction", correction_bolus)
         else:
             self._log_reason(f"No correction bolus needed (glucose at or below target: {self.settings['target_glucose']:.0f}mg/dL)", "glucose_correction", 0.0)
 

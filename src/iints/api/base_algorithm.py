@@ -12,6 +12,13 @@ class AlgorithmInput:
     carb_intake: float = 0.0
     patient_state: Dict[str, Any] = field(default_factory=dict)
     current_time: float = 0.0 # Added current_time
+    carbs_on_board: float = 0.0
+    isf: Optional[float] = None
+    icr: Optional[float] = None
+    dia_minutes: Optional[float] = None
+    basal_rate_u_per_hr: Optional[float] = None
+    glucose_trend_mgdl_min: Optional[float] = None
+    predicted_glucose_30min: Optional[float] = None
 
 
 @dataclass

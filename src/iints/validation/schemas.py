@@ -9,11 +9,15 @@ class StressEventModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     start_time: int = Field(ge=0)
-    event_type: Literal["meal", "missed_meal", "sensor_error", "exercise", "exercise_end"]
+    event_type: Literal["meal", "missed_meal", "sensor_error", "exercise", "exercise_end", "ratio_change"]
     value: Optional[float] = None
     reported_value: Optional[float] = None
     absorption_delay_minutes: int = Field(default=0, ge=0)
     duration: int = Field(default=0, ge=0)
+    isf: Optional[float] = Field(default=None, gt=0)
+    icr: Optional[float] = Field(default=None, gt=0)
+    basal_rate: Optional[float] = Field(default=None, ge=0)
+    dia_minutes: Optional[float] = Field(default=None, gt=0)
 
     @model_validator(mode="after")
     def _check_required_fields(self) -> "StressEventModel":
@@ -26,6 +30,12 @@ class StressEventModel(BaseModel):
         if self.event_type == "sensor_error":
             if self.value is None:
                 raise ValueError("sensor_error requires a value")
+        if self.event_type == "ratio_change":
+            if all(
+                val is None
+                for val in (self.isf, self.icr, self.basal_rate, self.dia_minutes)
+            ):
+                raise ValueError("ratio_change requires at least one ratio value (isf/icr/basal_rate/dia_minutes)")
         return self
 
 

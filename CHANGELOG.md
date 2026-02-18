@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- (no entries)
+- Added dynamic ratio support (ISF/ICR/DIA/Basal) and scenario ratio-change events.
+- Added glucose trend + 30-min prediction signal in simulator and algorithm input.
+- Safety supervisor now blocks predicted hypoglycemia and caps excessive basal rates.
 
 ## v0.1.15
 

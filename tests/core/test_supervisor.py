@@ -61,3 +61,34 @@ def test_supervisor_records_violation_when_actions_taken():
     report = supervisor.get_safety_report()
     assert report["total_violations"] == 1
     assert report["violation_breakdown"]["warning"] == 1
+
+
+def test_supervisor_blocks_predicted_hypoglycemia():
+    supervisor = IndependentSupervisor(predicted_hypoglycemia_threshold=60.0)
+
+    result = supervisor.evaluate_safety(
+        current_glucose=110.0,
+        proposed_insulin=1.0,
+        current_time=0.0,
+        current_iob=0.5,
+        predicted_glucose_30min=55.0,
+    )
+
+    assert result["approved_insulin"] == 0
+    assert any("PREDICTED_HYPO" in action for action in result["actions_taken"])
+
+
+def test_supervisor_caps_basal_limit():
+    supervisor = IndependentSupervisor()
+
+    result = supervisor.evaluate_safety(
+        current_glucose=140.0,
+        proposed_insulin=1.0,
+        current_time=0.0,
+        current_iob=0.0,
+        basal_insulin_units=1.0,
+        basal_limit_units=0.4,
+    )
+
+    assert result["approved_insulin"] == pytest.approx(0.4)
+    assert any("BASAL_LIMIT" in action for action in result["actions_taken"])

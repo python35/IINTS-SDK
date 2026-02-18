@@ -77,6 +77,10 @@ def build_stress_events(payloads: List[Dict[str, Any]]) -> List[StressEvent]:
                 reported_value=event_data.get("reported_value"),
                 absorption_delay_minutes=event_data.get("absorption_delay_minutes", 0),
                 duration=event_data.get("duration", 0),
+                isf=event_data.get("isf"),
+                icr=event_data.get("icr"),
+                basal_rate=event_data.get("basal_rate"),
+                dia_minutes=event_data.get("dia_minutes"),
             )
         )
     return events

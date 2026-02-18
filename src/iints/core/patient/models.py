@@ -21,7 +21,8 @@ class CustomPatientModel:
                  meal_mismatch_epsilon: float = 1.0, # Factor for meal mismatch
                  dawn_phenomenon_strength: float = 0.0, # mg/dL per hour
                  dawn_start_hour: float = 4.0,
-                 dawn_end_hour: float = 8.0):
+                 dawn_end_hour: float = 8.0,
+                 carb_absorption_duration_minutes: float = 240.0):
         """
         Initializes the patient model with simplified parameters.
 
@@ -48,6 +49,7 @@ class CustomPatientModel:
         self.dawn_phenomenon_strength = dawn_phenomenon_strength
         self.dawn_start_hour = dawn_start_hour
         self.dawn_end_hour = dawn_end_hour
+        self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
 
 
         self.initial_glucose = initial_glucose
@@ -156,12 +158,21 @@ class CustomPatientModel:
             # Simple model: carbs absorb over time, peaking around meal_effect_delay
             # This is a very rough approximation
             absorption_factor = 0.0
-            if carb_event['time_since_intake'] <= 240: # Carbs absorb for ~4 hours
+            if carb_event['time_since_intake'] <= self.carb_absorption_duration_minutes: # Carbs absorb for ~4 hours
                 absorption_factor = self.glucose_absorption_rate * (np.exp(-carb_event['time_since_intake'] / self.meal_effect_delay) - np.exp(-carb_event['time_since_intake'] / (self.meal_effect_delay * 0.5)))
                 carb_effect += carb_event['amount'] * absorption_factor
                 new_active_carb_intakes.append(carb_event)
             # Carbs are "gone" after a while, or their effect is negligible
         self.active_carb_intakes = new_active_carb_intakes
+        # Estimate carbs on board based on remaining absorption window
+        carb_remaining = 0.0
+        for carb_event in self.active_carb_intakes:
+            remaining_fraction = max(
+                0.0,
+                1.0 - (carb_event['time_since_intake'] / self.carb_absorption_duration_minutes),
+            )
+            carb_remaining += carb_event['amount'] * remaining_fraction
+        self.carbs_on_board = carb_remaining
 
 
         # --- Exercise Effect ---
@@ -217,7 +228,35 @@ class CustomPatientModel:
             "current_glucose": self.current_glucose,
             "insulin_on_board": self.insulin_on_board,
             "carbs_on_board": self.carbs_on_board,
+            "basal_rate_u_per_hr": self.basal_insulin_rate,
+            "isf": self.insulin_sensitivity,
+            "icr": self.carb_factor,
+            "dia_minutes": self.insulin_action_duration,
         }
+
+    def get_ratio_state(self) -> Dict[str, float]:
+        return {
+            "basal_rate_u_per_hr": self.basal_insulin_rate,
+            "isf": self.insulin_sensitivity,
+            "icr": self.carb_factor,
+            "dia_minutes": self.insulin_action_duration,
+        }
+
+    def set_ratio_state(
+        self,
+        isf: Optional[float] = None,
+        icr: Optional[float] = None,
+        basal_rate: Optional[float] = None,
+        dia_minutes: Optional[float] = None,
+    ) -> None:
+        if isf is not None:
+            self.insulin_sensitivity = float(isf)
+        if icr is not None:
+            self.carb_factor = float(icr)
+        if basal_rate is not None:
+            self.basal_insulin_rate = float(basal_rate)
+        if dia_minutes is not None:
+            self.insulin_action_duration = float(dia_minutes)
 
     def get_state(self) -> Dict[str, Any]:
         return {

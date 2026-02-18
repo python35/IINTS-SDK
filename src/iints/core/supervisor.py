@@ -45,6 +45,8 @@ class IndependentSupervisor:
                  max_iob=4.0,                    # Units
                  trend_stop=-2.0,                # mg/dL per minute
                  hypo_cutoff=70.0,               # mg/dL
+                 predicted_hypoglycemia_threshold=60.0,  # mg/dL
+                 predicted_hypoglycemia_horizon_minutes=30,  # minutes
                  safety_config: Optional["SafetyConfig"] = None):
         
         if safety_config is not None:
@@ -57,6 +59,8 @@ class IndependentSupervisor:
             max_iob = safety_config.max_iob
             trend_stop = safety_config.trend_stop
             hypo_cutoff = safety_config.hypo_cutoff
+            predicted_hypoglycemia_threshold = safety_config.predicted_hypoglycemia_threshold
+            predicted_hypoglycemia_horizon_minutes = safety_config.predicted_hypoglycemia_horizon_minutes
 
         self.hypoglycemia_threshold = hypoglycemia_threshold
         self.severe_hypoglycemia_threshold = severe_hypoglycemia_threshold
@@ -67,6 +71,8 @@ class IndependentSupervisor:
         self.max_iob = max_iob
         self.trend_stop = trend_stop
         self.hypo_cutoff = hypo_cutoff
+        self.predicted_hypoglycemia_threshold = predicted_hypoglycemia_threshold
+        self.predicted_hypoglycemia_horizon_minutes = predicted_hypoglycemia_horizon_minutes
         
         # State tracking
         self.glucose_history: List[Tuple[float, float]] = []
@@ -75,8 +81,16 @@ class IndependentSupervisor:
         self.last_iob = 0.0
         self.dose_history: List[tuple] = []
         
-    def evaluate_safety(self, current_glucose: float, proposed_insulin: float, 
-                       current_time: float, current_iob: float = 0.0) -> Dict[str, Any]:
+    def evaluate_safety(
+        self,
+        current_glucose: float,
+        proposed_insulin: float,
+        current_time: float,
+        current_iob: float = 0.0,
+        predicted_glucose_30min: Optional[float] = None,
+        basal_insulin_units: Optional[float] = None,
+        basal_limit_units: Optional[float] = None,
+    ) -> Dict[str, Any]:
         """
         Evaluate safety of proposed insulin dose based on current glucose and IOB.
         Returns modified insulin dose and safety status.
@@ -90,6 +104,28 @@ class IndependentSupervisor:
         self.glucose_history.append((current_time, current_glucose))
         if len(self.glucose_history) > 20:  # Keep last 20 readings
             self.glucose_history.pop(0)
+
+        # Predictive hypo guard (30-min horizon)
+        if predicted_glucose_30min is not None:
+            if predicted_glucose_30min <= self.predicted_hypoglycemia_threshold:
+                safety_status = SafetyLevel.EMERGENCY
+                proposed_insulin = 0
+                actions_taken.append(
+                    f"PREDICTED_HYPO: {predicted_glucose_30min:.1f} mg/dL in "
+                    f"{self.predicted_hypoglycemia_horizon_minutes} min"
+                )
+                self.emergency_mode = True
+
+        # Basal rate limit (relative to patient basal)
+        if basal_insulin_units is not None and basal_limit_units is not None:
+            if basal_insulin_units > basal_limit_units:
+                excess = basal_insulin_units - basal_limit_units
+                proposed_insulin = max(0.0, proposed_insulin - excess)
+                actions_taken.append(
+                    f"BASAL_LIMIT: basal {basal_insulin_units:.2f}U exceeds "
+                    f"limit {basal_limit_units:.2f}U"
+                )
+                safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
         
         # 1. Hard Hypo Cutoff (absolute stop)
         if current_glucose <= self.hypo_cutoff:

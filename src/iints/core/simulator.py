@@ -25,7 +25,19 @@ class SimulationLimitError(RuntimeError):
 
 class StressEvent:
     """Represents a discrete event that can occur during a simulation for stress testing."""
-    def __init__(self, start_time: int, event_type: str, value: Any = None, reported_value: Any = None, absorption_delay_minutes: int = 0, duration: int = 0) -> None:
+    def __init__(
+        self,
+        start_time: int,
+        event_type: str,
+        value: Any = None,
+        reported_value: Any = None,
+        absorption_delay_minutes: int = 0,
+        duration: int = 0,
+        isf: Optional[float] = None,
+        icr: Optional[float] = None,
+        basal_rate: Optional[float] = None,
+        dia_minutes: Optional[float] = None,
+    ) -> None:
         """
         Args:
             start_time (int): The simulation time (in minutes) when the event should occur.
@@ -41,12 +53,29 @@ class StressEvent:
         self.reported_value = reported_value # New attribute
         self.absorption_delay_minutes = absorption_delay_minutes # New attribute
         self.duration = duration
+        self.isf = isf
+        self.icr = icr
+        self.basal_rate = basal_rate
+        self.dia_minutes = dia_minutes
 
     def __str__(self) -> str:
         reported_str = f", Reported: {self.reported_value}" if self.reported_value is not None else ""
+        ratio_str = ""
+        if self.event_type == "ratio_change":
+            parts = []
+            if self.isf is not None:
+                parts.append(f"ISF={self.isf}")
+            if self.icr is not None:
+                parts.append(f"ICR={self.icr}")
+            if self.basal_rate is not None:
+                parts.append(f"Basal={self.basal_rate}")
+            if self.dia_minutes is not None:
+                parts.append(f"DIA={self.dia_minutes}")
+            if parts:
+                ratio_str = ", " + ", ".join(parts)
         delay_str = f", Delay: {self.absorption_delay_minutes}m" if self.absorption_delay_minutes > 0 else ""
         duration_str = f", Duration: {self.duration}m" if self.duration > 0 else ""
-        return f"Event(Time: {self.start_time}m, Type: {self.event_type}, Value: {self.value}{reported_str}{delay_str}{duration_str})"
+        return f"Event(Time: {self.start_time}m, Type: {self.event_type}, Value: {self.value}{reported_str}{ratio_str}{delay_str}{duration_str})"
 
 class Simulator:
     """
@@ -87,25 +116,27 @@ class Simulator:
         if self.seed is not None:
             np.random.seed(self.seed) # Set numpy seed for reproducibility
             # Potentially set other seeds here if other random modules are used (e.g., random.seed(self.seed))
-        if safety_config is None:
-            safety_config = SafetyConfig()
-        self.supervisor = IndependentSupervisor(safety_config=safety_config)
-        self.input_validator = InputValidator(safety_config=safety_config)
+        self.safety_config = safety_config or SafetyConfig()
+        self.supervisor = IndependentSupervisor(safety_config=self.safety_config)
+        self.input_validator = InputValidator(safety_config=self.safety_config)
         self.sensor_model = sensor_model or SensorModel(seed=seed)
         self.pump_model = pump_model or PumpModel(seed=seed)
         self.on_step = on_step
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
         self.enable_profiling = enable_profiling
-        if safety_config is not None:
-            critical_glucose_threshold = safety_config.critical_glucose_threshold
-            critical_glucose_duration_minutes = safety_config.critical_glucose_duration_minutes
+        if self.safety_config is not None:
+            critical_glucose_threshold = self.safety_config.critical_glucose_threshold
+            critical_glucose_duration_minutes = self.safety_config.critical_glucose_duration_minutes
         self.critical_glucose_threshold = critical_glucose_threshold
         self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
         self._critical_low_minutes = 0
         self._current_time = 0
         self._resume_state = False
         self._termination_info: Optional[Dict[str, Any]] = None
+        self._ratio_overrides: List[Dict[str, Any]] = []
+        self._base_ratio_state: Optional[Dict[str, float]] = None
+        self._previous_glucose_for_trend: Optional[float] = None
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -127,6 +158,67 @@ class Simulator:
                     f.write(json.dumps(data, default=str) + '\n')
             except IOError as e:
                 logger.warning("Could not write to audit log file at %s. Error: %s", self.audit_log_path, e)
+
+    def _apply_ratio_overrides(self, current_time: float) -> Dict[str, float]:
+        if self._base_ratio_state is None:
+            self._base_ratio_state = self.patient_model.get_ratio_state()
+        effective = dict(self._base_ratio_state)
+        active = [
+            override
+            for override in self._ratio_overrides
+            if override["start_time"] <= current_time <= override["end_time"]
+        ]
+        if active:
+            latest = active[-1]
+            if latest.get("isf") is not None:
+                effective["isf"] = latest["isf"]
+            if latest.get("icr") is not None:
+                effective["icr"] = latest["icr"]
+            if latest.get("basal_rate_u_per_hr") is not None:
+                effective["basal_rate_u_per_hr"] = latest["basal_rate_u_per_hr"]
+            if latest.get("dia_minutes") is not None:
+                effective["dia_minutes"] = latest["dia_minutes"]
+
+        self.patient_model.set_ratio_state(
+            isf=effective.get("isf"),
+            icr=effective.get("icr"),
+            basal_rate=effective.get("basal_rate_u_per_hr"),
+            dia_minutes=effective.get("dia_minutes"),
+        )
+        try:
+            if effective.get("isf") is not None:
+                self.algorithm.set_isf(float(effective["isf"]))
+            if effective.get("icr") is not None:
+                self.algorithm.set_icr(float(effective["icr"]))
+        except Exception:
+            # Algorithm may ignore dynamic ratio updates; no hard failure.
+            pass
+        return effective
+
+    def _predict_glucose(
+        self,
+        current_glucose: float,
+        trend_mgdl_min: float,
+        iob_units: float,
+        cob_grams: float,
+        isf: float,
+        icr: float,
+        dia_minutes: float,
+        horizon_minutes: int,
+        carb_absorption_minutes: float,
+    ) -> float:
+        trend_component = trend_mgdl_min * horizon_minutes
+
+        insulin_component = 0.0
+        if dia_minutes > 0:
+            insulin_component = -iob_units * isf * min(horizon_minutes / dia_minutes, 1.0)
+
+        carb_component = 0.0
+        if icr > 0:
+            carb_effect_per_gram = isf / icr
+            carb_component = cob_grams * carb_effect_per_gram * min(horizon_minutes / carb_absorption_minutes, 1.0)
+
+        return current_glucose + trend_component + insulin_component + carb_component
 
     def add_stress_event(self, event: StressEvent) -> None:
         """Adds a stress event to be triggered during the simulation."""
@@ -244,6 +336,9 @@ class Simulator:
             self._critical_low_minutes = 0
             self._current_time = 0
             self._termination_info = None
+            self._ratio_overrides = []
+            self._base_ratio_state = self.patient_model.get_ratio_state()
+            self._previous_glucose_for_trend = None
         else:
             self._resume_state = False
         if self.enable_profiling:
@@ -292,6 +387,18 @@ class Simulator:
                         self.add_stress_event(end_event)
                     elif event.event_type == 'exercise_end':
                         self.patient_model.stop_exercise()
+                    elif event.event_type == 'ratio_change':
+                        duration = event.duration if event.duration > 0 else float("inf")
+                        self._ratio_overrides.append(
+                            {
+                                "start_time": current_time,
+                                "end_time": current_time + duration,
+                                "isf": event.isf,
+                                "icr": event.icr,
+                                "basal_rate_u_per_hr": event.basal_rate,
+                                "dia_minutes": event.dia_minutes,
+                            }
+                        )
 
                     events_to_process_now.append(event) # Mark for removal from stress_events list
 
@@ -319,12 +426,44 @@ class Simulator:
             # This ensures even sensor error stress events are validated
             glucose_to_algorithm = self.input_validator.validate_glucose(glucose_to_algorithm, float(current_time))
 
+            # Apply dynamic ratio overrides (ISF/ICR/DIA/Basal) if any
+            ratio_state = self._apply_ratio_overrides(float(current_time))
+            effective_isf = float(ratio_state.get("isf", self.patient_model.insulin_sensitivity))
+            effective_icr = float(ratio_state.get("icr", self.patient_model.carb_factor))
+            effective_dia = float(ratio_state.get("dia_minutes", self.patient_model.insulin_action_duration))
+            effective_basal = float(ratio_state.get("basal_rate_u_per_hr", self.patient_model.basal_insulin_rate))
+
+            # Glucose trend (mg/dL per minute) based on sensor value
+            glucose_trend = 0.0
+            if self._previous_glucose_for_trend is not None:
+                glucose_trend = (glucose_to_algorithm - self._previous_glucose_for_trend) / float(self.time_step)
+            self._previous_glucose_for_trend = glucose_to_algorithm
+
+            predicted_glucose_30 = self._predict_glucose(
+                current_glucose=glucose_to_algorithm,
+                trend_mgdl_min=glucose_trend,
+                iob_units=self.patient_model.insulin_on_board,
+                cob_grams=self.patient_model.carbs_on_board,
+                isf=effective_isf,
+                icr=effective_icr,
+                dia_minutes=effective_dia,
+                horizon_minutes=self.safety_config.predicted_hypoglycemia_horizon_minutes,
+                carb_absorption_minutes=self.patient_model.carb_absorption_duration_minutes,
+            )
+
             # --- Algorithm Input ---
             algo_input = AlgorithmInput(
                 current_glucose=glucose_to_algorithm,
                 time_step=self.time_step,
                 insulin_on_board=self.patient_model.insulin_on_board,
                 carb_intake=algo_carb_intake_this_step, # Use algo's perspective of carbs
+                carbs_on_board=self.patient_model.carbs_on_board,
+                isf=effective_isf,
+                icr=effective_icr,
+                dia_minutes=effective_dia,
+                basal_rate_u_per_hr=effective_basal,
+                glucose_trend_mgdl_min=glucose_trend,
+                predicted_glucose_30min=predicted_glucose_30,
                 patient_state=self.patient_model.get_patient_state(),
                 current_time=float(current_time) # Pass current_time
             )
@@ -346,11 +485,17 @@ class Simulator:
 
             # --- Safety Supervision ---
             start_perf_time = time.perf_counter()
+            proposed_basal_units = float(insulin_output.get("basal_insulin", 0.0))
+            basal_limit_u_per_hr = effective_basal * self.safety_config.max_basal_multiplier
+            basal_limit_units = (basal_limit_u_per_hr / 60.0) * float(self.time_step)
             safety_result = self.supervisor.evaluate_safety(
                 current_glucose=glucose_to_algorithm,
                 proposed_insulin=algo_recommended_insulin,
                 current_time=float(current_time),
-                current_iob=self.patient_model.insulin_on_board
+                current_iob=self.patient_model.insulin_on_board,
+                predicted_glucose_30min=predicted_glucose_30,
+                basal_insulin_units=proposed_basal_units,
+                basal_limit_units=basal_limit_units,
             )
             supervisor_latency_ms = (time.perf_counter() - start_perf_time) * 1000
             if self.enable_profiling:
@@ -415,6 +560,8 @@ class Simulator:
                 "time_minutes": current_time,
                 "glucose_actual_mgdl": actual_glucose_reading,
                 "glucose_to_algo_mgdl": glucose_to_algorithm,
+                "glucose_trend_mgdl_min": glucose_trend,
+                "predicted_glucose_30min": predicted_glucose_30,
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
                 "sensor_status": sensor_reading.status,
@@ -426,6 +573,10 @@ class Simulator:
                 "carb_intake_grams": patient_carb_intake_this_step,
                 "patient_iob_units": self.patient_model.insulin_on_board,
                 "patient_cob_grams": self.patient_model.carbs_on_board,
+                "effective_isf": effective_isf,
+                "effective_icr": effective_icr,
+                "effective_basal_rate_u_per_hr": effective_basal,
+                "effective_dia_minutes": effective_dia,
                 "uncertainty": insulin_output.get("uncertainty", 0.0),
                 "fallback_triggered": insulin_output.get("fallback_triggered", False),
                 "safety_level": safety_level.value,
