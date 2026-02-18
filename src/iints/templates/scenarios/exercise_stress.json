@@ -1,0 +1,29 @@
+{
+  "scenario_name": "Exercise Sensitivity Shift",
+  "scenario_version": "1.0",
+  "description": "Exercise raises insulin sensitivity mid-run. Includes ratio_change event.",
+  "stress_events": [
+    {
+      "start_time": 60,
+      "event_type": "meal",
+      "value": 60,
+      "absorption_delay_minutes": 10,
+      "duration": 60
+    },
+    {
+      "start_time": 180,
+      "event_type": "exercise",
+      "value": 0.6,
+      "duration": 45
+    },
+    {
+      "start_time": 180,
+      "event_type": "ratio_change",
+      "isf": 90,
+      "icr": 18,
+      "basal_rate": 0.3,
+      "dia_minutes": 240,
+      "duration": 180
+    }
+  ]
+}

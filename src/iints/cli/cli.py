@@ -227,10 +227,12 @@ def init(
             from importlib.resources import files
             algo_content = files("iints.templates").joinpath("default_algorithm.py").read_text()
             scenario_content = files("iints.templates.scenarios").joinpath("example_scenario.json").read_text()
+            exercise_content = files("iints.templates.scenarios").joinpath("exercise_stress.json").read_text()
         else:
             from importlib import resources
             algo_content = resources.read_text("iints.templates", "default_algorithm.py")
             scenario_content = resources.read_text("iints.templates.scenarios", "example_scenario.json")
+            exercise_content = resources.read_text("iints.templates.scenarios", "exercise_stress.json")
     except Exception as e:
         console.print(f"[bold red]Error reading template files: {e}[/bold red]")
         raise typer.Exit(code=1)
@@ -244,6 +246,8 @@ def init(
 
     with open(project_path / "scenarios" / "example_scenario.json", "w") as f:
         f.write(scenario_content)
+    with open(project_path / "scenarios" / "exercise_stress.json", "w") as f:
+        f.write(exercise_content)
         
     # Create README
     readme_content = f"""# {project_name}
@@ -316,6 +320,17 @@ def quickstart(
         scenario_path.write_text(json.dumps(preset.get("scenario", {}), indent=2))
     except Exception as e:
         console.print(f"[yellow]Preset scenario not available: {e}[/yellow]")
+
+    try:
+        if sys.version_info >= (3, 9):
+            from importlib.resources import files
+            exercise_content = files("iints.templates.scenarios").joinpath("exercise_stress.json").read_text()
+        else:
+            from importlib import resources
+            exercise_content = resources.read_text("iints.templates.scenarios", "exercise_stress.json")
+        (project_path / "scenarios" / "exercise_stress.json").write_text(exercise_content)
+    except Exception as e:
+        console.print(f"[yellow]Exercise stress scenario not available: {e}[/yellow]")
 
     readme_content = f"""# {project_name}
 
@@ -711,7 +726,14 @@ def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient' or 'patient_559_config')")] = "default_patient",
     patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
-    scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file (e.g., scenarios/example_scenario.json)")] = None,
+    scenario_path: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--scenario",
+            "--scenario-path",
+            help="Path to the scenario JSON file (e.g., scenarios/example_scenario.json)",
+        ),
+    ] = None,
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Path, typer.Option(help="Directory to save simulation results")] = Path("./results/data"),
