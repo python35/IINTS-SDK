@@ -50,6 +50,7 @@ jobs:
 
     - name: Generate SBOM (CycloneDX)
       run: |
+        python -m pip install --upgrade cyclonedx-bom
         python -m cyclonedx_bom -o sbom.json
 
     - name: Build package
