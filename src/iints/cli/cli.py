@@ -954,6 +954,7 @@ def run(
     stress_events = []
     stress_event_payloads: List[Dict[str, Any]] = []
     scenario_model = None
+    scenario_payload: Optional[Dict[str, Any]] = None
     if scenario_path:
         if not scenario_path.is_file():
             console.print(f"[bold red]Error: Scenario file '{scenario_path}' not found.[/bold red]")
@@ -961,6 +962,7 @@ def run(
         
         try:
             scenario_model = load_scenario(scenario_path)
+            scenario_payload = scenario_model.model_dump()
             stress_event_payloads = scenario_to_payloads(scenario_model)
             stress_events = build_stress_events(stress_event_payloads)
             console.print(
@@ -1011,7 +1013,6 @@ def run(
     simulation_results_df, safety_report = simulator.run_batch(duration)
     
     # 6. Output Results
-    scenario_payload = scenario_model.model_dump() if scenario_model else None
     config_payload: Dict[str, Any] = {
         "run_type": "single",
         "algorithm": {
