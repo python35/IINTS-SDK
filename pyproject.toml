@@ -50,6 +50,14 @@ nightscout = [
 [project.scripts]
 iints = "iints.cli.cli:app"
 
+[project.entry-points."iints.algorithms"]
+"PID Controller" = "iints.core.algorithms.pid_controller:PIDController"
+"Fixed Basal Bolus" = "iints.core.algorithms.fixed_basal_bolus:FixedBasalBolus"
+"Correction Bolus" = "iints.core.algorithms.correction_bolus:CorrectionBolusAlgorithm"
+"Standard Pump" = "iints.core.algorithms.standard_pump_algo:StandardPumpAlgorithm"
+"Mock Constant Dose" = "iints.core.algorithms.mock_algorithms:ConstantDoseAlgorithm"
+"Mock Random Dose" = "iints.core.algorithms.mock_algorithms:RandomDoseAlgorithm"
+
 [project.urls]
 "Homepage" = "https://github.com/python35/IINTS-SDK"
 

@@ -44,6 +44,14 @@ iints run --algo algorithms/example_algorithm.py \
   --seed 42
 ```
 
+Each run writes a reproducible bundle to `results/<run_id>/` by default:
+- `config.json`
+- `run_metadata.json`
+- `run_manifest.json` (SHA-256 hashes for provenance)
+- `results.csv`
+- `report.pdf`
+- `audit/` and `baseline/` (when enabled)
+
 ### One-Line Runner (CSV + audit + PDF + baseline + profiling)
 ```bash
 iints run-full --algo algorithms/example_algorithm.py \

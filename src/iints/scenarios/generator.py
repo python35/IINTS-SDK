@@ -4,10 +4,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import random
 
+from iints.validation.schemas import LATEST_SCHEMA_VERSION
+
 
 @dataclass
 class ScenarioGeneratorConfig:
     name: str
+    schema_version: str = LATEST_SCHEMA_VERSION
     version: str = "1.0"
     description: str = "Generated scenario"
     duration_minutes: int = 1440
@@ -82,6 +85,7 @@ def generate_random_scenario(config: ScenarioGeneratorConfig) -> Dict[str, Any]:
 
     return {
         "scenario_name": config.name,
+        "schema_version": config.schema_version,
         "scenario_version": config.version,
         "description": config.description,
         "stress_events": events,

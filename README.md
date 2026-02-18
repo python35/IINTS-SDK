@@ -47,6 +47,7 @@ iints run-full --algo algorithms/example_algorithm.py \
   --scenario-path scenarios/clinic_safe_baseline.json \
   --output-dir results/run_full
 ```
+By default, runs write to `results/<run_id>/` and include `config.json`, `run_metadata.json`, and `run_manifest.json`.
 
 Import real-world CGM data:
 ```bash
@@ -63,6 +64,7 @@ Official real-world datasets (download on demand):
 iints data list
 iints data info aide_t1d
 iints data fetch aide_t1d
+iints data cite aide_t1d
 ```
 Some datasets require approval and are marked as `request` in the registry.
 `iints data info` prints BibTeX + citation text for easy referencing.
@@ -81,11 +83,23 @@ iints import-nightscout --url https://your-nightscout.example --output-dir resul
 Scenario generator:
 ```bash
 iints scenarios generate --name "Random Stress Test" --output-path scenarios/generated_scenario.json
+iints scenarios migrate --input-path scenarios/legacy.json
 ```
 
 Parallel batch runs:
 ```bash
 iints run-parallel --algo algorithms/example_algorithm.py --scenarios-dir scenarios --output-dir results/batch
+```
+
+Interactive run wizard:
+```bash
+iints run-wizard
+```
+
+Algorithm registry:
+```bash
+iints algorithms list
+iints algorithms info "PID Controller"
 ```
 
 Or run the full demo workflow (import + run + report) in one script:

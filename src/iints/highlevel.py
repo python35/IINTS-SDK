@@ -24,7 +24,9 @@ from iints.validation import (
 )
 from iints.utils.run_io import (
     build_run_metadata,
+    build_run_manifest,
     generate_run_id,
+    maybe_sign_manifest,
     resolve_output_dir,
     resolve_seed,
     write_json,
@@ -161,6 +163,36 @@ def run_simulation(
         generator.generate_pdf(results_df, safety_report, str(report_path))
         outputs["report_pdf"] = str(report_path)
 
+    if "performance_report" in safety_report:
+        profiling_path = output_path / "profiling.json"
+        write_json(profiling_path, safety_report["performance_report"])
+        outputs["profiling_path"] = str(profiling_path)
+
+    manifest_files = {
+        "config": config_path,
+        "run_metadata": run_metadata_path,
+        "results_csv": results_csv,
+    }
+    if "report_pdf" in outputs:
+        manifest_files["report_pdf"] = Path(outputs["report_pdf"])
+    if "audit" in outputs:
+        audit_paths = outputs["audit"]
+        manifest_files["audit_summary"] = Path(audit_paths.get("summary", ""))
+    if "baseline_files" in outputs:
+        baseline_files = outputs["baseline_files"]
+        manifest_files["baseline_json"] = Path(baseline_files.get("json", ""))
+        manifest_files["baseline_csv"] = Path(baseline_files.get("csv", ""))
+    if "profiling_path" in outputs:
+        manifest_files["profiling"] = Path(outputs["profiling_path"])
+
+    run_manifest = build_run_manifest(output_path, manifest_files)
+    run_manifest_path = output_path / "run_manifest.json"
+    write_json(run_manifest_path, run_manifest)
+    outputs["run_manifest_path"] = str(run_manifest_path)
+    signature_path = maybe_sign_manifest(run_manifest_path)
+    if signature_path:
+        outputs["run_manifest_signature"] = str(signature_path)
+
     return outputs
 
 
@@ -259,5 +291,34 @@ def run_full(
     generator = ClinicalReportGenerator()
     generator.generate_pdf(results_df, safety_report, str(report_path))
     outputs["report_pdf"] = str(report_path)
+
+    if "performance_report" in safety_report:
+        profiling_path = output_path / "profiling.json"
+        write_json(profiling_path, safety_report["performance_report"])
+        outputs["profiling_path"] = str(profiling_path)
+
+    manifest_files = {
+        "config": config_path,
+        "run_metadata": run_metadata_path,
+        "results_csv": results_csv,
+        "report_pdf": report_path,
+    }
+    if "audit" in outputs:
+        audit_paths = outputs["audit"]
+        manifest_files["audit_summary"] = Path(audit_paths.get("summary", ""))
+    if "baseline_files" in outputs:
+        baseline_files = outputs["baseline_files"]
+        manifest_files["baseline_json"] = Path(baseline_files.get("json", ""))
+        manifest_files["baseline_csv"] = Path(baseline_files.get("csv", ""))
+    if "profiling_path" in outputs:
+        manifest_files["profiling"] = Path(outputs["profiling_path"])
+
+    run_manifest = build_run_manifest(output_path, manifest_files)
+    run_manifest_path = output_path / "run_manifest.json"
+    write_json(run_manifest_path, run_manifest)
+    outputs["run_manifest_path"] = str(run_manifest_path)
+    signature_path = maybe_sign_manifest(run_manifest_path)
+    if signature_path:
+        outputs["run_manifest_signature"] = str(signature_path)
 
     return outputs

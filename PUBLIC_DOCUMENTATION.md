@@ -1,4 +1,4 @@
-# IINTS-AF Public Documentation (v0.1.15)
+# IINTS-AF Public Documentation (v0.1.16)
 
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.
@@ -24,6 +24,13 @@ This document is the public, single‑entry documentation index for the IINTS‑
 - **Quickstart**: `README.md`
 - **Notebooks**: `examples/notebooks/` (step‑by‑step walkthroughs)
 - **Presets**: `src/iints/presets/presets.json`
+
+### Research Checklist (Recommended)
+- Use a fixed `seed` for every run (or record the auto‑seed in `run_metadata.json`).
+- Archive `config.json`, `run_metadata.json`, `run_manifest.json`, and `results.csv` together.
+- Keep `report.pdf` + `audit/` for reviewability.
+- Cite datasets using `iints data cite <dataset_id>`.
+- Record the SDK version + git SHA from `run_metadata.json`.
 
 ---
 

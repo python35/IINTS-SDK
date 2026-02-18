@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Literal
 
+LATEST_SCHEMA_VERSION = "1.1"
+
 from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
@@ -43,9 +45,19 @@ class ScenarioModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     scenario_name: str = Field(min_length=1)
+    schema_version: str = Field(default=LATEST_SCHEMA_VERSION, min_length=1)
     scenario_version: str = Field(min_length=1)
     description: Optional[str] = None
     stress_events: List[StressEventModel] = Field(default_factory=list)
+
+    @field_validator("schema_version", mode="before")
+    @classmethod
+    def _normalize_schema_version(cls, value: Any) -> str:
+        if isinstance(value, (int, float)):
+            return str(value)
+        if value is None:
+            return LATEST_SCHEMA_VERSION
+        return str(value)
 
     @field_validator("scenario_version", mode="before")
     @classmethod

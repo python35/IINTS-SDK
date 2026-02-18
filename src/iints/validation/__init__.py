@@ -9,7 +9,7 @@ import yaml
 from pydantic import ValidationError
 
 from iints.core.simulator import StressEvent
-from iints.validation.schemas import ScenarioModel, StressEventModel, PatientConfigModel
+from iints.validation.schemas import ScenarioModel, StressEventModel, PatientConfigModel, LATEST_SCHEMA_VERSION
 
 
 def _convert_legacy_scenario(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -40,15 +40,27 @@ def _convert_legacy_scenario(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
+def migrate_scenario_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize legacy schemas into the latest scenario schema."""
+    data = _convert_legacy_scenario(data)
+    if "schema_version" not in data or not data.get("schema_version"):
+        data["schema_version"] = LATEST_SCHEMA_VERSION
+    if "scenario_version" not in data or not data.get("scenario_version"):
+        data["scenario_version"] = "1.0"
+    if "scenario_name" not in data or not data.get("scenario_name"):
+        data["scenario_name"] = "Unnamed Scenario"
+    return data
+
+
 def load_scenario(path: Union[str, Path]) -> ScenarioModel:
     scenario_path = Path(path)
     data = json.loads(scenario_path.read_text())
-    data = _convert_legacy_scenario(data)
+    data = migrate_scenario_dict(data)
     return ScenarioModel.model_validate(data)
 
 
 def validate_scenario_dict(data: Dict[str, Any]) -> ScenarioModel:
-    data = _convert_legacy_scenario(data)
+    data = migrate_scenario_dict(data)
     return ScenarioModel.model_validate(data)
 
 

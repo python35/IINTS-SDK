@@ -1,5 +1,6 @@
 {
   "scenario_name": "Exercise Sensitivity Shift",
+  "schema_version": "1.1",
   "scenario_version": "1.0",
   "description": "Exercise raises insulin sensitivity mid-run. Includes ratio_change event.",
   "stress_events": [

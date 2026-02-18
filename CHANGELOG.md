@@ -2,7 +2,13 @@
 
 ## Unreleased
 
-- (no entries)
+- Default run provenance: `config.json`, `run_metadata.json`, and `run_manifest.json` for every run.
+- Deterministic seeds by default with per-run `run_id` and standardized output layout.
+- Scenario schema versioning + migration tooling (`iints scenarios migrate`).
+- Benchmark suite emits standardized summary + manifest; runs are now seeded.
+- Dataset manager adds `iints data cite` and always writes SHA256SUMS.txt.
+- Algorithm plugin registry with `iints algorithms list/info` + entry points.
+- CI now includes SBOM generation + `pip-audit`, and Python 3.12 in the test matrix.
 
 ## v0.1.16
 

@@ -18,6 +18,7 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
 from iints.core.safety import SafetyConfig
 from iints.scenarios import ScenarioGeneratorConfig, generate_random_scenario
@@ -41,7 +42,9 @@ from iints.data.registry import (
 )
 from iints.utils.run_io import (
     build_run_metadata,
+    build_run_manifest,
     generate_run_id,
+    maybe_sign_manifest,
     resolve_output_dir,
     resolve_seed,
     write_json,
@@ -52,6 +55,7 @@ from iints.validation import (
     load_scenario,
     load_patient_config,
     load_patient_config_by_name,
+    migrate_scenario_dict,
     scenario_to_payloads,
     scenario_warnings,
     validate_patient_config_dict,
@@ -65,11 +69,13 @@ presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 data_app = typer.Typer(help="Official datasets and data packs.")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
+algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
 app.add_typer(scenarios_app, name="scenarios")
+app.add_typer(algorithms_app, name="algorithms")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     if not algo.is_file():
@@ -202,6 +208,7 @@ def _run_parallel_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "output_dir": str(output_dir),
         "results_csv": outputs.get("results_csv"),
         "report_pdf": outputs.get("report_pdf"),
+        "run_manifest": outputs.get("run_manifest_path"),
         "terminated_early": safety_report.get("terminated_early", False),
         "total_violations": safety_report.get("total_violations", 0),
         "error": "",
@@ -543,6 +550,7 @@ def presets_run(
     output_dir = resolve_output_dir(output_dir, run_id)
     results_df, safety_report = simulator.run_batch(duration)
 
+    scenario_payload = scenario_model.model_dump() if scenario_model else None
     config_payload: Dict[str, Any] = {
         "run_type": "preset",
         "preset_name": name,
@@ -597,6 +605,28 @@ def presets_run(
     iints.generate_report(results_df, str(report_path), safety_report)
     console.print(f"PDF report saved to: {report_path}")
 
+    manifest_files = {
+        "config": config_path,
+        "run_metadata": run_metadata_path,
+        "results_csv": results_file,
+        "report_pdf": report_path,
+    }
+    if compare_baselines:
+        manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
+        manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
+    if output_dir / "audit" / "audit_summary.json":
+        manifest_files["audit_summary"] = output_dir / "audit" / "audit_summary.json"
+    run_manifest = build_run_manifest(output_dir, manifest_files)
+    run_manifest_path = output_dir / "run_manifest.json"
+    write_json(run_manifest_path, run_manifest)
+    console.print(f"Run manifest: {run_manifest_path}")
+    signature_path = maybe_sign_manifest(run_manifest_path)
+    if signature_path:
+        console.print(f"Run manifest signature: {signature_path}")
+    signature_path = maybe_sign_manifest(run_manifest_path)
+    if signature_path:
+        console.print(f"Run manifest signature: {signature_path}")
+
 
 @presets_app.command("create")
 def presets_create(
@@ -632,6 +662,7 @@ def presets_create(
 
     scenario = {
         "scenario_name": f"Clinic Safe {name.replace('_', ' ').title()}",
+        "schema_version": "1.1",
         "scenario_version": "1.0",
         "stress_events": [
             {"start_time": 60, "event_type": "meal", "value": 45, "absorption_delay_minutes": 15, "duration": 60},
@@ -655,6 +686,46 @@ def presets_create(
     console.print(f"[green]Preset files created:[/green] {patient_yaml_path} , {scenario_path}")
     console.print("[bold]Add this preset to presets.json if you want it built-in:[/bold]")
     console.print_json(json.dumps(preset_snippet, indent=2))
+
+
+@app.command("run-wizard")
+def run_wizard():
+    """Interactive wizard to run a preset quickly."""
+    console = Console()
+    presets = _load_presets()
+    preset_names = [preset.get("name", "") for preset in presets if preset.get("name")]
+    if not preset_names:
+        console.print("[bold red]No presets available.[/bold red]")
+        raise typer.Exit(code=1)
+
+    preset_choice = typer.prompt("Preset name", default=preset_names[0])
+    algo_path = Path(typer.prompt("Algorithm path", default="algorithms/example_algorithm.py"))
+    seed_input = typer.prompt("Seed (blank for auto)", default="", show_default=False)
+    seed = int(seed_input) if seed_input.strip() else None
+    output_dir_input = typer.prompt("Output directory (blank for default)", default="", show_default=False)
+    output_dir = Path(output_dir_input) if output_dir_input.strip() else None
+
+    presets_run(
+        name=preset_choice,
+        algo=algo_path,
+        output_dir=output_dir,
+        compare_baselines=True,
+        seed=seed,
+        safety_min_glucose=None,
+        safety_max_glucose=None,
+        safety_max_glucose_delta_per_5_min=None,
+        safety_hypoglycemia_threshold=None,
+        safety_severe_hypoglycemia_threshold=None,
+        safety_hyperglycemia_threshold=None,
+        safety_max_insulin_per_bolus=None,
+        safety_glucose_rate_alarm=None,
+        safety_max_insulin_per_hour=None,
+        safety_max_iob=None,
+        safety_trend_stop=None,
+        safety_hypo_cutoff=None,
+        safety_critical_glucose_threshold=None,
+        safety_critical_glucose_duration_minutes=None,
+    )
 
 
 @profiles_app.command("create")
@@ -745,6 +816,27 @@ def scenarios_wizard():
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(scenario, indent=2))
     typer.echo(f"Scenario saved: {output_path}")
+
+
+@scenarios_app.command("migrate")
+def scenarios_migrate(
+    input_path: Annotated[Path, typer.Argument(help="Scenario JSON to migrate")],
+    output_path: Annotated[Optional[Path], typer.Option(help="Output path (default: overwrite input)")] = None,
+):
+    """Migrate a scenario JSON to the latest schema version."""
+    console = Console()
+    if not input_path.is_file():
+        console.print(f"[bold red]Error: Scenario '{input_path}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+    try:
+        data = json.loads(input_path.read_text())
+    except json.JSONDecodeError as exc:
+        console.print(f"[bold red]Invalid JSON: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+    migrated = migrate_scenario_dict(data)
+    target = output_path or input_path
+    target.write_text(json.dumps(migrated, indent=2))
+    console.print(f"[green]Migrated scenario saved to {target}[/green]")
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
@@ -926,7 +1018,7 @@ def run(
             "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
         },
         "patient_config": validated_patient_params,
-        "scenario": scenario_model.model_dump() if scenario_path else None,
+        "scenario": scenario_payload,
         "duration_minutes": duration,
         "time_step_minutes": time_step,
         "seed": resolved_seed,
@@ -972,6 +1064,20 @@ def run(
     # Generate full report (using the new iints.generate_report function)
     report_output_path = output_dir / "report.pdf"
     iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
+
+    manifest_files = {
+        "config": config_path,
+        "run_metadata": run_metadata_path,
+        "results_csv": results_file,
+        "report_pdf": report_output_path,
+    }
+    if compare_baselines:
+        manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
+        manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
+    run_manifest = build_run_manifest(output_dir, manifest_files)
+    run_manifest_path = output_dir / "run_manifest.json"
+    write_json(run_manifest_path, run_manifest)
+    console.print(f"Run manifest: {run_manifest_path}")
 
 
 @app.command("run-full")
@@ -1051,6 +1157,12 @@ def run_full(
         console.print(f"Baseline files: {outputs['baseline_files']}")
     if "run_metadata_path" in outputs:
         console.print(f"Run metadata: {outputs['run_metadata_path']}")
+    if "run_manifest_path" in outputs:
+        console.print(f"Run manifest: {outputs['run_manifest_path']}")
+    if "profiling_path" in outputs:
+        console.print(f"Profiling report: {outputs['profiling_path']}")
+    if "run_manifest_signature" in outputs:
+        console.print(f"Run manifest signature: {outputs['run_manifest_signature']}")
 
 
 @app.command("run-parallel")
@@ -1626,6 +1738,48 @@ def check_deps():
         table.add_row(name, status, notes)
 
     console.print(table)
+
+
+@algorithms_app.command("list")
+def algorithms_list():
+    """List available algorithm plugins and built-ins."""
+    console = Console()
+    entries = list_algorithm_plugins()
+    table = Table(title="IINTS Algorithms", show_header=True, header_style="bold cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Source", style="magenta")
+    table.add_column("Status", style="yellow")
+    table.add_column("Class", style="white")
+    for entry in entries:
+        table.add_row(
+            entry.name,
+            entry.source,
+            entry.status,
+            entry.class_path,
+        )
+    console.print(table)
+
+
+@algorithms_app.command("info")
+def algorithms_info(
+    name: Annotated[str, typer.Argument(help="Algorithm display name")],
+):
+    """Show metadata for a specific algorithm."""
+    console = Console()
+    entries = list_algorithm_plugins()
+    matches = [entry for entry in entries if entry.name.lower() == name.lower()]
+    if not matches:
+        console.print(f"[bold red]Algorithm '{name}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+    entry = matches[0]
+    console.print(f"[bold]Name:[/bold] {entry.name}")
+    console.print(f"[bold]Source:[/bold] {entry.source}")
+    console.print(f"[bold]Status:[/bold] {entry.status}")
+    console.print(f"[bold]Class:[/bold] {entry.class_path}")
+    if entry.error:
+        console.print(f"[bold red]Error:[/bold red] {entry.error}")
+    if entry.metadata:
+        console.print_json(json.dumps(entry.metadata.to_dict(), indent=2))
 @docs_app.command("algo")
 def docs_algo(
     algo_path: Annotated[Path, typer.Option(help="Path to the algorithm Python file to document")],
@@ -1708,19 +1862,25 @@ def benchmark(
     scenarios_dir: Annotated[Path, typer.Option(help="Directory containing scenario JSON files")] = Path("scenarios"),
     duration: Annotated[int, typer.Option(help="Simulation duration in minutes for each run")] = 720, # 12 hours
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
-    output_dir: Annotated[Path, typer.Option(help="Directory to save all benchmark results")] = Path("./results/benchmarks"),
+    output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save all benchmark results")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Base seed for deterministic runs")] = None,
 ):
     """
     Runs a series of simulations to benchmark an AI algorithm against a standard pump
     across multiple patient configurations and scenarios.
     """
     console = Console()
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    output_dir = resolve_output_dir(output_dir, run_id)
     console.print(f"[bold blue]Starting IINTS-AF Benchmark Suite[/bold blue]")
     console.print(f"AI Algorithm: [green]{algo_to_benchmark.name}[/green]")
     # console.print(f"Standard Pump Config: [yellow]{standard_pump_config}[/yellow]") # Removed, as standard pump uses patient params
     console.print(f"Patient Configs from: [cyan]{patient_configs_dir}[/cyan]")
     console.print(f"Scenarios from: [magenta]{scenarios_dir}[/magenta]")
     console.print(f"Duration: {duration} min, Time Step: {time_step} min")
+    console.print(f"Run ID: {run_id}")
+    console.print(f"Output directory: {output_dir}")
 
     if not algo_to_benchmark.is_file():
         console.print(f"[bold red]Error: AI Algorithm file '{algo_to_benchmark}' not found.[/bold red]")
@@ -1734,6 +1894,22 @@ def benchmark(
     
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    config_payload = {
+        "run_type": "benchmark",
+        "run_id": run_id,
+        "algorithm_path": str(algo_to_benchmark),
+        "patient_configs_dir": str(patient_configs_dir),
+        "scenarios_dir": str(scenarios_dir),
+        "duration_minutes": duration,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+    }
+    config_path = output_dir / "config.json"
+    write_json(config_path, config_payload)
+    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_dir)
+    run_metadata_path = output_dir / "run_metadata.json"
+    write_json(run_metadata_path, run_metadata)
 
     # Load AI Algorithm
     ai_algo_instance = None
@@ -1780,6 +1956,7 @@ def benchmark(
         raise typer.Exit(code=1)
 
     benchmark_results = []
+    run_index = 0
 
     # Iterate through patients and scenarios
     for patient_config_file in patient_config_files:
@@ -1796,29 +1973,30 @@ def benchmark(
             scenario_name = scenario_file.stem
             console.print(f"  [bold]Scenario: {scenario_name}[/bold]")
             
-            # Load Scenario Data
-            stress_events = []
+            # Load Scenario Data (validated)
             try:
-                with open(scenario_file, 'r') as f:
-                    scenario_config = json.load(f)
-                for event_data in scenario_config.get("stress_events", []):
-                    event = iints.StressEvent(
-                        start_time=event_data['start_time'],
-                        event_type=event_data['event_type'],
-                        value=event_data.get('value'),
-                        reported_value=event_data.get('reported_value'),
-                        absorption_delay_minutes=event_data.get('absorption_delay_minutes', 0),
-                        duration=event_data.get('duration', 0)
-                    )
-                    stress_events.append(event)
-            except (json.JSONDecodeError, KeyError) as e:
+                scenario_model = load_scenario(scenario_file)
+                payloads = scenario_to_payloads(scenario_model)
+                stress_events = build_stress_events(payloads)
+            except ValidationError as e:
+                console.print(f"[bold red]  Scenario validation failed: {scenario_file.name}[/bold red]")
+                for line in format_validation_error(e):
+                    console.print(f"  - {line}")
+                continue
+            except Exception as e:
                 console.print(f"[bold red]  Error loading scenario '{scenario_file.name}': {e}[/bold red]")
                 continue # Skip this scenario
 
+            job_seed = resolved_seed + run_index
             # --- Run AI Algorithm Simulation ---
             console.print(f"    Running [green]{ai_algo_instance.get_algorithm_metadata().name}[/green]...")
             patient_model_ai = iints.PatientModel(**patient_params) # New instance for each run
-            simulator_ai = iints.Simulator(patient_model=patient_model_ai, algorithm=ai_algo_instance, time_step=time_step)
+            simulator_ai = iints.Simulator(
+                patient_model=patient_model_ai,
+                algorithm=ai_algo_instance,
+                time_step=time_step,
+                seed=job_seed,
+            )
             for event in stress_events:
                 simulator_ai.add_stress_event(event)
             
@@ -1838,7 +2016,12 @@ def benchmark(
             # We'll pass the patient_params directly to the StandardPumpAlgorithm constructor.
             standard_pump_algo_instance = iints.StandardPumpAlgorithm(settings=patient_params) 
             patient_model_std = iints.PatientModel(**patient_params) # New instance for each run
-            simulator_std = iints.Simulator(patient_model=patient_model_std, algorithm=standard_pump_algo_instance, time_step=time_step)
+            simulator_std = iints.Simulator(
+                patient_model=patient_model_std,
+                algorithm=standard_pump_algo_instance,
+                time_step=time_step,
+                seed=job_seed,
+            )
             for event in stress_events:
                 simulator_std.add_stress_event(event)
             
@@ -1855,6 +2038,8 @@ def benchmark(
 
             # Store results
             benchmark_results.append({
+                "run_id": run_id,
+                "seed": job_seed,
                 "Patient": patient_config_name,
                 "Scenario": scenario_name,
                 "AI Algo": ai_algo_instance.get_algorithm_metadata().name,
@@ -1864,6 +2049,7 @@ def benchmark(
                 **{f"Std {k}": v for k, v in metrics_std.items()},
                 **{f"Std Safety Violations": safety_report_std.get('total_violations', float('nan'))},
             })
+            run_index += 1
     
     console.print("\n[bold green]Benchmark Suite Completed![/bold green]")
 
@@ -1907,3 +2093,26 @@ def benchmark(
             ai_safety_violations = row['AI Safety Violations']
             std_safety_violations = row['Std Safety Violations']
             row_data.append(f"{ai_safety_violations:.0f}" if not pd.isna(ai_safety_violations) else "N/A")
+            row_data.append(f"{std_safety_violations:.0f}" if not pd.isna(std_safety_violations) else "N/A")
+            table.add_row(*row_data)
+
+        console.print(table)
+
+        results_csv = output_dir / "benchmark_summary.csv"
+        results_df.to_csv(results_csv, index=False)
+        console.print(f"[green]Benchmark summary saved:[/green] {results_csv}")
+
+        manifest_files = {
+            "config": config_path,
+            "run_metadata": run_metadata_path,
+            "benchmark_summary": results_csv,
+        }
+        run_manifest = build_run_manifest(output_dir, manifest_files)
+        run_manifest_path = output_dir / "run_manifest.json"
+        write_json(run_manifest_path, run_manifest)
+        console.print(f"Run manifest: {run_manifest_path}")
+        signature_path = maybe_sign_manifest(run_manifest_path)
+        if signature_path:
+            console.print(f"Run manifest signature: {signature_path}")
+    else:
+        console.print("[yellow]No benchmark results were generated.[/yellow]")
