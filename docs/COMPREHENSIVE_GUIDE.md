@@ -10,7 +10,7 @@ The IINTS-AF SDK is designed for researchers and developers to create, simulate,
 
 ### 2.1 System Requirements
 
-*   Python 3.8 or higher.
+*   Python 3.10 or higher.
 *   `pip` package manager.
 
 ### 2.2 Installing the SDK

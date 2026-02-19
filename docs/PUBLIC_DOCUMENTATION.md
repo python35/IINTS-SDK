@@ -69,7 +69,7 @@ Registry documentation:
 For non‑code content (notebooks, PDF reports, plots), the following tools are required:
 
 ### Required Apps / Software
-- **Python** 3.9+ (3.11 recommended)
+- **Python** 3.10+ (3.11+ recommended)
 - **Jupyter / Colab** for notebooks
 - **PDF reader** for reports
 - **Terminal** for CLI use

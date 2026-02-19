@@ -5,7 +5,7 @@ This document contains the full technical usage for the IINTS-AF SDK.
 ## Installation
 
 ### System Requirements
-* Python 3.8+
+* Python 3.10+
 * Works on Windows, macOS, and Linux
 
 ### From TestPyPI
