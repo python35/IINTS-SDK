@@ -1,4 +1,4 @@
-.PHONY: help setup dev test lint typecheck clean build publish publish-test tag push-tag github-release release
+.PHONY: help setup dev test lint typecheck sbom clean build publish publish-test tag push-tag github-release release
 
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
@@ -16,6 +16,7 @@ help:
 	@echo "  test         Run pytest"
 	@echo "  lint         Run flake8"
 	@echo "  typecheck    Run mypy"
+	@echo "  sbom         Generate CycloneDX SBOM (sbom.json)"
 	@echo "  clean        Remove build artifacts"
 	@echo "  build        Build sdist/wheel"
 	@echo "  publish      Upload to PyPI (needs TWINE creds)"
@@ -42,6 +43,10 @@ lint:
 
 typecheck:
 	$(PYTHON) -m mypy src/iints
+
+sbom:
+	$(PIP) install --upgrade cyclonedx-bom
+	cyclonedx-bom -o sbom.json
 
 clean:
 	rm -rf dist build src/*.egg-info .pytest_cache
