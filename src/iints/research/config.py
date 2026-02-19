@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -37,5 +37,21 @@ class TrainingConfig:
     hidden_size: int = 64
     num_layers: int = 2
     dropout: float = 0.1
-    validation_split: float = 0.1
+
+    # P0-2: Subject-level split fractions (must sum to <= 1.0).
+    # The remaining fraction after val + test goes to training.
+    # Set subject_level_split=True (default) to split by subject ID to
+    # prevent data leakage between train/val/test sets.
+    subject_level_split: bool = True
+    validation_split: float = 0.15   # fraction of subjects for validation
+    test_split: float = 0.15         # fraction of subjects for held-out test
+
     seed: int = 42
+
+    # P3-10: Normalization strategy.  Options: "zscore", "robust", "none".
+    normalization: str = "zscore"
+
+    # P3-12: Loss function.  Options: "mse", "quantile".
+    # For quantile loss, also set `quantile` (0 < q < 1).
+    loss: str = "mse"
+    quantile: Optional[float] = None  # e.g. 0.9 for 90th-percentile upper bound
