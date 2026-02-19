@@ -68,37 +68,40 @@ def _device_mode_code(series: pd.Series) -> pd.Series:
 
 def _openaps_iob_activity(t: float, dia: float, peak: float) -> float:
     """
-    OpenAPS bilinear IOB activity curve.
+    OpenAPS bilinear insulin *activity* curve.
 
-    Returns the *fraction* of a 1-unit bolus still active at time ``t`` minutes
-    after injection, using the published bilinear approximation.
+    Returns the normalised activity rate of a 1-unit bolus at time ``t``
+    minutes after injection.  The activity rises linearly from 0 at injection
+    to its peak at ``t == peak``, then falls back to 0 at ``t == dia``.
 
-    Reference: OpenAPS Reference Design, oref0 source (iob.js / profile.js).
+    This is the canonical piecewise-linear approximation used in the OpenAPS
+    oref0 reference implementation (iob.js / profile.js).
 
     Parameters
     ----------
     t : float
-        Minutes since bolus delivery.
+        Minutes since bolus delivery.  Negative values are treated as 0.
     dia : float
-        Duration of insulin action (minutes).
+        Duration of insulin action (minutes).  Activity is 0 at and beyond DIA.
     peak : float
-        Time to peak activity (minutes).  Typical rapid-acting: 75 min.
+        Time to peak activity (minutes).  Typical rapid-acting insulins: 75 min.
 
     Returns
     -------
     float
-        IOB fraction in [0, 1].
+        Normalised activity in [0, 1].
+        - 0.0 at t <= 0 (insulin just delivered, no metabolic action yet)
+        - 1.0 at t == peak (maximum effect)
+        - 0.0 at t >= dia (insulin fully metabolised)
     """
     if t <= 0:
-        return 1.0
+        return 0.0
     if t >= dia:
         return 0.0
-    # Piecewise linear: rise from 0→peak, fall from peak→dia
+    # Piecewise linear: rise from 0→1 over [0, peak], fall from 1→0 over [peak, dia]
     if t <= peak:
-        # Activity rises linearly from 0 → 1 over [0, peak]
         activity_frac = t / peak
     else:
-        # Activity falls linearly from 1 → 0 over [peak, dia]
         activity_frac = 1.0 - (t - peak) / (dia - peak)
     return max(0.0, min(1.0, activity_frac))
 

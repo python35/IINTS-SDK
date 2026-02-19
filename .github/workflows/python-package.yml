@@ -21,15 +21,19 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
+    - name: Install core dependencies
       run: |
         python -m pip install --upgrade pip
         pip install build flake8 mypy pandas-stubs types-PyYAML types-psutil pytest-cov
         pip install -r requirements-dev.txt
         pip install -e .
-        # Install project dependencies for linting/type checking if applicable
-        # If your project has a requirements.txt, uncomment the next line:
-        # pip install -r requirements.txt
+
+    # P2-8: Install research extras (PyTorch CPU + pyarrow) for research tests
+    - name: Install research extras
+      run: |
+        pip install -e ".[research]"
+        # CPU-only torch to keep CI fast
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
 
     - name: Lint with Flake8
       run: |
@@ -37,21 +41,33 @@ jobs:
 
     - name: Type check with MyPy
       run: |
-        mypy src/iints/ # adjust path to your main package
+        mypy src/iints/
 
-    - name: Run tests with PyTest
+    # P2-8: Run tests with coverage across BOTH the main package and research scripts
+    - name: Run tests with PyTest (SDK + Research)
       run: |
-        pytest --cov=src/iints --cov-report=xml
+        pytest \
+          --cov=src/iints \
+          --cov=research \
+          --cov-report=xml \
+          --cov-report=term-missing \
+          tests/
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-py${{ matrix.python-version }}
+        path: coverage.xml
 
     - name: Security audit (pip-audit)
       run: |
-        python -m pip install --upgrade pip-audit cyclonedx-bom
+        python -m pip install --upgrade pip-audit
         pip-audit -r requirements.txt
 
     - name: Generate SBOM (CycloneDX)
       run: |
         python -m pip install --upgrade cyclonedx-bom
-        cyclonedx-bom -o sbom.json
+        python -m cyclonedx_bom -o sbom.json
 
     - name: Build package
       run: |
@@ -59,7 +75,6 @@ jobs:
 
     - name: Test basic installation and CLI
       run: |
-        # Create a temporary virtual environment to install and test the package
         python -m venv .venv_ci_test
         ./.venv_ci_test/bin/pip install dist/*.whl
         ./.venv_ci_test/bin/iints --help
@@ -71,3 +86,43 @@ jobs:
         path: |
           dist/
           sbom.json
+
+  # P2-8: Dedicated research-pipeline coverage job
+  research-coverage:
+    name: Research Pipeline Coverage (Py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov
+        pip install -r requirements-dev.txt
+        pip install -e ".[research]"
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+    - name: Run research unit tests with coverage
+      run: |
+        pytest \
+          tests/research/ \
+          --cov=src/iints/research \
+          --cov=research \
+          --cov-report=xml:coverage-research.xml \
+          --cov-report=term-missing \
+          -v
+
+    - name: Upload research coverage
+      uses: actions/upload-artifact@v4
+      with:
+        name: research-coverage-py${{ matrix.python-version }}
+        path: coverage-research.xml
