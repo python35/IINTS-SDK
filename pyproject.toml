@@ -71,6 +71,9 @@ iints = "iints.cli.cli:app"
 [project.urls]
 "Homepage" = "https://github.com/python35/IINTS-SDK"
 
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.setuptools.package-data]
 iints = [
   "templates/*.py",

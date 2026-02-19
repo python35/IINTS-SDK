@@ -1523,6 +1523,155 @@ def data_fetch(
         raise typer.Exit(code=1)
 
 
+# ---------------------------------------------------------------------------
+# P1-4: Research pipeline CLI commands
+# ---------------------------------------------------------------------------
+
+research_app = typer.Typer(help="Research pipeline: dataset preparation and quality reporting.")
+app.add_typer(research_app, name="research")
+
+
+@research_app.command("prepare-azt1d")
+def research_prepare_azt1d(
+    input_dir: Annotated[Path, typer.Option(help="Root directory containing AZT1D Subject folders")] = Path("data_packs/public/azt1d/AZT1D 2025/CGM Records"),
+    output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/azt1d/processed/azt1d_merged.csv"),
+    report: Annotated[Path, typer.Option(help="Quality report output path")] = Path("data_packs/public/azt1d/quality_report.json"),
+    time_step: Annotated[int, typer.Option(help="Expected CGM sample interval (minutes)")] = 5,
+    max_gap_multiplier: Annotated[float, typer.Option(help="Segment-break gap multiplier")] = 2.5,
+    dia_minutes: Annotated[float, typer.Option(help="Insulin action duration (minutes)")] = 240.0,
+    peak_minutes: Annotated[float, typer.Option(help="IOB peak time (minutes, OpenAPS bilinear)")] = 75.0,
+    carb_absorb_minutes: Annotated[float, typer.Option(help="Carb absorption duration (minutes)")] = 120.0,
+    max_basal: Annotated[float, typer.Option(help="Clip basal values above this (U/hr)")] = 20.0,
+    max_bolus: Annotated[float, typer.Option(help="Clip bolus values above this (U)")] = 30.0,
+    max_carbs: Annotated[float, typer.Option(help="Clip carb grams above this")] = 200.0,
+    basal_is_rate: Annotated[bool, typer.Option(help="Treat Basal column as U/hr (convert to U/step)")] = True,
+):
+    """
+    Prepare the AZT1D CGM dataset for LSTM predictor training.
+
+    Reads per-subject CSVs, applies basal-rate conversion (U/hr → U/step),
+    derives IOB/COB using the OpenAPS bilinear model, adds time-of-day
+    cyclical features, and writes the merged dataset plus a quality report.
+
+    Example
+    -------
+    iints research prepare-azt1d --input-dir data_packs/public/azt1d/... --output merged.parquet
+    """
+    console = Console()
+    if not input_dir.exists():
+        console.print(f"[bold red]Input directory not found: {input_dir}[/bold red]")
+        raise typer.Exit(code=1)
+
+    import subprocess, sys  # noqa: E401
+    cmd = [
+        sys.executable,
+        str(Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_azt1d.py"),
+        "--input", str(input_dir),
+        "--output", str(output),
+        "--report", str(report),
+        "--time-step", str(time_step),
+        "--max-gap-multiplier", str(max_gap_multiplier),
+        "--dia-minutes", str(dia_minutes),
+        "--peak-minutes", str(peak_minutes),
+        "--carb-absorb-minutes", str(carb_absorb_minutes),
+        "--max-basal", str(max_basal),
+        "--max-bolus", str(max_bolus),
+        "--max-carbs", str(max_carbs),
+    ]
+    if not basal_is_rate:
+        cmd.append("--no-basal-is-rate")
+    try:
+        import importlib.util as _ilu
+        # Prefer in-process execution when the research script is importable
+        spec = _ilu.spec_from_file_location(
+            "_prepare_azt1d",
+            Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_azt1d.py",
+        )
+        if spec is not None and spec.loader is not None:
+            import sys as _sys
+            _old_argv = _sys.argv[:]
+            _sys.argv = cmd[1:]  # strip python interpreter
+            try:
+                mod = _ilu.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore[union-attr]
+                mod.main()  # type: ignore[attr-defined]
+            finally:
+                _sys.argv = _old_argv
+        else:
+            result = subprocess.run(cmd, check=True)
+    except Exception as exc:
+        console.print(f"[bold red]prepare-azt1d failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Dataset written to:[/green] {output}")
+    console.print(f"[green]Quality report   :[/green] {report}")
+
+
+@research_app.command("quality")
+def research_quality(
+    report: Annotated[Path, typer.Option(help="Path to quality_report.json produced by prepare-azt1d")] = Path("data_packs/public/azt1d/quality_report.json"),
+):
+    """
+    Display a quality report produced by `iints research prepare-azt1d`.
+
+    Shows dataset summary statistics, subject count, glucose range, and
+    pipeline parameters in a formatted table.
+
+    Example
+    -------
+    iints research quality --report data_packs/public/azt1d/quality_report.json
+    """
+    console = Console()
+    if not report.exists():
+        console.print(f"[bold red]Report not found: {report}[/bold red]")
+        console.print("Run [bold]iints research prepare-azt1d[/bold] first.")
+        raise typer.Exit(code=1)
+
+    try:
+        data = json.loads(report.read_text())
+    except Exception as exc:
+        console.print(f"[bold red]Failed to parse report: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"AZT1D Dataset Quality Report", show_header=True, header_style="bold cyan")
+    table.add_column("Field", style="green")
+    table.add_column("Value", style="white")
+
+    display_keys = [
+        ("source", "Source directory"),
+        ("records_total", "Total records"),
+        ("subjects", "Subject count"),
+        ("subject_ids", "Subject IDs"),
+        ("start_time", "Start time"),
+        ("end_time", "End time"),
+        ("glucose_mean", "Glucose mean (mg/dL)"),
+        ("glucose_std", "Glucose std (mg/dL)"),
+        ("glucose_min", "Glucose min (mg/dL)"),
+        ("glucose_max", "Glucose max (mg/dL)"),
+        ("insulin_mean", "Insulin mean (U/step)"),
+        ("carb_mean", "Carb mean (g/step)"),
+        ("iob_model", "IOB model"),
+        ("basal_is_rate", "Basal as U/hr"),
+        ("time_step_minutes", "Time step (min)"),
+        ("dia_minutes", "DIA (min)"),
+        ("peak_minutes", "Peak time (min)"),
+        ("carb_absorb_minutes", "Carb absorb (min)"),
+    ]
+
+    for key, label in display_keys:
+        if key in data:
+            val = data[key]
+            if isinstance(val, list):
+                val = ", ".join(str(v) for v in val)
+            elif isinstance(val, float):
+                val = f"{val:.3f}"
+            else:
+                val = str(val)
+            table.add_row(label, val)
+
+    console.print(table)
+
+
 @app.command("import-data")
 def import_data(
     input_csv: Annotated[Path, typer.Option(help="Path to CGM CSV file")],

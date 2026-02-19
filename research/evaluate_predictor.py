@@ -15,16 +15,24 @@ except Exception as exc:
     ) from exc
 
 from iints.research.config import PredictorConfig
-from iints.research.dataset import build_sequences, load_dataset
-from iints.research.predictor import load_predictor
+from iints.research.dataset import FeatureScaler, build_sequences, load_dataset
+from iints.research.predictor import evaluate_baselines, load_predictor
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data", required=True, type=Path, help="Parquet dataset path")
+    parser = argparse.ArgumentParser(
+        description="Evaluate an LSTM glucose predictor and compare against baselines."
+    )
+    parser.add_argument("--data", required=True, type=Path, help="Dataset path (CSV or Parquet)")
     parser.add_argument("--model", required=True, type=Path, help="Model checkpoint (.pt)")
     parser.add_argument("--config", required=False, type=Path, help="Optional config YAML")
     parser.add_argument("--out", required=False, type=Path, help="Output metrics JSON")
+    parser.add_argument(
+        "--mc-samples",
+        type=int,
+        default=0,
+        help="If > 0, run MC Dropout inference with this many samples and report uncertainty.",
+    )
     return parser.parse_args()
 
 
@@ -53,20 +61,68 @@ def main() -> None:
         target_column=predictor_cfg.target_column,
     )
 
+    # P3-11: Evaluate baselines on raw (unscaled) X for interpretable comparison
+    baselines = evaluate_baselines(
+        X, y,
+        horizon_steps=predictor_cfg.horizon_steps,
+        time_step_minutes=predictor_cfg.time_step_minutes,
+    )
+
+    # Apply scaler from checkpoint if present
+    scaler_data = model_cfg.get("scaler")
+    if scaler_data:
+        scaler = FeatureScaler.from_dict(scaler_data)
+        X_scaled = scaler.transform(X)
+    else:
+        X_scaled = X
+
     model.eval()
     with torch.no_grad():
-        preds = model(torch.from_numpy(X))
+        preds = model(torch.from_numpy(X_scaled))
     preds_np = preds.numpy()
 
     mae = float(np.mean(np.abs(preds_np - y)))
     rmse = float(np.sqrt(np.mean((preds_np - y) ** 2)))
 
-    metrics = {"mae": mae, "rmse": rmse}
+    metrics: dict = {
+        "lstm": {"mae": mae, "rmse": rmse},
+        "baselines": baselines,
+    }
+
+    # P3-12: Optional MC Dropout uncertainty
+    if args.mc_samples > 0:
+        tensor_x = torch.from_numpy(X_scaled)
+        mean_t, std_t = model.predict_with_uncertainty(tensor_x, n_samples=args.mc_samples)
+        mean_np = mean_t.numpy()
+        std_np = std_t.numpy()
+        metrics["mc_dropout"] = {
+            "n_samples": args.mc_samples,
+            "mean_mae": float(np.mean(np.abs(mean_np - y))),
+            "mean_rmse": float(np.sqrt(np.mean((mean_np - y) ** 2))),
+            "mean_std": float(std_np.mean()),
+            "max_std": float(std_np.max()),
+        }
+
+    # Print comparison table
+    print("\n=== Evaluation Results ===")
+    print(f"{'Model':<20} {'MAE':>8} {'RMSE':>8}")
+    print("-" * 38)
+    for bname, bm in baselines.items():
+        print(f"{bname:<20} {bm['mae']:>8.3f} {bm['rmse']:>8.3f}")
+    print(f"{'LSTM':<20} {mae:>8.3f} {rmse:>8.3f}")
+    if "mc_dropout" in metrics:
+        mcd = metrics["mc_dropout"]
+        print(f"\nMC Dropout ({args.mc_samples} samples):")
+        print(f"  Mean MAE : {mcd['mean_mae']:.3f}")
+        print(f"  Mean RMSE: {mcd['mean_rmse']:.3f}")
+        print(f"  Mean std : {mcd['mean_std']:.3f}")
+
     if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(metrics, indent=2))
-        print(f"Saved metrics: {args.out}")
+        print(f"\nSaved metrics: {args.out}")
     else:
-        print(metrics)
+        print(json.dumps(metrics, indent=2))
 
 
 if __name__ == "__main__":
