@@ -223,16 +223,16 @@ class ClinicalReportGenerator:
                 col_widths = [52, 26, 26, 26, 30]
                 headers = ["Algorithm", "TIR 70-180", "Time <70", "Time >180", "Safety Overrides"]
                 for idx, header in enumerate(headers):
-                    pdf.cell(col_widths[idx], 6, header, 1, 0, "C")
+                    pdf.cell(col_widths[idx], 6, header, border=1, align="C")
                 pdf.ln()
 
                 pdf.set_font("Helvetica", "", 9)
                 for row in baseline["rows"]:
-                    pdf.cell(col_widths[0], 6, str(row.get("algorithm", ""))[:24], 1, 0)
-                    pdf.cell(col_widths[1], 6, f"{row.get('tir_70_180', 0):.1f}%", 1, 0, "C")
-                    pdf.cell(col_widths[2], 6, f"{row.get('tir_below_70', 0):.1f}%", 1, 0, "C")
-                    pdf.cell(col_widths[3], 6, f"{row.get('tir_above_180', 0):.1f}%", 1, 0, "C")
-                    pdf.cell(col_widths[4], 6, str(row.get("bolus_interventions", 0)), 1, 0, "C")
+                    pdf.cell(col_widths[0], 6, str(row.get("algorithm", ""))[:24], border=1)
+                    pdf.cell(col_widths[1], 6, f"{row.get('tir_70_180', 0):.1f}%", border=1, align="C")
+                    pdf.cell(col_widths[2], 6, f"{row.get('tir_below_70', 0):.1f}%", border=1, align="C")
+                    pdf.cell(col_widths[3], 6, f"{row.get('tir_above_180', 0):.1f}%", border=1, align="C")
+                    pdf.cell(col_widths[4], 6, str(row.get("bolus_interventions", 0)), border=1, align="C")
                     pdf.ln()
 
             pdf.ln(4)

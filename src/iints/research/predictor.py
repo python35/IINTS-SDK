@@ -5,6 +5,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+_IMPORT_ERROR: Optional[BaseException]
 try:
     import torch
     from torch import nn
