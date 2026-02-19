@@ -67,13 +67,17 @@ jobs:
     - name: Generate SBOM (CycloneDX)
       run: |
         python -m pip install --upgrade cyclonedx-bom
-        SBOM_BIN="$(python -c 'import os,sys; print(os.path.join(os.path.dirname(sys.executable), "cyclonedx-bom"))')"
-        if [ ! -x "$SBOM_BIN" ]; then
-          echo "SBOM tool not found at $SBOM_BIN"
-          ls -la "$(dirname "$SBOM_BIN")"
+        SBOM_BOM_BIN="$(python -c 'import os,sys; print(os.path.join(os.path.dirname(sys.executable), "cyclonedx-bom"))')"
+        SBOM_PY_BIN="$(python -c 'import os,sys; print(os.path.join(os.path.dirname(sys.executable), "cyclonedx-py"))')"
+        if [ -x "$SBOM_PY_BIN" ]; then
+          "$SBOM_PY_BIN" environment -o sbom.json
+        elif [ -x "$SBOM_BOM_BIN" ]; then
+          "$SBOM_BOM_BIN" -o sbom.json
+        else
+          echo "No CycloneDX CLI found in $(dirname "$SBOM_BOM_BIN")"
+          ls -la "$(dirname "$SBOM_BOM_BIN")"
           exit 1
         fi
-        "$SBOM_BIN" -o sbom.json
 
     - name: Build package
       run: |
