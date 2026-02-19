@@ -20,7 +20,7 @@ except Exception as exc:
     ) from exc
 
 from iints.research.config import PredictorConfig, TrainingConfig
-from iints.research.dataset import build_sequences, load_parquet
+from iints.research.dataset import build_sequences, load_dataset
 from iints.research.predictor import LSTMPredictor
 
 
@@ -42,7 +42,7 @@ def main() -> None:
     np.random.seed(training_cfg.seed)
     torch.manual_seed(training_cfg.seed)
 
-    df = load_parquet(args.data)
+    df = load_dataset(args.data)
     X, y = build_sequences(
         df,
         history_steps=predictor_cfg.history_steps,

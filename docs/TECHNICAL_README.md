@@ -129,7 +129,7 @@ iints report --results-csv results/data/sim_results_example.csv \
 ```
 
 ## Research Track (AI Predictor)
-See `research/README.md` for training and evaluation scripts.
+See `research/README.md` for training and evaluation scripts. The predictor is not a dosing controller; it only provides a 30-120 minute forecast signal to the Safety Supervisor.
 
 Quick start:
 ```bash

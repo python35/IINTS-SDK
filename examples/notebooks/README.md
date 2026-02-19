@@ -22,3 +22,6 @@ Recommended order (each has a Colab button inside):
    [Open in Colab](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/07_Ablation_Supervisor.ipynb)
 9. `08_Data_Registry_and_Import.ipynb`
    [Open in Colab](https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/08_Data_Registry_and_Import.ipynb)
+
+AI research track:
+- Optional predictor training lives in `research/README.md` and is referenced in notebooks 00, 06, and 08.

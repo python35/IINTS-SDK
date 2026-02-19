@@ -12,7 +12,7 @@ We treat the following as **public API** and stable within a MAJOR version:
 - `iints.Simulator`, `iints.PatientModel`, `iints.PatientProfile`
 - `iints.generate_report`, `iints.generate_quickstart_report`, `iints.generate_demo_report`
 - `iints.import_cgm_csv`, `iints.import_cgm_dataframe`, `iints.scenario_from_csv`
-- CLI commands documented in `README.md` and `TECHNICAL_README.md`
+- CLI commands documented in `README.md` and `docs/TECHNICAL_README.md`
 
 ## Deprecation Process
 When we need to change or remove a public API:

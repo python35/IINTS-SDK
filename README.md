@@ -135,10 +135,31 @@ Hands-on Jupyter notebooks live in [`examples/notebooks/`](examples/notebooks/)
 * Optional Torch/LSTM usage
 * Ablation study (with/without Supervisor)
 
+### AI Research Track (Predictor)
+IINTS-AF includes an optional research pipeline to train a glucose **predictor** that feeds the Safety Supervisor with a 30-120 minute forecast. The predictor never doses insulin; it only provides a forecast signal.
+
+Install research extras:
+```bash
+pip install iints-sdk-python35[research]
+```
+
+Train a starter predictor:
+```bash
+python research/synthesize_dataset.py --runs 25 --output data/synthetic.parquet
+python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
+```
+
+Integrate:
+```python
+from iints.research import load_predictor_service
+predictor = load_predictor_service("models/predictor.pt")
+outputs = iints.run_simulation(..., predictor=predictor)
+```
+
 ### Documentation
-* Product manual: `SDK_COMPREHENSIVE_GUIDE.md`
+* Product manual: `docs/COMPREHENSIVE_GUIDE.md`
 * Notebook index: `examples/notebooks/README.md`
-* Technical README: `TECHNICAL_README.md`
+* Technical README: `docs/TECHNICAL_README.md`
 * API Stability: `API_STABILITY.md`
 * Research track: `research/README.md`
 

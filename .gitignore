@@ -29,6 +29,16 @@ results/
 
 # Official datasets (downloaded locally)
 data_packs/official/
+# Local sample data packs
+data_packs/sample/
+# Synthetic data packs
+data_packs/synthetic/
+# Public datasets (downloaded locally)
+data_packs/public/
+# Processed training artifacts
+data_packs/**/processed/
+# Trained model outputs
+models/
 
 # Coverage
 .coverage
@@ -38,6 +48,7 @@ coverage.xml
 *.tmp
 *.log
 .DS_Store
+tools/local/
 Thumbs.db
 
 # IDE

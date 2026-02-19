@@ -53,6 +53,15 @@ def save_parquet(df: pd.DataFrame, path: Path) -> None:
         ) from exc
 
 
+def save_dataset(df: pd.DataFrame, path: Path) -> None:
+    """Save dataset as parquet when available, or CSV as a fallback."""
+    if path.suffix.lower() in {".parquet", ".pq"}:
+        save_parquet(df, path)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+
+
 def load_parquet(path: Path) -> pd.DataFrame:
     try:
         return pd.read_parquet(path)
@@ -60,6 +69,15 @@ def load_parquet(path: Path) -> pd.DataFrame:
         raise RuntimeError(
             "Parquet support requires pyarrow. Install with `pip install iints-sdk-python35[research]`."
         ) from exc
+
+
+def load_dataset(path: Path) -> pd.DataFrame:
+    """Load a dataset from parquet or CSV."""
+    if path.suffix.lower() in {".parquet", ".pq"}:
+        return load_parquet(path)
+    if path.suffix.lower() in {".csv", ".txt"}:
+        return pd.read_csv(path)
+    raise ValueError(f"Unsupported dataset format: {path.suffix}")
 
 
 def concat_runs(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:

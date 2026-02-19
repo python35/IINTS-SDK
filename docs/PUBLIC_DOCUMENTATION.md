@@ -8,10 +8,10 @@ This document is the public, single‑entry documentation index for the IINTS‑
 ## 1) Software Documentation
 
 ### Developer Docs
-- **Primary guide**: `SDK_COMPREHENSIVE_GUIDE.md`
+- **Primary guide**: `COMPREHENSIVE_GUIDE.md`
 - **Technical details**: `TECHNICAL_README.md`
-- **API stability**: `API_STABILITY.md`
-- **Change history**: `CHANGELOG.md`
+- **API stability**: `../API_STABILITY.md`
+- **Change history**: `../CHANGELOG.md`
 
 ### Technical Architecture
 - **Core simulation**: `src/iints/core/` (Simulator, Supervisor, SafetyConfig)
@@ -21,10 +21,10 @@ This document is the public, single‑entry documentation index for the IINTS‑
 - **CLI**: `src/iints/cli/cli.py`
 
 ### User Guides
-- **Quickstart**: `README.md`
+- **Quickstart**: `../README.md`
 - **Notebooks**: `examples/notebooks/` (step‑by‑step walkthroughs)
 - **Presets**: `src/iints/presets/presets.json`
-- **AI Research Track**: `research/README.md`
+- **AI Research Track**: `../research/README.md`
 
 ### Research Checklist (Recommended)
 - Use a fixed `seed` for every run (or record the auto‑seed in `run_metadata.json`).
@@ -86,25 +86,27 @@ For non‑code content (notebooks, PDF reports, plots), the following tools are 
 
 ## 4) AI Systems Documentation
 
-IINTS‑AF is a **simulation platform**. It ships **optional demo AI components** but does not
+IINTS‑AF is a **simulation platform**. It ships an **optional AI research pipeline** but does not
 bundle a production‑trained model. The following documentation applies when using AI algorithms
 inside the SDK:
 
 ### Model Card (Template)
-**Model Name**: Example LSTM Insulin Algorithm (optional)
-- **Location**: `src/iints/core/algorithms/lstm_algorithm.py`
-- **Purpose**: Demonstration of uncertainty‑aware insulin prediction
-- **Training Data**: *Not bundled in SDK* (user‑provided)
+**Model Name**: IINTS Predictor (research track)
+- **Location**: `research/` and `src/iints/research/`
+- **Purpose**: Forecast glucose 30-120 minutes ahead for Safety Supervisor foresight
+- **Training Data**: *Not bundled in SDK* (user‑provided or synthetic)
 - **Evaluation**: Compare using built‑in metrics (TIR, CV, LBGI/HBGI, safety violations)
+- **Model card**: `research/model_card.md`
 
 ### Model Architecture
-- LSTM + Monte‑Carlo Dropout (uncertainty estimation)
-- Fallback safety controller if uncertainty too high
+- LSTM predictor (time‑series forecaster)
+- Safety Supervisor remains deterministic and always gates dosing
 
 ### Datasheet / Training‑Evaluation Notes
 - The SDK includes **dataset registry** + **import tools** to support training data ingestion.
 - Users should document the specific dataset, preprocessing, and evaluation protocol
   used for any trained model.
+- Datasheet template: `research/datasheet.md`
 
 ### Recommended Evaluation Outputs
 - Safety report (`safety_report`)
@@ -115,8 +117,8 @@ inside the SDK:
 
 ## Canonical Entry Points (Public)
 
-- `README.md` (start here)
-- `SDK_COMPREHENSIVE_GUIDE.md`
+- `../README.md` (start here)
+- `COMPREHENSIVE_GUIDE.md`
 - `TECHNICAL_README.md`
 - `data_packs/DATA_SCHEMA.md`
 - `data_packs/DATASETS.md`

@@ -1,0 +1,25 @@
+predictor:
+  history_minutes: 240
+  horizon_minutes: 60
+  time_step_minutes: 5
+  feature_columns:
+    - glucose_actual_mgdl
+    - glucose_trend_mgdl_min
+    - insulin_units
+    - carb_grams
+    - derived_iob_units
+    - derived_cob_grams
+    - time_of_day_sin
+    - time_of_day_cos
+    - device_mode_code
+  target_column: glucose_actual_mgdl
+
+training:
+  epochs: 20
+  batch_size: 256
+  learning_rate: 0.001
+  hidden_size: 64
+  num_layers: 2
+  dropout: 0.1
+  validation_split: 0.1
+  seed: 42

@@ -1,7 +1,7 @@
-# IINTS-AF SDK: Official Manual (v0.1.15)
+# IINTS-AF SDK: Official Manual (v0.1.16)
 
 The authoritative, up‑to‑date manual lives at:
 
-- `SDK_COMPREHENSIVE_GUIDE.md`
-
-This file remains a pointer to avoid duplication.
+- `COMPREHENSIVE_GUIDE.md`
+- `manuals/IINTS-AF_SDK_Manual.pdf`
+- `../research/README.md` (AI predictor research track)

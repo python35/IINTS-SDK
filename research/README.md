@@ -23,6 +23,34 @@ We standardize training data to **Parquet** with at least these columns:
 - `effective_basal_rate_u_per_hr`
 - `glucose_trend_mgdl_min`
 
+For CGM-only datasets (no insulin/carbs), use:
+```bash
+python research/prepare_aide_cgm.py \
+  --input data_packs/public/aide_t1d/Data\\ Tables/AIDEDeviceCGM.txt \
+  --output data_packs/public/aide_t1d/processed/aide_cgm.csv
+```
+and train with `research/configs/predictor_cgm_only.yaml`.
+
+Full AIDE training run:
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/aide_t1d/processed/aide_cgm.csv \
+  --config research/configs/predictor_cgm_only.yaml \
+  --out models/aide_predictor_full
+```
+
+AZT1D (CGM + insulin + carbs) preparation and training:
+```bash
+PYTHONPATH=src python3 research/prepare_azt1d.py \
+  --input "data_packs/public/azt1d/AZT1D 2025/CGM Records" \
+  --output data_packs/public/azt1d/processed/azt1d_merged.csv
+
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --config research/configs/predictor_azt1d.yaml \
+  --out models/azt1d_predictor_full
+```
+
 ## Training
 ```bash
 python research/train_predictor.py --data data/training.parquet --config research/configs/predictor.yaml --out models
