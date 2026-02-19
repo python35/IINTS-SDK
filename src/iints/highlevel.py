@@ -70,6 +70,7 @@ def run_simulation(
     export_audit: bool = True,
     generate_report: bool = True,
     safety_config: Optional[SafetyConfig] = None,
+    predictor: Optional[object] = None,
 ) -> Dict[str, Any]:
     """
     One-line simulation runner with audit + report + baseline comparison.
@@ -92,6 +93,7 @@ def run_simulation(
         time_step=time_step,
         seed=resolved_seed,
         safety_config=effective_safety_config,
+        predictor=predictor,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -206,6 +208,7 @@ def run_full(
     output_dir: Optional[Union[str, Path]] = None,
     enable_profiling: bool = True,
     safety_config: Optional[SafetyConfig] = None,
+    predictor: Optional[object] = None,
 ) -> Dict[str, Any]:
     """
     One-line runner that always exports results + audit + PDF + baseline comparison.
@@ -229,6 +232,7 @@ def run_full(
         seed=resolved_seed,
         enable_profiling=enable_profiling,
         safety_config=effective_safety_config,
+        predictor=predictor,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)

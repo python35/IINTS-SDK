@@ -4,7 +4,7 @@ from .dataset import (
     load_parquet,
     save_parquet,
 )
-from .predictor import LSTMPredictor, load_predictor
+from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
 
 __all__ = [
     "PredictorConfig",
@@ -14,4 +14,6 @@ __all__ = [
     "save_parquet",
     "LSTMPredictor",
     "load_predictor",
+    "PredictorService",
+    "load_predictor_service",
 ]

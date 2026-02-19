@@ -38,4 +38,20 @@ python research/evaluate_predictor.py --data data/validation.parquet --model mod
 python research/export_predictor.py --model models/predictor.pt --out models/predictor.onnx
 ```
 
+## Integrate with Simulator (Option 1)
+```python
+import iints
+from iints.research import load_predictor_service
+from iints.core.algorithms.pid_controller import PIDController
+
+predictor = load_predictor_service("models/predictor.pt")
+sim = iints.Simulator(
+    patient_model=iints.PatientModel(),
+    algorithm=PIDController(),
+    time_step=5,
+    predictor=predictor,
+)
+results, safety = sim.run_batch(720)
+```
+
 See `model_card.md` and `datasheet.md` for documentation templates.

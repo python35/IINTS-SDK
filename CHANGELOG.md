@@ -10,6 +10,7 @@
 - Algorithm plugin registry with `iints algorithms list/info` + entry points.
 - CI now includes SBOM generation + `pip-audit`, and Python 3.12 in the test matrix.
 - Added AI research track scaffolding (predictor model, datasets, training/eval scripts).
+- Simulator now supports optional AI predictor injection for proactive safety.
 
 ## v0.1.16
 

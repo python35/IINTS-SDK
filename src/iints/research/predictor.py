@@ -50,6 +50,26 @@ class LSTMPredictor(nn.Module):  # type: ignore[misc]
         return self.head(last_hidden)
 
 
+class PredictorService:
+    def __init__(self, model: "LSTMPredictor", config: dict) -> None:
+        self.model = model
+        self.config = config
+        self.feature_columns = list(config.get("feature_columns", []))
+        self.history_steps = int(config.get("history_steps", 1))
+        self.horizon_steps = int(config.get("horizon_steps", 1))
+
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        if torch is None:  # pragma: no cover
+            raise ImportError(
+                "Torch is required for predictor inference. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+        self.model.eval()
+        with torch.no_grad():
+            tensor = torch.from_numpy(x.astype(np.float32))
+            outputs = self.model(tensor).cpu().numpy()
+        return outputs
+
+
 def load_predictor(model_path: Path) -> Tuple["LSTMPredictor", dict]:
     if torch is None or nn is None:  # pragma: no cover
         raise ImportError(
@@ -67,6 +87,11 @@ def load_predictor(model_path: Path) -> Tuple["LSTMPredictor", dict]:
     model.load_state_dict(payload["state_dict"])
     model.eval()
     return model, config
+
+
+def load_predictor_service(model_path: Path) -> PredictorService:
+    model, config = load_predictor(model_path)
+    return PredictorService(model, config)
 
 
 def predict_batch(model: "LSTMPredictor", x: np.ndarray) -> np.ndarray:

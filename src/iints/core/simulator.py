@@ -96,6 +96,7 @@ class Simulator:
         critical_glucose_threshold: float = 40.0,
         critical_glucose_duration_minutes: int = 30,
         safety_config: Optional[SafetyConfig] = None,
+        predictor: Optional[object] = None,
     ) -> None:
         """
         Initializes the simulator.
@@ -121,6 +122,23 @@ class Simulator:
         self.input_validator = InputValidator(safety_config=self.safety_config)
         self.sensor_model = sensor_model or SensorModel(seed=seed)
         self.pump_model = pump_model or PumpModel(seed=seed)
+        self.predictor = predictor
+        self._predictor_history: List[Dict[str, float]] = []
+        self._predictor_feature_columns: List[str] = [
+            "glucose_actual_mgdl",
+            "patient_iob_units",
+            "patient_cob_grams",
+            "effective_isf",
+            "effective_icr",
+            "effective_basal_rate_u_per_hr",
+            "glucose_trend_mgdl_min",
+        ]
+        self._predictor_history_steps = max(int(240 / float(self.time_step)), 1)
+        self._predictor_horizon_steps = max(
+            int(self.safety_config.predicted_hypoglycemia_horizon_minutes / float(self.time_step)),
+            1,
+        )
+        self._init_predictor_settings()
         self.on_step = on_step
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
@@ -149,6 +167,65 @@ class Simulator:
                     f.write("") # Overwrite the file
             except IOError as e:
                 logger.warning("Could not clear audit log file at %s. Error: %s", self.audit_log_path, e)
+
+    def _init_predictor_settings(self) -> None:
+        if self.predictor is None:
+            return
+        try:
+            config = getattr(self.predictor, "config", None)
+            if isinstance(config, dict):
+                feature_columns = config.get("feature_columns")
+                history_steps = config.get("history_steps")
+                horizon_steps = config.get("horizon_steps")
+            else:
+                feature_columns = getattr(self.predictor, "feature_columns", None)
+                history_steps = getattr(self.predictor, "history_steps", None)
+                horizon_steps = getattr(self.predictor, "horizon_steps", None)
+
+            if isinstance(feature_columns, list) and feature_columns:
+                self._predictor_feature_columns = [str(col) for col in feature_columns]
+            if isinstance(history_steps, int) and history_steps > 0:
+                self._predictor_history_steps = history_steps
+            if isinstance(horizon_steps, int) and horizon_steps > 0:
+                self._predictor_horizon_steps = horizon_steps
+        except Exception:
+            return
+
+    def _predict_with_model(self, feature_row: Dict[str, float], fallback: float) -> Tuple[float, float]:
+        """
+        Returns (ai_prediction, heuristic_prediction). If model fails or lacks history,
+        ai_prediction falls back to heuristic_prediction.
+        """
+        self._predictor_history.append(feature_row)
+        if len(self._predictor_history) < self._predictor_history_steps:
+            return fallback, fallback
+
+        history_slice = self._predictor_history[-self._predictor_history_steps :]
+        try:
+            import numpy as np
+
+            X = np.zeros((1, self._predictor_history_steps, len(self._predictor_feature_columns)), dtype=float)
+            for i, row in enumerate(history_slice):
+                for j, col in enumerate(self._predictor_feature_columns):
+                    X[0, i, j] = float(row.get(col, 0.0))
+
+            predict_fn = getattr(self.predictor, "predict", None)
+            if not callable(predict_fn):
+                return fallback, fallback
+            output = predict_fn(X)
+            if hasattr(output, "shape"):
+                output_arr = np.array(output, dtype=float)
+                if output_arr.ndim == 2:
+                    return float(output_arr[0, -1]), fallback
+                if output_arr.ndim == 1:
+                    return float(output_arr[-1]), fallback
+            if isinstance(output, (list, tuple)) and output:
+                return float(output[-1]), fallback
+            if isinstance(output, (float, int)):
+                return float(output), fallback
+        except Exception:
+            return fallback, fallback
+        return fallback, fallback
 
     def _write_audit_log(self, data: Dict[str, Any]) -> None:
         """Writes a single step's audit data to the JSON log file."""
@@ -333,6 +410,7 @@ class Simulator:
             self.pump_model.reset()
             self.simulation_data = []
             self.meal_queue = [] # Reset meal queue for new run
+            self._predictor_history = []
             self._critical_low_minutes = 0
             self._current_time = 0
             self._termination_info = None
@@ -439,7 +517,7 @@ class Simulator:
                 glucose_trend = (glucose_to_algorithm - self._previous_glucose_for_trend) / float(self.time_step)
             self._previous_glucose_for_trend = glucose_to_algorithm
 
-            predicted_glucose_30 = self._predict_glucose(
+            predicted_glucose_heuristic = self._predict_glucose(
                 current_glucose=glucose_to_algorithm,
                 trend_mgdl_min=glucose_trend,
                 iob_units=self.patient_model.insulin_on_board,
@@ -450,6 +528,20 @@ class Simulator:
                 horizon_minutes=self.safety_config.predicted_hypoglycemia_horizon_minutes,
                 carb_absorption_minutes=self.patient_model.carb_absorption_duration_minutes,
             )
+            predicted_glucose_30 = predicted_glucose_heuristic
+            predicted_glucose_ai = None
+            if self.predictor is not None:
+                feature_row = {
+                    "glucose_actual_mgdl": float(glucose_to_algorithm),
+                    "patient_iob_units": float(self.patient_model.insulin_on_board),
+                    "patient_cob_grams": float(self.patient_model.carbs_on_board),
+                    "effective_isf": float(effective_isf),
+                    "effective_icr": float(effective_icr),
+                    "effective_basal_rate_u_per_hr": float(effective_basal),
+                    "glucose_trend_mgdl_min": float(glucose_trend),
+                }
+                predicted_glucose_ai, _ = self._predict_with_model(feature_row, predicted_glucose_heuristic)
+                predicted_glucose_30 = float(predicted_glucose_ai)
 
             # --- Algorithm Input ---
             algo_input = AlgorithmInput(
@@ -562,6 +654,8 @@ class Simulator:
                 "glucose_to_algo_mgdl": glucose_to_algorithm,
                 "glucose_trend_mgdl_min": glucose_trend,
                 "predicted_glucose_30min": predicted_glucose_30,
+                "predicted_glucose_heuristic_30min": predicted_glucose_heuristic,
+                "predicted_glucose_ai_30min": predicted_glucose_ai,
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
                 "sensor_status": sensor_reading.status,

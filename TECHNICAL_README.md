@@ -138,6 +138,18 @@ python research/synthesize_dataset.py --runs 10 --output data/synthetic.parquet
 python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
 ```
 
+Integration:
+```python
+from iints.research import load_predictor_service
+predictor = load_predictor_service("models/predictor.pt")
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    predictor=predictor,
+    duration_minutes=720,
+)
+```
+
 ### Dependency Check (Optional Torch)
 ```bash
 pip install "iints[torch]"
