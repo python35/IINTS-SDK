@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Protocol, Sequence, TYPE_CHECKING
 
 import numpy as np
 
@@ -21,78 +21,115 @@ else:
 # LSTM predictor
 # ---------------------------------------------------------------------------
 
-class LSTMPredictor(nn.Module):  # type: ignore[misc]
-    def __init__(
-        self,
-        input_size: int,
-        hidden_size: int = 64,
-        num_layers: int = 2,
-        dropout: float = 0.1,
-        horizon_steps: int = 12,
-    ) -> None:
-        if torch is None or nn is None:  # pragma: no cover
-            raise ImportError(
-                "Torch is required for LSTMPredictor. Install with `pip install iints-sdk-python35[research]`."
-            ) from _IMPORT_ERROR
-        super().__init__()
-        self.horizon_steps = horizon_steps
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            dropout=dropout if num_layers > 1 else 0.0,
-            batch_first=True,
-        )
-        self.head = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Dropout(p=dropout),   # P3-12: dropout in head for MC Dropout inference
-            nn.Linear(hidden_size, horizon_steps),
-        )
+if TYPE_CHECKING:
+    import torch  # pragma: no cover
+    from torch import nn  # pragma: no cover
 
-    def forward(self, x: "torch.Tensor") -> "torch.Tensor":
-        _, (hidden, _) = self.lstm(x)
-        last_hidden = hidden[-1]
-        return self.head(last_hidden)
+    class LSTMPredictor(nn.Module):
+        def __init__(
+            self,
+            input_size: int,
+            hidden_size: int = 64,
+            num_layers: int = 2,
+            dropout: float = 0.1,
+            horizon_steps: int = 12,
+        ) -> None: ...
 
-    # P3-12: Monte Carlo Dropout inference
-    def predict_with_uncertainty(
-        self,
-        x: "torch.Tensor",
-        n_samples: int = 50,
-    ) -> Tuple["torch.Tensor", "torch.Tensor"]:
-        """
-        Run MC Dropout inference to estimate predictive uncertainty.
+        def forward(self, x: "torch.Tensor") -> "torch.Tensor": ...
 
-        Activates dropout at inference time and runs ``n_samples`` forward
-        passes.  Returns the mean prediction and standard deviation across
-        samples as a proxy for aleatoric + epistemic uncertainty.
+        def predict_with_uncertainty(
+            self,
+            x: "torch.Tensor",
+            n_samples: int = 50,
+        ) -> Tuple["torch.Tensor", "torch.Tensor"]: ...
+else:
+    if nn is None:  # pragma: no cover
+        class LSTMPredictor:  # type: ignore[no-redef]
+            def __init__(self, *args: object, **kwargs: object) -> None:
+                raise ImportError(
+                    "Torch is required for LSTMPredictor. Install with `pip install iints-sdk-python35[research]`."
+                ) from _IMPORT_ERROR
+    else:
+        class LSTMPredictor(nn.Module):  # type: ignore[misc,no-redef]
+            def __init__(
+                self,
+                input_size: int,
+                hidden_size: int = 64,
+                num_layers: int = 2,
+                dropout: float = 0.1,
+                horizon_steps: int = 12,
+            ) -> None:
+                if torch is None or nn is None:  # pragma: no cover
+                    raise ImportError(
+                        "Torch is required for LSTMPredictor. Install with `pip install iints-sdk-python35[research]`."
+                    ) from _IMPORT_ERROR
+                super().__init__()
+                self.horizon_steps = horizon_steps
+                self.lstm = nn.LSTM(
+                    input_size=input_size,
+                    hidden_size=hidden_size,
+                    num_layers=num_layers,
+                    dropout=dropout if num_layers > 1 else 0.0,
+                    batch_first=True,
+                )
+                self.head = nn.Sequential(
+                    nn.Linear(hidden_size, hidden_size),
+                    nn.ReLU(),
+                    nn.Dropout(p=dropout),   # P3-12: dropout in head for MC Dropout inference
+                    nn.Linear(hidden_size, horizon_steps),
+                )
 
-        Parameters
-        ----------
-        x : torch.Tensor of shape [B, T, F]
-            Input batch.
-        n_samples : int
-            Number of stochastic forward passes.
+            def forward(self, x: "torch.Tensor") -> "torch.Tensor":
+                _, (hidden, _) = self.lstm(x)
+                last_hidden = hidden[-1]
+                return self.head(last_hidden)
 
-        Returns
-        -------
-        mean : torch.Tensor of shape [B, horizon_steps]
-        std  : torch.Tensor of shape [B, horizon_steps]
-        """
-        if torch is None:  # pragma: no cover
-            raise ImportError("Torch required.") from _IMPORT_ERROR
-        # Keep dropout active during inference
-        self.train()
-        with torch.no_grad():
-            preds = torch.stack([self.forward(x) for _ in range(n_samples)], dim=0)
-        self.eval()
-        return preds.mean(dim=0), preds.std(dim=0)
+            # P3-12: Monte Carlo Dropout inference
+            def predict_with_uncertainty(
+                self,
+                x: "torch.Tensor",
+                n_samples: int = 50,
+            ) -> Tuple["torch.Tensor", "torch.Tensor"]:
+                """
+                Run MC Dropout inference to estimate predictive uncertainty.
+
+                Activates dropout at inference time and runs ``n_samples`` forward
+                passes.  Returns the mean prediction and standard deviation across
+                samples as a proxy for aleatoric + epistemic uncertainty.
+
+                Parameters
+                ----------
+                x : torch.Tensor of shape [B, T, F]
+                    Input batch.
+                n_samples : int
+                    Number of stochastic forward passes.
+
+                Returns
+                -------
+                mean : torch.Tensor of shape [B, horizon_steps]
+                std  : torch.Tensor of shape [B, horizon_steps]
+                """
+                if torch is None:  # pragma: no cover
+                    raise ImportError("Torch required.") from _IMPORT_ERROR
+                # Keep dropout active during inference
+                self.train()
+                with torch.no_grad():
+                    preds = torch.stack([self.forward(x) for _ in range(n_samples)], dim=0)
+                self.eval()
+                return preds.mean(dim=0), preds.std(dim=0)
 
 
 # ---------------------------------------------------------------------------
 # P3-11: Baseline predictors
 # ---------------------------------------------------------------------------
+
+class BaselinePredictor(Protocol):
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        ...
+
+    def name(self) -> str:
+        ...
+
 
 class LastValueBaseline:
     """
@@ -123,8 +160,7 @@ class LastValueBaseline:
         last_glucose = X[:, -1, 0]  # shape [N]
         return np.tile(last_glucose[:, None], (1, self.horizon_steps)).astype(np.float32)
 
-    @staticmethod
-    def name() -> str:
+    def name(self) -> str:
         return "LastValue"
 
 
@@ -175,8 +211,7 @@ class LinearTrendBaseline:
         preds = intercepts[:, None] + slopes[:, None] * t_future[None, :]
         return preds.astype(np.float32)
 
-    @staticmethod
-    def name() -> str:
+    def name(self) -> str:
         return "LinearTrend"
 
 
@@ -202,10 +237,11 @@ def evaluate_baselines(
     {"mae": float, "rmse": float}.
     """
     results = {}
-    for baseline in [
+    baselines: Sequence[BaselinePredictor] = [
         LastValueBaseline(horizon_steps),
         LinearTrendBaseline(horizon_steps, time_step_minutes),
-    ]:
+    ]
+    for baseline in baselines:
         preds = baseline.predict(X)
         mae = float(np.mean(np.abs(preds - y)))
         rmse = float(np.sqrt(np.mean((preds - y) ** 2)))
