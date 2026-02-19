@@ -67,11 +67,7 @@ jobs:
     - name: Generate SBOM (CycloneDX)
       run: |
         python -m pip install --upgrade cyclonedx-bom
-        SBOM_BIN="$(python - <<'PY'
-import os, sys
-print(os.path.join(os.path.dirname(sys.executable), "cyclonedx-bom"))
-PY
-)"
+        SBOM_BIN="$(python -c 'import os,sys; print(os.path.join(os.path.dirname(sys.executable), "cyclonedx-bom"))')"
         if [ ! -x "$SBOM_BIN" ]; then
           echo "SBOM tool not found at $SBOM_BIN"
           ls -la "$(dirname "$SBOM_BIN")"
