@@ -5,6 +5,7 @@ PIP ?= $(PYTHON) -m pip
 BUILD ?= $(PYTHON) -m build
 TWINE ?= $(PYTHON) -m twine
 SBOM_BIN ?= $(shell $(PYTHON) -c "import os,sys; print(os.path.join(os.path.dirname(sys.executable), 'cyclonedx-bom'))")
+SBOM_PY_BIN ?= $(shell $(PYTHON) -c "import os,sys; print(os.path.join(os.path.dirname(sys.executable), 'cyclonedx-py'))")
 GH ?= gh
 VERSION ?= $(shell $(PYTHON) -c "import re, pathlib; print(re.search(r'^version = \"(.*)\"$$', pathlib.Path('pyproject.toml').read_text(), re.M).group(1))")
 TAG ?= v$(VERSION)
@@ -47,7 +48,14 @@ typecheck:
 
 sbom:
 	$(PIP) install --upgrade cyclonedx-bom
-	$(SBOM_BIN) -o sbom.json
+	@if [ -x "$(SBOM_PY_BIN)" ]; then \
+		"$(SBOM_PY_BIN)" environment -o sbom.json; \
+	elif [ -x "$(SBOM_BIN)" ]; then \
+		"$(SBOM_BIN)" -o sbom.json; \
+	else \
+		echo "SBOM tools not found. Ensure cyclonedx-bom is installed in the active Python environment."; \
+		exit 1; \
+	fi
 
 clean:
 	rm -rf dist build src/*.egg-info .pytest_cache
