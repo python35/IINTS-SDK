@@ -99,6 +99,7 @@ def _run_single_patient(job: Dict[str, Any]) -> Dict[str, Any]:
     patient_model_type: str = job.get("patient_model_type", "custom")
 
     try:
+        patient_model: Any
         # --- Instantiate patient model ---
         if patient_model_type == "bergman":
             from iints.core.patient.bergman_model import BergmanPatientModel
@@ -290,7 +291,7 @@ def _compute_aggregate_metrics(df: pd.DataFrame) -> Dict[str, Any]:
     for metric in _METRICS_OF_INTEREST:
         if metric not in df.columns:
             continue
-        values = df[metric].dropna().values
+        values = df[metric].dropna().to_numpy(dtype=float)
         if len(values) == 0:
             continue
         agg[metric] = {
@@ -309,7 +310,7 @@ def _compute_aggregate_safety(df: pd.DataFrame) -> Dict[str, Any]:
     """Population-level safety aggregates."""
     agg: Dict[str, Any] = {}
     if "safety_index_score" in df.columns:
-        scores = df["safety_index_score"].dropna().values
+        scores = df["safety_index_score"].dropna().to_numpy(dtype=float)
         if len(scores) > 0:
             agg["safety_index"] = {
                 "mean": float(np.mean(scores)),
@@ -322,5 +323,5 @@ def _compute_aggregate_safety(df: pd.DataFrame) -> Dict[str, Any]:
         grade_counts = df["safety_grade"].value_counts().to_dict()
         agg["grade_distribution"] = {str(k): int(v) for k, v in grade_counts.items()}
     if "terminated_early" in df.columns:
-        agg["early_termination_rate"] = float(df["terminated_early"].mean())
+        agg["early_termination_rate"] = float(df["terminated_early"].astype(float).mean())
     return agg

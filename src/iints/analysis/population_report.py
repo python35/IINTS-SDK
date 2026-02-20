@@ -171,9 +171,10 @@ class PopulationReportGenerator:
         if hypo_cols:
             path = str(output_dir / "_plot_hypo_risk.png")
             fig, ax = plt.subplots(figsize=(6, 4))
-            data = [df[c].dropna().values for c in hypo_cols]
+            data = [df[c].dropna().astype(float).to_numpy() for c in hypo_cols]
             labels = ["TBR <70 mg/dL (%)", "TBR <54 mg/dL (%)"][:len(data)]
-            bp = ax.boxplot(data, labels=labels, patch_artist=True)
+            bp = ax.boxplot(data, patch_artist=True)
+            ax.set_xticklabels(labels)
             for patch, color in zip(bp["boxes"], [IINTS_BLUE, IINTS_RED]):
                 patch.set_facecolor(color)
                 patch.set_alpha(0.6)

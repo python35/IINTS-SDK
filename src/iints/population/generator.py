@@ -101,6 +101,8 @@ class PopulationGenerator:
         """Return a list of *n_patients* :class:`PatientProfile` instances."""
         n = self.config.n_patients
         base = self.config.base_profile
+        if base is None:
+            base = PatientProfile()
 
         sampled: Dict[str, np.ndarray] = {
             name: self._sample_parameter(dist, n)

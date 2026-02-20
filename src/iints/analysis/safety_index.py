@@ -96,7 +96,7 @@ def _interpret(score: float, penalties: Dict[str, float], weights: Dict[str, flo
 
     # Identify the top penalty contributor
     weighted = {k: weights[k] * _norm(v, NORM_SCALES[k]) for k, v in penalties.items()}
-    top_key = max(weighted, key=weighted.get)
+    top_key = max(weighted, key=lambda k: weighted[k])
     key_labels = {
         "w_below54":    "time critically below 54 mg/dL",
         "w_below70":    "time below 70 mg/dL",
@@ -167,8 +167,8 @@ def _compute_hypo_episode_duration(glucose: pd.Series, time_step_minutes: float)
     An episode starts when glucose drops below 70 mg/dL and ends when it
     rises back above 70 mg/dL.  Returns 0.0 if no episodes.
     """
-    below = (glucose < 70.0).values
-    if not below.any():
+    below = (glucose < 70.0).to_numpy(dtype=bool)
+    if not np.any(below):
         return 0.0
 
     episode_lengths: list[int] = []
@@ -228,7 +228,8 @@ def compute_safety_index(
         weights = dict(weights)  # defensive copy
     _validate_weights(weights)
 
-    glucose = results_df["glucose_actual_mgdl"].astype(float)
+    glucose_series = results_df["glucose_actual_mgdl"].astype(float)
+    glucose = glucose_series.to_numpy(dtype=float)
     n = max(len(glucose), 1)
 
     # --- Component 1: TBR critical < 54 mg/dL (%) ---
@@ -243,10 +244,10 @@ def compute_safety_index(
     supervisor_rate = interventions / duration_hours
 
     # --- Component 4: Mean hypo episode duration (hours) ---
-    mean_episode_hr = _compute_hypo_episode_duration(glucose, time_step_minutes) / 60.0
+    mean_episode_hr = _compute_hypo_episode_duration(glucose_series, time_step_minutes) / 60.0
 
     # --- Component 5: Tail-risk binary (1 if any glucose < 54, else 0) ---
-    tail_risk = 1.0 if (glucose < 54.0).any() else 0.0
+    tail_risk = 1.0 if np.any(glucose < 54.0) else 0.0
 
     penalties: Dict[str, float] = {
         "w_below54":    tbr_critical,
