@@ -12,6 +12,14 @@
 - Added AI research track scaffolding (predictor model, datasets, training/eval scripts).
 - Simulator now supports optional AI predictor injection for proactive safety.
 
+## v0.1.17
+
+- Added Monte Carlo population evaluation with parallel runner, safety index aggregation, and PDF reporting.
+- Added Bergman minimal patient model (UVA/Padova-lite) for physiologic simulations.
+- Added population CLI entrypoint (`iints evaluate`) with seeded runs and confidence intervals.
+- Expanded research pipeline: subject-level splits, OpenAPS-style IOB model, baseline predictors, MC dropout, and quantile loss.
+- Added research-focused tests for population + Bergman model.
+
 ## v0.1.16
 
 - Added dynamic ratio support (ISF/ICR/DIA/Basal) and scenario ratio-change events.

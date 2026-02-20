@@ -1,4 +1,4 @@
-# IINTS-AF SDK: Official Manual (v0.1.16)
+# IINTS-AF SDK: Official Manual (v0.1.17)
 
 The authoritative, up‑to‑date manual lives at:
 
