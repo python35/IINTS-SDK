@@ -215,6 +215,124 @@ def _run_parallel_job(job: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 @app.command()
+def evaluate(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    population: Annotated[int, typer.Option(help="Number of virtual patients to simulate")] = 100,
+    patient_config_name: Annotated[str, typer.Option("--patient-config", help="Base patient configuration name")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option("--patient-config-path", help="Path to base patient config YAML")] = None,
+    scenario_path: Annotated[Optional[Path], typer.Option("--scenario", help="Path to scenario JSON")] = None,
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
+    time_step: Annotated[int, typer.Option(help="Time step in minutes")] = 5,
+    output_dir: Annotated[Optional[Path], typer.Option(help="Output directory")] = None,
+    max_workers: Annotated[Optional[int], typer.Option(help="Max parallel workers (default: all cores)")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed for reproducibility")] = None,
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type: 'custom' or 'bergman'")] = "custom",
+):
+    """
+    Run a Monte Carlo population evaluation of an algorithm.
+
+    Generates N virtual patients with physiological variation, runs each
+    through the simulator in parallel, and reports aggregate TIR, hypo-risk,
+    and Safety Index with 95% confidence intervals.
+
+    Example:
+        iints evaluate --algo my_algo.py --population 500 --seed 42
+    """
+    console = Console()
+    console.print(f"[bold blue]IINTS-AF Population Evaluation[/bold blue]")
+    console.print(f"  Algorithm:       [green]{algo.name}[/green]")
+    console.print(f"  Population size: [cyan]{population}[/cyan]")
+    console.print(f"  Patient model:   [cyan]{patient_model}[/cyan]")
+    console.print(f"  Duration:        {duration} min")
+    console.print()
+
+    # Validate algo file exists
+    _load_algorithm_instance(algo, console)
+
+    patient_config: Union[str, Path] = str(patient_config_path) if patient_config_path else patient_config_name
+    scenario = str(scenario_path) if scenario_path else None
+
+    from iints.highlevel import run_population
+
+    with console.status("[bold green]Running population evaluation...", spinner="dots"):
+        results = run_population(
+            algo_path=str(algo),
+            n_patients=population,
+            scenario=scenario,
+            patient_config=patient_config,
+            duration_minutes=duration,
+            time_step=time_step,
+            seed=seed,
+            output_dir=str(output_dir) if output_dir else None,
+            max_workers=max_workers,
+            patient_model_type=patient_model,
+        )
+
+    report = results["population_report"]
+    agg = report["aggregate_metrics"]
+    safety_agg = report["aggregate_safety"]
+
+    # --- Results table ---
+    table = Table(title=f"Population Evaluation Results (N={population})")
+    table.add_column("Metric", style="cyan", min_width=25)
+    table.add_column("Mean", justify="right", style="green")
+    table.add_column("95% CI", justify="right", style="yellow")
+    table.add_column("Std", justify="right", style="dim")
+
+    _METRIC_DISPLAY = {
+        "tir_70_180": "TIR 70-180 mg/dL (%)",
+        "tir_below_70": "Time <70 mg/dL (%)",
+        "tir_below_54": "Time <54 mg/dL (%)",
+        "tir_above_180": "Time >180 mg/dL (%)",
+        "mean_glucose": "Mean Glucose (mg/dL)",
+        "cv": "Coefficient of Variation (%)",
+        "gmi": "Glucose Management Indicator (%)",
+    }
+
+    for metric_key, stats in agg.items():
+        label = _METRIC_DISPLAY.get(metric_key, metric_key)
+        table.add_row(
+            label,
+            f"{stats['mean']:.1f}",
+            f"[{stats['ci_lower']:.1f}, {stats['ci_upper']:.1f}]",
+            f"{stats['std']:.1f}",
+        )
+
+    if "safety_index" in safety_agg:
+        si = safety_agg["safety_index"]
+        table.add_row(
+            "[bold]Safety Index[/bold]",
+            f"[bold]{si['mean']:.1f}[/bold]",
+            f"[{si['ci_lower']:.1f}, {si['ci_upper']:.1f}]",
+            f"{si['std']:.1f}",
+        )
+
+    console.print(table)
+
+    # --- Grade distribution ---
+    if "grade_distribution" in safety_agg:
+        console.print()
+        grade_table = Table(title="Safety Grade Distribution")
+        grade_table.add_column("Grade", style="bold")
+        grade_table.add_column("Count", justify="right")
+        grade_table.add_column("Percentage", justify="right")
+        for grade in ["A", "B", "C", "D", "F"]:
+            count = safety_agg["grade_distribution"].get(grade, 0)
+            pct = count / population * 100 if population else 0
+            grade_table.add_row(grade, str(count), f"{pct:.1f}%")
+        console.print(grade_table)
+
+    etr = safety_agg.get("early_termination_rate")
+    if etr is not None and etr > 0:
+        console.print(f"\n[yellow]Early termination rate: {etr * 100:.1f}%[/yellow]")
+
+    console.print(f"\n[green]Results saved to:[/green] {results['output_dir']}")
+    console.print(f"  - population_summary.csv")
+    console.print(f"  - population_report.json")
+    console.print(f"  - population_report.pdf")
+
+
+@app.command()
 def init(
     project_name: Annotated[str, typer.Option(help="Name of the project directory")] = "my_iints_project",
 ):

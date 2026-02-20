@@ -52,8 +52,24 @@ from .data.nightscout import NightscoutConfig, import_nightscout
 from .data.tidepool import TidepoolClient, load_openapi_spec
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
-from .highlevel import run_simulation, run_full
+from .highlevel import run_simulation, run_full, run_population
 from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
+
+# Population testing
+from .population import (
+    PopulationGenerator,
+    PopulationConfig,
+    ParameterDistribution,
+    PopulationRunner,
+    PopulationResult,
+    PatientResult,
+)
+
+# Bergman Minimal Model (ODE-based patient)
+try:
+    from .core.patient.bergman_model import BergmanPatientModel
+except ImportError:  # pragma: no cover - scipy may not be installed
+    BergmanPatientModel = None  # type: ignore[assignment,misc]
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
@@ -142,6 +158,16 @@ __all__ = [
     # High-level API
     "run_simulation",
     "run_full",
+    "run_population",
     "ScenarioGeneratorConfig",
     "generate_random_scenario",
+    # Population testing
+    "PopulationGenerator",
+    "PopulationConfig",
+    "ParameterDistribution",
+    "PopulationRunner",
+    "PopulationResult",
+    "PatientResult",
+    # Bergman model
+    "BergmanPatientModel",
 ]

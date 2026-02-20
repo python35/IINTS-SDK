@@ -326,3 +326,126 @@ def run_full(
         outputs["run_manifest_signature"] = str(signature_path)
 
     return outputs
+
+
+# ---------------------------------------------------------------------------
+# Population (Monte Carlo) evaluation
+# ---------------------------------------------------------------------------
+
+def run_population(
+    algo_path: Optional[Union[str, Path]] = None,
+    algo_class_name: Optional[str] = None,
+    n_patients: int = 100,
+    scenario: Optional[Union[str, Path, Dict[str, Any]]] = None,
+    patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = "default_patient",
+    duration_minutes: int = 720,
+    time_step: int = 5,
+    seed: Optional[int] = None,
+    output_dir: Optional[Union[str, Path]] = None,
+    max_workers: Optional[int] = None,
+    safety_config: Optional[SafetyConfig] = None,
+    safety_weights: Optional[Dict[str, float]] = None,
+    patient_model_type: str = "custom",
+    population_cv: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Run a Monte Carlo population evaluation.
+
+    Generates *n_patients* virtual patients with physiological variation
+    around a base profile, runs each through the simulator in parallel,
+    and returns aggregate statistics with 95 % confidence intervals for
+    TIR, hypo-risk, and the IINTS Safety Index.
+    """
+    from iints.population.generator import PopulationConfig, PopulationGenerator
+    from iints.population.runner import PopulationRunner
+    from iints.analysis.population_report import PopulationReportGenerator
+
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    output_path = resolve_output_dir(output_dir, run_id)
+
+    # --- Resolve base patient profile ---
+    patient_params = _resolve_patient_config(patient_config)
+    base_profile = PatientProfile(
+        isf=patient_params.get("insulin_sensitivity", 50.0),
+        icr=patient_params.get("carb_factor", 10.0),
+        basal_rate=patient_params.get("basal_insulin_rate", 0.8),
+        initial_glucose=patient_params.get("initial_glucose", 120.0),
+        insulin_action_duration=patient_params.get("insulin_action_duration", 300.0),
+        dawn_phenomenon_strength=patient_params.get("dawn_phenomenon_strength", 0.0),
+        dawn_start_hour=patient_params.get("dawn_start_hour", 4.0),
+        dawn_end_hour=patient_params.get("dawn_end_hour", 8.0),
+        glucose_decay_rate=patient_params.get("glucose_decay_rate", 0.05),
+        glucose_absorption_rate=patient_params.get("glucose_absorption_rate", 0.03),
+        insulin_peak_time=patient_params.get("insulin_peak_time", 75.0),
+        meal_mismatch_epsilon=patient_params.get("meal_mismatch_epsilon", 1.0),
+    )
+
+    pop_config = PopulationConfig(
+        n_patients=n_patients,
+        base_profile=base_profile,
+        seed=resolved_seed,
+    )
+    if population_cv:
+        for param_name, cv_value in population_cv.items():
+            if param_name in pop_config.parameter_distributions:
+                pop_config.parameter_distributions[param_name].cv = cv_value
+
+    generator = PopulationGenerator(pop_config)
+    profiles = generator.generate()
+
+    # --- Resolve scenario ---
+    scenario_payload = _resolve_scenario_payloads(scenario)
+    stress_event_payloads = (
+        scenario_payload.get("stress_events", []) if scenario_payload else []
+    )
+
+    # --- Run population ---
+    runner = PopulationRunner(
+        algo_path=algo_path,
+        algo_class_name=algo_class_name,
+        scenario_payloads=stress_event_payloads,
+        duration_minutes=duration_minutes,
+        time_step=time_step,
+        base_seed=resolved_seed,
+        max_workers=max_workers,
+        safety_config=safety_config,
+        safety_weights=safety_weights,
+        patient_model_type=patient_model_type,
+    )
+    result = runner.run(profiles)
+
+    # --- Save outputs ---
+    summary_csv = output_path / "population_summary.csv"
+    result.summary_df.to_csv(summary_csv, index=False)
+
+    population_report = {
+        "run_id": run_id,
+        "n_patients": n_patients,
+        "duration_minutes": duration_minutes,
+        "time_step_minutes": time_step,
+        "seed": resolved_seed,
+        "patient_model_type": patient_model_type,
+        "aggregate_metrics": result.aggregate_metrics,
+        "aggregate_safety": result.aggregate_safety,
+    }
+    write_json(output_path / "population_report.json", population_report)
+
+    # --- PDF report ---
+    report_generator = PopulationReportGenerator()
+    report_pdf_path = output_path / "population_report.pdf"
+    report_generator.generate_pdf(
+        summary_df=result.summary_df,
+        aggregate_metrics=result.aggregate_metrics,
+        aggregate_safety=result.aggregate_safety,
+        output_path=str(report_pdf_path),
+    )
+
+    return {
+        "result": result,
+        "run_id": run_id,
+        "output_dir": str(output_path),
+        "population_summary_csv": str(summary_csv),
+        "population_report": population_report,
+        "report_pdf": str(report_pdf_path),
+    }
