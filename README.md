@@ -5,7 +5,11 @@
 [![Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/coverage.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
 [![Docs Coverage](https://raw.githubusercontent.com/python35/IINTS-SDK/main/badges/docs.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/health-badges.yml)
 
-Project site: [python35.github.io/IINTS-Site](https://python35.github.io/IINTS-Site/index.html)
+## Project Links
+* Website: [python35.github.io/IINTS-Site](https://python35.github.io/IINTS-Site/index.html)
+* Documentation: [PUBLIC_DOCUMENTATION.md](docs/PUBLIC_DOCUMENTATION.md)
+* Technical Manual (PDF): [IINTS-AF_SDK_Manual.pdf](docs/manuals/IINTS-AF_SDK_Manual.pdf)
+* Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 <div style="text-align:center;">
   <img src="Ontwerp zonder titel.png" alt="" style="display:block; margin:0 auto;">
