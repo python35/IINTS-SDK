@@ -49,8 +49,8 @@ class PatientFactory:
                 CustomPatientModel(initial_glucose=120, insulin_sensitivity=60),  # Low sensitivity
                 CustomPatientModel(initial_glucose=120, carb_factor=8),          # Fast carb absorption
                 CustomPatientModel(initial_glucose=120, carb_factor=12),         # Slow carb absorption
-                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.03), # Slow metabolism
-                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.07), # Fast metabolism
+                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.0015), # Slow metabolism
+                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.0035), # Fast metabolism
             ]
         else:
             # Use FDA-approved virtual patients

@@ -375,7 +375,7 @@ def run_population(
         dawn_phenomenon_strength=patient_params.get("dawn_phenomenon_strength", 0.0),
         dawn_start_hour=patient_params.get("dawn_start_hour", 4.0),
         dawn_end_hour=patient_params.get("dawn_end_hour", 8.0),
-        glucose_decay_rate=patient_params.get("glucose_decay_rate", 0.05),
+        glucose_decay_rate=patient_params.get("glucose_decay_rate", 0.002),
         glucose_absorption_rate=patient_params.get("glucose_absorption_rate", 0.03),
         insulin_peak_time=patient_params.get("insulin_peak_time", 75.0),
         meal_mismatch_epsilon=patient_params.get("meal_mismatch_epsilon", 1.0),

@@ -18,7 +18,7 @@ class PatientProfile:
     dawn_end_hour: float = 8.0
 
     # Advanced knobs (optional)
-    glucose_decay_rate: float = 0.05
+    glucose_decay_rate: float = 0.002
     glucose_absorption_rate: float = 0.03
     insulin_action_duration: float = 300.0
     insulin_peak_time: float = 75.0
