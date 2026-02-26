@@ -22,6 +22,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    try:
+        import onnxscript  # noqa: F401
+    except Exception as exc:
+        raise SystemExit(
+            "ONNX export requires onnxscript. Install with `pip install iints-sdk-python35[research]`."
+        ) from exc
     model, cfg = load_predictor(args.model)
     model.eval()
 

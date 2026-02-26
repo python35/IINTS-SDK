@@ -40,6 +40,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-basal", type=float, default=20.0, help="Clip basal values above this (U/hr)")
     parser.add_argument("--max-bolus", type=float, default=30.0, help="Clip bolus values above this")
     parser.add_argument("--max-carbs", type=float, default=200.0, help="Clip carb grams above this")
+    parser.add_argument("--isf-default", type=float, default=50.0, help="Fallback ISF (mg/dL per U)")
+    parser.add_argument("--icr-default", type=float, default=10.0, help="Fallback ICR (g/U)")
     # P0-1: Flag to control whether Basal column is U/hr (default: True, correct for AZT1D)
     parser.add_argument(
         "--basal-is-rate",
@@ -195,6 +197,11 @@ def main() -> None:
             df["basal_units"] = (raw_basal / 60.0 * args.time_step)
         else:
             df["basal_units"] = raw_basal
+        # Always keep an estimated basal rate in U/hr for model features
+        if args.basal_is_rate:
+            df["effective_basal_rate_u_per_hr"] = raw_basal
+        else:
+            df["effective_basal_rate_u_per_hr"] = raw_basal * (60.0 / args.time_step)
 
         df["bolus_units"] = _clean_column(df, "TotalBolusInsulinDelivered").clip(upper=args.max_bolus)
         df["correction_units"] = _clean_column(df, "CorrectionDelivered").clip(upper=args.max_bolus)
@@ -225,6 +232,11 @@ def main() -> None:
         )
         df["derived_iob_units"] = iob
         df["derived_cob_grams"] = cob
+        # Align to the generic research feature schema
+        df["patient_iob_units"] = df["derived_iob_units"]
+        df["patient_cob_grams"] = df["derived_cob_grams"]
+        df["effective_isf"] = float(args.isf_default)
+        df["effective_icr"] = float(args.icr_default)
 
         minutes = (
             df["timestamp"].dt.hour * 60
@@ -233,6 +245,12 @@ def main() -> None:
         )
         df["time_of_day_sin"] = np.sin(2 * np.pi * minutes / 1440.0)
         df["time_of_day_cos"] = np.cos(2 * np.pi * minutes / 1440.0)
+
+        # Multimodal placeholders (AZT1D does not provide these)
+        df["steps"] = 0.0
+        df["calories"] = 0.0
+        df["heart_rate"] = 0.0
+        df["sleep_minutes"] = 0.0
 
         df = df[df["glucose_actual_mgdl"] > 0].copy()
         df = df[df["glucose_trend_mgdl_min"].notna()].copy()
@@ -249,6 +267,15 @@ def main() -> None:
                     "carb_grams",
                     "derived_iob_units",
                     "derived_cob_grams",
+                    "patient_iob_units",
+                    "patient_cob_grams",
+                    "effective_isf",
+                    "effective_icr",
+                    "effective_basal_rate_u_per_hr",
+                    "steps",
+                    "calories",
+                    "heart_rate",
+                    "sleep_minutes",
                     "time_of_day_sin",
                     "time_of_day_cos",
                     "device_mode_code",
@@ -277,6 +304,8 @@ def main() -> None:
         "peak_minutes": args.peak_minutes,
         "carb_absorb_minutes": args.carb_absorb_minutes,
         "iob_model": "openaps_bilinear",
+        "effective_isf_default": args.isf_default,
+        "effective_icr_default": args.icr_default,
     }
     args.report.write_text(json.dumps(report, indent=2))
 

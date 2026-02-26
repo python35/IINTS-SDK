@@ -1,0 +1,29 @@
+{
+  "scenario_name": "Chaos: Insulin Stacking",
+  "schema_version": "1.1",
+  "scenario_version": "1.0",
+  "description": "Red-team scenario with repeated false-high CGM values to induce stacked boluses. Use with StackingAIAlgorithm.",
+  "stress_events": [
+    {
+      "start_time": 30,
+      "event_type": "sensor_error",
+      "value": 260
+    },
+    {
+      "start_time": 35,
+      "event_type": "sensor_error",
+      "value": 260
+    },
+    {
+      "start_time": 40,
+      "event_type": "sensor_error",
+      "value": 260
+    },
+    {
+      "start_time": 60,
+      "event_type": "meal",
+      "value": 40,
+      "reported_value": 40
+    }
+  ]
+}

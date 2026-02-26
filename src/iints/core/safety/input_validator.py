@@ -91,5 +91,5 @@ class InputValidator:
     def validate_insulin(self, dose: float) -> float:
         """Validates that a proposed insulin dose is non-negative."""
         if dose < 0:
-            raise ValueError(f"INVALID_DOSE_ERROR: Proposed insulin dose {dose} U cannot be negative.")
+            return 0.0
         return dose

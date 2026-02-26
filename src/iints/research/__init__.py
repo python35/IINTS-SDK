@@ -9,6 +9,7 @@ from .dataset import (
     save_dataset,
 )
 from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
+from .losses import QuantileLoss, SafetyWeightedMSE
 
 __all__ = [
     "PredictorConfig",
@@ -24,4 +25,6 @@ __all__ = [
     "load_predictor",
     "PredictorService",
     "load_predictor_service",
+    "QuantileLoss",
+    "SafetyWeightedMSE",
 ]

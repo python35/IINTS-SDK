@@ -27,6 +27,11 @@ class SafetyConfig:
     predicted_hypoglycemia_threshold: float = 60.0
     predicted_hypoglycemia_horizon_minutes: int = 30
 
+    # Formal safety contract (logic validation)
+    contract_enabled: bool = True
+    contract_glucose_threshold: float = 90.0
+    contract_trend_threshold_mgdl_min: float = -1.0  # -5 mg/dL per 5 minutes
+
     # Simulation termination limits
     critical_glucose_threshold: float = 40.0
     critical_glucose_duration_minutes: int = 30

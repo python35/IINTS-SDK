@@ -34,6 +34,7 @@ class TrainingConfig:
     epochs: int = 20
     batch_size: int = 128
     learning_rate: float = 1e-3
+    weight_decay: float = 0.0
     hidden_size: int = 64
     num_layers: int = 2
     dropout: float = 0.1
@@ -55,3 +56,13 @@ class TrainingConfig:
     # For quantile loss, also set `quantile` (0 < q < 1).
     loss: str = "mse"
     quantile: Optional[float] = None  # e.g. 0.9 for 90th-percentile upper bound
+
+    # Fine-tuning controls
+    freeze_lstm_layers: int = 0          # freeze first N LSTM layers
+    early_stopping_patience: int = 0     # 0 disables early stopping
+    early_stopping_min_delta: float = 0.0
+
+    # Safety-weighted loss (penalize low-glucose errors more strongly)
+    safety_weighted_low_threshold: float = 80.0
+    safety_weighted_alpha: float = 2.0
+    safety_weighted_max_weight: float = 4.0

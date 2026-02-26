@@ -1,0 +1,32 @@
+predictor:
+  history_minutes: 240
+  horizon_minutes: 120
+  time_step_minutes: 5
+  feature_columns:
+    - glucose_actual_mgdl
+    - glucose_trend_mgdl_min
+    - patient_iob_units
+    - patient_cob_grams
+    - effective_isf
+    - effective_icr
+    - effective_basal_rate_u_per_hr
+    - time_of_day_sin
+    - time_of_day_cos
+  target_column: glucose_actual_mgdl
+
+training:
+  epochs: 30
+  batch_size: 128
+  learning_rate: 0.001
+  hidden_size: 96
+  num_layers: 2
+  dropout: 0.2
+  subject_level_split: true
+  validation_split: 0.15
+  test_split: 0.15
+  seed: 42
+  normalization: zscore
+  loss: safety_weighted
+  safety_weighted_low_threshold: 80.0
+  safety_weighted_alpha: 2.0
+  safety_weighted_max_weight: 4.0

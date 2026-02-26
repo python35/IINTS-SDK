@@ -361,11 +361,15 @@ def init(
             algo_content = files("iints.templates").joinpath("default_algorithm.py").read_text()
             scenario_content = files("iints.templates.scenarios").joinpath("example_scenario.json").read_text()
             exercise_content = files("iints.templates.scenarios").joinpath("exercise_stress.json").read_text()
+            stacking_content = files("iints.templates.scenarios").joinpath("chaos_insulin_stacking.json").read_text()
+            runaway_content = files("iints.templates.scenarios").joinpath("chaos_runaway_ai.json").read_text()
         else:
             from importlib import resources
             algo_content = resources.read_text("iints.templates", "default_algorithm.py")
             scenario_content = resources.read_text("iints.templates.scenarios", "example_scenario.json")
             exercise_content = resources.read_text("iints.templates.scenarios", "exercise_stress.json")
+            stacking_content = resources.read_text("iints.templates.scenarios", "chaos_insulin_stacking.json")
+            runaway_content = resources.read_text("iints.templates.scenarios", "chaos_runaway_ai.json")
     except Exception as e:
         console.print(f"[bold red]Error reading template files: {e}[/bold red]")
         raise typer.Exit(code=1)
@@ -381,6 +385,10 @@ def init(
         f.write(scenario_content)
     with open(project_path / "scenarios" / "exercise_stress.json", "w") as f:
         f.write(exercise_content)
+    with open(project_path / "scenarios" / "chaos_insulin_stacking.json", "w") as f:
+        f.write(stacking_content)
+    with open(project_path / "scenarios" / "chaos_runaway_ai.json", "w") as f:
+        f.write(runaway_content)
         
     # Create README
     readme_content = f"""# {project_name}
@@ -1725,6 +1733,180 @@ def research_prepare_azt1d(
     console.print(f"[green]Quality report   :[/green] {report}")
 
 
+@research_app.command("prepare-ohio")
+def research_prepare_ohio(
+    input_dir: Annotated[Path, typer.Option(help="Root directory containing OhioT1DM patient_* folders")] = Path("data_packs/public/ohio_t1dm"),
+    output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv"),
+    report: Annotated[Path, typer.Option(help="Quality report output path")] = Path("data_packs/public/ohio_t1dm/quality_report.json"),
+    time_step: Annotated[int, typer.Option(help="Expected CGM sample interval (minutes)")] = 5,
+    max_gap_multiplier: Annotated[float, typer.Option(help="Segment-break gap multiplier")] = 2.5,
+    dia_minutes: Annotated[float, typer.Option(help="Insulin action duration (minutes)")] = 240.0,
+    peak_minutes: Annotated[float, typer.Option(help="IOB peak time (minutes, OpenAPS bilinear)")] = 75.0,
+    carb_absorb_minutes: Annotated[float, typer.Option(help="Carb absorption duration (minutes)")] = 120.0,
+    max_insulin: Annotated[float, typer.Option(help="Clip insulin units above this")] = 30.0,
+    max_carbs: Annotated[float, typer.Option(help="Clip carb grams above this")] = 200.0,
+    icr_default: Annotated[float, typer.Option(help="Fallback ICR (g/U)")] = 10.0,
+    isf_default: Annotated[float, typer.Option(help="Fallback ISF (mg/dL per U)")] = 50.0,
+    basal_default: Annotated[float, typer.Option(help="Fallback basal rate (U/hr)")] = 0.0,
+    meal_window_min: Annotated[float, typer.Option(help="Meal→insulin matching window (minutes)")] = 30.0,
+    isf_window_min: Annotated[float, typer.Option(help="ISF estimation window (minutes)")] = 60.0,
+    min_meal_carbs: Annotated[float, typer.Option(help="Minimum carbs to consider a meal (g)")] = 5.0,
+    min_bolus: Annotated[float, typer.Option(help="Minimum insulin to consider a bolus (U)")] = 0.1,
+):
+    """
+    Prepare the OhioT1DM dataset for LSTM predictor training.
+
+    Reads per-patient CSVs, derives IOB/COB using the OpenAPS bilinear model,
+    estimates effective ISF/ICR/basal per subject, adds time-of-day features,
+    and writes the merged dataset plus a quality report.
+
+    Example
+    -------
+    iints research prepare-ohio --input-dir data_packs/public/ohio_t1dm --output ohio.parquet
+    """
+    console = Console()
+    if not input_dir.exists():
+        console.print(f"[bold red]Input directory not found: {input_dir}[/bold red]")
+        raise typer.Exit(code=1)
+
+    import subprocess, sys  # noqa: E401
+    cmd = [
+        sys.executable,
+        str(Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py"),
+        "--input", str(input_dir),
+        "--output", str(output),
+        "--report", str(report),
+        "--time-step", str(time_step),
+        "--max-gap-multiplier", str(max_gap_multiplier),
+        "--dia-minutes", str(dia_minutes),
+        "--peak-minutes", str(peak_minutes),
+        "--carb-absorb-minutes", str(carb_absorb_minutes),
+        "--max-insulin", str(max_insulin),
+        "--max-carbs", str(max_carbs),
+        "--icr-default", str(icr_default),
+        "--isf-default", str(isf_default),
+        "--basal-default", str(basal_default),
+        "--meal-window-min", str(meal_window_min),
+        "--isf-window-min", str(isf_window_min),
+        "--min-meal-carbs", str(min_meal_carbs),
+        "--min-bolus", str(min_bolus),
+    ]
+    try:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "_prepare_ohio_t1dm",
+            Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py",
+        )
+        if spec is not None and spec.loader is not None:
+            import sys as _sys
+            _old_argv = _sys.argv[:]
+            _sys.argv = cmd[1:]
+            try:
+                mod = _ilu.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore[union-attr]
+                mod.main()  # type: ignore[attr-defined]
+            finally:
+                _sys.argv = _old_argv
+        else:
+            subprocess.run(cmd, check=True)
+    except Exception as exc:
+        console.print(f"[bold red]prepare-ohio failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Dataset written to:[/green] {output}")
+    console.print(f"[green]Quality report   :[/green] {report}")
+
+
+@research_app.command("prepare-hupa")
+def research_prepare_hupa(
+    input_dir: Annotated[Path, typer.Option(help="Root directory containing HUPA-UCM CSV files")] = Path("data_packs/public/hupa_ucm"),
+    output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv"),
+    report: Annotated[Path, typer.Option(help="Quality report output path")] = Path("data_packs/public/hupa_ucm/quality_report.json"),
+    time_step: Annotated[int, typer.Option(help="Expected CGM sample interval (minutes)")] = 5,
+    max_gap_multiplier: Annotated[float, typer.Option(help="Segment-break gap multiplier")] = 2.5,
+    dia_minutes: Annotated[float, typer.Option(help="Insulin action duration (minutes)")] = 240.0,
+    peak_minutes: Annotated[float, typer.Option(help="IOB peak time (minutes, OpenAPS bilinear)")] = 75.0,
+    carb_absorb_minutes: Annotated[float, typer.Option(help="Carb absorption duration (minutes)")] = 120.0,
+    max_insulin: Annotated[float, typer.Option(help="Clip insulin units above this")] = 30.0,
+    max_carbs: Annotated[float, typer.Option(help="Clip carb grams above this")] = 200.0,
+    carb_serving_grams: Annotated[float, typer.Option(help="Carb serving size (g) for carb_input")] = 10.0,
+    basal_is_rate: Annotated[bool, typer.Option(help="Treat basal_rate as U/hr (convert to U/step)")] = False,
+    icr_default: Annotated[float, typer.Option(help="Fallback ICR (g/U)")] = 10.0,
+    isf_default: Annotated[float, typer.Option(help="Fallback ISF (mg/dL per U)")] = 50.0,
+    basal_default: Annotated[float, typer.Option(help="Fallback basal rate (U/hr)")] = 0.0,
+    meal_window_min: Annotated[float, typer.Option(help="Meal→insulin matching window (minutes)")] = 30.0,
+    isf_window_min: Annotated[float, typer.Option(help="ISF estimation window (minutes)")] = 60.0,
+    min_meal_carbs: Annotated[float, typer.Option(help="Minimum carbs to consider a meal (g)")] = 5.0,
+    min_bolus: Annotated[float, typer.Option(help="Minimum insulin to consider a bolus (U)")] = 0.1,
+):
+    """
+    Prepare the HUPA-UCM dataset for LSTM predictor training.
+
+    Parses per-patient CSVs, derives IOB/COB, estimates ISF/ICR/basal per
+    subject, and writes the merged dataset plus a quality report.
+
+    Example
+    -------
+    iints research prepare-hupa --input-dir data_packs/public/hupa_ucm --output hupa.parquet
+    """
+    console = Console()
+    if not input_dir.exists():
+        console.print(f"[bold red]Input directory not found: {input_dir}[/bold red]")
+        raise typer.Exit(code=1)
+
+    import subprocess, sys  # noqa: E401
+    cmd = [
+        sys.executable,
+        str(Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_hupa_ucm.py"),
+        "--input", str(input_dir),
+        "--output", str(output),
+        "--report", str(report),
+        "--time-step", str(time_step),
+        "--max-gap-multiplier", str(max_gap_multiplier),
+        "--dia-minutes", str(dia_minutes),
+        "--peak-minutes", str(peak_minutes),
+        "--carb-absorb-minutes", str(carb_absorb_minutes),
+        "--max-insulin", str(max_insulin),
+        "--max-carbs", str(max_carbs),
+        "--carb-serving-grams", str(carb_serving_grams),
+        "--icr-default", str(icr_default),
+        "--isf-default", str(isf_default),
+        "--basal-default", str(basal_default),
+        "--meal-window-min", str(meal_window_min),
+        "--isf-window-min", str(isf_window_min),
+        "--min-meal-carbs", str(min_meal_carbs),
+        "--min-bolus", str(min_bolus),
+    ]
+    if basal_is_rate:
+        cmd.append("--basal-is-rate")
+    else:
+        cmd.append("--no-basal-is-rate")
+    try:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "_prepare_hupa_ucm",
+            Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_hupa_ucm.py",
+        )
+        if spec is not None and spec.loader is not None:
+            import sys as _sys
+            _old_argv = _sys.argv[:]
+            _sys.argv = cmd[1:]
+            try:
+                mod = _ilu.module_from_spec(spec)
+                spec.loader.exec_module(mod)  # type: ignore[union-attr]
+                mod.main()  # type: ignore[attr-defined]
+            finally:
+                _sys.argv = _old_argv
+        else:
+            subprocess.run(cmd, check=True)
+    except Exception as exc:
+        console.print(f"[bold red]prepare-hupa failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Dataset written to:[/green] {output}")
+    console.print(f"[green]Quality report   :[/green] {report}")
+
+
 @research_app.command("quality")
 def research_quality(
     report: Annotated[Path, typer.Option(help="Path to quality_report.json produced by prepare-azt1d")] = Path("data_packs/public/azt1d/quality_report.json"),
@@ -1788,6 +1970,35 @@ def research_quality(
             table.add_row(label, val)
 
     console.print(table)
+
+
+@research_app.command("export-onnx")
+def research_export_onnx(
+    model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),
+    out: Annotated[Path, typer.Option(help="Output ONNX file path")] = Path("models/predictor.onnx"),
+):
+    """
+    Export a trained predictor to ONNX for edge/Jetson deployment.
+    """
+    console = Console()
+    if not model.exists():
+        console.print(f"[bold red]Model not found: {model}[/bold red]")
+        raise typer.Exit(code=1)
+
+    import subprocess, sys  # noqa: E401
+    cmd = [
+        sys.executable,
+        str(Path(__file__).parent.parent.parent.parent.parent / "research" / "export_predictor.py"),
+        "--model", str(model),
+        "--out", str(out),
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+    except Exception as exc:
+        console.print(f"[bold red]export-onnx failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]ONNX written to:[/green] {out}")
 
 
 @app.command("import-data")

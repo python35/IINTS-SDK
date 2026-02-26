@@ -93,6 +93,7 @@ class Simulator:
         sensor_model: Optional[SensorModel] = None,
         pump_model: Optional[PumpModel] = None,
         on_step: Optional[Callable[[Dict[str, Any]], Optional[Dict[str, Any]]]] = None,
+        on_safety_event: Optional[Callable[[Dict[str, Any]], None]] = None,
         critical_glucose_threshold: float = 40.0,
         critical_glucose_duration_minutes: int = 30,
         safety_config: Optional[SafetyConfig] = None,
@@ -140,6 +141,7 @@ class Simulator:
         )
         self._init_predictor_settings()
         self.on_step = on_step
+        self.on_safety_event = on_safety_event
         self.meal_queue: List[Dict[str, Any]] = [] # Initialize meal queue for delayed absorption
         self.audit_log_path = audit_log_path
         self.enable_profiling = enable_profiling
@@ -236,6 +238,36 @@ class Simulator:
             except IOError as e:
                 logger.warning("Could not write to audit log file at %s. Error: %s", self.audit_log_path, e)
 
+    def _emit_safety_event(self, payload: Dict[str, Any]) -> None:
+        if not self.on_safety_event:
+            return
+        try:
+            self.on_safety_event(payload)
+        except Exception as exc:
+            logger.warning("on_safety_event callback raised: %s", exc)
+
+    def _validate_glucose_fail_soft(self, glucose_value: float, current_time: float, source: str) -> float:
+        try:
+            return self.input_validator.validate_glucose(glucose_value, current_time)
+        except ValueError as exc:
+            fallback = self.input_validator.last_valid_glucose
+            if fallback is None:
+                fallback = float(
+                    max(self.input_validator.min_glucose, min(glucose_value, self.input_validator.max_glucose))
+                )
+            self._write_audit_log(
+                {
+                    "timestamp": current_time,
+                    "event": "glucose_validation_fail_soft",
+                    "source": source,
+                    "input_value": glucose_value,
+                    "fallback_value": fallback,
+                    "error": str(exc),
+                }
+            )
+            self.input_validator.last_valid_glucose = fallback
+            self.input_validator.last_validation_time = current_time
+            return fallback
     def _apply_ratio_overrides(self, current_time: float) -> Dict[str, float]:
         if self._base_ratio_state is None:
             self._base_ratio_state = self.patient_model.get_ratio_state()
@@ -437,7 +469,9 @@ class Simulator:
             algo_carb_intake_this_step = 0.0
             actual_glucose_reading = self.patient_model.get_current_glucose()
             # Validate the raw sensor reading
-            actual_glucose_reading = self.input_validator.validate_glucose(actual_glucose_reading, float(current_time))
+            actual_glucose_reading = self._validate_glucose_fail_soft(
+                actual_glucose_reading, float(current_time), "sensor_raw"
+            )
             sensor_reading = self.sensor_model.read(actual_glucose_reading, float(current_time))
             glucose_to_algorithm = sensor_reading.value
 
@@ -502,7 +536,9 @@ class Simulator:
 
             # Validate glucose passed to algorithm (could be modified by stress events)
             # This ensures even sensor error stress events are validated
-            glucose_to_algorithm = self.input_validator.validate_glucose(glucose_to_algorithm, float(current_time))
+            glucose_to_algorithm = self._validate_glucose_fail_soft(
+                glucose_to_algorithm, float(current_time), "sensor_to_algo"
+            )
 
             # Apply dynamic ratio overrides (ISF/ICR/DIA/Basal) if any
             ratio_state = self._apply_ratio_overrides(float(current_time))
@@ -603,16 +639,23 @@ class Simulator:
             pump_delivery = self.pump_model.deliver(delivered_insulin, self.time_step)
             delivered_insulin = pump_delivery.delivered_units
 
-            # --- Audit Logging ---
-            self._write_audit_log({
-                "timestamp": current_time,
-                "cgm": actual_glucose_reading,
-                "ai_suggestion": algo_recommended_insulin,
-                "supervisor_override": overridden,
-                "final_dose": delivered_insulin,
-                "safety_reason": safety_reason,
-                "hidden_state_summary": self.algorithm.get_state()
-            })
+            if safety_triggered:
+                self._emit_safety_event(
+                    {
+                        "source": "supervisor",
+                        "time_minutes": current_time,
+                        "glucose_mgdl": glucose_to_algorithm,
+                        "ai_requested_units": algo_recommended_insulin,
+                        "supervisor_approved_units": safety_result["approved_insulin"],
+                        "pump_delivered_units": delivered_insulin,
+                        "safety_level": safety_level.value,
+                        "safety_reason": safety_reason,
+                        "safety_actions": safety_actions,
+                        "predicted_glucose_30min": predicted_glucose_30,
+                        "iob_units": self.patient_model.insulin_on_board,
+                        "cob_grams": self.patient_model.carbs_on_board,
+                    }
+                )
 
             # --- Human-in-the-loop callback ---
             human_intervention = None
@@ -635,9 +678,70 @@ class Simulator:
                     if "additional_carbs" in human_intervention:
                         patient_carb_intake_this_step += float(human_intervention["additional_carbs"])
                     if "override_delivered_insulin" in human_intervention:
-                        delivered_insulin = float(human_intervention["override_delivered_insulin"])
+                        requested_override = float(human_intervention["override_delivered_insulin"])
+                        if requested_override < 0.0:
+                            requested_override = 0.0
+                        # Remove any same-timestamp dose to avoid double-counting in supervisor history
+                        self.supervisor.dose_history = [
+                            (t, d) for (t, d) in self.supervisor.dose_history if t != float(current_time)
+                        ]
+                        override_result = self.supervisor.evaluate_safety(
+                            current_glucose=glucose_to_algorithm,
+                            proposed_insulin=requested_override,
+                            current_time=float(current_time),
+                            current_iob=self.patient_model.insulin_on_board,
+                            predicted_glucose_30min=predicted_glucose_30,
+                            basal_insulin_units=proposed_basal_units,
+                            basal_limit_units=basal_limit_units,
+                        )
+                        delivered_override = override_result["approved_insulin"]
+                        pump_delivery = self.pump_model.deliver(delivered_override, self.time_step)
+                        delivered_insulin = pump_delivery.delivered_units
+                        safety_level = override_result["safety_level"]
+                        safety_actions = "; ".join(override_result["actions_taken"])
+                        safety_reason = override_result.get("safety_reason", safety_reason)
+                        safety_triggered = override_result.get("safety_triggered", safety_triggered)
+                        if override_result.get("safety_triggered", False):
+                            self._emit_safety_event(
+                                {
+                                    "source": "human_override",
+                                    "time_minutes": current_time,
+                                    "glucose_mgdl": glucose_to_algorithm,
+                                    "ai_requested_units": algo_recommended_insulin,
+                                    "human_requested_units": requested_override,
+                                    "supervisor_approved_units": override_result["approved_insulin"],
+                                    "pump_delivered_units": delivered_insulin,
+                                    "safety_level": safety_level.value,
+                                    "safety_reason": safety_reason,
+                                    "safety_actions": safety_actions,
+                                    "predicted_glucose_30min": predicted_glucose_30,
+                                    "iob_units": self.patient_model.insulin_on_board,
+                                    "cob_grams": self.patient_model.carbs_on_board,
+                                }
+                            )
+                        self._write_audit_log(
+                            {
+                                "timestamp": current_time,
+                                "event": "human_override_revalidated",
+                                "requested_override": requested_override,
+                                "approved_override": delivered_override,
+                                "final_dose": delivered_insulin,
+                                "safety_reason": safety_reason,
+                            }
+                        )
                     if human_intervention.get("stop_simulation"):
                         logger.warning("Simulation stopped by human-in-the-loop callback.")
+
+            # --- Audit Logging ---
+            self._write_audit_log({
+                "timestamp": current_time,
+                "cgm": actual_glucose_reading,
+                "ai_suggestion": algo_recommended_insulin,
+                "supervisor_override": overridden,
+                "final_dose": delivered_insulin,
+                "safety_reason": safety_reason,
+                "hidden_state_summary": self.algorithm.get_state()
+            })
 
             # --- Patient Model Update ---
             self.patient_model.update(

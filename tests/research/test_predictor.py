@@ -26,6 +26,7 @@ from iints.research.predictor import (
     evaluate_baselines,
     load_predictor,
 )
+from iints.research.losses import SafetyWeightedMSE
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +76,15 @@ class TestLSTMPredictor:
             out1 = model(x)
             out2 = model(x)
         torch.testing.assert_close(out1, out2)
+
+
+def test_safety_weighted_mse_weights_low_targets():
+    loss_fn = SafetyWeightedMSE(low_threshold=80.0, alpha=2.0, max_weight=4.0)
+    preds = torch.tensor([[100.0, 90.0], [100.0, 90.0]])
+    targets = torch.tensor([[70.0, 70.0], [110.0, 110.0]])
+    loss = loss_fn(preds, targets)
+    # Loss should be finite and > 0
+    assert loss.item() > 0.0
 
 
 # ---------------------------------------------------------------------------

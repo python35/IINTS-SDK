@@ -33,7 +33,12 @@ except Exception:  # pragma: no cover - fallback if torch/device manager import 
 from .core.safety import SafetyConfig, SafetySupervisor
 from .core.devices.models import SensorModel, PumpModel
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
-from .core.algorithms.mock_algorithms import ConstantDoseAlgorithm, RandomDoseAlgorithm
+from .core.algorithms.mock_algorithms import (
+    ConstantDoseAlgorithm,
+    RandomDoseAlgorithm,
+    RunawayAIAlgorithm,
+    StackingAIAlgorithm,
+)
 
 # Data Handling
 from .data.ingestor import DataIngestor
@@ -52,6 +57,7 @@ from .data.nightscout import NightscoutConfig, import_nightscout
 from .data.tidepool import TidepoolClient, load_openapi_spec
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
+from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
 from .highlevel import run_simulation, run_full, run_population
 from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
 
@@ -133,6 +139,8 @@ __all__ = [
     "StandardPumpAlgorithm",
     "ConstantDoseAlgorithm",
     "RandomDoseAlgorithm",
+    "RunawayAIAlgorithm",
+    "StackingAIAlgorithm",
     # Data
     "DataIngestor",
     "ImportResult",
@@ -151,6 +159,8 @@ __all__ = [
     # Analysis Metrics
     "generate_benchmark_metrics",
     "ClinicalReportGenerator",
+    "EnergyEstimate",
+    "estimate_energy_per_decision",
     # Reporting
     "generate_report",
     "generate_quickstart_report",

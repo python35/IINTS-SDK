@@ -30,6 +30,7 @@ from iints.research.dataset import (
     subject_split,
 )
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
+from iints.research.losses import QuantileLoss, SafetyWeightedMSE
 
 
 # ---------------------------------------------------------------------------
@@ -44,6 +45,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", required=True, type=Path, help="YAML config file")
     parser.add_argument("--out", required=True, type=Path, help="Output directory")
     parser.add_argument(
+        "--warm-start",
+        type=Path,
+        default=None,
+        help="Optional path to a pretrained predictor.pt to initialize weights",
+    )
+    parser.add_argument(
         "--registry",
         type=Path,
         default=None,
@@ -52,27 +59,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-# ---------------------------------------------------------------------------
-# P3-12: Quantile (pinball) loss
-# ---------------------------------------------------------------------------
-
-class QuantileLoss(nn.Module):
-    """Pinball / quantile loss for probabilistic forecasting."""
-
-    def __init__(self, quantile: float = 0.9) -> None:
-        super().__init__()
-        if not 0.0 < quantile < 1.0:
-            raise ValueError(f"quantile must be in (0, 1), got {quantile}")
-        self.quantile = quantile
-
-    def forward(self, preds: "torch.Tensor", targets: "torch.Tensor") -> "torch.Tensor":
-        errors = targets - preds
-        loss = torch.where(
-            errors >= 0,
-            self.quantile * errors,
-            (self.quantile - 1.0) * errors,
-        )
-        return loss.mean()
 
 
 # ---------------------------------------------------------------------------
@@ -186,12 +172,14 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Build sequences (boundary-safe)
     # -----------------------------------------------------------------------
+    segment_column = "segment" if "segment" in df.columns else None
     X_train, y_train = build_sequences(
         train_df,
         history_steps=predictor_cfg.history_steps,
         horizon_steps=predictor_cfg.horizon_steps,
         feature_columns=predictor_cfg.feature_columns,
         target_column=predictor_cfg.target_column,
+        segment_column=segment_column,
     )
     X_val, y_val = build_sequences(
         val_df,
@@ -199,6 +187,7 @@ def main() -> None:
         horizon_steps=predictor_cfg.horizon_steps,
         feature_columns=predictor_cfg.feature_columns,
         target_column=predictor_cfg.target_column,
+        segment_column=segment_column,
     )
     X_test, y_test = build_sequences(
         test_df,
@@ -206,6 +195,7 @@ def main() -> None:
         horizon_steps=predictor_cfg.horizon_steps,
         feature_columns=predictor_cfg.feature_columns,
         target_column=predictor_cfg.target_column,
+        segment_column=segment_column,
     )
 
     # -----------------------------------------------------------------------
@@ -244,7 +234,30 @@ def main() -> None:
         dropout=training_cfg.dropout,
         horizon_steps=predictor_cfg.horizon_steps,
     )
-    optimizer = torch.optim.Adam(model.parameters(), lr=training_cfg.learning_rate)
+
+    # Optional warm-start from a pretrained checkpoint (same input size & horizon)
+    if args.warm_start:
+        ckpt = torch.load(args.warm_start, map_location="cpu")
+        state = ckpt.get("state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
+        ckpt_cfg = ckpt.get("config") if isinstance(ckpt, dict) else None
+        if ckpt_cfg:
+            if ckpt_cfg.get("input_size") != X_train.shape[-1]:
+                raise ValueError(
+                    f"Warm-start input size mismatch: checkpoint={ckpt_cfg.get('input_size')}, "
+                    f"current={X_train.shape[-1]}"
+                )
+            if ckpt_cfg.get("horizon_steps") != predictor_cfg.horizon_steps:
+                raise ValueError(
+                    f"Warm-start horizon mismatch: checkpoint={ckpt_cfg.get('horizon_steps')}, "
+                    f"current={predictor_cfg.horizon_steps}"
+                )
+        model.load_state_dict(state, strict=True)
+        print(f"Warm-start: loaded weights from {args.warm_start}")
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, model.parameters()),
+        lr=training_cfg.learning_rate,
+        weight_decay=training_cfg.weight_decay,
+    )
 
     # P3-12: Choose loss function
     if training_cfg.loss == "quantile":
@@ -253,15 +266,48 @@ def main() -> None:
             raise ValueError("training.quantile must be set when training.loss == 'quantile'")
         criterion: nn.Module = QuantileLoss(quantile=q)
         print(f"Loss: quantile (q={q})")
+    elif training_cfg.loss == "safety_weighted":
+        criterion = SafetyWeightedMSE(
+            low_threshold=training_cfg.safety_weighted_low_threshold,
+            alpha=training_cfg.safety_weighted_alpha,
+            max_weight=training_cfg.safety_weighted_max_weight,
+        )
+        print(
+            "Loss: safety_weighted "
+            f"(low<{training_cfg.safety_weighted_low_threshold}, "
+            f"alpha={training_cfg.safety_weighted_alpha}, "
+            f"max_weight={training_cfg.safety_weighted_max_weight})"
+        )
     else:
         criterion = nn.MSELoss()
         print("Loss: MSE")
+
+    # -----------------------------------------------------------------------
+    # Optional layer freezing (fine-tune)
+    # -----------------------------------------------------------------------
+    if training_cfg.freeze_lstm_layers > 0:
+        freeze_n = min(training_cfg.freeze_lstm_layers, training_cfg.num_layers)
+        for name, param in model.lstm.named_parameters():
+            for layer_idx in range(freeze_n):
+                if f"_l{layer_idx}" in name:
+                    param.requires_grad = False
+        print(f"Freeze: first {freeze_n} LSTM layer(s)")
+        # Rebuild optimizer to respect requires_grad flags
+        optimizer = torch.optim.Adam(
+            filter(lambda p: p.requires_grad, model.parameters()),
+            lr=training_cfg.learning_rate,
+            weight_decay=training_cfg.weight_decay,
+        )
 
     # -----------------------------------------------------------------------
     # Training loop
     # -----------------------------------------------------------------------
     metrics: dict = {"train_loss": [], "val_loss": []}
     start = time.time()
+    best_val = float("inf")
+    best_epoch = -1
+    best_state: dict | None = None
+    patience = 0
 
     for epoch in range(training_cfg.epochs):
         model.train()
@@ -281,9 +327,29 @@ def main() -> None:
         metrics["val_loss"].append(val_loss)
         print(f"Epoch {epoch + 1}/{training_cfg.epochs} — train={train_loss:.4f} val={val_loss:.4f}")
 
+        # Early stopping
+        if training_cfg.early_stopping_patience > 0:
+            if val_loss < (best_val - training_cfg.early_stopping_min_delta):
+                best_val = val_loss
+                best_epoch = epoch + 1
+                best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+                patience = 0
+            else:
+                patience += 1
+                if patience >= training_cfg.early_stopping_patience:
+                    print(
+                        f"Early stopping at epoch {epoch + 1} "
+                        f"(best epoch {best_epoch}, best val {best_val:.4f})"
+                    )
+                    break
+
     # -----------------------------------------------------------------------
     # Held-out test evaluation
     # -----------------------------------------------------------------------
+    # Restore best model if early stopping captured a better epoch
+    if best_state is not None:
+        model.load_state_dict(best_state)
+
     test_mse = _evaluate(model, test_loader)
     test_mae = float(
         np.mean(
@@ -349,6 +415,7 @@ def main() -> None:
         "data_sha256": data_sha256,
         "config_path": str(args.config),
         "config_sha256": config_sha256,
+        "warm_start": str(args.warm_start) if args.warm_start else None,
         # Split
         "subject_level_split": training_cfg.subject_level_split,
         "train_subjects": train_subjects,
@@ -362,6 +429,11 @@ def main() -> None:
         "epochs": training_cfg.epochs,
         "normalization": training_cfg.normalization,
         "loss_fn": training_cfg.loss,
+        "weight_decay": training_cfg.weight_decay,
+        "freeze_lstm_layers": training_cfg.freeze_lstm_layers,
+        "early_stopping_patience": training_cfg.early_stopping_patience,
+        "early_stopping_min_delta": training_cfg.early_stopping_min_delta,
+        "best_epoch": best_epoch if best_epoch > 0 else None,
         "train_loss_final": metrics["train_loss"][-1],
         "val_loss_final": metrics["val_loss"][-1],
         "metrics": metrics,

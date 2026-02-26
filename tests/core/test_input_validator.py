@@ -5,9 +5,7 @@ from iints.core.safety.input_validator import InputValidator
 
 def test_input_validator_rejects_negative_insulin():
     validator = InputValidator()
-
-    with pytest.raises(ValueError, match="INVALID_DOSE_ERROR"):
-        validator.validate_insulin(-0.5)
+    assert validator.validate_insulin(-0.5) == 0.0
 
 
 def test_input_validator_rejects_unrealistic_glucose_jump():

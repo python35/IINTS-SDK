@@ -121,6 +121,11 @@ class PumpModel:
         status = "ok"
         reason = "approved"
 
+        if delivered < 0.0:
+            delivered = 0.0
+            status = "clamped"
+            reason = "negative_request"
+
         if self.max_units_per_step is not None and delivered > self.max_units_per_step:
             delivered = self.max_units_per_step
             status = "capped"

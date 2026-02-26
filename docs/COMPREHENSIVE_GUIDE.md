@@ -215,6 +215,46 @@ python research/train_predictor.py --data data/synthetic.parquet --config resear
 python research/evaluate_predictor.py --data data/synthetic.parquet --model models/predictor.pt
 ```
 
+OhioT1DM preparation + training:
+```bash
+python research/prepare_ohio_t1dm.py \
+  --input data_packs/public/ohio_t1dm \
+  --output data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv
+
+python research/train_predictor.py \
+  --data data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv \
+  --config research/configs/predictor_ohio_dual_guard.yaml \
+  --out models/ohio_dual_guard
+```
+Tip: the bundled Ohio pack has only a few subjects. For a stronger model,
+add more subjects and/or pretrain on synthetic/AZT1D, then fine‑tune on Ohio.
+
+HUPA-UCM preparation:
+```bash
+python research/prepare_hupa_ucm.py \
+  --input data_packs/public/hupa_ucm \
+  --output data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv
+```
+
+AZT1D → HUPA fine‑tuning:
+```bash
+python research/train_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --config research/configs/predictor_multimodal_dual_guard.yaml \
+  --out models/pretrain_azt1d
+
+python research/train_predictor.py \
+  --data data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv \
+  --config research/configs/predictor_multimodal_dual_guard_finetune.yaml \
+  --warm-start models/pretrain_azt1d/predictor.pt \
+  --out models/hupa_finetuned
+```
+
+ONNX export (edge/Jetson):
+```bash
+iints research export-onnx --model models/hupa_finetuned_v2/predictor.pt --out models/hupa_finetuned_v2/predictor.onnx
+```
+
 Integration:
 ```python
 from iints.research import load_predictor_service
@@ -272,6 +312,75 @@ The safety report includes:
 - Bolus interventions
 - Recent safety events
 
+### 10.1 Formal Safety Contract (Logic Validation)
+
+Because the supervisor is deterministic, the SDK ships with a **formal safety contract** you can test exhaustively.
+By default, insulin is inhibited when:
+
+```
+glucose < 90 mg/dL AND trend <= -5 mg/dL per 5 minutes
+```
+
+These thresholds are configurable in `SafetyConfig`:
+
+```python
+from iints.core.safety import SafetyConfig
+
+config = SafetyConfig(
+    contract_enabled=True,
+    contract_glucose_threshold=90.0,
+    contract_trend_threshold_mgdl_min=-1.0,  # -5 mg/dL per 5 minutes
+)
+```
+
+Unit tests iterate across glucose/trend grids to prove no unsafe dose can pass this contract.
+
+### 10.2 Red‑Team Scenarios (Chaos Testing)
+
+For robust safety validation, the SDK includes chaos scenarios and stress algorithms:
+
+* `StackingAIAlgorithm` + `chaos_insulin_stacking.json`
+* `RunawayAIAlgorithm` + `chaos_runaway_ai.json`
+
+Example CLI run:
+
+```bash
+iints run --algo algorithms/stacking_ai.py --scenario-path scenarios/chaos_insulin_stacking.json
+```
+
+### 10.3 SafetyEvent Callback (Trust API)
+
+When the supervisor intervenes, you can capture the reason and display it to the user:
+
+```python
+def on_safety_event(event):
+    print(
+        f"AI requested {event['ai_requested_units']:.2f}U, "
+        f"approved {event['supervisor_approved_units']:.2f}U "
+        f"because: {event['safety_reason']}"
+    )
+
+sim = Simulator(patient_model=patient, algorithm=algo, on_safety_event=on_safety_event)
+```
+
+This makes the safety system **auditable and explainable** in demos or UIs.
+
+### 10.4 Edge Efficiency (Battery & Resource Impact)
+
+Safety checks are extremely lightweight. You can estimate energy per decision using:
+
+```
+Energy (J) = Power (W) × Time (s)
+```
+
+Example: at 5W and 0.002 ms per safety decision,
+```
+Energy ≈ 5 × 0.000002 = 0.00001 J (10 µJ)
+```
+
+This makes on‑device deployment feasible even on low‑power hardware. Use your device’s real power budget for a precise estimate.
+The SDK is pure Python and runs on any device that can run Python 3.10+ (optional GPU for training only).
+
 ## 11. Precision Telemetry (Profiling)
 
 Enable latency profiling on the simulator to measure:
@@ -298,6 +407,21 @@ Audit trail + PDF report example:
 
 ```bash
 python3 examples/audit_and_report.py
+```
+
+Demo showcase script (researcher/clinician/company demo):
+
+```bash
+python3 examples/demo_showcase.py --output-dir results/demo_showcase
+```
+
+Paper-aligned Dual-Guard predictor configuration:
+
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --config research/configs/predictor_paper_dual_guard.yaml \
+  --out models/paper_dual_guard
 ```
 
 ## 13. Development Workflow

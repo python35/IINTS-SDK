@@ -7,9 +7,16 @@ from enum import Enum
 
 class SafetyLevel(Enum):
     SAFE = "safe"
-    WARNING = "warning" 
+    WARNING = "warning"
     CRITICAL = "critical"
     EMERGENCY = "emergency"
+
+_SAFETY_RANK = {
+    SafetyLevel.SAFE: 0,
+    SafetyLevel.WARNING: 1,
+    SafetyLevel.CRITICAL: 2,
+    SafetyLevel.EMERGENCY: 3,
+}
 
 @dataclass
 class SafetyViolation:
@@ -47,6 +54,9 @@ class IndependentSupervisor:
                  hypo_cutoff=70.0,               # mg/dL
                  predicted_hypoglycemia_threshold=60.0,  # mg/dL
                  predicted_hypoglycemia_horizon_minutes=30,  # minutes
+                 contract_enabled: bool = True,
+                 contract_glucose_threshold: float = 90.0,
+                 contract_trend_threshold_mgdl_min: float = -1.0,
                  safety_config: Optional["SafetyConfig"] = None):
         
         if safety_config is not None:
@@ -61,6 +71,9 @@ class IndependentSupervisor:
             hypo_cutoff = safety_config.hypo_cutoff
             predicted_hypoglycemia_threshold = safety_config.predicted_hypoglycemia_threshold
             predicted_hypoglycemia_horizon_minutes = safety_config.predicted_hypoglycemia_horizon_minutes
+            contract_enabled = safety_config.contract_enabled
+            contract_glucose_threshold = safety_config.contract_glucose_threshold
+            contract_trend_threshold_mgdl_min = safety_config.contract_trend_threshold_mgdl_min
 
         self.hypoglycemia_threshold = hypoglycemia_threshold
         self.severe_hypoglycemia_threshold = severe_hypoglycemia_threshold
@@ -73,6 +86,9 @@ class IndependentSupervisor:
         self.hypo_cutoff = hypo_cutoff
         self.predicted_hypoglycemia_threshold = predicted_hypoglycemia_threshold
         self.predicted_hypoglycemia_horizon_minutes = predicted_hypoglycemia_horizon_minutes
+        self.contract_enabled = contract_enabled
+        self.contract_glucose_threshold = contract_glucose_threshold
+        self.contract_trend_threshold_mgdl_min = contract_trend_threshold_mgdl_min
         
         # State tracking
         self.glucose_history: List[Tuple[float, float]] = []
@@ -125,7 +141,7 @@ class IndependentSupervisor:
                     f"BASAL_LIMIT: basal {basal_insulin_units:.2f}U exceeds "
                     f"limit {basal_limit_units:.2f}U"
                 )
-                safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+                safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
         # 1. Hard Hypo Cutoff (absolute stop)
         if current_glucose <= self.hypo_cutoff:
@@ -155,28 +171,44 @@ class IndependentSupervisor:
         if glucose_rate <= self.trend_stop:
             proposed_insulin = 0
             actions_taken.append(f"NEGATIVE_TREND_LIMIT: Glucose dropping at {glucose_rate:.2f} mg/dL/min")
-            safety_status = max(safety_status, SafetyLevel.CRITICAL, key=lambda x: x.value)
+            safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
+
+        # 3b. Formal safety contract (logic validation)
+        if self.contract_enabled:
+            if (
+                current_glucose < self.contract_glucose_threshold
+                and glucose_rate <= self.contract_trend_threshold_mgdl_min
+            ):
+                proposed_insulin = 0
+                actions_taken.append(
+                    "SAFETY_CONTRACT: Inhibit insulin when glucose < "
+                    f"{self.contract_glucose_threshold:.0f} and trend <= "
+                    f"{self.contract_trend_threshold_mgdl_min:.2f} mg/dL/min"
+                )
+                safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
 
         # 4. Dynamic IOB Clamp
         if current_iob >= self.max_iob:
             proposed_insulin = 0
             actions_taken.append(f"MAX_IOB_REACHED: IOB {current_iob:.2f}U exceeds {self.max_iob:.2f}U")
-            safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+            safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 5. Insulin Dose Limits
         if proposed_insulin > self.max_insulin_per_bolus:
             proposed_insulin = self.max_insulin_per_bolus
             actions_taken.append(f"LIMIT: Bolus capped at {self.max_insulin_per_bolus}U")
-            safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+            safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
         # 6. Insulin Stacking Check (using IOB)
         # If IOB is high, be more conservative with additional insulin.
         if current_iob > self.max_insulin_per_bolus: # Use max_bolus as proxy for "high IOB"
             if current_glucose < 150: # Don't stack if not significantly high
-                reduction_factor = max(0, (150 - current_glucose) / 100) # Reduce more aggressively closer to 100
+                reduction_factor = max(0.0, (150 - current_glucose) / 100.0) # Reduce more aggressively closer to 100
+                if reduction_factor > 1.0:
+                    reduction_factor = 1.0
                 proposed_insulin *= (1 - reduction_factor)
                 actions_taken.append(f"CAUTION: High IOB ({current_iob:.2f}U) - insulin reduced to prevent stacking")
-                safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+                safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 7. Glucose Rate of Change (legacy alarm)
         if len(self.glucose_history) >= 2:
@@ -184,7 +216,7 @@ class IndependentSupervisor:
                 if glucose_rate < -self.glucose_rate_alarm and proposed_insulin > 0:
                     proposed_insulin *= 0.5  # Reduce insulin if glucose dropping fast
                     actions_taken.append("CAUTION: Fast glucose drop - insulin reduced")
-                    safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+                    safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 8. Hard Time-Window Cap (last 60 minutes)
         if proposed_insulin > 0:
@@ -198,8 +230,14 @@ class IndependentSupervisor:
                     actions_taken.append(
                         f"WINDOW_CAP_EXCEEDED: 60min cap {self.max_60min:.2f}U reached"
                     )
-                    safety_status = max(safety_status, SafetyLevel.WARNING, key=lambda x: x.value)
+                    safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
             self.dose_history.append((current_time, proposed_insulin))
+
+        # Final clamp: never allow negative insulin
+        if proposed_insulin < 0.0:
+            proposed_insulin = 0.0
+            actions_taken.append("NEGATIVE_DOSE_CLAMPED: Insulin dose clamped to 0")
+            safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
         # 9. Emergency Mode Recovery
         if self.emergency_mode and current_glucose > self.hypoglycemia_threshold + 20:
@@ -237,6 +275,10 @@ class IndependentSupervisor:
             "safety_reason": decision.reason,
             "safety_triggered": decision.triggered,
         }
+
+    @staticmethod
+    def _max_level(current: SafetyLevel, candidate: SafetyLevel) -> SafetyLevel:
+        return candidate if _SAFETY_RANK[candidate] > _SAFETY_RANK[current] else current
     
     def _calculate_glucose_rate(self) -> float:
         """Calculate glucose rate of change in mg/dL per minute."""

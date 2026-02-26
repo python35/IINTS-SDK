@@ -51,6 +51,59 @@ PYTHONPATH=src python3 research/train_predictor.py \
   --out models/azt1d_predictor_full
 ```
 
+OhioT1DM (CGM + insulin + carbs) preparation and training:
+```bash
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input data_packs/public/ohio_t1dm \
+  --output data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv
+
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv \
+  --config research/configs/predictor_ohio_dual_guard.yaml \
+  --out models/ohio_dual_guard
+```
+Note: The bundled Ohio pack in this repo contains only a few subjects. For a
+research‑grade model, add more subjects and/or pretrain on synthetic/AZT1D,
+then fine‑tune on OhioT1DM.
+
+HUPA-UCM (CGM + insulin + carbs + activity) preparation:
+```bash
+PYTHONPATH=src python3 research/prepare_hupa_ucm.py \
+  --input data_packs/public/hupa_ucm \
+  --output data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv
+```
+
+“Enormous” model recipe (AZT1D → HUPA fine‑tune):
+```bash
+# 1) Pretrain on AZT1D (multimodal config; extra channels are zero-filled)
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --config research/configs/predictor_multimodal_dual_guard.yaml \
+  --out models/pretrain_azt1d
+
+# 2) Fine-tune on HUPA-UCM using warm-start (lower LR + early stopping)
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv \
+  --config research/configs/predictor_multimodal_dual_guard_finetune.yaml \
+  --warm-start models/pretrain_azt1d/predictor.pt \
+  --out models/hupa_finetuned
+```
+
+Export to ONNX (edge/Jetson):
+```bash
+PYTHONPATH=src python3 research/export_predictor.py \
+  --model models/hupa_finetuned_v2/predictor.pt \
+  --out models/hupa_finetuned_v2/predictor.onnx
+```
+
+Paper-aligned Dual-Guard predictor (safety-weighted loss, 120-min horizon):
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --config research/configs/predictor_paper_dual_guard.yaml \
+  --out models/paper_dual_guard
+```
+
 ## Training
 ```bash
 python research/train_predictor.py --data data/training.parquet --config research/configs/predictor.yaml --out models
