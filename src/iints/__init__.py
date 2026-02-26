@@ -3,7 +3,7 @@
 import pandas as pd # Required for type hints like pd.DataFrame
 from typing import Optional
 
-__version__ = "0.0.18"
+__version__ = "0.1.18"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.

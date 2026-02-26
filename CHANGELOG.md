@@ -4,7 +4,7 @@
 
 - (empty)
 
-## v0.0.18
+## v0.1.18
 
 - Multimodal predictor training pipeline with warm-start fine‑tuning and early stopping.
 - Added HUPA‑UCM and OhioT1DM preparation scripts + configs.
