@@ -2,15 +2,17 @@
 
 ## Unreleased
 
-- Default run provenance: `config.json`, `run_metadata.json`, and `run_manifest.json` for every run.
-- Deterministic seeds by default with per-run `run_id` and standardized output layout.
-- Scenario schema versioning + migration tooling (`iints scenarios migrate`).
-- Benchmark suite emits standardized summary + manifest; runs are now seeded.
-- Dataset manager adds `iints data cite` and always writes SHA256SUMS.txt.
-- Algorithm plugin registry with `iints algorithms list/info` + entry points.
-- CI now includes SBOM generation + `pip-audit`, and Python 3.12 in the test matrix.
-- Added AI research track scaffolding (predictor model, datasets, training/eval scripts).
-- Simulator now supports optional AI predictor injection for proactive safety.
+- (empty)
+
+## v0.0.18
+
+- Multimodal predictor training pipeline with warm-start fine‑tuning and early stopping.
+- Added HUPA‑UCM and OhioT1DM preparation scripts + configs.
+- Added SafetyWeighted and Quantile loss modules with robust torch guards.
+- Added chaos‑test algorithms, scenarios, and safety‑event callback support.
+- Demo showcase supports predictor integration + optional ONNX export.
+- Added ONNX export CLI and research extras for edge deployment.
+- Updated docs with end‑to‑end training + export steps.
 
 ## v0.1.17
 
