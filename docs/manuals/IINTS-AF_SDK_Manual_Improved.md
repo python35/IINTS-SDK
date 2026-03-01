@@ -1,5 +1,5 @@
 # IINTS-AF SDK Technical Reference Manual
-Version 0.1.17 | Python SDK
+Version 0.1.19 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -7,6 +7,31 @@ This SDK is intended for research, simulation, and algorithm validation.
 It has NOT received FDA clearance or CE marking for clinical use.
 
 ---
+
+## How to Use This Manual (Read First)
+
+This manual is long. Use this map to find what you need fast:
+- **Full SDK overview:** `docs/COMPREHENSIVE_GUIDE.md`
+- **CLI reference:** `docs/TECHNICAL_README.md`
+- **Research track (predictor training):** `research/README.md`
+- **Notebooks:** `examples/notebooks/README.md`
+
+Recommended notebook order (best for new users):
+- `00_Quickstart.ipynb` — run a full simulation
+- `01_Presets_and_Scenarios.ipynb` — scenarios + presets
+- `02_Safety_and_Supervisor.ipynb` — safety checks
+- `03_Audit_Trail_and_Report.ipynb` — audit trail + PDF
+- `04_Baseline_and_Metrics.ipynb` — metrics & baselines
+- `05_Devices_and_HumanInLoop.ipynb` — pumps/sensors + manual override
+- `06_Optional_Torch_LSTM.ipynb` — predictor training
+- `07_Ablation_Supervisor.ipynb` — safety ablation
+- `08_Data_Registry_and_Import.ipynb` — data import + registry
+
+Quick task routing:
+- **Run a simulation fast:** Section 2.2
+- **Customize safety limits:** Section 4.2
+- **Generate audit report:** Section 5.4
+- **Train an AI predictor:** Section 8.2 + `research/README.md`
 
 ## Table of Contents
 
@@ -1519,7 +1544,7 @@ SafetyConfig(
   author = {Bobbaers, Rune},
   title = {IINTS-AF: Intelligent Insulin Titration System for Artificial Pancreas},
   year = {2026},
-  version = {0.1.17},
+  version = {0.1.19},
   url = {https://github.com/python35/IINTS-SDK},
   note = {Pre-clinical research software for insulin dosing algorithm validation}
 }

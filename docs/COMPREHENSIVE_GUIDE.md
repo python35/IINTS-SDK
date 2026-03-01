@@ -2,6 +2,25 @@
 
 This document provides a complete, end-to-end manual for the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, data formats, safety features, profiling, examples, and development workflows.
 
+## Documentation Map (Start Here)
+
+Use this map if you are new to the SDK:
+- **Hands-on learning:** `examples/notebooks/README.md`
+- **CLI reference:** `docs/TECHNICAL_README.md`
+- **Research pipeline:** `research/README.md`
+- **PDF manual:** `docs/manuals/IINTS-AF_SDK_Manual_Improved.md`
+
+Recommended notebook order:
+- `00_Quickstart.ipynb`
+- `01_Presets_and_Scenarios.ipynb`
+- `02_Safety_and_Supervisor.ipynb`
+- `03_Audit_Trail_and_Report.ipynb`
+- `04_Baseline_and_Metrics.ipynb`
+- `05_Devices_and_HumanInLoop.ipynb`
+- `06_Optional_Torch_LSTM.ipynb`
+- `07_Ablation_Supervisor.ipynb`
+- `08_Data_Registry_and_Import.ipynb`
+
 ## 1. Introduction to IINTS-AF SDK
 
 The IINTS-AF SDK is designed for researchers and developers to create, simulate, and benchmark insulin delivery algorithms for artificial pancreas systems. It provides a robust framework for patient simulation, data handling, and algorithm evaluation, alongside tools for documentation and continuous integration.

@@ -10,7 +10,12 @@ Use this folder as the single source of truth for public docs.
 - `OFFICIAL_MANUAL.md` — pointers to the canonical manual
 
 ## Manuals
+- `manuals/IINTS-AF_SDK_Manual_Improved.md`
+- `manuals/IINTS-AF_SDK_Manual_Improved_clean.md`
 - `manuals/IINTS-AF_SDK_Manual.pdf`
+
+## Notebooks
+- `../examples/notebooks/README.md` — ordered learning path and Colab links
 
 ## Legal
 - `../PRIVACY_POLICY.md`
