@@ -21,6 +21,7 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{needspace}
+\usepackage{etoolbox}
 \usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{listings}
@@ -45,6 +46,15 @@
 \renewcommand{\subsection}{\Needspace{5\baselineskip}\oldsubsection}
 \let\oldsubsubsection\subsubsection
 \renewcommand{\subsubsection}{\Needspace{4\baselineskip}\oldsubsubsection}
+
+% Keep grouped content together
+\AtBeginEnvironment{itemize}{\needspace{5\baselineskip}}
+\AtBeginEnvironment{enumerate}{\needspace{5\baselineskip}}
+\AtBeginEnvironment{longtable}{\needspace{8\baselineskip}}
+\AtBeginEnvironment{table}{\needspace{8\baselineskip}}
+\AtBeginEnvironment{figure}{\needspace{8\baselineskip}}
+\AtBeginEnvironment{Shaded}{\needspace{8\baselineskip}}
+\AtBeginEnvironment{Highlighting}{\needspace{8\baselineskip}}
 
 \pagestyle{fancy}
 \fancyhf{}

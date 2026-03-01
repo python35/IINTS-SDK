@@ -21,9 +21,7 @@ build_pdf () {
     --output "$output"
 }
 
-build_pdf "$MANUAL_DIR/IINTS-AF_SDK_Manual_Improved.md" "$MANUAL_DIR/IINTS-AF_SDK_Manual_Improved.pdf"
-build_pdf "$MANUAL_DIR/IINTS-AF_SDK_Manual_Improved_clean.md" "$MANUAL_DIR/IINTS-AF_SDK_Manual_Improved_clean.pdf"
+build_pdf "$MANUAL_DIR/IINTS-AF_SDK_Manual.md" "$MANUAL_DIR/IINTS-AF_SDK_Manual.pdf"
 
 echo "Manuals built:"
-echo " - $MANUAL_DIR/IINTS-AF_SDK_Manual_Improved.pdf"
-echo " - $MANUAL_DIR/IINTS-AF_SDK_Manual_Improved_clean.pdf"
+echo " - $MANUAL_DIR/IINTS-AF_SDK_Manual.pdf"
