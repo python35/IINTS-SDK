@@ -120,17 +120,17 @@ The IINTS-AF SDK (Intelligent Insulin Titration System for Artificial Pancreas) 
 
 ### Key Capabilities
 
-✅ **Plug-and-play algorithm architecture** - Implement one method, get full simulation
-✅ **9-layer Independent Safety Supervisor** - Deterministic override guarantees
-✅ **Realistic device models** - CGM sensor and insulin pump error simulation
-✅ **Commercial pump emulators** - Medtronic 780G, Omnipod 5, Tandem Control-IQ
-✅ **Clinical metrics** - TIR, GMI, CV, LBGI, HBGI per ATTD/ADA guidelines
-✅ **Complete audit trail** - JSONL + CSV + JSON summary with integrity hashing
-✅ **PDF clinical reports** - Visual reports with glucose traces and safety summaries
-✅ **Benchmark mode** - Head-to-head algorithm comparison
-✅ **Real-world data import** - Dexcom, Libre, Nightscout, AIDE/PEDAP, AZT1D, HUPA-UCM
-✅ **Optional AI predictor** - Proactive glucose forecasting
-✅ **Reproducible runs** - Seeded randomness and signable manifests
+[OK] **Plug-and-play algorithm architecture** - Implement one method, get full simulation
+[OK] **9-layer Independent Safety Supervisor** - Deterministic override guarantees
+[OK] **Realistic device models** - CGM sensor and insulin pump error simulation
+[OK] **Commercial pump emulators** - Medtronic 780G, Omnipod 5, Tandem Control-IQ
+[OK] **Clinical metrics** - TIR, GMI, CV, LBGI, HBGI per ATTD/ADA guidelines
+[OK] **Complete audit trail** - JSONL + CSV + JSON summary with integrity hashing
+[OK] **PDF clinical reports** - Visual reports with glucose traces and safety summaries
+[OK] **Benchmark mode** - Head-to-head algorithm comparison
+[OK] **Real-world data import** - Dexcom, Libre, Nightscout, AIDE/PEDAP, AZT1D, HUPA-UCM
+[OK] **Optional AI predictor** - Proactive glucose forecasting
+[OK] **Reproducible runs** - Seeded randomness and signable manifests
 
 ### Intended Use
 
@@ -483,16 +483,16 @@ generator.generate_pdf(
 
 **Recommended Next Steps:**
 
-1. ✅ Complete the Getting Started guide
-2. 📊 Run benchmark comparisons
-3. 🔬 Test with stress scenarios
-4. 📈 Import real CGM data
-5. 🤖 Explore AI predictor integration
-6. 📝 Generate clinical reports
-7. 🎓 Review safety architecture
-8. 🔧 Customize patient profiles
-9. 📦 Package algorithm for distribution
-10. 📢 Share results with community
+1. [OK] Complete the Getting Started guide
+2. [Metrics] Run benchmark comparisons
+3. [Research] Test with stress scenarios
+4. [Performance] Import real CGM data
+5. [AI] Explore AI predictor integration
+6. [Notes] Generate clinical reports
+7. [Training] Review safety architecture
+8. [Tools] Customize patient profiles
+9. [Package] Package algorithm for distribution
+10. [Announcement] Share results with community
 
 **Need Help?**
 - Check Troubleshooting section (9.0)
@@ -558,11 +558,11 @@ generator.generate_pdf(
 ### 3.3 Safety Layer Integration
 
 The Independent Safety Supervisor runs **deterministically** and can:
-- ✅ Override dangerous algorithm requests
-- ✅ Log all interventions with reasons
-- ✅ Enforce hard limits (hypoglycemia protection)
-- ✅ Apply dynamic limits (IOB clamping)
-- ✅ Validate all inputs/outputs
+- [OK] Override dangerous algorithm requests
+- [OK] Log all interventions with reasons
+- [OK] Enforce hard limits (hypoglycemia protection)
+- [OK] Apply dynamic limits (IOB clamping)
+- [OK] Validate all inputs/outputs
 
 **Key Principle:** Safety layer is **always active** and cannot be disabled.
 
