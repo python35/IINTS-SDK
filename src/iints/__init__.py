@@ -3,7 +3,7 @@
 import pandas as pd # Required for type hints like pd.DataFrame
 from typing import Optional
 
-__version__ = "0.1.18"
+__version__ = "0.1.19"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
@@ -20,6 +20,7 @@ from .api.base_algorithm import (
 # Core Simulation Components
 from .core.simulator import Simulator, StressEvent, SimulationLimitError
 from .core.patient.models import PatientModel
+from .core.patient.patient_factory import PatientFactory
 from .core.patient.profile import PatientProfile
 try:
     from .core.device_manager import DeviceManager
@@ -130,6 +131,7 @@ __all__ = [
     "InsulinAlgorithm", "AlgorithmInput", "AlgorithmResult", "AlgorithmMetadata", "WhyLogEntry",
     # Core
     "Simulator", "StressEvent", "PatientModel", "DeviceManager",
+    "PatientFactory",
     "PatientProfile",
     "SimulationLimitError",
     "SafetySupervisor",

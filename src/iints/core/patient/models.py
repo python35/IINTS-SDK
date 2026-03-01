@@ -16,6 +16,7 @@ class CustomPatientModel:
     def __init__(self, basal_insulin_rate: float = 0.8, insulin_sensitivity: float = 50.0,
                  carb_factor: float = 10.0, glucose_decay_rate: float = 0.002,
                  initial_glucose: float = 120.0, glucose_absorption_rate: float = 0.03,
+                 basal_glucose_target: Optional[float] = None,
                  insulin_action_duration: float = 300.0, # minutes, e.g., 5 hours
                  insulin_peak_time: float = 75.0, # minutes
                  meal_mismatch_epsilon: float = 1.0, # Factor for meal mismatch
@@ -43,6 +44,7 @@ class CustomPatientModel:
         self.carb_factor = carb_factor
         self.glucose_decay_rate = glucose_decay_rate
         self.glucose_absorption_rate = glucose_absorption_rate
+        self.basal_glucose_target = basal_glucose_target if basal_glucose_target is not None else initial_glucose
         self.insulin_action_duration = insulin_action_duration
         self.insulin_peak_time = insulin_peak_time
         self.meal_mismatch_epsilon = meal_mismatch_epsilon
@@ -182,7 +184,8 @@ class CustomPatientModel:
 
 
         # --- Basal metabolic glucose production/consumption (simplified) ---
-        basal_glucose_change = -self.glucose_decay_rate * self.current_glucose * time_step
+        # Homeostatic drift toward a basal target (prevents runaway decline)
+        basal_glucose_change = -self.glucose_decay_rate * (self.current_glucose - self.basal_glucose_target) * time_step
 
         # --- Dawn phenomenon effect ---
         dawn_effect = 0.0

@@ -95,7 +95,10 @@ class RunawayAIAlgorithm(InsulinAlgorithm):
 
     def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
         trend = data.glucose_trend_mgdl_min
-        if data.current_glucose <= self.trigger_glucose or (trend is not None and trend < 0):
+        current_glucose = data.current_glucose
+        if current_glucose is None:
+            dose = 0.0
+        elif current_glucose <= self.trigger_glucose or (trend is not None and trend < 0):
             dose = self.max_bolus
         else:
             dose = 0.0

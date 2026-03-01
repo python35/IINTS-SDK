@@ -42,6 +42,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-carbs", type=float, default=200.0, help="Clip carb grams above this")
     parser.add_argument("--isf-default", type=float, default=50.0, help="Fallback ISF (mg/dL per U)")
     parser.add_argument("--icr-default", type=float, default=10.0, help="Fallback ICR (g/U)")
+    parser.add_argument(
+        "--no-filter-meals-without-rise",
+        action="store_true",
+        help="Disable filtering meal events that do not produce a glucose rise.",
+    )
+    parser.add_argument("--meal-rise-threshold", type=float, default=10.0, help="Min glucose rise to keep meal (mg/dL)")
+    parser.add_argument("--meal-pre-window", type=float, default=10.0, help="Minutes before meal for baseline")
+    parser.add_argument("--meal-post-window", type=float, default=90.0, help="Minutes after meal for rise detection")
     # P0-1: Flag to control whether Basal column is U/hr (default: True, correct for AZT1D)
     parser.add_argument(
         "--basal-is-rate",
@@ -57,6 +65,34 @@ def _clean_column(df: pd.DataFrame, name: str, default: float = 0.0) -> pd.Serie
     if name not in df.columns:
         return pd.Series(default, index=df.index)
     return pd.to_numeric(df[name], errors="coerce").fillna(default)
+
+
+def _filter_meals_by_response(df: pd.DataFrame, args: argparse.Namespace) -> tuple[int, int]:
+    """Zero meal events that do not produce a glucose rise within the window."""
+    if "carb_intake_grams" not in df.columns:
+        return 0, 0
+    total_meals = 0
+    filtered_meals = 0
+    for _, seg in df.groupby("segment", sort=False):
+        meal_mask = pd.to_numeric(seg["carb_intake_grams"], errors="coerce") > 0
+        meal_idx = seg.index[meal_mask]
+        for idx in meal_idx:
+            total_meals += 1
+            t0 = df.loc[idx, "time_minutes"]
+            pre = seg[(seg["time_minutes"] >= t0 - args.meal_pre_window) & (seg["time_minutes"] <= t0 + args.meal_pre_window)]
+            post = seg[(seg["time_minutes"] >= t0 + args.meal_pre_window) & (seg["time_minutes"] <= t0 + args.meal_post_window)]
+            if pre.empty or post.empty:
+                continue
+            pre_med = pd.to_numeric(pre["glucose_actual_mgdl"], errors="coerce").median()
+            post_max = pd.to_numeric(post["glucose_actual_mgdl"], errors="coerce").max()
+            if not np.isfinite(pre_med) or not np.isfinite(post_max):
+                continue
+            if (post_max - pre_med) < args.meal_rise_threshold:
+                df.loc[idx, "carb_intake_grams"] = 0.0
+                if "carb_grams" in df.columns:
+                    df.loc[idx, "carb_grams"] = 0.0
+                filtered_meals += 1
+    return total_meals, filtered_meals
 
 
 def _device_mode_code(series: pd.Series) -> pd.Series:
@@ -176,6 +212,8 @@ def main() -> None:
         raise SystemExit(f"Input directory not found: {args.input}")
 
     frames = []
+    total_meals_all = 0
+    filtered_meals_all = 0
     for csv_path in sorted(args.input.glob("Subject */Subject *.csv")):
         subject_id = csv_path.parent.name.replace("Subject", "").strip()
         df = pd.read_csv(csv_path)
@@ -184,6 +222,7 @@ def main() -> None:
         df["subject_id"] = subject_id
 
         df["glucose_actual_mgdl"] = _clean_column(df, "CGM")
+        df["glucose_to_algo_mgdl"] = df["glucose_actual_mgdl"]
 
         # ------------------------------------------------------------------
         # P0-1: Basal unit conversion
@@ -210,16 +249,25 @@ def main() -> None:
         carb_size = _clean_column(df, "CarbSize")
         food_delivered = _clean_column(df, "FoodDelivered")
         df["carb_grams"] = carb_size.where(carb_size > 0, food_delivered).clip(upper=args.max_carbs)
+        df["carb_intake_grams"] = df["carb_grams"]
 
         df["device_mode_code"] = _device_mode_code(df.get("DeviceMode", pd.Series(index=df.index)))
 
         df = df.sort_values("timestamp").reset_index(drop=True)
+        df["time_minutes"] = (
+            (df["timestamp"] - df["timestamp"].iloc[0]).dt.total_seconds() / 60.0
+        )
         df["delta_min"] = df["timestamp"].diff().dt.total_seconds() / 60.0
         max_gap = args.time_step * args.max_gap_multiplier
         segment_break = df["delta_min"].isna() | (df["delta_min"] <= 0) | (df["delta_min"] > max_gap)
         df["segment"] = segment_break.cumsum()
 
         df["glucose_trend_mgdl_min"] = df["glucose_actual_mgdl"].diff() / df["delta_min"]
+
+        if not args.no_filter_meals_without_rise:
+            total_meals, filtered_meals = _filter_meals_by_response(df, args)
+            total_meals_all += total_meals
+            filtered_meals_all += filtered_meals
 
         # P0-3: Use OpenAPS-style bilinear IOB model
         iob, cob = _derive_iob_cob_openaps(
@@ -232,6 +280,9 @@ def main() -> None:
         )
         df["derived_iob_units"] = iob
         df["derived_cob_grams"] = cob
+        # Clamp to physiological bounds
+        df["derived_iob_units"] = df["derived_iob_units"].clip(lower=0.0)
+        df["derived_cob_grams"] = df["derived_cob_grams"].clip(lower=0.0)
         # Align to the generic research feature schema
         df["patient_iob_units"] = df["derived_iob_units"]
         df["patient_cob_grams"] = df["derived_cob_grams"]
@@ -261,10 +312,13 @@ def main() -> None:
                 [
                     "subject_id",
                     "timestamp",
+                    "time_minutes",
                     "glucose_actual_mgdl",
+                    "glucose_to_algo_mgdl",
                     "glucose_trend_mgdl_min",
                     "insulin_units",
                     "carb_grams",
+                    "carb_intake_grams",
                     "derived_iob_units",
                     "derived_cob_grams",
                     "patient_iob_units",
@@ -306,10 +360,16 @@ def main() -> None:
         "iob_model": "openaps_bilinear",
         "effective_isf_default": args.isf_default,
         "effective_icr_default": args.icr_default,
+        "meal_filter_applied": not args.no_filter_meals_without_rise,
+        "meal_filter_threshold_mgdl": args.meal_rise_threshold,
+        "meal_filter_pre_window_min": args.meal_pre_window,
+        "meal_filter_post_window_min": args.meal_post_window,
+        "meal_events_total": int(total_meals_all),
+        "meal_events_filtered": int(filtered_meals_all),
     }
     args.report.write_text(json.dumps(report, indent=2))
 
-    save_dataset(combined.drop(columns=["timestamp"]), args.output)
+    save_dataset(combined, args.output)
     print(f"Saved quality report: {args.report}")
     print(f"Saved training data: {args.output}")
 

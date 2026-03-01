@@ -30,7 +30,7 @@ from iints.research.dataset import (
     subject_split,
 )
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
-from iints.research.losses import QuantileLoss, SafetyWeightedMSE
+from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +57,50 @@ def parse_args() -> argparse.Namespace:
         help="Path to model registry JSON (default: <out>/../registry.json)",
     )
     return parser.parse_args()
+
+
+def _apply_meal_announcement(
+    df: pd.DataFrame,
+    predictor_cfg: PredictorConfig,
+    training_cfg: TrainingConfig,
+) -> pd.DataFrame:
+    """Optionally create a pre-announced meal feature (clinical practice)."""
+    minutes = training_cfg.meal_announcement_minutes
+    feature = training_cfg.meal_announcement_feature
+    if minutes is None or feature not in predictor_cfg.feature_columns:
+        return df
+    source = training_cfg.meal_announcement_column
+    if source not in df.columns:
+        print(
+            f"WARNING: Meal announcement enabled but source column '{source}' "
+            "not found. Feature will be filled with zeros."
+        )
+        df[feature] = 0.0
+        return df
+
+    shift_steps = int(round(minutes / predictor_cfg.time_step_minutes))
+    if shift_steps <= 0:
+        return df
+
+    group_cols = []
+    if "subject_id" in df.columns:
+        group_cols.append("subject_id")
+    if "segment" in df.columns:
+        group_cols.append("segment")
+
+    sort_cols = [c for c in (*group_cols, "time_minutes") if c in df.columns]
+    if sort_cols:
+        df = df.sort_values(sort_cols).reset_index(drop=True)
+
+    if group_cols:
+        df[feature] = (
+            df.groupby(group_cols, observed=False)[source]
+            .shift(-shift_steps)
+            .fillna(0.0)
+        )
+    else:
+        df[feature] = df[source].shift(-shift_steps).fillna(0.0)
+    return df
 
 
 
@@ -131,6 +175,7 @@ def main() -> None:
     # Load data
     # -----------------------------------------------------------------------
     df = load_dataset(args.data)
+    df = _apply_meal_announcement(df, predictor_cfg, training_cfg)
 
     # P1-5: Compute dataset hash for reproducibility tracking
     data_sha256 = _sha256_file(args.data)
@@ -139,6 +184,18 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # P0-2: Subject-level split
     # -----------------------------------------------------------------------
+    if training_cfg.subject_level_split and "subject_id" in df.columns:
+        min_rows = predictor_cfg.history_steps + predictor_cfg.horizon_steps + 1
+        counts = df.groupby("subject_id").size()
+        eligible = counts[counts >= min_rows].index
+        dropped = sorted(set(counts.index) - set(eligible))
+        if dropped:
+            print(f"Dropping {len(dropped)} subjects with < {min_rows} rows: {dropped}")
+        df = df[df["subject_id"].isin(eligible)].reset_index(drop=True)
+        if df["subject_id"].nunique() < 3:
+            print("WARNING: Too few eligible subjects for subject-level split; using row-level split.")
+            training_cfg.subject_level_split = False
+
     if training_cfg.subject_level_split and "subject_id" in df.columns:
         train_df, val_df, test_df = subject_split(
             df,
@@ -173,30 +230,67 @@ def main() -> None:
     # Build sequences (boundary-safe)
     # -----------------------------------------------------------------------
     segment_column = "segment" if "segment" in df.columns else None
-    X_train, y_train = build_sequences(
-        train_df,
-        history_steps=predictor_cfg.history_steps,
-        horizon_steps=predictor_cfg.horizon_steps,
-        feature_columns=predictor_cfg.feature_columns,
-        target_column=predictor_cfg.target_column,
-        segment_column=segment_column,
-    )
-    X_val, y_val = build_sequences(
-        val_df,
-        history_steps=predictor_cfg.history_steps,
-        horizon_steps=predictor_cfg.horizon_steps,
-        feature_columns=predictor_cfg.feature_columns,
-        target_column=predictor_cfg.target_column,
-        segment_column=segment_column,
-    )
-    X_test, y_test = build_sequences(
-        test_df,
-        history_steps=predictor_cfg.history_steps,
-        horizon_steps=predictor_cfg.horizon_steps,
-        feature_columns=predictor_cfg.feature_columns,
-        target_column=predictor_cfg.target_column,
-        segment_column=segment_column,
-    )
+    try:
+        X_train, y_train = build_sequences(
+            train_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+        X_val, y_val = build_sequences(
+            val_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+        X_test, y_test = build_sequences(
+            test_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+    except ValueError as exc:
+        if training_cfg.subject_level_split:
+            print(f"WARNING: subject-level split yielded insufficient sequences ({exc}). Falling back to row-level split.")
+            rng = np.random.default_rng(training_cfg.seed)
+            idx = rng.permutation(len(df))
+            n_test = max(1, round(len(df) * training_cfg.test_split))
+            n_val = max(1, round(len(df) * training_cfg.validation_split))
+            test_df = df.iloc[idx[:n_test]].reset_index(drop=True)
+            val_df = df.iloc[idx[n_test: n_test + n_val]].reset_index(drop=True)
+            train_df = df.iloc[idx[n_test + n_val:]].reset_index(drop=True)
+            X_train, y_train = build_sequences(
+                train_df,
+                history_steps=predictor_cfg.history_steps,
+                horizon_steps=predictor_cfg.horizon_steps,
+                feature_columns=predictor_cfg.feature_columns,
+                target_column=predictor_cfg.target_column,
+                segment_column=segment_column,
+            )
+            X_val, y_val = build_sequences(
+                val_df,
+                history_steps=predictor_cfg.history_steps,
+                horizon_steps=predictor_cfg.horizon_steps,
+                feature_columns=predictor_cfg.feature_columns,
+                target_column=predictor_cfg.target_column,
+                segment_column=segment_column,
+            )
+            X_test, y_test = build_sequences(
+                test_df,
+                history_steps=predictor_cfg.history_steps,
+                horizon_steps=predictor_cfg.horizon_steps,
+                feature_columns=predictor_cfg.feature_columns,
+                target_column=predictor_cfg.target_column,
+                segment_column=segment_column,
+            )
+        else:
+            raise
 
     # -----------------------------------------------------------------------
     # P3-10: Feature normalisation — fit on TRAINING data only
@@ -277,6 +371,22 @@ def main() -> None:
             f"(low<{training_cfg.safety_weighted_low_threshold}, "
             f"alpha={training_cfg.safety_weighted_alpha}, "
             f"max_weight={training_cfg.safety_weighted_max_weight})"
+        )
+    elif training_cfg.loss == "band_weighted":
+        criterion = BandWeightedMSE(
+            low_threshold=training_cfg.band_weighted_low_threshold,
+            high_threshold=training_cfg.band_weighted_high_threshold,
+            low_weight=training_cfg.band_weighted_low_weight,
+            high_weight=training_cfg.band_weighted_high_weight,
+            max_weight=training_cfg.band_weighted_max_weight,
+        )
+        print(
+            "Loss: band_weighted "
+            f"(low<{training_cfg.band_weighted_low_threshold}, "
+            f"high>{training_cfg.band_weighted_high_threshold}, "
+            f"low_w={training_cfg.band_weighted_low_weight}, "
+            f"high_w={training_cfg.band_weighted_high_weight}, "
+            f"max_w={training_cfg.band_weighted_max_weight})"
         )
     else:
         criterion = nn.MSELoss()
