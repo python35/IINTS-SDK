@@ -1,0 +1,53 @@
+% Professional Pandoc LaTeX preamble for manuals
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{lmodern}
+\else
+  \usepackage{fontspec}
+  \setmainfont{Arial Unicode MS}
+  \setsansfont{Helvetica}
+  \setmonofont{Menlo}
+\fi
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{setspace}
+\setstretch{1.08}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{fvextra}
+
+\definecolor{IINTSBlue}{RGB}{26,72,130}
+\definecolor{CodeBg}{RGB}{245,245,245}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=MidnightBlue,
+  urlcolor=MidnightBlue
+}
+
+\titleformat{\section}{\Large\bfseries\color{IINTSBlue}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\textit{IINTS-AF SDK Manual}}
+\rhead{\leftmark}
+\cfoot{\thepage}
+
+% Improve code blocks
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines=true,fontsize=\small,frame=single,framesep=2mm,rulecolor=\color{gray}}
+\fvset{breaklines=true,breakanywhere=true}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{2em}
+\sloppy

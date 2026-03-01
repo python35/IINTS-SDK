@@ -1,4 +1,4 @@
-.PHONY: help setup dev test lint typecheck sbom clean build publish publish-test tag push-tag github-release release
+.PHONY: help setup dev test lint typecheck sbom manuals clean build publish publish-test tag push-tag github-release release
 
 PYTHON ?= python3
 PIP ?= $(PYTHON) -m pip
@@ -19,6 +19,7 @@ help:
 	@echo "  lint         Run flake8"
 	@echo "  typecheck    Run mypy"
 	@echo "  sbom         Generate CycloneDX SBOM (sbom.json)"
+	@echo "  manuals      Build professional PDF manuals (Pandoc + Tectonic)"
 	@echo "  clean        Remove build artifacts"
 	@echo "  build        Build sdist/wheel"
 	@echo "  publish      Upload to PyPI (needs TWINE creds)"
@@ -56,6 +57,9 @@ sbom:
 		echo "SBOM tools not found. Ensure cyclonedx-bom is installed in the active Python environment."; \
 		exit 1; \
 	fi
+
+manuals:
+	tools/build_manuals.sh
 
 clean:
 	rm -rf dist build src/*.egg-info .pytest_cache

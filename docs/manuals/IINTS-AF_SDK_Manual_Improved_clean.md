@@ -17,15 +17,15 @@ This manual is long. Use this map to find what you need fast:
 - **Notebooks:** `examples/notebooks/README.md`
 
 Recommended notebook order (best for new users):
-- `00_Quickstart.ipynb` — run a full simulation
-- `01_Presets_and_Scenarios.ipynb` — scenarios + presets
-- `02_Safety_and_Supervisor.ipynb` — safety checks
-- `03_Audit_Trail_and_Report.ipynb` — audit trail + PDF
-- `04_Baseline_and_Metrics.ipynb` — metrics & baselines
-- `05_Devices_and_HumanInLoop.ipynb` — pumps/sensors + manual override
-- `06_Optional_Torch_LSTM.ipynb` — predictor training
-- `07_Ablation_Supervisor.ipynb` — safety ablation
-- `08_Data_Registry_and_Import.ipynb` — data import + registry
+- `00_Quickstart.ipynb` - run a full simulation
+- `01_Presets_and_Scenarios.ipynb` - scenarios + presets
+- `02_Safety_and_Supervisor.ipynb` - safety checks
+- `03_Audit_Trail_and_Report.ipynb` - audit trail + PDF
+- `04_Baseline_and_Metrics.ipynb` - metrics & baselines
+- `05_Devices_and_HumanInLoop.ipynb` - pumps/sensors + manual override
+- `06_Optional_Torch_LSTM.ipynb` - predictor training
+- `07_Ablation_Supervisor.ipynb` - safety ablation
+- `08_Data_Registry_and_Import.ipynb` - data import + registry
 
 Quick task routing:
 - **Run a simulation fast:** Section 2.2

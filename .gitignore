@@ -48,6 +48,8 @@ coverage.xml
 *.tmp
 *.log
 .DS_Store
+docs/manuals/.tectonic-cache/
+docs/manuals/.cache/
 tools/local/
 Thumbs.db
 
