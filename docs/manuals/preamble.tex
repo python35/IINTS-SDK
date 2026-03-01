@@ -20,6 +20,7 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{needspace}
 \usepackage{longtable}
 \usepackage{booktabs}
 \usepackage{listings}
@@ -38,6 +39,13 @@
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
 \titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
 
+\let\oldsection\section
+\renewcommand{\section}{\Needspace{6\baselineskip}\oldsection}
+\let\oldsubsection\subsection
+\renewcommand{\subsection}{\Needspace{5\baselineskip}\oldsubsection}
+\let\oldsubsubsection\subsubsection
+\renewcommand{\subsubsection}{\Needspace{4\baselineskip}\oldsubsubsection}
+
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{\textit{IINTS-AF SDK Manual}}
@@ -51,3 +59,7 @@
 \setlength{\parskip}{6pt}
 \setlength{\emergencystretch}{2em}
 \sloppy
+\raggedbottom
+\widowpenalty=10000
+\clubpenalty=10000
+\brokenpenalty=10000
