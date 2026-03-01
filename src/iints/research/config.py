@@ -52,7 +52,7 @@ class TrainingConfig:
     # P3-10: Normalization strategy.  Options: "zscore", "robust", "none".
     normalization: str = "zscore"
 
-    # P3-12: Loss function.  Options: "mse", "quantile".
+    # P3-12: Loss function.  Options: "mse", "quantile", "safety_weighted", "band_weighted".
     # For quantile loss, also set `quantile` (0 < q < 1).
     loss: str = "mse"
     quantile: Optional[float] = None  # e.g. 0.9 for 90th-percentile upper bound
@@ -66,3 +66,17 @@ class TrainingConfig:
     safety_weighted_low_threshold: float = 80.0
     safety_weighted_alpha: float = 2.0
     safety_weighted_max_weight: float = 4.0
+
+    # Band-weighted loss (penalize low/high glucose errors)
+    band_weighted_low_threshold: float = 70.0
+    band_weighted_high_threshold: float = 180.0
+    band_weighted_low_weight: float = 2.0
+    band_weighted_high_weight: float = 1.5
+    band_weighted_max_weight: float = 5.0
+
+    # Optional: pre-announced meals (clinically common for AID systems).
+    # If enabled, create `meal_announcement_feature` by shifting
+    # `meal_announcement_column` earlier by `meal_announcement_minutes`.
+    meal_announcement_minutes: Optional[float] = None
+    meal_announcement_column: str = "carb_intake_grams"
+    meal_announcement_feature: str = "meal_announcement_grams"

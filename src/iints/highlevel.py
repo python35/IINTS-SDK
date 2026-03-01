@@ -8,9 +8,10 @@ import pandas as pd
 import yaml
 
 from iints.api.base_algorithm import InsulinAlgorithm
-from iints.core.patient.models import PatientModel
+from iints.core.patient.patient_factory import PatientFactory
 from iints.core.patient.profile import PatientProfile
 from iints.core.simulator import Simulator
+from iints.core.devices.models import SensorModel
 from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.reporting import ClinicalReportGenerator
@@ -62,6 +63,11 @@ def run_simulation(
     algorithm: Union[InsulinAlgorithm, type],
     scenario: Optional[Union[str, Path, Dict[str, Any]]] = None,
     patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = "default_patient",
+    patient_model_type: str = "auto",
+    sensor_noise_std: Optional[float] = None,
+    sensor_lag_minutes: Optional[int] = None,
+    sensor_dropout_prob: Optional[float] = None,
+    sensor_bias: Optional[float] = None,
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
@@ -81,11 +87,29 @@ def run_simulation(
     output_path = resolve_output_dir(output_dir, run_id)
 
     patient_params = _resolve_patient_config(patient_config)
-    patient_model = PatientModel(**patient_params)
+    patient_model = PatientFactory.create_patient(patient_type=patient_model_type, **patient_params)
 
     scenario_payload = _resolve_scenario_payloads(scenario)
     stress_event_payloads = scenario_payload.get("stress_events", []) if scenario_payload else []
     effective_safety_config = safety_config or SafetyConfig()
+
+    sensor_model = None
+    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
+        sensor_model = SensorModel(
+            noise_std=float(sensor_noise_std or 0.0),
+            lag_minutes=int(sensor_lag_minutes or 0),
+            dropout_prob=float(sensor_dropout_prob or 0.0),
+            bias=float(sensor_bias or 0.0),
+            seed=resolved_seed,
+        )
+    elif patient_model_type == "auto":
+        sensor_model = SensorModel(
+            noise_std=7.0,
+            lag_minutes=10,
+            dropout_prob=0.0,
+            bias=0.0,
+            seed=resolved_seed,
+        )
 
     simulator = Simulator(
         patient_model=patient_model,
@@ -94,6 +118,7 @@ def run_simulation(
         seed=resolved_seed,
         safety_config=effective_safety_config,
         predictor=predictor,
+        sensor_model=sensor_model,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -127,6 +152,7 @@ def run_simulation(
             "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
         },
         "patient_config": patient_params,
+        "patient_model_type": patient_model_type,
         "scenario": scenario_payload,
         "duration_minutes": duration_minutes,
         "time_step_minutes": time_step,
@@ -135,6 +161,7 @@ def run_simulation(
         "export_audit": export_audit,
         "generate_report": generate_report,
         "safety_config": asdict(effective_safety_config),
+        "sensor_model": sensor_model.get_state() if sensor_model else None,
     }
     config_path = output_path / "config.json"
     write_json(config_path, config_payload)
@@ -202,6 +229,11 @@ def run_full(
     algorithm: Union[InsulinAlgorithm, type],
     scenario: Optional[Union[str, Path, Dict[str, Any]]] = None,
     patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = "default_patient",
+    patient_model_type: str = "auto",
+    sensor_noise_std: Optional[float] = None,
+    sensor_lag_minutes: Optional[int] = None,
+    sensor_dropout_prob: Optional[float] = None,
+    sensor_bias: Optional[float] = None,
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
@@ -219,11 +251,29 @@ def run_full(
     output_path = resolve_output_dir(output_dir, run_id)
 
     patient_params = _resolve_patient_config(patient_config)
-    patient_model = PatientModel(**patient_params)
+    patient_model = PatientFactory.create_patient(patient_type=patient_model_type, **patient_params)
 
     scenario_payload = _resolve_scenario_payloads(scenario)
     stress_event_payloads = scenario_payload.get("stress_events", []) if scenario_payload else []
     effective_safety_config = safety_config or SafetyConfig()
+
+    sensor_model = None
+    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
+        sensor_model = SensorModel(
+            noise_std=float(sensor_noise_std or 0.0),
+            lag_minutes=int(sensor_lag_minutes or 0),
+            dropout_prob=float(sensor_dropout_prob or 0.0),
+            bias=float(sensor_bias or 0.0),
+            seed=resolved_seed,
+        )
+    elif patient_model_type == "auto":
+        sensor_model = SensorModel(
+            noise_std=7.0,
+            lag_minutes=10,
+            dropout_prob=0.0,
+            bias=0.0,
+            seed=resolved_seed,
+        )
 
     simulator = Simulator(
         patient_model=patient_model,
@@ -233,6 +283,7 @@ def run_full(
         enable_profiling=enable_profiling,
         safety_config=effective_safety_config,
         predictor=predictor,
+        sensor_model=sensor_model,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -274,6 +325,7 @@ def run_full(
         "generate_report": True,
         "enable_profiling": enable_profiling,
         "safety_config": asdict(effective_safety_config),
+        "sensor_model": sensor_model.get_state() if sensor_model else None,
     }
     config_path = output_path / "config.json"
     write_json(config_path, config_payload)
@@ -345,7 +397,7 @@ def run_population(
     max_workers: Optional[int] = None,
     safety_config: Optional[SafetyConfig] = None,
     safety_weights: Optional[Dict[str, float]] = None,
-    patient_model_type: str = "custom",
+    patient_model_type: str = "auto",
     population_cv: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """

@@ -17,7 +17,7 @@ predictor:
     - time_of_day_sin
     - time_of_day_cos
     # Optional (clinical practice): pre-announced meals
-    # - meal_announcement_grams
+    - meal_announcement_grams
   target_column: glucose_actual_mgdl
 
 training:
@@ -41,6 +41,6 @@ training:
   early_stopping_patience: 5
   early_stopping_min_delta: 0.0
   # Optional (clinical practice): pre-announced meals
-  # meal_announcement_minutes: 15
-  # meal_announcement_column: carb_intake_grams
-  # meal_announcement_feature: meal_announcement_grams
+  meal_announcement_minutes: 15
+  meal_announcement_column: carb_grams
+  meal_announcement_feature: meal_announcement_grams

@@ -226,7 +226,7 @@ def evaluate(
     output_dir: Annotated[Optional[Path], typer.Option(help="Output directory")] = None,
     max_workers: Annotated[Optional[int], typer.Option(help="Max parallel workers (default: all cores)")] = None,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for reproducibility")] = None,
-    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type: 'custom' or 'bergman'")] = "custom",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
 ):
     """
     Run a Monte Carlo population evaluation of an algorithm.
@@ -581,6 +581,11 @@ def presets_run(
     output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save outputs")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+    patient_model_type: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
+    sensor_noise_std: Annotated[Optional[float], typer.Option("--sensor-noise-std", help="CGM noise std (mg/dL)")] = None,
+    sensor_lag_minutes: Annotated[Optional[int], typer.Option("--sensor-lag-minutes", help="CGM lag (minutes)")] = None,
+    sensor_dropout_prob: Annotated[Optional[float], typer.Option("--sensor-dropout-prob", help="CGM dropout probability (0-1)")] = None,
+    sensor_bias: Annotated[Optional[float], typer.Option("--sensor-bias", help="CGM bias (mg/dL)")] = None,
     safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
     safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
     safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min", help="Max glucose delta per 5 min (mg/dL)")] = None,
@@ -613,7 +618,7 @@ def presets_run(
     try:
         patient_config_name = preset.get("patient_config", "default_patient")
         validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
-        patient_model = iints.PatientModel(**validated_patient_params)
+        patient_model = iints.PatientFactory.create_patient(patient_type=patient_model_type, **validated_patient_params)
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
         for line in format_validation_error(e):
@@ -642,12 +647,32 @@ def presets_run(
         critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
     )
 
+    sensor_model = None
+    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
+        sensor_model = iints.SensorModel(
+            noise_std=float(sensor_noise_std or 0.0),
+            lag_minutes=int(sensor_lag_minutes or 0),
+            dropout_prob=float(sensor_dropout_prob or 0.0),
+            bias=float(sensor_bias or 0.0),
+            seed=resolved_seed,
+        )
+    elif patient_model_type == "auto":
+        sensor_model = iints.SensorModel(
+            noise_std=7.0,
+            lag_minutes=10,
+            dropout_prob=0.0,
+            bias=0.0,
+            seed=resolved_seed,
+        )
+
     simulator_kwargs: Dict[str, Any] = {
         "patient_model": patient_model,
         "algorithm": algorithm_instance,
         "time_step": time_step,
         "safety_config": safety_config,
     }
+    if sensor_model is not None:
+        simulator_kwargs["sensor_model"] = sensor_model
     simulator_kwargs["seed"] = resolved_seed
     if safety_config is None:
         safety_config = SafetyConfig()
@@ -981,6 +1006,11 @@ def run(
     output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save simulation results")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
+    patient_model_type: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
+    sensor_noise_std: Annotated[Optional[float], typer.Option("--sensor-noise-std", help="CGM noise std (mg/dL)")] = None,
+    sensor_lag_minutes: Annotated[Optional[int], typer.Option("--sensor-lag-minutes", help="CGM lag (minutes)")] = None,
+    sensor_dropout_prob: Annotated[Optional[float], typer.Option("--sensor-dropout-prob", help="CGM dropout probability (0-1)")] = None,
+    sensor_bias: Annotated[Optional[float], typer.Option("--sensor-bias", help="CGM bias (mg/dL)")] = None,
     safety_min_glucose: Annotated[Optional[float], typer.Option("--safety-min-glucose", help="Min plausible glucose (mg/dL)")] = None,
     safety_max_glucose: Annotated[Optional[float], typer.Option("--safety-max-glucose", help="Max plausible glucose (mg/dL)")] = None,
     safety_max_glucose_delta_per_5_min: Annotated[Optional[float], typer.Option("--safety-max-glucose-delta-per-5-min", help="Max glucose delta per 5 min (mg/dL)")] = None,
@@ -1060,8 +1090,11 @@ def run(
             validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
             patient_label = patient_config_name
 
-        patient_model = iints.PatientModel(**validated_patient_params)
-        console.print(f"Using patient model: {patient_model.__class__.__name__} with config [cyan]{patient_label}[/cyan]")
+        patient_model = iints.PatientFactory.create_patient(patient_type=patient_model_type, **validated_patient_params)
+        console.print(
+            f"Using patient model: {patient_model.__class__.__name__} "
+            f"({patient_model_type}) with config [cyan]{patient_label}[/cyan]"
+        )
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
         for line in format_validation_error(e):
@@ -1125,12 +1158,31 @@ def run(
     output_dir = resolve_output_dir(output_dir, run_id)
 
     effective_safety_config = safety_config or SafetyConfig()
+    sensor_model = None
+    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
+        sensor_model = iints.SensorModel(
+            noise_std=float(sensor_noise_std or 0.0),
+            lag_minutes=int(sensor_lag_minutes or 0),
+            dropout_prob=float(sensor_dropout_prob or 0.0),
+            bias=float(sensor_bias or 0.0),
+            seed=resolved_seed,
+        )
+    elif patient_model_type == "auto":
+        sensor_model = iints.SensorModel(
+            noise_std=7.0,
+            lag_minutes=10,
+            dropout_prob=0.0,
+            bias=0.0,
+            seed=resolved_seed,
+        )
+
     simulator = iints.Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
         time_step=time_step,
         seed=resolved_seed,
         safety_config=effective_safety_config,
+        sensor_model=sensor_model,
     )
     
     for event in stress_events:

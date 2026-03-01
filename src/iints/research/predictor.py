@@ -59,10 +59,6 @@ else:
                 dropout: float = 0.1,
                 horizon_steps: int = 12,
             ) -> None:
-                if torch is None or nn is None:  # pragma: no cover
-                    raise ImportError(
-                        "Torch is required for LSTMPredictor. Install with `pip install iints-sdk-python35[research]`."
-                    ) from _IMPORT_ERROR
                 super().__init__()
                 self.horizon_steps = horizon_steps
                 self.lstm = nn.LSTM(
@@ -109,8 +105,6 @@ else:
                 mean : torch.Tensor of shape [B, horizon_steps]
                 std  : torch.Tensor of shape [B, horizon_steps]
                 """
-                if torch is None:  # pragma: no cover
-                    raise ImportError("Torch required.") from _IMPORT_ERROR
                 # Keep dropout active during inference
                 self.train()
                 with torch.no_grad():

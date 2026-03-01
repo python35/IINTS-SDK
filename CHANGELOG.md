@@ -4,6 +4,13 @@
 
 - (empty)
 
+## v0.1.19
+
+- Added meal-response filtering for OhioT1DM/AZT1D prep to drop noisy meal labels.
+- Recomputed subject segments and IOB/COB per segment for more stable training windows.
+- Added band-weighted loss options to emphasize hypo/hyper accuracy.
+- Enabled early stopping in default research configs for better generalization.
+
 ## v0.1.18
 
 - Multimodal predictor training pipeline with warm-start fine‑tuning and early stopping.

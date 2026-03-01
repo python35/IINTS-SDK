@@ -1,5 +1,5 @@
 [flake8]
-exclude = .venv_ci_test,src/iints/templates
+exclude = .venv,.venv_ci_test,.mypy_cache,.pytest_cache,build,dist,src/iints/templates
 select = E9,F63,F7,F82
 show-source = True
 statistics = True

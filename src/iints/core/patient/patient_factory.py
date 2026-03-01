@@ -3,6 +3,13 @@ from typing import Dict, Any, Optional
 from .models import CustomPatientModel
 
 try:
+    from .bergman_model import BergmanPatientModel
+    BERGMAN_AVAILABLE = True
+except Exception:
+    BergmanPatientModel = None  # type: ignore[assignment,misc]
+    BERGMAN_AVAILABLE = False
+
+try:
     from simglucose.simulation.env import T1DSimEnv
     from simglucose.patient.t1dpatient import T1DPatient
     from simglucose.sensor.cgm import CGMSensor
@@ -25,10 +32,22 @@ class PatientFactory:
     ]
     
     @staticmethod
-    def create_patient(patient_type='custom', patient_id=None, initial_glucose=120.0, **kwargs):
+    def create_patient(patient_type='auto', patient_id=None, initial_glucose=120.0, **kwargs):
         """Create a patient model based on type."""
+        if patient_type == 'auto':
+            if BERGMAN_AVAILABLE and BergmanPatientModel is not None:
+                return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
+            if SIMGLUCOSE_AVAILABLE:
+                patient_name = patient_id or PatientFactory.SIMGLUCOSE_PATIENTS[0]
+                return SimglucosePatientWrapper(patient_name, initial_glucose)
+            return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
         if patient_type == 'custom':
             return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+        elif patient_type == 'bergman':
+            if not BERGMAN_AVAILABLE or BergmanPatientModel is None:
+                print("Warning: Bergman model not available, falling back to custom model")
+                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+            return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
         elif patient_type == 'simglucose':
             if not SIMGLUCOSE_AVAILABLE:
                 print("Warning: Simglucose not available, falling back to custom model")
