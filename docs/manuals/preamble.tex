@@ -62,8 +62,8 @@
 \rhead{\leftmark}
 \cfoot{\thepage}
 
-% Improve code blocks
-\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines=true,fontsize=\small,frame=single,framesep=2mm,rulecolor=\color{gray}}
+% Improve code blocks (allow pandoc token macros via commandchars)
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\},breaklines=true,fontsize=\small,frame=single,framesep=2mm,rulecolor=\color{gray}}
 \fvset{breaklines=true,breakanywhere=true}
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{6pt}
