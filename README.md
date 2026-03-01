@@ -158,7 +158,9 @@ outputs = iints.run_simulation(..., predictor=predictor)
 ```
 
 ### Documentation
-* Product manual: `docs/COMPREHENSIVE_GUIDE.md`
+* PDF manual: `docs/manuals/IINTS-AF_SDK_Manual.pdf`
+* Manual source: `docs/manuals/IINTS-AF_SDK_Manual.md`
+* Comprehensive guide: `docs/COMPREHENSIVE_GUIDE.md`
 * Notebook index: `examples/notebooks/README.md`
 * Technical README: `docs/TECHNICAL_README.md`
 * API Stability: `API_STABILITY.md`
