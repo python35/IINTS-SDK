@@ -219,6 +219,15 @@ print(f"Report generated: {results['clinical_report']}")
 - Generates results CSV, clinical report PDF, and audit trail
 - Compares against baseline algorithms automatically
 
+**Sanity check (first run):**
+- `results/results.csv` exists and grows during the run
+- `results/clinical_reports/` contains a PDF
+- Console shows no safety contract violations
+
+**Expected runtime:**
+- Laptop CPU: ~30-90 seconds for the quickstart preset
+- GPU not required
+
 ### 2.3 Understanding the Output Files
 
 After running a simulation, you'll find these files in the `results/` folder:
@@ -234,6 +243,16 @@ After running a simulation, you'll find these files in the `results/` folder:
 | `audit/safety_summary.json` | Safety interventions summary |
 | `baseline/pid_results.csv` | PID controller baseline comparison |
 | `baseline/standard_pump.csv` | Standard pump baseline comparison |
+
+**Quick interpretation:**
+- Start with `clinical_report.pdf` for a human-readable summary.
+- Use `results.csv` for plotting and deeper analysis.
+- Use `audit/safety_summary.json` to explain *why* the supervisor intervened.
+
+**Data consistency checks:**
+- `glucose_actual_mgdl` should be in 40-400 mg/dL range.
+- `patient_iob_units` and `patient_cob_grams` should be >= 0.
+- Large jumps (>60 mg/dL in 5 min) usually indicate data issues.
 
 **Example: Loading Results in Python**
 
@@ -396,18 +415,18 @@ iints import-data --input-csv my_cgm_export.csv \
 
 ```python
 # Python API
-from iints.data.import_cgm_csv
+from iints.data.importer import import_cgm_csv
+from iints.core.simulator import Simulator
 
 result = import_cgm_csv(
     "my_cgm_export.csv",
     data_format="dexcom",  # or "libre", "generic"
-    scenario_name="Patient A - Week 1"
+    scenario_name="Patient A - Week 1",
 )
 
-# Use in simulation
 sim = Simulator(
     algorithm=MyAlgorithm(),
-    scenario=result.scenario
+    scenario=result.scenario,
 )
 ```
 
@@ -415,6 +434,24 @@ sim = Simulator(
 - Dexcom CSV export
 - Libre CSV export
 - Generic CSV (auto-detects columns)
+
+**Minimum required columns (generic CSV):**
+- Timestamp (ISO or epoch minutes)
+- Glucose (mg/dL)
+
+**Optional but recommended:**
+- Carbs (grams)
+- Insulin (units)
+- Notes/events
+
+**Common import pitfalls:**
+- Mixed timezones or missing timezone offsets
+- Glucose in mmol/L (convert to mg/dL)
+- Duplicate timestamps (keep the latest reading)
+
+**Quick validation:**
+- Plot glucose vs time to confirm it is smooth and within 40-400 mg/dL
+- Ensure meal events align with glucose rises (15-90 minutes after)
 - Nightscout JSON
 - Dataset registry packs (AIDE, PEDAP, AZT1D, HUPA-UCM)
 
@@ -579,6 +616,19 @@ config = SafetyConfig(
     contract_trend_threshold=-1.0,  # mg/dL per 5 minutes
 )
 ```
+
+**When to tune SafetyConfig**
+- Only after you can reproduce a baseline run with stable glucose and no crashes.
+- Increase strictness (lower cutoffs / lower max rates) when testing new or unstable algorithms.
+- Relax cutoffs only for controlled research experiments with full audit logs.
+
+**Recommended baseline ranges (adult research)**
+- `max_bolus`: 2-6 U
+- `max_basal_rate`: 1-3 U/hr
+- `max_iob`: 6-12 U
+- `hyper_cutoff`: 250-300 mg/dL
+
+**Audit note:** All SafetyConfig values are written to `run_metadata.json` and `audit/safety_summary.json`.
 
 ### 4.3 9 Safety Checks Explained
 
@@ -793,6 +843,80 @@ results = run_batch_experiment(
 # Compare metrics across all runs
 comparison_df = results.compare_metrics()
 print(comparison_df[['algorithm', 'patient', 'TIR', 'GMI', 'interventions']])
+```
+
+### 5.4 Audit Trail Analysis
+
+Every run produces a structured audit trail that explains why the safety layer intervened.
+
+```python
+import pandas as pd
+
+audit = pd.read_csv("results/your_run/audit/audit_trail.csv")
+print(audit[['timestamp', 'glucose_actual_mgdl', 'action', 'reason']].head())
+
+# Count interventions by type
+print(audit['action'].value_counts())
+```
+
+**Interpretation tips:**
+- If `action` is `suspend` or `cap`, the supervisor overrode the algorithm.
+- If `reason` repeats often, your algorithm is too aggressive for that patient profile.
+
+### 5.5 Custom Safety Thresholds
+
+Use SafetyConfig to tighten or relax constraints for research experiments.
+
+```python
+from iints.core.safety import SafetyConfig
+from iints.core.simulator import Simulator
+
+safe_config = SafetyConfig(
+    max_bolus=3.0,
+    max_iob=8.0,
+    hyper_cutoff=250.0,
+)
+
+sim = Simulator(algorithm=MyAlgorithm(), safety_config=safe_config)
+```
+
+### 5.6 Pump Emulator Benchmarking
+
+Benchmark alternative pump behaviors or commercial-emulator presets.
+
+```python
+from iints.analysis.hardware_benchmark import benchmark_pump_emulators
+
+bench = benchmark_pump_emulators(duration_minutes=120)
+print(bench[['model', 'avg_step_ms', 'max_step_ms']])
+```
+
+### 5.7 Live Streaming Simulation
+
+Stream real-time values for dashboards or demos.
+
+```python
+from iints.core.simulator import Simulator
+
+sim = Simulator(algorithm=MyAlgorithm())
+for state in sim.run_stream(duration_minutes=120):
+    print(state['timestamp'], state['glucose_actual_mgdl'])
+```
+
+### 5.8 Reproducible Runs for Publications
+
+To make results reproducible:
+- Fix `seed`
+- Persist `config.json`
+- Record dataset hash and commit SHA
+
+```python
+results = iints.run_simulation(
+    algorithm=MyAlgorithm(),
+    duration_minutes=720,
+    seed=123,
+)
+print(results['run_manifest'])
 ```
 
 ---
@@ -1168,6 +1292,20 @@ iints data cite aide_t1d
 - `azt1d`: Arizona Type 1 Diabetes Dataset
 - `ohio_t1dm`: OhioT1DM Dataset
 - `sample`: Bundled demo data (no download needed)
+
+**Integrity and reproducibility**
+- Every dataset entry includes a SHA-256 checksum and citation metadata.
+- The fetch command validates the checksum automatically.
+- Use `iints data info <dataset>` to record version and hash in your paper.
+
+**Typical layout after fetch**
+```
+data_packs/
+  public/
+    ohio_t1dm/
+      raw/...
+      processed/...
+```
 
 ### 8.3 Reproducibility Techniques
 
