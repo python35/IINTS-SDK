@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from iints.core.safety.config import SafetyConfig
 
@@ -33,18 +33,18 @@ class InputValidator:
         self.last_valid_glucose: Optional[float] = None
         self.last_validation_time: Optional[float] = None
 
-    def reset(self):
+    def reset(self) -> None:
         """Resets the state of the validator for a new simulation."""
         self.last_valid_glucose = None
         self.last_validation_time = None
 
-    def get_state(self) -> dict:
+    def get_state(self) -> Dict[str, Any]:
         return {
             "last_valid_glucose": self.last_valid_glucose,
             "last_validation_time": self.last_validation_time,
         }
 
-    def set_state(self, state: dict) -> None:
+    def set_state(self, state: Dict[str, Any]) -> None:
         self.last_valid_glucose = state.get("last_valid_glucose")
         self.last_validation_time = state.get("last_validation_time")
 

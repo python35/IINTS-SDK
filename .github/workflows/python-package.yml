@@ -43,6 +43,14 @@ jobs:
       run: |
         mypy src/iints/
 
+    - name: Type check safety core (strict gate)
+      run: |
+        mypy --strict \
+          src/iints/core/supervisor.py \
+          src/iints/core/safety/config.py \
+          src/iints/core/safety/input_validator.py
+        mypy --check-untyped-defs src/iints/core/simulator.py
+
     # P2-8: Run tests with coverage across BOTH the main package and research scripts
     - name: Run tests with PyTest (SDK + Research)
       run: |
@@ -52,6 +60,10 @@ jobs:
           --cov-report=xml \
           --cov-report=term-missing \
           tests/
+
+    - name: Performance budget gate (p95/p99)
+      run: |
+        pytest tests/performance/test_latency_budget.py -q
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v4

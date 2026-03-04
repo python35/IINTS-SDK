@@ -114,6 +114,20 @@ python research/train_predictor.py --data data/training.parquet --config researc
 python research/evaluate_predictor.py --data data/validation.parquet --model models/predictor.pt
 ```
 
+MC Dropout calibration run (95% interval coverage + band metrics):
+```bash
+python research/evaluate_predictor.py \
+  --data data/validation.parquet \
+  --model models/predictor.pt \
+  --mc-samples 50 \
+  --out results/predictor_eval.json
+```
+
+Both training and evaluation outputs include lineage metadata:
+- `schema_id` and `schema_version`
+- dataframe fingerprint
+- optional source file SHA-256
+
 ## Export
 ```bash
 python research/export_predictor.py --model models/predictor.pt --out models/predictor.onnx

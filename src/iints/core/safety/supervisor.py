@@ -1,6 +1,7 @@
 from typing import Optional
 
 from iints.core.safety.config import SafetyConfig
+from iints.core.safety.input_validator import InputValidator
 from iints.core.supervisor import IndependentSupervisor as FullSupervisor
 
 class IndependentSupervisor(FullSupervisor):
@@ -31,9 +32,3 @@ class IndependentSupervisor(FullSupervisor):
 
 # Alias for backward compatibility as the codebase migrates
 SafetySupervisor = IndependentSupervisor
-
-class InputValidator:
-    """
-    Validates simulation inputs.
-    """
-    pass

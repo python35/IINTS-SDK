@@ -765,15 +765,13 @@ def presets_run(
     if compare_baselines:
         manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
         manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
-    if output_dir / "audit" / "audit_summary.json":
-        manifest_files["audit_summary"] = output_dir / "audit" / "audit_summary.json"
+    audit_summary_path = output_dir / "audit" / "audit_summary.json"
+    if audit_summary_path.exists():
+        manifest_files["audit_summary"] = audit_summary_path
     run_manifest = build_run_manifest(output_dir, manifest_files)
     run_manifest_path = output_dir / "run_manifest.json"
     write_json(run_manifest_path, run_manifest)
     console.print(f"Run manifest: {run_manifest_path}")
-    signature_path = maybe_sign_manifest(run_manifest_path)
-    if signature_path:
-        console.print(f"Run manifest signature: {signature_path}")
     signature_path = maybe_sign_manifest(run_manifest_path)
     if signature_path:
         console.print(f"Run manifest signature: {signature_path}")

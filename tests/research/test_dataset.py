@@ -21,6 +21,7 @@ from iints.research.dataset import (
     FeatureScaler,
     basic_stats,
     build_sequences,
+    compute_dataset_lineage,
     concat_runs,
     load_dataset,
     save_dataset,
@@ -318,3 +319,26 @@ class TestHelpers:
         stats = basic_stats(df, ["a", "nonexistent"])
         assert "nonexistent_mean" not in stats
         assert "a_mean" in stats
+
+    def test_lineage_stable_for_same_dataframe(self):
+        df = _make_df(60, n_subjects=3, seed=123)
+        a = compute_dataset_lineage(df)
+        b = compute_dataset_lineage(df.copy())
+        assert a["schema_id"] == b["schema_id"]
+        assert a["dataframe_fingerprint"] == b["dataframe_fingerprint"]
+
+    def test_lineage_changes_when_values_change(self):
+        df = _make_df(60, n_subjects=3, seed=123)
+        a = compute_dataset_lineage(df)
+        df2 = df.copy()
+        df2.loc[0, "glucose_actual_mgdl"] += 1.0
+        b = compute_dataset_lineage(df2)
+        assert a["schema_id"] == b["schema_id"]
+        assert a["dataframe_fingerprint"] != b["dataframe_fingerprint"]
+
+    def test_lineage_changes_when_schema_changes(self):
+        df = _make_df(60, n_subjects=3, seed=123)
+        a = compute_dataset_lineage(df)
+        df2 = df.rename(columns={"carb_grams": "carbs"})
+        b = compute_dataset_lineage(df2)
+        assert a["schema_id"] != b["schema_id"]

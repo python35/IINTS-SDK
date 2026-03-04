@@ -115,9 +115,6 @@ class Simulator:
         self.simulation_data: List[Any] = [] # To store results
         self.stress_events: List[StressEvent] = []
         self.seed = seed
-        if self.seed is not None:
-            np.random.seed(self.seed) # Set numpy seed for reproducibility
-            # Potentially set other seeds here if other random modules are used (e.g., random.seed(self.seed))
         self.safety_config = safety_config or SafetyConfig()
         self.supervisor = IndependentSupervisor(safety_config=self.safety_config)
         self.input_validator = InputValidator(safety_config=self.safety_config)

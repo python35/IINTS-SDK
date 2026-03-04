@@ -26,9 +26,11 @@ from iints.research.config import PredictorConfig, TrainingConfig
 from iints.research.dataset import (
     FeatureScaler,
     build_sequences,
+    compute_dataset_lineage,
     load_dataset,
     subject_split,
 )
+from iints.research.metrics import band_regression_metrics, regression_metrics
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
 from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
 
@@ -176,6 +178,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     df = load_dataset(args.data)
     df = _apply_meal_announcement(df, predictor_cfg, training_cfg)
+    dataset_lineage = compute_dataset_lineage(df, source_path=args.data)
 
     # P1-5: Compute dataset hash for reproducibility tracking
     data_sha256 = _sha256_file(args.data)
@@ -460,17 +463,20 @@ def main() -> None:
     if best_state is not None:
         model.load_state_dict(best_state)
 
-    test_mse = _evaluate(model, test_loader)
-    test_mae = float(
-        np.mean(
-            [
-                np.abs(
-                    model(bx).detach().numpy() - by.numpy()
-                ).mean()
-                for bx, by in test_loader
-            ]
-        )
-    )
+    test_pred_batches = []
+    test_target_batches = []
+    model.eval()
+    with torch.no_grad():
+        for batch_x, batch_y in test_loader:
+            test_pred_batches.append(model(batch_x).cpu().numpy())
+            test_target_batches.append(batch_y.cpu().numpy())
+
+    test_preds = np.concatenate(test_pred_batches, axis=0)
+    test_targets = np.concatenate(test_target_batches, axis=0)
+    test_summary = regression_metrics(test_targets, test_preds)
+    test_band_metrics = band_regression_metrics(test_targets, test_preds)
+    test_mse = float(np.mean((test_preds - test_targets) ** 2))
+    test_mae = test_summary["mae"]
 
     # -----------------------------------------------------------------------
     # P3-11: Baseline comparison on test set
@@ -484,8 +490,7 @@ def main() -> None:
     print("\nBaseline comparison (test set):")
     for bname, bmetrics in baselines.items():
         print(f"  {bname}: MAE={bmetrics['mae']:.2f}, RMSE={bmetrics['rmse']:.2f}")
-    lstm_rmse = float(np.sqrt(test_mse))
-    print(f"  LSTM   : MAE={test_mae:.2f}, RMSE={lstm_rmse:.2f}")
+    print(f"  LSTM   : MAE={test_mae:.2f}, RMSE={test_summary['rmse']:.2f}")
 
     # -----------------------------------------------------------------------
     # P1-6: Save model checkpoint with scaler embedded
@@ -505,6 +510,7 @@ def main() -> None:
             "feature_columns": predictor_cfg.feature_columns,
             "target_column": predictor_cfg.target_column,
             "scaler": scaler.to_dict(),   # P3-10: embed scaler for inference
+            "dataset_schema_id": dataset_lineage["schema_id"],
         },
     }
     torch.save(payload, model_path)
@@ -523,6 +529,7 @@ def main() -> None:
         # Dataset
         "data_path": str(args.data),
         "data_sha256": data_sha256,
+        "dataset_lineage": dataset_lineage,
         "config_path": str(args.config),
         "config_sha256": config_sha256,
         "warm_start": str(args.warm_start) if args.warm_start else None,
@@ -549,8 +556,10 @@ def main() -> None:
         "metrics": metrics,
         # Evaluation
         "test_mse": float(test_mse),
-        "test_rmse": lstm_rmse,
+        "test_rmse": test_summary["rmse"],
         "test_mae": test_mae,
+        "test_bias": test_summary["bias"],
+        "test_band_metrics": test_band_metrics,
         "baselines": baselines,
     }
     report_path = args.out / "training_report.json"
@@ -569,8 +578,9 @@ def main() -> None:
         "seed": training_cfg.seed,
         "epochs": training_cfg.epochs,
         "val_loss_final": metrics["val_loss"][-1],
-        "test_rmse": lstm_rmse,
+        "test_rmse": test_summary["rmse"],
         "test_mae": test_mae,
+        "dataset_schema_id": dataset_lineage["schema_id"],
         "normalization": training_cfg.normalization,
         "timestamp_utc": report["timestamp_utc"],
     }

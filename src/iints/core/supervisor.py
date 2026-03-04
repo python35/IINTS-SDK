@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from iints.core.safety.config import SafetyConfig
 from dataclasses import dataclass
@@ -42,18 +42,18 @@ class IndependentSupervisor:
     Implements hard safety limits and emergency overrides.
     """
     
-    def __init__(self, 
-                 hypoglycemia_threshold=70,      # mg/dL
-                 severe_hypoglycemia_threshold=54,  # mg/dL
-                 hyperglycemia_threshold=250,    # mg/dL
-                 max_insulin_per_bolus=5,        # Units
-                 glucose_rate_alarm=5,           # mg/dL per minute
-                 max_60min=3.0,                  # Units per 60 minutes
-                 max_iob=4.0,                    # Units
-                 trend_stop=-2.0,                # mg/dL per minute
-                 hypo_cutoff=70.0,               # mg/dL
-                 predicted_hypoglycemia_threshold=60.0,  # mg/dL
-                 predicted_hypoglycemia_horizon_minutes=30,  # minutes
+    def __init__(self,
+                 hypoglycemia_threshold: float = 70.0,      # mg/dL
+                 severe_hypoglycemia_threshold: float = 54.0,  # mg/dL
+                 hyperglycemia_threshold: float = 250.0,    # mg/dL
+                 max_insulin_per_bolus: float = 5.0,        # Units
+                 glucose_rate_alarm: float = 5.0,           # mg/dL per minute
+                 max_60min: float = 3.0,                    # Units per 60 minutes
+                 max_iob: float = 4.0,                      # Units
+                 trend_stop: float = -2.0,                  # mg/dL per minute
+                 hypo_cutoff: float = 70.0,                 # mg/dL
+                 predicted_hypoglycemia_threshold: float = 60.0,  # mg/dL
+                 predicted_hypoglycemia_horizon_minutes: int = 30,  # minutes
                  contract_enabled: bool = True,
                  contract_glucose_threshold: float = 90.0,
                  contract_trend_threshold_mgdl_min: float = -1.0,
@@ -95,7 +95,7 @@ class IndependentSupervisor:
         self.violations: List[SafetyViolation] = []
         self.emergency_mode = False
         self.last_iob = 0.0
-        self.dose_history: List[tuple] = []
+        self.dose_history: List[Tuple[float, float]] = []
         
     def evaluate_safety(
         self,
@@ -320,7 +320,7 @@ class IndependentSupervisor:
             ]
         }
     
-    def reset(self):
+    def reset(self) -> None:
         """Reset supervisor state."""
         self.glucose_history.clear()
         self.violations.clear()

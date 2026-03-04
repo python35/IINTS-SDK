@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Tuple
+import hashlib
+import json
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from pathlib import Path
 
 import numpy as np
@@ -304,6 +306,61 @@ def load_dataset(path: Path) -> pd.DataFrame:
     if path.suffix.lower() in {".csv", ".txt"}:
         return pd.read_csv(path)
     raise ValueError(f"Unsupported dataset format: {path.suffix}")
+
+
+def compute_dataset_lineage(
+    df: pd.DataFrame,
+    source_path: Optional[Path] = None,
+    subject_column: str = "subject_id",
+    time_column: str = "time_minutes",
+) -> Dict[str, Any]:
+    """
+    Build a stable lineage payload for reproducibility and audit trails.
+
+    Returns a dictionary with:
+    - schema_version / schema_id based on ordered columns + dtypes
+    - dataframe_fingerprint based on row content hash
+    - optional source file hash
+    - optional subject/time metadata when available
+    """
+    columns = list(df.columns)
+    dtypes = {col: str(df[col].dtype) for col in columns}
+    schema_payload = {"columns": columns, "dtypes": dtypes}
+    schema_json = json.dumps(schema_payload, sort_keys=True, separators=(",", ":"))
+    schema_id = hashlib.sha256(schema_json.encode("utf-8")).hexdigest()
+
+    row_hashes = pd.util.hash_pandas_object(df[columns], index=False).to_numpy()
+    digest = hashlib.sha256()
+    digest.update(row_hashes.tobytes())
+    dataframe_fingerprint = digest.hexdigest()
+
+    lineage: Dict[str, Any] = {
+        "schema_version": "research_dataset_schema_v1",
+        "schema_id": schema_id,
+        "rows": int(len(df)),
+        "column_count": int(len(columns)),
+        "columns": columns,
+        "dtypes": dtypes,
+        "dataframe_fingerprint": dataframe_fingerprint,
+    }
+
+    if subject_column in df.columns:
+        lineage["subject_count"] = int(df[subject_column].nunique())
+
+    if time_column in df.columns and len(df) > 0:
+        lineage["time_min"] = float(df[time_column].min())
+        lineage["time_max"] = float(df[time_column].max())
+
+    if source_path is not None:
+        lineage["source_path"] = str(source_path)
+        if source_path.exists():
+            file_digest = hashlib.sha256()
+            with source_path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(8192), b""):
+                    file_digest.update(chunk)
+            lineage["source_file_sha256"] = file_digest.hexdigest()
+
+    return lineage
 
 
 def concat_runs(frames: Iterable[pd.DataFrame]) -> pd.DataFrame:

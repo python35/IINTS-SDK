@@ -39,6 +39,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=7.0.0",
+  "hypothesis>=6.0.0",
   "flake8",
   "mypy",
   "pandas-stubs",
