@@ -34,6 +34,19 @@ from iints.utils.run_io import (
 )
 
 
+def _predictor_metadata(predictor: Optional[object]) -> Optional[Dict[str, Any]]:
+    if predictor is None:
+        return None
+    config = getattr(predictor, "config", None)
+    return {
+        "class": f"{predictor.__class__.__module__}.{predictor.__class__.__name__}",
+        "history_steps": getattr(predictor, "history_steps", None),
+        "horizon_steps": getattr(predictor, "horizon_steps", None),
+        "feature_columns": getattr(predictor, "feature_columns", None),
+        "config": config if isinstance(config, dict) else None,
+    }
+
+
 def _resolve_patient_config(patient_config: Union[str, Path, Dict[str, Any], PatientProfile]) -> Dict[str, Any]:
     if isinstance(patient_config, PatientProfile):
         return validate_patient_config_dict(patient_config.to_patient_config()).model_dump()
@@ -162,6 +175,7 @@ def run_simulation(
         "generate_report": generate_report,
         "safety_config": asdict(effective_safety_config),
         "sensor_model": sensor_model.get_state() if sensor_model else None,
+        "predictor": _predictor_metadata(predictor),
     }
     config_path = output_path / "config.json"
     write_json(config_path, config_payload)
@@ -326,6 +340,7 @@ def run_full(
         "enable_profiling": enable_profiling,
         "safety_config": asdict(effective_safety_config),
         "sensor_model": sensor_model.get_state() if sensor_model else None,
+        "predictor": _predictor_metadata(predictor),
     }
     config_path = output_path / "config.json"
     write_json(config_path, config_payload)

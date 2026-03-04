@@ -7,10 +7,14 @@ from typing_extensions import Annotated
 from pydantic import ValidationError
 import os
 import importlib.util
+import importlib
 import sys
 import json
+import tempfile
+import time
 import yaml # Added for Virtual Patient Registry
 import pandas as pd # Added for DataFrame in benchmark results
+import numpy as np
 
 from rich.console import Console  # type: ignore # For pretty printing
 from rich.table import Table  # type: ignore # For comparison table
@@ -50,14 +54,20 @@ from iints.utils.run_io import (
     write_json,
 )
 from iints.validation import (
+    apply_contract_to_config,
     build_stress_events,
+    compute_run_metrics,
+    evaluate_run,
     format_validation_error,
+    load_contract_spec,
+    load_validation_profiles,
     load_scenario,
     load_patient_config,
     load_patient_config_by_name,
     migrate_scenario_dict,
     scenario_to_payloads,
     scenario_warnings,
+    verify_safety_contract,
     validate_patient_config_dict,
     validate_scenario_dict,
 )
@@ -160,6 +170,58 @@ def _parse_column_mapping(items: List[str], console: Console) -> Dict[str, str]:
     return mapping
 
 
+def _load_json_dict(path: Path, label: str) -> Dict[str, Any]:
+    try:
+        payload = json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} is not valid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return payload
+
+
+def _module_available(module_name: str) -> bool:
+    try:
+        importlib.import_module(module_name)
+        return True
+    except Exception:
+        return False
+
+
+def _parse_float_csv(values: str, label: str) -> List[float]:
+    parsed: List[float] = []
+    for token in values.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        try:
+            parsed.append(float(token))
+        except ValueError as exc:
+            raise ValueError(f"Invalid float in {label}: '{token}'") from exc
+    if not parsed:
+        raise ValueError(f"{label} cannot be empty")
+    return parsed
+
+
+def _load_predictor_service_from_path(predictor_path: Optional[Path], console: Console) -> Optional[object]:
+    if predictor_path is None:
+        return None
+    if not predictor_path.is_file():
+        console.print(f"[bold red]Predictor checkpoint not found: {predictor_path}[/bold red]")
+        raise typer.Exit(code=1)
+    try:
+        from iints.research.predictor import load_predictor_service
+
+        return load_predictor_service(predictor_path)
+    except Exception as exc:
+        console.print(
+            "[bold red]Could not load predictor service. Install research extras "
+            "(`pip install iints-sdk-python35[research]`) and verify the checkpoint format.[/bold red]"
+        )
+        console.print(f"[red]Details:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+
 def _build_safety_config_from_options(**kwargs: Any) -> Optional[SafetyConfig]:
     if all(value is None for value in kwargs.values()):
         return None
@@ -186,6 +248,12 @@ def _run_parallel_job(job: Dict[str, Any]) -> Dict[str, Any]:
     patient_config = job["patient_config"]
     safety_config = _build_safety_config_from_dict(job.get("safety_overrides"))
     algorithm_instance = _load_algorithm_instance_silent(algo_path)
+    predictor = None
+    predictor_path = job.get("predictor_path")
+    if predictor_path:
+        from iints.research.predictor import load_predictor_service
+
+        predictor = load_predictor_service(Path(predictor_path))
 
     outputs = iints.run_simulation(
         algorithm=algorithm_instance,
@@ -199,6 +267,7 @@ def _run_parallel_job(job: Dict[str, Any]) -> Dict[str, Any]:
         export_audit=bool(job.get("export_audit")),
         generate_report=bool(job.get("generate_report")),
         safety_config=safety_config,
+        predictor=predictor,
     )
     outputs.pop("results", None)
     safety_report = outputs.get("safety_report", {})
@@ -330,6 +399,383 @@ def evaluate(
     console.print(f"  - population_summary.csv")
     console.print(f"  - population_report.json")
     console.print(f"  - population_report.pdf")
+
+
+@app.command("doctor")
+def doctor(
+    smoke_run: Annotated[bool, typer.Option(help="Run a short deterministic smoke simulation")] = False,
+    smoke_duration: Annotated[int, typer.Option(help="Smoke simulation duration in minutes")] = 30,
+):
+    """
+    Environment and installation health-check for developers.
+    """
+    console = Console()
+    required_checks: List[Tuple[str, bool, str]] = []
+
+    py_ok = sys.version_info >= (3, 10)
+    required_checks.append(
+        ("Python >= 3.10", py_ok, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
+    )
+
+    package_checks = [
+        ("pandas", True, "core"),
+        ("numpy", True, "core"),
+        ("typer", True, "core"),
+        ("rich", True, "core"),
+        ("yaml", True, "core"),
+        ("torch", False, "research"),
+        ("onnx", False, "research"),
+        ("onnxscript", False, "research"),
+        ("h5py", False, "research"),
+    ]
+
+    table = Table(title="IINTS Doctor", show_lines=False)
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Detail", style="dim")
+
+    for check_name, passed, detail in required_checks:
+        table.add_row(check_name, "[green]OK[/green]" if passed else "[red]FAIL[/red]", detail)
+
+    for module_name, required, category in package_checks:
+        available = _module_available(module_name)
+        status = "[green]OK[/green]" if available else ("[red]MISSING[/red]" if required else "[yellow]optional[/yellow]")
+        extra = f"{category} dependency"
+        table.add_row(f"Module: {module_name}", status, extra)
+        if required:
+            required_checks.append((f"Module: {module_name}", available, extra))
+
+    try:
+        presets = _load_presets()
+        presets_ok = len(presets) > 0
+        table.add_row("Preset bundle", "[green]OK[/green]" if presets_ok else "[red]FAIL[/red]", f"{len(presets)} presets loaded")
+        required_checks.append(("Preset bundle", presets_ok, f"{len(presets)} presets"))
+    except Exception as exc:
+        table.add_row("Preset bundle", "[red]FAIL[/red]", str(exc))
+        required_checks.append(("Preset bundle", False, str(exc)))
+
+    try:
+        profiles = load_validation_profiles()
+        profiles_ok = len(profiles) > 0
+        table.add_row(
+            "Validation profiles",
+            "[green]OK[/green]" if profiles_ok else "[red]FAIL[/red]",
+            ", ".join(sorted(profiles.keys())) if profiles else "none",
+        )
+        required_checks.append(("Validation profiles", profiles_ok, f"{len(profiles)} profiles"))
+    except Exception as exc:
+        table.add_row("Validation profiles", "[red]FAIL[/red]", str(exc))
+        required_checks.append(("Validation profiles", False, str(exc)))
+
+    if smoke_run:
+        try:
+            with tempfile.TemporaryDirectory(prefix="iints_doctor_") as tmp:
+                smoke_outputs = iints.run_simulation(
+                    algorithm=iints.ConstantDoseAlgorithm(),
+                    duration_minutes=max(smoke_duration, 5),
+                    output_dir=Path(tmp),
+                    compare_baselines=False,
+                    export_audit=False,
+                    generate_report=False,
+                    seed=42,
+                )
+                results_path = smoke_outputs.get("results_csv", "")
+                smoke_ok = bool(results_path) and Path(results_path).is_file()
+                detail = f"results: {results_path}" if smoke_ok else "simulation output missing"
+                table.add_row("Smoke simulation", "[green]OK[/green]" if smoke_ok else "[red]FAIL[/red]", detail)
+                required_checks.append(("Smoke simulation", smoke_ok, detail))
+        except Exception as exc:
+            table.add_row("Smoke simulation", "[red]FAIL[/red]", str(exc))
+            required_checks.append(("Smoke simulation", False, str(exc)))
+
+    console.print(table)
+    if not all(passed for _, passed, _ in required_checks):
+        raise typer.Exit(code=1)
+
+
+@app.command("validation-profiles")
+def validation_profiles(
+    profiles_path: Annotated[Optional[Path], typer.Option(help="Optional custom profiles YAML")] = None,
+):
+    """List available run-validation profiles."""
+    console = Console()
+    try:
+        profiles = load_validation_profiles(profiles_path)
+    except Exception as exc:
+        console.print(f"[bold red]Could not load validation profiles: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Validation Profiles")
+    table.add_column("Profile", style="cyan")
+    table.add_column("Min Duration (min)", justify="right")
+    table.add_column("Checks", justify="right")
+    table.add_column("Description")
+    for profile_id, profile in sorted(profiles.items()):
+        table.add_row(
+            profile_id,
+            str(profile.min_duration_minutes),
+            str(len(profile.checks)),
+            profile.description,
+        )
+    console.print(table)
+
+
+@app.command("validate-run")
+def validate_run(
+    results_csv: Annotated[Path, typer.Option(help="Path to simulation results CSV")],
+    profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
+    safety_report_path: Annotated[Optional[Path], typer.Option(help="Optional safety report JSON")] = None,
+    duration_minutes: Annotated[Optional[int], typer.Option(help="Override run duration (minutes)")] = None,
+    profiles_path: Annotated[Optional[Path], typer.Option(help="Optional custom profiles YAML")] = None,
+    output_json: Annotated[Optional[Path], typer.Option(help="Write validation report JSON")] = None,
+    fail_on_check: Annotated[bool, typer.Option(help="Exit with code 1 when required checks fail")] = True,
+):
+    """
+    Validate a simulation run against a profile (TIR/hypo/CV/safety gates).
+    """
+    console = Console()
+    if not results_csv.is_file():
+        console.print(f"[bold red]Results file not found: {results_csv}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        profiles = load_validation_profiles(profiles_path)
+    except Exception as exc:
+        console.print(f"[bold red]Could not load validation profiles: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    selected_profile = profiles.get(profile)
+    if selected_profile is None:
+        available = ", ".join(sorted(profiles.keys()))
+        console.print(f"[bold red]Unknown profile '{profile}'. Available: {available}[/bold red]")
+        raise typer.Exit(code=1)
+
+    safety_report: Optional[Dict[str, Any]] = None
+    if safety_report_path is not None:
+        if not safety_report_path.is_file():
+            console.print(f"[bold red]Safety report not found: {safety_report_path}[/bold red]")
+            raise typer.Exit(code=1)
+        try:
+            safety_report = _load_json_dict(safety_report_path, "safety report")
+        except ValueError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
+            raise typer.Exit(code=1)
+
+    try:
+        results_df = pd.read_csv(results_csv)
+    except Exception as exc:
+        console.print(f"[bold red]Could not read results CSV: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        report = evaluate_run(
+            results_df,
+            profile=selected_profile,
+            safety_report=safety_report,
+            duration_minutes=duration_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Run validation failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    summary = Table(title=f"Run Validation — {selected_profile.profile_id}")
+    summary.add_column("Field", style="cyan")
+    summary.add_column("Value", style="white")
+    summary.add_row("Profile description", selected_profile.description)
+    summary.add_row(
+        "Required checks",
+        f"{report.required_checks_passed}/{report.required_checks_total}",
+    )
+    summary.add_row("Score", f"{report.score:.1f}")
+    summary.add_row("Overall", "[green]PASS[/green]" if report.passed else "[red]FAIL[/red]")
+    console.print(summary)
+
+    checks_table = Table(title="Validation Checks")
+    checks_table.add_column("Status", style="bold")
+    checks_table.add_column("Check")
+    checks_table.add_column("Value", justify="right")
+    checks_table.add_column("Target", justify="right")
+    checks_table.add_column("Required", justify="center")
+    for check in report.checks:
+        status = "[green]PASS[/green]" if check.passed else "[red]FAIL[/red]"
+        value = "n/a" if check.value is None else f"{check.value:.2f}"
+        target = f"{check.rule.op} {check.rule.threshold:g}"
+        checks_table.add_row(
+            status,
+            check.rule.label,
+            value,
+            target,
+            "yes" if check.rule.required else "no",
+        )
+    console.print(checks_table)
+
+    metrics_table = Table(title="Computed Metrics")
+    metrics_table.add_column("Metric", style="cyan")
+    metrics_table.add_column("Value", justify="right")
+    for key, metric_value in sorted(report.metrics.items()):
+        metrics_table.add_row(key, f"{metric_value:.3f}")
+    console.print(metrics_table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report.to_dict(), indent=2))
+        console.print(f"[green]Validation report written:[/green] {output_json}")
+
+    if fail_on_check and not report.passed:
+        raise typer.Exit(code=1)
+
+
+@app.command("contract-verify")
+def contract_verify(
+    contract_path: Annotated[Optional[Path], typer.Option(help="Optional YAML safety-contract file")] = None,
+    glucose_min: Annotated[float, typer.Option(help="Minimum glucose to test (mg/dL)")] = 50.0,
+    glucose_max: Annotated[float, typer.Option(help="Maximum glucose to test (mg/dL)")] = 160.0,
+    glucose_step: Annotated[float, typer.Option(help="Glucose grid step (mg/dL)")] = 5.0,
+    trend_min: Annotated[float, typer.Option(help="Minimum trend to test (mg/dL/min)")] = -5.0,
+    trend_max: Annotated[float, typer.Option(help="Maximum trend to test (mg/dL/min)")] = 3.0,
+    trend_step: Annotated[float, typer.Option(help="Trend grid step (mg/dL/min)")] = 0.5,
+    proposed_doses: Annotated[str, typer.Option(help="Comma-separated proposed insulin doses (U)")] = "0.0,0.5,1.0,2.0,4.0",
+    output_json: Annotated[Optional[Path], typer.Option(help="Write contract verification report JSON")] = None,
+    fail_on_violation: Annotated[bool, typer.Option(help="Exit with code 1 when any contract violation is found")] = True,
+):
+    """
+    Compile and formally verify the deterministic safety contract on a full input grid.
+    """
+    console = Console()
+    try:
+        spec = load_contract_spec(contract_path)
+    except Exception as exc:
+        console.print(f"[bold red]Could not load contract spec: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    if glucose_step <= 0 or trend_step <= 0:
+        console.print("[bold red]glucose-step and trend-step must be > 0[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        dose_values = _parse_float_csv(proposed_doses, "proposed-doses")
+    except ValueError as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    glucose_values = np.arange(glucose_min, glucose_max + 1e-9, glucose_step).tolist()
+    trend_values = np.arange(trend_min, trend_max + 1e-9, trend_step).tolist()
+    report = verify_safety_contract(
+        spec,
+        glucose_values=glucose_values,
+        trend_values=trend_values,
+        proposed_doses=dose_values,
+    )
+
+    table = Table(title="Safety Contract Verification")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Contract enabled", str(spec.contract_enabled))
+    table.add_row("Glucose threshold", f"{spec.contract_glucose_threshold:.2f} mg/dL")
+    table.add_row("Trend threshold", f"{spec.contract_trend_threshold_mgdl_min:.2f} mg/dL/min")
+    table.add_row("Total cases", str(report.total_cases))
+    table.add_row("Expected blocked cases", str(report.expected_block_cases))
+    table.add_row("Blocked cases", str(report.blocked_cases))
+    table.add_row("Violations", str(len(report.violations)))
+    table.add_row("Status", "[green]PASS[/green]" if report.passed else "[red]FAIL[/red]")
+    console.print(table)
+
+    if report.violations:
+        violations_table = Table(title="Contract Violations (first 20)")
+        violations_table.add_column("Glucose", justify="right")
+        violations_table.add_column("Trend", justify="right")
+        violations_table.add_column("Proposed", justify="right")
+        violations_table.add_column("Approved", justify="right")
+        violations_table.add_column("Reason")
+        for violation in report.violations[:20]:
+            violations_table.add_row(
+                f"{violation.glucose_mgdl:.1f}",
+                f"{violation.trend_mgdl_min:.2f}",
+                f"{violation.proposed_insulin_units:.2f}",
+                f"{violation.approved_insulin_units:.2f}",
+                violation.reason,
+            )
+        console.print(violations_table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report.to_dict(), indent=2))
+        console.print(f"[green]Contract report written:[/green] {output_json}")
+
+    if fail_on_violation and not report.passed:
+        raise typer.Exit(code=1)
+
+
+@app.command("certify-run")
+def certify_run(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
+    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML")] = None,
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Path to scenario JSON")] = None,
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("results/certified_run"),
+    seed: Annotated[Optional[int], typer.Option(help="Random seed")] = None,
+    fail_on_check: Annotated[bool, typer.Option(help="Exit code 1 when validation profile fails")] = True,
+):
+    """
+    One-command certification pipeline: run-full + profile validation + artifacts.
+    """
+    console = Console()
+    algorithm_instance = _load_algorithm_instance(algo, console)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
+
+    patient_config: Union[str, Path]
+    if patient_config_path is not None:
+        if not patient_config_path.is_file():
+            console.print(f"[bold red]Patient config file not found: {patient_config_path}[/bold red]")
+            raise typer.Exit(code=1)
+        patient_config = patient_config_path
+    else:
+        patient_config = patient_config_name
+
+    outputs = iints.run_full(
+        algorithm=algorithm_instance,
+        scenario=str(scenario_path) if scenario_path else None,
+        patient_config=patient_config,
+        duration_minutes=duration,
+        time_step=time_step,
+        seed=seed,
+        output_dir=output_dir,
+        predictor=predictor,
+    )
+
+    results_csv = Path(outputs["results_csv"])
+    safety_summary_path = Path(outputs["audit"]["summary"]) if "audit" in outputs else None
+
+    try:
+        profiles = load_validation_profiles()
+    except Exception as exc:
+        console.print(f"[bold red]Could not load validation profiles: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+    selected_profile = profiles.get(profile)
+    if selected_profile is None:
+        console.print(f"[bold red]Unknown profile '{profile}'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    results_df = pd.read_csv(results_csv)
+    safety_report = _load_json_dict(safety_summary_path, "safety summary") if safety_summary_path else {}
+    report = evaluate_run(
+        results_df,
+        profile=selected_profile,
+        safety_report=safety_report,
+        duration_minutes=duration,
+    )
+
+    validation_path = Path(outputs["output_dir"]) / "validation_report.json"
+    validation_path.write_text(json.dumps(report.to_dict(), indent=2))
+    console.print(f"[green]Validation report:[/green] {validation_path}")
+    console.print(f"[bold]{'PASS' if report.passed else 'FAIL'}[/bold] {report.required_checks_passed}/{report.required_checks_total} required checks passed")
+
+    if fail_on_check and not report.passed:
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -578,6 +1024,7 @@ def presets_show(
 def presets_run(
     name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
     output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save outputs")] = None,
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
@@ -600,6 +1047,11 @@ def presets_run(
     safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
     safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
     safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
+    safety_predictor_uncertainty_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-uncertainty-gate", help="Enable predictor uncertainty gate")] = None,
+    safety_predictor_uncertainty_max_std_mgdl: Annotated[Optional[float], typer.Option("--safety-predictor-max-std", help="Max allowed predictor std (mg/dL) before fallback")] = None,
+    safety_predictor_ood_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-ood-gate", help="Enable predictor OOD gate")] = None,
+    safety_predictor_ood_zscore_threshold: Annotated[Optional[float], typer.Option("--safety-predictor-ood-z", help="Predictor OOD z-score threshold")] = None,
+    safety_predictor_ood_max_feature_fraction: Annotated[Optional[float], typer.Option("--safety-predictor-ood-feature-fraction", help="Max fraction of features allowed OOD")] = None,
 ):
     """Run a clinic-safe preset with an algorithm and generate outputs."""
     console = Console()
@@ -611,6 +1063,7 @@ def presets_run(
 
     algorithm_instance = _load_algorithm_instance(algo, console)
     console.print(f"Loaded algorithm: [green]{algorithm_instance.get_algorithm_metadata().name}[/green]")
+    predictor = _load_predictor_service_from_path(predictor_path, console)
 
     resolved_seed = resolve_seed(seed)
     run_id = generate_run_id(resolved_seed)
@@ -645,6 +1098,11 @@ def presets_run(
         hypo_cutoff=safety_hypo_cutoff,
         critical_glucose_threshold=safety_critical_glucose_threshold,
         critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+        predictor_uncertainty_gate_enabled=safety_predictor_uncertainty_gate_enabled,
+        predictor_uncertainty_max_std_mgdl=safety_predictor_uncertainty_max_std_mgdl,
+        predictor_ood_gate_enabled=safety_predictor_ood_gate_enabled,
+        predictor_ood_zscore_threshold=safety_predictor_ood_zscore_threshold,
+        predictor_ood_max_feature_fraction=safety_predictor_ood_max_feature_fraction,
     )
 
     sensor_model = None
@@ -670,6 +1128,7 @@ def presets_run(
         "algorithm": algorithm_instance,
         "time_step": time_step,
         "safety_config": safety_config,
+        "predictor": predictor,
     }
     if sensor_model is not None:
         simulator_kwargs["sensor_model"] = sensor_model
@@ -718,6 +1177,7 @@ def presets_run(
         "export_audit": True,
         "generate_report": True,
         "safety_config": asdict(safety_config),
+        "predictor_path": str(predictor_path) if predictor_path else None,
     }
     config_path = output_dir / "config.json"
     write_json(config_path, config_payload)
@@ -857,6 +1317,7 @@ def run_wizard():
     presets_run(
         name=preset_choice,
         algo=algo_path,
+        predictor_path=None,
         output_dir=output_dir,
         compare_baselines=True,
         seed=seed,
@@ -989,6 +1450,7 @@ def scenarios_migrate(
 @app.command()
 def run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
     patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient' or 'patient_559_config')")] = "default_patient",
     patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
     scenario_path: Annotated[
@@ -1023,6 +1485,11 @@ def run(
     safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
     safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
     safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
+    safety_predictor_uncertainty_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-uncertainty-gate", help="Enable predictor uncertainty gate")] = None,
+    safety_predictor_uncertainty_max_std_mgdl: Annotated[Optional[float], typer.Option("--safety-predictor-max-std", help="Max allowed predictor std (mg/dL) before fallback")] = None,
+    safety_predictor_ood_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-ood-gate", help="Enable predictor OOD gate")] = None,
+    safety_predictor_ood_zscore_threshold: Annotated[Optional[float], typer.Option("--safety-predictor-ood-z", help="Predictor OOD z-score threshold")] = None,
+    safety_predictor_ood_max_feature_fraction: Annotated[Optional[float], typer.Option("--safety-predictor-ood-feature-fraction", help="Max fraction of features allowed OOD")] = None,
 ):
     """
     Run an IINTS-AF simulation using a specified algorithm and patient configuration.
@@ -1070,6 +1537,7 @@ def run(
     if algorithm_instance is None:
         console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo}[/bold red]")
         raise typer.Exit(code=1)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
     
     # 2. Get Device
     device_manager = iints.DeviceManager()
@@ -1149,6 +1617,11 @@ def run(
         hypo_cutoff=safety_hypo_cutoff,
         critical_glucose_threshold=safety_critical_glucose_threshold,
         critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+        predictor_uncertainty_gate_enabled=safety_predictor_uncertainty_gate_enabled,
+        predictor_uncertainty_max_std_mgdl=safety_predictor_uncertainty_max_std_mgdl,
+        predictor_ood_gate_enabled=safety_predictor_ood_gate_enabled,
+        predictor_ood_zscore_threshold=safety_predictor_ood_zscore_threshold,
+        predictor_ood_max_feature_fraction=safety_predictor_ood_max_feature_fraction,
     )
 
     resolved_seed = resolve_seed(seed)
@@ -1181,6 +1654,7 @@ def run(
         seed=resolved_seed,
         safety_config=effective_safety_config,
         sensor_model=sensor_model,
+        predictor=predictor,
     )
     
     for event in stress_events:
@@ -1204,6 +1678,7 @@ def run(
         "export_audit": False,
         "generate_report": True,
         "safety_config": asdict(effective_safety_config),
+        "predictor_path": str(predictor_path) if predictor_path else None,
     }
     config_path = output_dir / "config.json"
     write_json(config_path, config_payload)
@@ -1261,6 +1736,7 @@ def run(
 @app.command("run-full")
 def run_full(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
     patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient')")] = "default_patient",
     patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
     scenario_path: Annotated[Optional[Path], typer.Option(help="Path to the scenario JSON file")] = None,
@@ -1282,10 +1758,16 @@ def run_full(
     safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff", help="Hard hypo cutoff (mg/dL)")] = None,
     safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose", help="Critical glucose threshold (mg/dL)")] = None,
     safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration", help="Critical glucose duration (minutes)")] = None,
+    safety_predictor_uncertainty_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-uncertainty-gate", help="Enable predictor uncertainty gate")] = None,
+    safety_predictor_uncertainty_max_std_mgdl: Annotated[Optional[float], typer.Option("--safety-predictor-max-std", help="Max allowed predictor std (mg/dL) before fallback")] = None,
+    safety_predictor_ood_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-ood-gate", help="Enable predictor OOD gate")] = None,
+    safety_predictor_ood_zscore_threshold: Annotated[Optional[float], typer.Option("--safety-predictor-ood-z", help="Predictor OOD z-score threshold")] = None,
+    safety_predictor_ood_max_feature_fraction: Annotated[Optional[float], typer.Option("--safety-predictor-ood-feature-fraction", help="Max fraction of features allowed OOD")] = None,
 ):
     """One-line runner: results CSV + audit + PDF + baseline comparison."""
     console = Console()
     algorithm_instance = _load_algorithm_instance(algo, console)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
 
     patient_config: Union[str, Path]
     if patient_config_path:
@@ -1311,6 +1793,11 @@ def run_full(
         hypo_cutoff=safety_hypo_cutoff,
         critical_glucose_threshold=safety_critical_glucose_threshold,
         critical_glucose_duration_minutes=safety_critical_glucose_duration_minutes,
+        predictor_uncertainty_gate_enabled=safety_predictor_uncertainty_gate_enabled,
+        predictor_uncertainty_max_std_mgdl=safety_predictor_uncertainty_max_std_mgdl,
+        predictor_ood_gate_enabled=safety_predictor_ood_gate_enabled,
+        predictor_ood_zscore_threshold=safety_predictor_ood_zscore_threshold,
+        predictor_ood_max_feature_fraction=safety_predictor_ood_max_feature_fraction,
     )
 
     outputs = iints.run_full(
@@ -1322,6 +1809,7 @@ def run_full(
         seed=seed,
         output_dir=output_dir,
         safety_config=safety_config,
+        predictor=predictor,
     )
 
     console.print("[green]Run complete.[/green]")
@@ -1346,6 +1834,7 @@ def run_full(
 @app.command("run-parallel")
 def run_parallel(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
     scenarios_dir: Annotated[Optional[Path], typer.Option(help="Directory with scenario JSON files")] = None,
     scenario_paths: Annotated[List[Path], typer.Option("--scenario-path", help="Scenario JSON path (repeatable)")] = [],
     patient_config_name: Annotated[str, typer.Option(help="Patient config name")] = "default_patient",
@@ -1373,10 +1862,17 @@ def run_parallel(
     safety_hypo_cutoff: Annotated[Optional[float], typer.Option("--safety-hypo-cutoff")] = None,
     safety_critical_glucose_threshold: Annotated[Optional[float], typer.Option("--safety-critical-glucose")] = None,
     safety_critical_glucose_duration_minutes: Annotated[Optional[int], typer.Option("--safety-critical-duration")] = None,
+    safety_predictor_uncertainty_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-uncertainty-gate")] = None,
+    safety_predictor_uncertainty_max_std_mgdl: Annotated[Optional[float], typer.Option("--safety-predictor-max-std")] = None,
+    safety_predictor_ood_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-ood-gate")] = None,
+    safety_predictor_ood_zscore_threshold: Annotated[Optional[float], typer.Option("--safety-predictor-ood-z")] = None,
+    safety_predictor_ood_max_feature_fraction: Annotated[Optional[float], typer.Option("--safety-predictor-ood-feature-fraction")] = None,
 ):
     """Run many scenarios in parallel across CPU cores."""
     console = Console()
     base_seed = resolve_seed(seed)
+    if predictor_path is not None:
+        _load_predictor_service_from_path(predictor_path, console)
     if scenarios_dir is None and not scenario_paths:
         console.print("[bold red]Provide --scenarios-dir or at least one --scenario-path.[/bold red]")
         raise typer.Exit(code=1)
@@ -1427,6 +1923,11 @@ def run_parallel(
         "hypo_cutoff": safety_hypo_cutoff,
         "critical_glucose_threshold": safety_critical_glucose_threshold,
         "critical_glucose_duration_minutes": safety_critical_glucose_duration_minutes,
+        "predictor_uncertainty_gate_enabled": safety_predictor_uncertainty_gate_enabled,
+        "predictor_uncertainty_max_std_mgdl": safety_predictor_uncertainty_max_std_mgdl,
+        "predictor_ood_gate_enabled": safety_predictor_ood_gate_enabled,
+        "predictor_ood_zscore_threshold": safety_predictor_ood_zscore_threshold,
+        "predictor_ood_max_feature_fraction": safety_predictor_ood_max_feature_fraction,
     }
     safety_overrides = {k: v for k, v in safety_overrides.items() if v is not None}
 
@@ -1451,6 +1952,7 @@ def run_parallel(
                     "export_audit": export_audit,
                     "generate_report": generate_report,
                     "safety_overrides": safety_overrides,
+                    "predictor_path": str(predictor_path) if predictor_path else None,
                 }
             )
             idx += 1
@@ -1480,6 +1982,127 @@ def run_parallel(
     summary_path = output_dir / "batch_summary.csv"
     summary_df.to_csv(summary_path, index=False)
     console.print(f"[green]Batch summary saved:[/green] {summary_path}")
+
+
+@app.command("scorecard")
+def scorecard(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
+    presets_csv: Annotated[Optional[str], typer.Option(help="Comma-separated preset names (default: all bundled presets)")] = None,
+    output_dir: Annotated[Path, typer.Option(help="Output directory for scorecard artifacts")] = Path("results/scorecard"),
+    seed: Annotated[Optional[int], typer.Option(help="Base random seed")] = 42,
+):
+    """
+    Run a scenario bank and generate a validation scorecard.
+    """
+    console = Console()
+    algorithm_template = _load_algorithm_instance(algo, console)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
+    try:
+        profiles = load_validation_profiles()
+    except Exception as exc:
+        console.print(f"[bold red]Could not load validation profiles: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+    selected_profile = profiles.get(profile)
+    if selected_profile is None:
+        console.print(f"[bold red]Unknown profile '{profile}'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    all_presets = _load_presets()
+    selected_names: Optional[set[str]] = None
+    if presets_csv:
+        selected_names = {name.strip() for name in presets_csv.split(",") if name.strip()}
+    presets_to_run = [
+        preset for preset in all_presets
+        if selected_names is None or preset.get("name") in selected_names
+    ]
+    if not presets_to_run:
+        console.print("[bold red]No presets selected for scorecard.[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    seed_base = resolve_seed(seed)
+    rows: List[Dict[str, Any]] = []
+    for idx, preset in enumerate(presets_to_run):
+        preset_name = str(preset.get("name", f"preset_{idx}"))
+        scenario_payload = preset.get("scenario")
+        if not isinstance(scenario_payload, dict):
+            console.print(f"[yellow]Skipping {preset_name}: no scenario payload[/yellow]")
+            continue
+
+        run_output_dir = output_dir / preset_name
+        algorithm_instance = algorithm_template.__class__()
+        outputs = iints.run_simulation(
+            algorithm=algorithm_instance,
+            scenario=scenario_payload,
+            patient_config=str(preset.get("patient_config", "default_patient")),
+            duration_minutes=int(preset.get("duration_minutes", 720)),
+            time_step=int(preset.get("time_step_minutes", 5)),
+            seed=seed_base + idx,
+            output_dir=run_output_dir,
+            compare_baselines=False,
+            export_audit=True,
+            generate_report=False,
+            predictor=predictor,
+        )
+        results_df = outputs["results"]
+        safety_report = outputs.get("safety_report", {})
+        validation = evaluate_run(
+            results_df,
+            profile=selected_profile,
+            safety_report=safety_report,
+            duration_minutes=int(preset.get("duration_minutes", 720)),
+        )
+
+        rows.append(
+            {
+                "preset": preset_name,
+                "passed": validation.passed,
+                "required_checks_passed": validation.required_checks_passed,
+                "required_checks_total": validation.required_checks_total,
+                "validation_score": validation.score,
+                "tir_70_180": validation.metrics.get("tir_70_180"),
+                "tir_below_70": validation.metrics.get("tir_below_70"),
+                "tir_below_54": validation.metrics.get("tir_below_54"),
+                "cv": validation.metrics.get("cv"),
+                "safety_index": validation.metrics.get("safety_index"),
+                "supervisor_interventions_per_hour": validation.metrics.get("supervisor_interventions_per_hour"),
+                "output_dir": str(run_output_dir),
+            }
+        )
+
+        (run_output_dir / "validation_report.json").write_text(json.dumps(validation.to_dict(), indent=2))
+
+    if not rows:
+        console.print("[bold red]Scorecard produced no rows.[/bold red]")
+        raise typer.Exit(code=1)
+
+    scorecard_df = pd.DataFrame(rows).sort_values(by=["passed", "validation_score"], ascending=[False, False])
+    scorecard_csv = output_dir / "scorecard.csv"
+    scorecard_json = output_dir / "scorecard.json"
+    scorecard_df.to_csv(scorecard_csv, index=False)
+    scorecard_json.write_text(json.dumps(rows, indent=2))
+
+    table = Table(title=f"Scenario Bank Scorecard ({selected_profile.profile_id})")
+    table.add_column("Preset", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Checks", justify="right")
+    table.add_column("Score", justify="right")
+    table.add_column("TIR", justify="right")
+    table.add_column("T<70", justify="right")
+    for row in rows:
+        table.add_row(
+            str(row["preset"]),
+            "[green]PASS[/green]" if bool(row["passed"]) else "[red]FAIL[/red]",
+            f"{int(row['required_checks_passed'])}/{int(row['required_checks_total'])}",
+            f"{float(row['validation_score']):.1f}",
+            f"{float(row['tir_70_180']):.1f}",
+            f"{float(row['tir_below_70']):.1f}",
+        )
+    console.print(table)
+    console.print(f"[green]Scorecard CSV:[/green] {scorecard_csv}")
+    console.print(f"[green]Scorecard JSON:[/green] {scorecard_json}")
 
 @app.command()
 def report(
@@ -2049,6 +2672,214 @@ def research_export_onnx(
         raise typer.Exit(code=1)
 
     console.print(f"[green]ONNX written to:[/green] {out}")
+
+
+@research_app.command("audit-split")
+def research_audit_split(
+    data: Annotated[Path, typer.Option(help="Prepared dataset path (CSV/Parquet)")],
+    history_steps: Annotated[int, typer.Option(help="History window length")] = 48,
+    horizon_steps: Annotated[int, typer.Option(help="Forecast horizon length")] = 6,
+    feature_columns_csv: Annotated[str, typer.Option(help="Comma-separated feature columns")] = "glucose_actual_mgdl,patient_iob_units,patient_cob_grams,effective_isf,effective_icr,effective_basal_rate_u_per_hr,glucose_trend_mgdl_min",
+    target_column: Annotated[str, typer.Option(help="Target column")] = "glucose_actual_mgdl",
+    subject_column: Annotated[str, typer.Option(help="Subject ID column")] = "subject_id",
+    segment_column: Annotated[Optional[str], typer.Option(help="Segment column (optional)")] = "segment_id",
+    output_json: Annotated[Optional[Path], typer.Option(help="Write audit report JSON")] = None,
+):
+    """
+    Audit subject-level leakage and window overlap for train/val/test splits.
+    """
+    console = Console()
+    if not data.exists():
+        console.print(f"[bold red]Dataset not found: {data}[/bold red]")
+        raise typer.Exit(code=1)
+
+    from iints.research.dataset import load_dataset
+    from iints.research.audit import audit_subject_split_and_leakage
+
+    df = load_dataset(data)
+    feature_columns = [col.strip() for col in feature_columns_csv.split(",") if col.strip()]
+    report = audit_subject_split_and_leakage(
+        df,
+        history_steps=history_steps,
+        horizon_steps=horizon_steps,
+        feature_columns=feature_columns,
+        target_column=target_column,
+        subject_column=subject_column,
+        segment_column=segment_column,
+    )
+
+    table = Table(title="Leakage & Split Audit")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Leakage free", "[green]yes[/green]" if report["leakage_free"] else "[red]no[/red]")
+    table.add_row("Train subjects", str(report["subject_counts"]["train"]))
+    table.add_row("Val subjects", str(report["subject_counts"]["val"]))
+    table.add_row("Test subjects", str(report["subject_counts"]["test"]))
+    table.add_row("Train windows", str(report["sequence_counts"]["train"]))
+    table.add_row("Val windows", str(report["sequence_counts"]["val"]))
+    table.add_row("Test windows", str(report["sequence_counts"]["test"]))
+    table.add_row("Overlap train/val", str(report["sequence_overlap_counts"]["train_val"]))
+    table.add_row("Overlap train/test", str(report["sequence_overlap_counts"]["train_test"]))
+    table.add_row("Overlap val/test", str(report["sequence_overlap_counts"]["val_test"]))
+    console.print(table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report, indent=2))
+        console.print(f"[green]Audit report written:[/green] {output_json}")
+
+    if not report["leakage_free"]:
+        raise typer.Exit(code=1)
+
+
+@research_app.command("evaluate-forecast")
+def research_evaluate_forecast(
+    input_csv: Annotated[Path, typer.Option(help="CSV with observed/predicted columns")],
+    observed_column: Annotated[str, typer.Option(help="Observed glucose column")] = "glucose_actual_mgdl",
+    predicted_column: Annotated[str, typer.Option(help="Predicted glucose column")] = "predicted_glucose_ai_30min",
+    predicted_std_column: Annotated[Optional[str], typer.Option(help="Optional prediction std column")] = "predictor_uncertainty_std_mgdl",
+    output_json: Annotated[Optional[Path], typer.Option(help="Write metrics JSON")] = None,
+):
+    """
+    Calibration-first forecast evaluation (global, band-wise, and alarm quality).
+    """
+    console = Console()
+    if not input_csv.exists():
+        console.print(f"[bold red]Input CSV not found: {input_csv}[/bold red]")
+        raise typer.Exit(code=1)
+    df = pd.read_csv(input_csv)
+    for col in (observed_column, predicted_column):
+        if col not in df.columns:
+            console.print(f"[bold red]Missing column: {col}[/bold red]")
+            raise typer.Exit(code=1)
+
+    from iints.research.evaluation import forecast_error_report
+
+    observed = df[observed_column].to_numpy(dtype=float)
+    predicted = df[predicted_column].to_numpy(dtype=float)
+    predicted_std = None
+    if predicted_std_column and predicted_std_column in df.columns:
+        predicted_std = df[predicted_std_column].to_numpy(dtype=float)
+
+    report = forecast_error_report(observed, predicted, predicted_std)
+
+    table = Table(title="Forecast Evaluation")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Samples", str(report["n"]))
+    table.add_row("MAE", f"{report['mae']:.3f}")
+    table.add_row("RMSE", f"{report['rmse']:.3f}")
+    table.add_row("Bias", f"{report['bias']:.3f}")
+    table.add_row("Within ±10 mg/dL (%)", f"{report['within_10_mgdl_pct']:.2f}")
+    table.add_row("Within ±20 mg/dL (%)", f"{report['within_20_mgdl_pct']:.2f}")
+    table.add_row("False hypo alarm (%)", f"{report['false_hypo_alarm_rate_pct']:.2f}")
+    table.add_row("Missed hypo (%)", f"{report['missed_hypo_rate_pct']:.2f}")
+    if "interval_95_coverage_pct" in report:
+        table.add_row("95% interval coverage (%)", f"{report['interval_95_coverage_pct']:.2f}")
+        table.add_row("Mean predicted std (mg/dL)", f"{report['mean_predicted_std_mgdl']:.3f}")
+    console.print(table)
+
+    band_table = Table(title="Band-wise Error")
+    band_table.add_column("Band", style="cyan")
+    band_table.add_column("Count", justify="right")
+    band_table.add_column("MAE", justify="right")
+    band_table.add_column("RMSE", justify="right")
+    band_table.add_column("Bias", justify="right")
+    for band, values in report["band_metrics"].items():
+        band_table.add_row(
+            band,
+            f"{values['count']:.0f}",
+            f"{values['mae']:.3f}" if not np.isnan(values["mae"]) else "n/a",
+            f"{values['rmse']:.3f}" if not np.isnan(values["rmse"]) else "n/a",
+            f"{values['bias']:.3f}" if not np.isnan(values["bias"]) else "n/a",
+        )
+    console.print(band_table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report, indent=2))
+        console.print(f"[green]Forecast metrics written:[/green] {output_json}")
+
+
+@research_app.command("parity-check")
+def research_parity_check(
+    model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")],
+    onnx: Annotated[Path, typer.Option(help="Exported ONNX model path")],
+    samples: Annotated[int, typer.Option(help="Random sample count for parity check")] = 64,
+    tolerance: Annotated[float, typer.Option(help="Maximum allowed absolute error")] = 1e-3,
+    seed: Annotated[int, typer.Option(help="Random seed")] = 42,
+    output_json: Annotated[Optional[Path], typer.Option(help="Write parity report JSON")] = None,
+):
+    """
+    Check Torch vs ONNX parity and report edge latency.
+    """
+    console = Console()
+    if not model.exists():
+        console.print(f"[bold red]Model not found: {model}[/bold red]")
+        raise typer.Exit(code=1)
+    if not onnx.exists():
+        console.print(f"[bold red]ONNX model not found: {onnx}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        import onnxruntime as ort
+    except Exception as exc:
+        console.print("[bold red]onnxruntime is required for parity-check.[/bold red]")
+        console.print(f"[red]Details:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    from iints.research.predictor import load_predictor_service
+
+    predictor = load_predictor_service(model)
+    feature_count = len(predictor.feature_columns)
+    history_steps = int(predictor.history_steps)
+    rng = np.random.default_rng(seed)
+    X = rng.normal(size=(samples, history_steps, feature_count)).astype(np.float32)
+
+    t0 = time.perf_counter()
+    torch_pred = predictor.predict(X)
+    torch_latency_ms = (time.perf_counter() - t0) * 1000.0
+
+    session = ort.InferenceSession(str(onnx), providers=["CPUExecutionProvider"])
+    input_name = session.get_inputs()[0].name
+    t1 = time.perf_counter()
+    onnx_pred = session.run(None, {input_name: X})[0]
+    onnx_latency_ms = (time.perf_counter() - t1) * 1000.0
+
+    diff = np.abs(torch_pred - onnx_pred)
+    max_abs = float(np.max(diff))
+    mean_abs = float(np.mean(diff))
+    passed = max_abs <= tolerance
+
+    report = {
+        "samples": samples,
+        "tolerance": tolerance,
+        "max_abs_diff": max_abs,
+        "mean_abs_diff": mean_abs,
+        "torch_latency_ms": torch_latency_ms,
+        "onnx_latency_ms": onnx_latency_ms,
+        "passed": passed,
+    }
+
+    table = Table(title="Torch/ONNX Parity")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_row("Samples", str(samples))
+    table.add_row("Tolerance", f"{tolerance:.6f}")
+    table.add_row("Max abs diff", f"{max_abs:.6f}")
+    table.add_row("Mean abs diff", f"{mean_abs:.6f}")
+    table.add_row("Torch latency (ms)", f"{torch_latency_ms:.2f}")
+    table.add_row("ONNX latency (ms)", f"{onnx_latency_ms:.2f}")
+    table.add_row("Status", "[green]PASS[/green]" if passed else "[red]FAIL[/red]")
+    console.print(table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report, indent=2))
+        console.print(f"[green]Parity report written:[/green] {output_json}")
+
+    if not passed:
+        raise typer.Exit(code=1)
 
 
 @app.command("import-data")

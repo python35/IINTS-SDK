@@ -12,6 +12,8 @@ from .dataset import (
 from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
 from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
 from .metrics import regression_metrics, band_regression_metrics, interval_coverage_metrics
+from .evaluation import forecast_error_report
+from .audit import audit_subject_split_and_leakage
 
 __all__ = [
     "PredictorConfig",
@@ -34,4 +36,6 @@ __all__ = [
     "regression_metrics",
     "band_regression_metrics",
     "interval_coverage_metrics",
+    "forecast_error_report",
+    "audit_subject_split_and_leakage",
 ]

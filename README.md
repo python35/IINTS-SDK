@@ -27,6 +27,24 @@ IINTS-AF is a **safety-first simulation and validation platform** for insulin do
 * ML engineers benchmarking AI controllers with medical safety rails
 * Developers building decision-support systems for closed-loop insulin delivery
 
+## From Black Box To Open Logic
+
+IINTS-AF uses a **Dual-Guard Security Architecture**: AI is advisory, deterministic safety logic is authoritative.
+
+**Layer 1 — InputValidator (Validation)**  
+Biological plausibility filter on incoming glucose signals.  
+It rejects or fail-soft clamps implausible values/rates so sensor artifacts do not propagate into control logic.
+
+**Layer 2 — Intelligence (Forecasting)**  
+LSTM predictor models hidden glucose/insulin dynamics and provides future glucose forecasts (e.g., 30-120 min horizon).  
+These outputs are advisory signals for safety assessment, not direct therapy commands.
+
+**Layer 3 — Independent Supervisor (Supervision)**  
+Deterministic safety layer validates every proposed dose against hard constraints (IOB caps, hypo prevention, trend checks, contract rules).  
+Supervisor decisions override algorithm outputs when risk is detected and are recorded in the audit trail.
+
+This architecture is designed to be auditable and explainable for research reviews, clinical discussions, and edge deployment demonstrations.
+
 ## Installation
 
 Install the SDK directly via PyPI:
@@ -49,6 +67,16 @@ iints run-full --algo algorithms/example_algorithm.py \
   --output-dir results/run_full
 ```
 By default, runs write to `results/<run_id>/` and include `config.json`, `run_metadata.json`, and `run_manifest.json`.
+
+Dual-Guard AI run (paper architecture: AI proposal + deterministic supervisor):
+```bash
+iints run-full \
+  --algo algorithms/example_algorithm.py \
+  --predictor models/hupa_finetuned_v2/predictor.pt \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --output-dir results/dual_guard
+```
+This keeps control deterministic: predictor signals are advisory only, final dosing remains supervisor-constrained.
 
 Import real-world CGM data:
 ```bash
@@ -95,6 +123,16 @@ iints run-parallel --algo algorithms/example_algorithm.py --scenarios-dir scenar
 Interactive run wizard:
 ```bash
 iints run-wizard
+```
+
+Developer health + validation gates:
+```bash
+iints doctor --smoke-run
+iints validation-profiles
+iints validate-run --results-csv results/run_full/results.csv --profile research_default
+iints contract-verify --output-json results/contract_report.json
+iints certify-run --algo algorithms/example_algorithm.py --profile strict_safety --output-dir results/certified
+iints scorecard --algo algorithms/example_algorithm.py --profile research_default --output-dir results/scorecard
 ```
 
 Algorithm registry:
@@ -148,6 +186,13 @@ Train a starter predictor:
 ```bash
 python research/synthesize_dataset.py --runs 25 --output data/synthetic.parquet
 python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
+```
+
+Audit data leakage and forecast calibration:
+```bash
+iints research audit-split --data data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv
+iints research evaluate-forecast --input-csv results/dual_guard/results.csv
+iints research parity-check --model models/hupa_finetuned_v2/predictor.pt --onnx models/hupa_finetuned_v2/predictor.onnx
 ```
 
 Integrate:

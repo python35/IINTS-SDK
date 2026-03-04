@@ -2,10 +2,26 @@
 
 ## Unreleased
 
-- (empty)
+- No unreleased entries.
 
 ## v0.1.20
 
+- Added profile-driven run validation engine (`iints validate-run`) with bundled threshold profiles (`screening`, `research_default`, `strict_safety`).
+- Added `iints validation-profiles` to inspect available validation gates.
+- Added `iints doctor` environment health-check with optional smoke simulation.
+- Added Dual-Guard predictor wiring in CLI (`run`, `run-full`, `run-parallel`, `presets run`) via `--predictor` checkpoint option.
+- Added predictor safety gates in simulator (uncertainty gate + out-of-distribution gate) with audit fields.
+- Added formal safety-contract compiler/verifier command (`iints contract-verify`) and packaged default contract spec.
+- Added leakage/split auditing (`iints research audit-split`) with sequence-overlap checks.
+- Added calibration-first forecast evaluator (`iints research evaluate-forecast`) with band-wise error and alarm-quality metrics.
+- Added scenario-bank scorecards (`iints scorecard`) and one-command certification pipeline (`iints certify-run`).
+- Added edge parity checks (`iints research parity-check`) for Torch vs ONNX output drift and latency.
+- Added predictor metadata capture in run config payloads for reproducibility.
+- Added demo scripts under `examples/demos/` including Open-Logic architecture showcase.
+- Added InputValidator telemetry in simulator outputs (`input_validator_fail_soft` and summary counters).
+- Hardened predictor evaluation pipeline to enforce checkpoint-compatible feature/scaler shapes and robust meal-announcement reconstruction.
+- Added OhioT1DM v2 training config (`predictor_ohio_dual_guard_v2.yaml`) with band-weighted loss + early stopping + meal preannounce support.
+- Added tests for validation engine + CLI commands and updated packaging to include validation profile YAML.
 - Fixed run-manifest safety/reporting bugs in CLI (`audit_summary` existence check and duplicate manifest signing call).
 - Removed simulator global NumPy seeding side effect to avoid cross-run randomness coupling.
 - Hardened safety core typing and enabled strict mypy gate for supervisor/input-validator modules.

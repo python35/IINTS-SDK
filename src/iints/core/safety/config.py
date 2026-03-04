@@ -26,6 +26,12 @@ class SafetyConfig:
     max_basal_multiplier: float = 3.0
     predicted_hypoglycemia_threshold: float = 60.0
     predicted_hypoglycemia_horizon_minutes: int = 30
+    predictor_mc_dropout_samples: int = 30
+    predictor_uncertainty_gate_enabled: bool = True
+    predictor_uncertainty_max_std_mgdl: float = 20.0
+    predictor_ood_gate_enabled: bool = True
+    predictor_ood_zscore_threshold: float = 4.0
+    predictor_ood_max_feature_fraction: float = 0.30
 
     # Formal safety contract (logic validation)
     contract_enabled: bool = True

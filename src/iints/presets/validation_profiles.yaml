@@ -1,0 +1,78 @@
+version: 1
+profiles:
+  research_default:
+    description: "Balanced default profile for retrospective algorithm validation."
+    min_duration_minutes: 240
+    checks:
+      - metric: tir_70_180
+        op: ">="
+        threshold: 60
+        label: "TIR 70-180 (%)"
+      - metric: tir_below_70
+        op: "<="
+        threshold: 8
+        label: "Time <70 mg/dL (%)"
+      - metric: tir_below_54
+        op: "<="
+        threshold: 2
+        label: "Time <54 mg/dL (%)"
+      - metric: cv
+        op: "<="
+        threshold: 40
+        label: "Coefficient of variation (%)"
+      - metric: supervisor_interventions_per_hour
+        op: "<="
+        threshold: 6
+        label: "Supervisor interventions / hour"
+      - metric: terminated_early
+        op: "=="
+        threshold: 0
+        label: "Terminated early flag"
+  strict_safety:
+    description: "Conservative profile intended for safety-critical benchmark gates."
+    min_duration_minutes: 720
+    checks:
+      - metric: tir_70_180
+        op: ">="
+        threshold: 70
+        label: "TIR 70-180 (%)"
+      - metric: tir_below_70
+        op: "<="
+        threshold: 4
+        label: "Time <70 mg/dL (%)"
+      - metric: tir_below_54
+        op: "<="
+        threshold: 1
+        label: "Time <54 mg/dL (%)"
+      - metric: cv
+        op: "<="
+        threshold: 36
+        label: "Coefficient of variation (%)"
+      - metric: safety_index
+        op: ">="
+        threshold: 75
+        label: "Safety index"
+      - metric: supervisor_interventions_per_hour
+        op: "<="
+        threshold: 4
+        label: "Supervisor interventions / hour"
+      - metric: terminated_early
+        op: "=="
+        threshold: 0
+        label: "Terminated early flag"
+  screening:
+    description: "Fast screening profile for development iterations."
+    min_duration_minutes: 120
+    checks:
+      - metric: tir_70_180
+        op: ">="
+        threshold: 50
+        label: "TIR 70-180 (%)"
+      - metric: tir_below_54
+        op: "<="
+        threshold: 3
+        label: "Time <54 mg/dL (%)"
+      - metric: terminated_early
+        op: "=="
+        threshold: 0
+        label: "Terminated early flag"

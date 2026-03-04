@@ -86,4 +86,5 @@ iints = [
   "data/virtual_patients/*.yaml",
   "data/demo/*.csv",
   "presets/*.json",
+  "presets/*.yaml",
 ]

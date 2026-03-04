@@ -10,6 +10,23 @@ from pydantic import ValidationError
 
 from iints.core.simulator import StressEvent
 from iints.validation.schemas import ScenarioModel, StressEventModel, PatientConfigModel, LATEST_SCHEMA_VERSION
+from iints.validation.run_validation import (
+    ValidationRule,
+    ValidationProfile,
+    ValidationCheckResult,
+    RunValidationReport,
+    load_validation_profiles,
+    compute_run_metrics,
+    evaluate_run,
+)
+from iints.validation.safety_contract import (
+    SafetyContractSpec,
+    SafetyContractViolation,
+    SafetyContractVerificationReport,
+    load_contract_spec,
+    apply_contract_to_config,
+    verify_safety_contract,
+)
 
 
 def _convert_legacy_scenario(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,3 +148,34 @@ def format_validation_error(error: ValidationError) -> List[str]:
         msg = entry.get("msg", "Invalid value")
         lines.append(f"{loc}: {msg}")
     return lines
+
+
+__all__ = [
+    "StressEventModel",
+    "ScenarioModel",
+    "PatientConfigModel",
+    "LATEST_SCHEMA_VERSION",
+    "ValidationRule",
+    "ValidationProfile",
+    "ValidationCheckResult",
+    "RunValidationReport",
+    "SafetyContractSpec",
+    "SafetyContractViolation",
+    "SafetyContractVerificationReport",
+    "load_scenario",
+    "validate_scenario_dict",
+    "scenario_warnings",
+    "build_stress_events",
+    "scenario_to_payloads",
+    "validate_patient_config_dict",
+    "load_patient_config",
+    "load_patient_config_by_name",
+    "load_validation_profiles",
+    "compute_run_metrics",
+    "evaluate_run",
+    "load_contract_spec",
+    "apply_contract_to_config",
+    "verify_safety_contract",
+    "format_validation_error",
+    "migrate_scenario_dict",
+]

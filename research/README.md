@@ -54,17 +54,23 @@ PYTHONPATH=src python3 research/train_predictor.py \
 OhioT1DM (CGM + insulin + carbs) preparation and training:
 ```bash
 PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
-  --input data_packs/public/ohio_t1dm \
-  --output data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv
+  --input data_packs/public/OhioT1DM \
+  --output data_packs/public/OhioT1DM/processed/ohio_merged.csv
 
 PYTHONPATH=src python3 research/train_predictor.py \
-  --data data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv \
-  --config research/configs/predictor_ohio_dual_guard.yaml \
+  --data data_packs/public/OhioT1DM/processed/ohio_merged.csv \
+  --config research/configs/predictor_ohio_dual_guard_v2.yaml \
   --out models/ohio_dual_guard
 ```
 Note: The bundled Ohio pack in this repo contains only a few subjects. For a
 research‑grade model, add more subjects and/or pretrain on synthetic/AZT1D,
 then fine‑tune on OhioT1DM.
+
+Recommended v2 recipe details:
+- Subject-level holdout split (leakage-safe).
+- Band-weighted loss (extra emphasis for hypo/hyper ranges).
+- Meal pre-announcement feature reconstruction (`meal_announcement_grams`).
+- Early stopping for stability and better generalization.
 
 HUPA-UCM (CGM + insulin + carbs + activity) preparation:
 ```bash
@@ -113,6 +119,10 @@ python research/train_predictor.py --data data/training.parquet --config researc
 ```bash
 python research/evaluate_predictor.py --data data/validation.parquet --model models/predictor.pt
 ```
+
+`evaluate_predictor.py` now enforces checkpoint-compatible feature dimensions and
+reconstructs optional meal-announcement features when configured, so evaluation
+cannot silently drift from the training pipeline.
 
 MC Dropout calibration run (95% interval coverage + band metrics):
 ```bash

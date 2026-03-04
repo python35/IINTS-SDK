@@ -1,0 +1,3 @@
+contract_enabled: true
+contract_glucose_threshold: 90.0
+contract_trend_threshold_mgdl_min: -1.0

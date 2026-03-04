@@ -159,6 +159,11 @@ class Simulator:
             "supervisor_latency_ms": [],
             "step_latency_ms": [],
         }
+        # Layer-1 telemetry (InputValidator)
+        self._input_validator_fail_soft_count = 0
+        self._input_validator_negative_insulin_clamp_count = 0
+        self._input_validator_last_error: Optional[str] = None
+        self._input_validator_last_step_fail_soft = False
         if self.audit_log_path:
             # Clear the log file at the beginning of a simulation run
             try:
@@ -190,14 +195,58 @@ class Simulator:
         except Exception:
             return
 
-    def _predict_with_model(self, feature_row: Dict[str, float], fallback: float) -> Tuple[float, float]:
+    def _predictor_ood_status(self, current_vector: np.ndarray) -> Dict[str, Any]:
+        if self.predictor is None:
+            return {
+                "in_distribution": True,
+                "max_zscore": 0.0,
+                "feature_fraction_over_threshold": 0.0,
+            }
+        scaler = getattr(self.predictor, "scaler", None)
+        center = getattr(scaler, "_center", None)
+        scale = getattr(scaler, "_scale", None)
+        if center is None or scale is None:
+            return {
+                "in_distribution": True,
+                "max_zscore": 0.0,
+                "feature_fraction_over_threshold": 0.0,
+            }
+
+        safe_scale = np.where(np.abs(scale) < 1e-8, 1.0, np.abs(scale))
+        z_scores = np.abs((current_vector - center) / safe_scale)
+        max_zscore = float(np.max(z_scores))
+        threshold = float(self.safety_config.predictor_ood_zscore_threshold)
+        fraction = float(np.mean(z_scores > threshold))
+        in_distribution = not (
+            self.safety_config.predictor_ood_gate_enabled
+            and (
+                max_zscore > threshold
+                or fraction > float(self.safety_config.predictor_ood_max_feature_fraction)
+            )
+        )
+        return {
+            "in_distribution": in_distribution,
+            "max_zscore": max_zscore,
+            "feature_fraction_over_threshold": fraction,
+        }
+
+    def _predict_with_model(self, feature_row: Dict[str, float], fallback: float) -> Tuple[float, float, Dict[str, Any]]:
         """
-        Returns (ai_prediction, heuristic_prediction). If model fails or lacks history,
+        Returns (ai_prediction, heuristic_prediction, meta). If model fails or lacks history,
         ai_prediction falls back to heuristic_prediction.
         """
+        meta: Dict[str, Any] = {
+            "predictor_used": False,
+            "predictor_gate_reason": "none",
+            "predictor_uncertainty_std_mgdl": None,
+            "predictor_in_distribution": True,
+            "predictor_ood_max_zscore": 0.0,
+            "predictor_ood_feature_fraction": 0.0,
+        }
         self._predictor_history.append(feature_row)
         if len(self._predictor_history) < self._predictor_history_steps:
-            return fallback, fallback
+            meta["predictor_gate_reason"] = "warmup"
+            return fallback, fallback, meta
 
         history_slice = self._predictor_history[-self._predictor_history_steps :]
         try:
@@ -208,23 +257,69 @@ class Simulator:
                 for j, col in enumerate(self._predictor_feature_columns):
                     X[0, i, j] = float(row.get(col, 0.0))
 
+            ood_status = self._predictor_ood_status(X[0, -1, :])
+            meta["predictor_in_distribution"] = bool(ood_status["in_distribution"])
+            meta["predictor_ood_max_zscore"] = float(ood_status["max_zscore"])
+            meta["predictor_ood_feature_fraction"] = float(ood_status["feature_fraction_over_threshold"])
+            if not bool(ood_status["in_distribution"]):
+                meta["predictor_gate_reason"] = "ood_gate"
+                return fallback, fallback, meta
+
+            uncertainty_std: Optional[float] = None
+            predict_uncertainty_fn = getattr(self.predictor, "predict_with_uncertainty", None)
+            if callable(predict_uncertainty_fn):
+                mean_pred, std_pred = predict_uncertainty_fn(
+                    X,
+                    n_samples=int(self.safety_config.predictor_mc_dropout_samples),
+                )
+                mean_arr = np.array(mean_pred, dtype=float)
+                std_arr = np.array(std_pred, dtype=float)
+                if mean_arr.ndim == 2:
+                    candidate = float(mean_arr[0, -1])
+                elif mean_arr.ndim == 1:
+                    candidate = float(mean_arr[-1])
+                else:
+                    candidate = float(fallback)
+                if std_arr.ndim == 2:
+                    uncertainty_std = float(std_arr[0, -1])
+                elif std_arr.ndim == 1:
+                    uncertainty_std = float(std_arr[-1])
+                else:
+                    uncertainty_std = None
+                meta["predictor_uncertainty_std_mgdl"] = uncertainty_std
+                if (
+                    self.safety_config.predictor_uncertainty_gate_enabled
+                    and uncertainty_std is not None
+                    and uncertainty_std > float(self.safety_config.predictor_uncertainty_max_std_mgdl)
+                ):
+                    meta["predictor_gate_reason"] = "uncertainty_gate"
+                    return fallback, fallback, meta
+                meta["predictor_used"] = True
+                return candidate, fallback, meta
+
             predict_fn = getattr(self.predictor, "predict", None)
             if not callable(predict_fn):
-                return fallback, fallback
+                meta["predictor_gate_reason"] = "missing_predict_function"
+                return fallback, fallback, meta
             output = predict_fn(X)
             if hasattr(output, "shape"):
                 output_arr = np.array(output, dtype=float)
                 if output_arr.ndim == 2:
-                    return float(output_arr[0, -1]), fallback
+                    meta["predictor_used"] = True
+                    return float(output_arr[0, -1]), fallback, meta
                 if output_arr.ndim == 1:
-                    return float(output_arr[-1]), fallback
+                    meta["predictor_used"] = True
+                    return float(output_arr[-1]), fallback, meta
             if isinstance(output, (list, tuple)) and output:
-                return float(output[-1]), fallback
+                meta["predictor_used"] = True
+                return float(output[-1]), fallback, meta
             if isinstance(output, (float, int)):
-                return float(output), fallback
+                meta["predictor_used"] = True
+                return float(output), fallback, meta
         except Exception:
-            return fallback, fallback
-        return fallback, fallback
+            meta["predictor_gate_reason"] = "predictor_exception"
+            return fallback, fallback, meta
+        return fallback, fallback, meta
 
     def _write_audit_log(self, data: Dict[str, Any]) -> None:
         """Writes a single step's audit data to the JSON log file."""
@@ -247,6 +342,9 @@ class Simulator:
         try:
             return self.input_validator.validate_glucose(glucose_value, current_time)
         except ValueError as exc:
+            self._input_validator_fail_soft_count += 1
+            self._input_validator_last_error = str(exc)
+            self._input_validator_last_step_fail_soft = True
             fallback = self.input_validator.last_valid_glucose
             if fallback is None:
                 fallback = float(
@@ -364,6 +462,11 @@ class Simulator:
         if self._termination_info:
             safety_report["terminated_early"] = True
             safety_report["termination_reason"] = self._termination_info
+        safety_report["input_validator_fail_soft_count"] = int(self._input_validator_fail_soft_count)
+        safety_report["input_validator_negative_insulin_clamp_count"] = int(
+            self._input_validator_negative_insulin_clamp_count
+        )
+        safety_report["input_validator_last_error"] = self._input_validator_last_error
         if self.enable_profiling:
             safety_report["performance_report"] = self._build_performance_report()
         logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
@@ -385,6 +488,7 @@ class Simulator:
             "safety_reason",
             "safety_triggered",
             "supervisor_latency_ms",
+            "input_validator_fail_soft",
             "sensor_status",
             "pump_status",
             "pump_reason",
@@ -407,6 +511,9 @@ class Simulator:
             "total_steps": int(len(audit_df)),
             "total_overrides": int(len(overrides)),
             "top_reasons": reasons,
+            "input_validator_fail_soft_count": int(
+                audit_df["input_validator_fail_soft"].fillna(False).astype(bool).sum()
+            ) if "input_validator_fail_soft" in audit_df.columns else 0,
         }
         if self._termination_info:
             summary["terminated_early"] = True
@@ -446,6 +553,10 @@ class Simulator:
             self._ratio_overrides = []
             self._base_ratio_state = self.patient_model.get_ratio_state()
             self._previous_glucose_for_trend = None
+            self._input_validator_fail_soft_count = 0
+            self._input_validator_negative_insulin_clamp_count = 0
+            self._input_validator_last_error = None
+            self._input_validator_last_step_fail_soft = False
         else:
             self._resume_state = False
         if self.enable_profiling:
@@ -464,6 +575,7 @@ class Simulator:
                 step_start_time = time.perf_counter()
             patient_carb_intake_this_step = 0.0
             algo_carb_intake_this_step = 0.0
+            self._input_validator_last_step_fail_soft = False
             actual_glucose_reading = self.patient_model.get_current_glucose()
             # Validate the raw sensor reading
             actual_glucose_reading = self._validate_glucose_fail_soft(
@@ -563,6 +675,14 @@ class Simulator:
             )
             predicted_glucose_30 = predicted_glucose_heuristic
             predicted_glucose_ai = None
+            predictor_meta: Dict[str, Any] = {
+                "predictor_used": False,
+                "predictor_gate_reason": "disabled",
+                "predictor_uncertainty_std_mgdl": None,
+                "predictor_in_distribution": True,
+                "predictor_ood_max_zscore": 0.0,
+                "predictor_ood_feature_fraction": 0.0,
+            }
             if self.predictor is not None:
                 feature_row = {
                     "glucose_actual_mgdl": float(glucose_to_algorithm),
@@ -573,7 +693,10 @@ class Simulator:
                     "effective_basal_rate_u_per_hr": float(effective_basal),
                     "glucose_trend_mgdl_min": float(glucose_trend),
                 }
-                predicted_glucose_ai, _ = self._predict_with_model(feature_row, predicted_glucose_heuristic)
+                predicted_glucose_ai, _, predictor_meta = self._predict_with_model(
+                    feature_row,
+                    predicted_glucose_heuristic,
+                )
                 predicted_glucose_30 = float(predicted_glucose_ai)
 
             # --- Algorithm Input ---
@@ -589,6 +712,9 @@ class Simulator:
                 basal_rate_u_per_hr=effective_basal,
                 glucose_trend_mgdl_min=glucose_trend,
                 predicted_glucose_30min=predicted_glucose_30,
+                predicted_glucose_30min_std=predictor_meta.get("predictor_uncertainty_std_mgdl"),
+                predictor_in_distribution=bool(predictor_meta.get("predictor_in_distribution", True)),
+                predictor_gate_reason=str(predictor_meta.get("predictor_gate_reason", "none")),
                 patient_state=self.patient_model.get_patient_state(),
                 current_time=float(current_time) # Pass current_time
             )
@@ -603,7 +729,10 @@ class Simulator:
                 insulin_output = self.algorithm.predict_insulin(algo_input)
             algo_recommended_insulin = insulin_output.get("total_insulin_delivered", 0.0)
             # Validate the algorithm's output to prevent negative insulin requests
+            raw_algo_recommended_insulin = float(algo_recommended_insulin)
             algo_recommended_insulin = self.input_validator.validate_insulin(algo_recommended_insulin)
+            if raw_algo_recommended_insulin < 0.0 and algo_recommended_insulin == 0.0:
+                self._input_validator_negative_insulin_clamp_count += 1
             
             # Get the why_log from the algorithm
             algorithm_why_log = self.algorithm.get_why_log()
@@ -649,6 +778,9 @@ class Simulator:
                         "safety_reason": safety_reason,
                         "safety_actions": safety_actions,
                         "predicted_glucose_30min": predicted_glucose_30,
+                        "predictor_gate_reason": predictor_meta.get("predictor_gate_reason"),
+                        "predictor_uncertainty_std_mgdl": predictor_meta.get("predictor_uncertainty_std_mgdl"),
+                        "predictor_in_distribution": predictor_meta.get("predictor_in_distribution", True),
                         "iob_units": self.patient_model.insulin_on_board,
                         "cob_grams": self.patient_model.carbs_on_board,
                     }
@@ -712,6 +844,9 @@ class Simulator:
                                     "safety_reason": safety_reason,
                                     "safety_actions": safety_actions,
                                     "predicted_glucose_30min": predicted_glucose_30,
+                                    "predictor_gate_reason": predictor_meta.get("predictor_gate_reason"),
+                                    "predictor_uncertainty_std_mgdl": predictor_meta.get("predictor_uncertainty_std_mgdl"),
+                                    "predictor_in_distribution": predictor_meta.get("predictor_in_distribution", True),
                                     "iob_units": self.patient_model.insulin_on_board,
                                     "cob_grams": self.patient_model.carbs_on_board,
                                 }
@@ -757,9 +892,16 @@ class Simulator:
                 "predicted_glucose_30min": predicted_glucose_30,
                 "predicted_glucose_heuristic_30min": predicted_glucose_heuristic,
                 "predicted_glucose_ai_30min": predicted_glucose_ai,
+                "predictor_used": predictor_meta.get("predictor_used", False),
+                "predictor_gate_reason": predictor_meta.get("predictor_gate_reason", "none"),
+                "predictor_uncertainty_std_mgdl": predictor_meta.get("predictor_uncertainty_std_mgdl"),
+                "predictor_in_distribution": predictor_meta.get("predictor_in_distribution", True),
+                "predictor_ood_max_zscore": predictor_meta.get("predictor_ood_max_zscore", 0.0),
+                "predictor_ood_feature_fraction": predictor_meta.get("predictor_ood_feature_fraction", 0.0),
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
                 "sensor_status": sensor_reading.status,
+                "input_validator_fail_soft": self._input_validator_last_step_fail_soft,
                 "pump_status": pump_delivery.status,
                 "pump_reason": pump_delivery.reason,
                 "basal_insulin_units": insulin_output.get("basal_insulin", 0.0),

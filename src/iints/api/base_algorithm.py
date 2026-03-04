@@ -19,6 +19,9 @@ class AlgorithmInput:
     basal_rate_u_per_hr: Optional[float] = None
     glucose_trend_mgdl_min: Optional[float] = None
     predicted_glucose_30min: Optional[float] = None
+    predicted_glucose_30min_std: Optional[float] = None
+    predictor_in_distribution: Optional[bool] = None
+    predictor_gate_reason: Optional[str] = None
 
 
 @dataclass

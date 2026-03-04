@@ -14,7 +14,7 @@ except Exception as exc:
         "Torch is required for evaluation. Install with `pip install iints-sdk-python35[research]`."
     ) from exc
 
-from iints.research.config import PredictorConfig
+from iints.research.config import PredictorConfig, TrainingConfig
 from iints.research.dataset import FeatureScaler, build_sequences, compute_dataset_lineage, load_dataset
 from iints.research.metrics import (
     band_regression_metrics,
@@ -41,23 +41,87 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _apply_meal_announcement(
+    df,
+    predictor_cfg: PredictorConfig,
+    training_cfg: TrainingConfig,
+):
+    """
+    Rebuild the optional pre-announced meal feature used during training.
+    """
+    minutes = training_cfg.meal_announcement_minutes
+    feature = training_cfg.meal_announcement_feature
+    if feature not in predictor_cfg.feature_columns:
+        return df
+
+    # If the feature was part of training but no reconstruction settings are
+    # available, fall back to zeros (common in datasets without meal announcements).
+    if minutes is None:
+        if feature not in df.columns:
+            df[feature] = 0.0
+        return df
+
+    source = training_cfg.meal_announcement_column
+    if source not in df.columns:
+        df[feature] = 0.0
+        return df
+
+    shift_steps = int(round(minutes / predictor_cfg.time_step_minutes))
+    if shift_steps <= 0:
+        return df
+
+    group_cols = []
+    if "subject_id" in df.columns:
+        group_cols.append("subject_id")
+    if "segment" in df.columns:
+        group_cols.append("segment")
+
+    sort_cols = [c for c in (*group_cols, "time_minutes") if c in df.columns]
+    if sort_cols:
+        df = df.sort_values(sort_cols).reset_index(drop=True)
+
+    if group_cols:
+        df[feature] = (
+            df.groupby(group_cols, observed=False)[source]
+            .shift(-shift_steps)
+            .fillna(0.0)
+        )
+    else:
+        df[feature] = df[source].shift(-shift_steps).fillna(0.0)
+    return df
+
+
 def main() -> None:
     args = parse_args()
     model, model_cfg = load_predictor(args.model)
+    predictor_cfg = PredictorConfig(
+        history_minutes=int(model_cfg["history_steps"]) * model_cfg.get("time_step_minutes", 5),
+        horizon_minutes=int(model_cfg["horizon_steps"]) * model_cfg.get("time_step_minutes", 5),
+        time_step_minutes=model_cfg.get("time_step_minutes", 5),
+        feature_columns=model_cfg["feature_columns"],
+        target_column=model_cfg["target_column"],
+    )
+    training_cfg = TrainingConfig()
 
     if args.config:
-        cfg = yaml.safe_load(args.config.read_text())
-        predictor_cfg = PredictorConfig(**cfg["predictor"])
-    else:
-        predictor_cfg = PredictorConfig(
-            history_minutes=int(model_cfg["history_steps"]) * model_cfg.get("time_step_minutes", 5),
-            horizon_minutes=int(model_cfg["horizon_steps"]) * model_cfg.get("time_step_minutes", 5),
-            time_step_minutes=model_cfg.get("time_step_minutes", 5),
-            feature_columns=model_cfg["feature_columns"],
-            target_column=model_cfg["target_column"],
-        )
+        cfg = yaml.safe_load(args.config.read_text()) or {}
+        if isinstance(cfg.get("training"), dict):
+            training_cfg = TrainingConfig(**cfg["training"])
+        if isinstance(cfg.get("predictor"), dict):
+            requested_cfg = PredictorConfig(**cfg["predictor"])
+            # Evaluation must match checkpoint architecture/features.
+            if (
+                requested_cfg.feature_columns != predictor_cfg.feature_columns
+                or requested_cfg.history_steps != predictor_cfg.history_steps
+                or requested_cfg.horizon_steps != predictor_cfg.horizon_steps
+            ):
+                print(
+                    "WARNING: --config predictor settings differ from checkpoint; "
+                    "using checkpoint feature/history/horizon to avoid invalid evaluation."
+                )
 
     df = load_dataset(args.data)
+    df = _apply_meal_announcement(df, predictor_cfg, training_cfg)
     X, y = build_sequences(
         df,
         history_steps=predictor_cfg.history_steps,
@@ -77,6 +141,13 @@ def main() -> None:
     scaler_data = model_cfg.get("scaler")
     if scaler_data:
         scaler = FeatureScaler.from_dict(scaler_data)
+        expected_features = len(np.asarray(scaler_data.get("center", []), dtype=float))
+        if expected_features and expected_features != X.shape[2]:
+            raise ValueError(
+                "Scaler/feature mismatch: checkpoint scaler expects "
+                f"{expected_features} features but input has {X.shape[2]}. "
+                "Re-evaluate with data prepared using the same feature pipeline as training."
+            )
         X_scaled = scaler.transform(X)
     else:
         X_scaled = X
