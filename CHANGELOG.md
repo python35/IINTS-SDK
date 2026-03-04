@@ -4,6 +4,17 @@
 
 - (empty)
 
+## v0.1.20
+
+- Fixed run-manifest safety/reporting bugs in CLI (`audit_summary` existence check and duplicate manifest signing call).
+- Removed simulator global NumPy seeding side effect to avoid cross-run randomness coupling.
+- Hardened safety core typing and enabled strict mypy gate for supervisor/input-validator modules.
+- Added property-based safety tests for non-negative bounded dosing, severe-hypo hard-stop, and formal safety contract invariants.
+- Added performance budget tests for supervisor and simulator latency percentiles (p95/p99) and CI gate.
+- Added research metrics module with global MAE/RMSE/Bias, glycemic-band metrics, and MC-dropout 95% coverage calibration.
+- Added dataset lineage metadata (schema id + dataframe fingerprint + source hash) to training/evaluation outputs and checkpoint config.
+- Updated research docs and test coverage for new metrics and lineage.
+
 ## v0.1.19
 
 - Added meal-response filtering for OhioT1DM/AZT1D prep to drop noisy meal labels.
