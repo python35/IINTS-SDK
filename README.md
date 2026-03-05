@@ -14,6 +14,7 @@ New here? Start with: [docs/PLAIN_LANGUAGE_GUIDE.md](https://github.com/python35
 - Optional AI glucose predictor as advisory signal.
 - Audit outputs: CSV, JSON, PDF reports.
 - Validation and scorecard tooling for repeatable benchmarks.
+- Transparent evidence manifest linked to peer-reviewed sources (`iints sources`).
 
 ## Open Logic (Dual-Guard)
 IINTS-AF is built as layered logic, not black-box control:
@@ -104,7 +105,16 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
 - Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)
 - Plain-language guide: [docs/PLAIN_LANGUAGE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/PLAIN_LANGUAGE_GUIDE.md)
+- Evidence base (peer-reviewed sources): [docs/EVIDENCE_BASE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/EVIDENCE_BASE.md)
 - Research track: [research/README.md](https://github.com/python35/IINTS-SDK/blob/main/research/README.md)
+
+## Evidence and Provenance
+The SDK ships a source manifest grounded in peer-reviewed diabetes literature and standards.
+
+```bash
+iints sources
+iints sources --category trial --output-json results/source_manifest.json
+```
 
 ## Safety Notice
 This SDK is for research and validation only.  

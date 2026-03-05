@@ -261,3 +261,29 @@ def test_research_registry_list_and_promote(tmp_path) -> None:
     assert promote_result.exit_code == 0
     rows = json.loads(registry.read_text())
     assert rows[0]["stage"] == "validated"
+
+
+def test_sources_command_lists_evidence_manifest() -> None:
+    result = runner.invoke(app, ["sources"])
+    assert result.exit_code == 0
+    assert "IINTS-AF Evidence Sources" in result.stdout
+    assert "ada_2026" in result.stdout
+
+
+def test_sources_command_writes_json_manifest(tmp_path) -> None:
+    out_json = tmp_path / "sources.json"
+    result = runner.invoke(
+        app,
+        [
+            "sources",
+            "--category",
+            "trial",
+            "--output-json",
+            str(out_json),
+        ],
+    )
+    assert result.exit_code == 0
+    assert out_json.is_file()
+    payload = json.loads(out_json.read_text())
+    assert payload["category"] == "trial"
+    assert payload["count"] >= 1

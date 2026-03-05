@@ -1,0 +1,107 @@
+version: 1
+updated_utc: "2026-03-05T00:00:00Z"
+sources:
+  - id: ada_2026_glycemic_goals
+    category: guideline
+    component: validation_targets
+    title: "Glycemic Goals and Hypoglycemia: Standards of Care in Diabetes—2026"
+    citation: "American Diabetes Association Professional Practice Committee. Diabetes Care. 2026;49(Suppl 1)."
+    doi: "10.2337/dc26-S006"
+    url: "https://doi.org/10.2337/dc26-S006"
+    rationale: "Reference for TIR/TBR/TAR target framing and hypoglycemia thresholds in validation profiles."
+  - id: ada_2026_diabetes_technology
+    category: guideline
+    component: cgm_and_aid_context
+    title: "Diabetes Technology: Standards of Care in Diabetes—2026"
+    citation: "American Diabetes Association Professional Practice Committee. Diabetes Care. 2026;49(Suppl 1)."
+    doi: "10.2337/dc26-S007"
+    url: "https://doi.org/10.2337/dc26-S007"
+    rationale: "Reference for CGM and AID operational context used in report language and safeguards."
+  - id: attd_2019_time_in_range
+    category: consensus
+    component: metrics_targets
+    title: "Clinical Targets for Continuous Glucose Monitoring Data Interpretation"
+    citation: "Battelino T, Danne T, Bergenstal RM, et al. Diabetes Care. 2019;42(8):1593-1603."
+    doi: "10.2337/dci19-0028"
+    url: "https://doi.org/10.2337/dci19-0028"
+    rationale: "Basis for TIR/TBR/TAR interpretation in analytics and scorecards."
+  - id: nejm_2019_control_iq
+    category: trial
+    component: aid_benchmarking
+    title: "Six-Month Randomized, Multicenter Trial of Closed-Loop Control in Type 1 Diabetes"
+    citation: "Brown SA, et al. N Engl J Med. 2019;381(18):1707-1717."
+    doi: "10.1056/NEJMoa1907863"
+    url: "https://doi.org/10.1056/NEJMoa1907863"
+    rationale: "Reference envelope for realistic AID performance ranges in benchmark narratives."
+  - id: adapt_2022_ahcl
+    category: trial
+    component: aid_benchmarking
+    title: "Advanced hybrid closed loop therapy versus conventional treatment in adults with type 1 diabetes (ADAPT)"
+    citation: "Benhamou PY, et al. Lancet Diabetes Endocrinol. 2022;10(10):720-731."
+    doi: "10.1016/S2213-8587(22)00212-1"
+    url: "https://doi.org/10.1016/S2213-8587(22)00212-1"
+    rationale: "Adds modern AHCL outcomes for realistic comparator ranges."
+  - id: cobry_2010_meal_bolus_timing
+    category: trial
+    component: prebolus_timing
+    title: "Timing of Meal Insulin Boluses to Achieve Optimal Postprandial Glycemic Control"
+    citation: "Cobry E, et al. J Diabetes Sci Technol. 2010;4(3):679-685."
+    doi: "10.1177/193229681000400404"
+    url: "https://doi.org/10.1177/193229681000400404"
+    rationale: "Reference for pre-bolus timing defaults and scenario annotations."
+  - id: heise_2017_fiasp_pkpd
+    category: pharmacology
+    component: insulin_action_profiles
+    title: "A Faster-Onset Formulation of Insulin Aspart"
+    citation: "Heise T, et al. Clin Pharmacokinet. 2017;56(5):551-559."
+    doi: "10.1007/s40262-017-0510-8"
+    url: "https://doi.org/10.1007/s40262-017-0510-8"
+    rationale: "Reference for rapid insulin onset assumptions in therapy profiles."
+  - id: klaff_2020_urli_pkpd
+    category: pharmacology
+    component: insulin_action_profiles
+    title: "Ultra Rapid Lispro Demonstrates Accelerated Pharmacokinetics and Pharmacodynamics"
+    citation: "Klaff LJ, et al. Diabetes Obes Metab. 2020;22(10):1799-1807."
+    doi: "10.1111/dom.14049"
+    url: "https://doi.org/10.1111/dom.14049"
+    rationale: "Reference for ultra-rapid insulin variants and action-curve configuration."
+  - id: wentholt_2004_cgm_lag
+    category: sensor
+    component: cgm_lag_and_validator
+    title: "How glucose sensors can facilitate therapy in diabetes management"
+    citation: "Wentholt IME, et al. Diabetes Technol Ther. 2004;6(5):615-624."
+    doi: "10.1089/dia.2004.6.615"
+    url: "https://doi.org/10.1089/dia.2004.6.615"
+    rationale: "Background reference for physiologic CGM lag and fail-soft validator behavior."
+  - id: dalla_man_2007_meal_model
+    category: model
+    component: virtual_patient_dynamics
+    title: "Meal simulation model of the glucose-insulin system"
+    citation: "Dalla Man C, Rizza RA, Cobelli C. IEEE Trans Biomed Eng. 2007;54(10):1740-1749."
+    doi: "10.1109/TBME.2007.893506"
+    url: "https://doi.org/10.1109/TBME.2007.893506"
+    rationale: "Reference foundation for physiologic meal disturbance modeling."
+  - id: visentin_2018_uvapadova
+    category: model
+    component: simulation_validation
+    title: "The University of Virginia/Padova Type 1 Diabetes Simulator Matches the 2014 DMMS.R"
+    citation: "Visentin R, et al. J Diabetes Sci Technol. 2018;12(5):1074-1083."
+    doi: "10.1177/1932296818757747"
+    url: "https://doi.org/10.1177/1932296818757747"
+    rationale: "Reference for simulator validation methodology and in-silico credibility."
+  - id: riddell_2017_exercise_consensus
+    category: consensus
+    component: exercise_stress_scenarios
+    title: "Exercise management in type 1 diabetes: a consensus statement"
+    citation: "Riddell MC, et al. Lancet Diabetes Endocrinol. 2017;5(5):377-390."
+    doi: "10.1016/S2213-8587(17)30014-1"
+    url: "https://doi.org/10.1016/S2213-8587(17)30014-1"
+    rationale: "Reference for exercise stress scenario defaults and safety interpretation."
+  - id: marling_2020_ohiot1dm
+    category: dataset
+    component: predictor_training_data
+    title: "OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020"
+    citation: "Marling C, Bunescu R. CEUR Workshop Proc. 2020;2675."
+    doi: ""
+    url: "http://ceur-ws.org/Vol-2675/paper2.pdf"
+    rationale: "Primary public dataset used for subject-level predictor training and evaluation."

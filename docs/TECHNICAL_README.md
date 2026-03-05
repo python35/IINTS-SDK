@@ -86,6 +86,13 @@ iints validate --scenario-path scenarios/example_scenario.json \
   --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
 ```
 
+### Show Scientific Sources Used by the SDK
+```bash
+iints sources
+iints sources --category guideline
+iints sources --output-json results/source_manifest.json
+```
+
 ### Import Real-World CGM Data
 ```bash
 iints import-data --input-csv data/my_cgm.csv --output-dir results/imported

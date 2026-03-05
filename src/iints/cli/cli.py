@@ -149,6 +149,22 @@ def _load_presets() -> List[Dict[str, Any]]:
         content = resources.read_text("iints.presets", "presets.json")
     return json.loads(content)
 
+
+def _load_evidence_sources() -> Dict[str, Any]:
+    if sys.version_info >= (3, 9):
+        from importlib.resources import files
+
+        content = files("iints.presets").joinpath("evidence_sources.yaml").read_text()
+    else:
+        from importlib import resources
+
+        content = resources.read_text("iints.presets", "evidence_sources.yaml")
+    raw = yaml.safe_load(content) or {}
+    if not isinstance(raw, dict):
+        raise ValueError("evidence_sources.yaml must contain a top-level mapping")
+    return raw
+
+
 def _get_preset(name: str) -> Dict[str, Any]:
     presets = _load_presets()
     for preset in presets:
@@ -2523,6 +2539,80 @@ def data_fetch(
     except DatasetFetchError as e:
         console.print(f"[bold red]{e}[/bold red]")
         raise typer.Exit(code=1)
+
+
+@app.command("sources")
+def sources(
+    category: Annotated[Optional[str], typer.Option(help="Filter by source category (guideline, trial, model, dataset, ...).")] = None,
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional JSON output path.")] = None,
+):
+    """List evidence sources used to ground simulation defaults and evaluation targets."""
+    console = Console()
+
+    try:
+        payload = _load_evidence_sources()
+    except Exception as exc:
+        console.print(f"[bold red]Could not load evidence sources: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    rows = payload.get("sources", [])
+    if not isinstance(rows, list):
+        console.print("[bold red]Invalid evidence_sources.yaml: 'sources' must be a list[/bold red]")
+        raise typer.Exit(code=1)
+
+    filtered: List[Dict[str, Any]] = []
+    for entry in rows:
+        if not isinstance(entry, dict):
+            continue
+        if category and str(entry.get("category", "")).strip().lower() != category.strip().lower():
+            continue
+        filtered.append(entry)
+
+    if not filtered:
+        if category:
+            console.print(f"[yellow]No sources found for category '{category}'.[/yellow]")
+        else:
+            console.print("[yellow]No evidence sources found.[/yellow]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS-AF Evidence Sources", show_header=True, header_style="bold cyan")
+    table.add_column("ID", style="green")
+    table.add_column("Category", style="magenta")
+    table.add_column("Component", style="white")
+    table.add_column("Year", style="yellow")
+    table.add_column("Title", style="white")
+    table.add_column("DOI / URL", style="blue")
+    for entry in filtered:
+        citation = str(entry.get("citation", ""))
+        year = ""
+        for token in citation.replace(";", " ").replace(".", " ").split():
+            if len(token) == 4 and token.isdigit():
+                year = token
+                break
+        doi = str(entry.get("doi", "")).strip()
+        url = str(entry.get("url", "")).strip()
+        table.add_row(
+            str(entry.get("id", "")),
+            str(entry.get("category", "")),
+            str(entry.get("component", "")),
+            year,
+            str(entry.get("title", "")),
+            doi if doi else url,
+        )
+    console.print(table)
+    console.print("[dim]See docs/EVIDENCE_BASE.md for mapping, assumptions, and implementation notes.[/dim]")
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        export_payload = {
+            "version": payload.get("version", 1),
+            "updated_utc": payload.get("updated_utc"),
+            "category": category,
+            "count": len(filtered),
+            "sources": filtered,
+        }
+        output_json.write_text(json.dumps(export_payload, indent=2))
+        console.print(f"[green]Saved source manifest: {output_json}[/green]")
 
 
 # ---------------------------------------------------------------------------

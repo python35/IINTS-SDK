@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.1.21
+
+- Added evidence source manifest (`iints sources`) backed by peer-reviewed references in `src/iints/presets/evidence_sources.yaml`.
+- Added `docs/EVIDENCE_BASE.md` and linked it from the main docs for transparent source-to-feature mapping.
 - Added deterministic replay validation (`iints replay-check`) with stable output hashing.
 - Added golden benchmark packs and CLI runner (`iints golden-benchmark`) for scenario-range regression checks.
 - Added calibration gate profiles and gate-aware forecast evaluation (`iints research evaluate-forecast --gate-profile ...`).

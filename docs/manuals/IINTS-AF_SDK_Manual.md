@@ -1,5 +1,5 @@
 # IINTS-AF SDK Technical Reference Manual
-Version 0.1.20 | Python SDK
+Version 0.1.21 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -43,6 +43,10 @@ Quick task routing:
 - **Customize safety limits:** Section 4.2
 - **Generate audit report:** Section 5.4
 - **Train an AI predictor:** Section 8.2 + `research/README.md`
+
+Evidence routing:
+- **Peer-reviewed source mapping:** `docs/EVIDENCE_BASE.md`
+- **CLI source manifest:** `iints sources` or `iints sources --output-json results/source_manifest.json`
 
 ## Table of Contents
 
@@ -1693,7 +1697,7 @@ SafetyConfig(
   author = {Bobbaers, Rune},
   title = {IINTS-AF: Intelligent Insulin Titration System for Artificial Pancreas},
   year = {2026},
-  version = {0.1.20},
+  version = {0.1.21},
   url = {https://github.com/python35/IINTS-SDK},
   note = {Pre-clinical research software for insulin dosing algorithm validation}
 }

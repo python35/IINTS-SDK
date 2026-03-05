@@ -58,6 +58,7 @@ You will get output files like:
 - “I want a first run” -> `README.md`
 - “I want full CLI commands” -> `docs/TECHNICAL_README.md`
 - “I want full architecture details” -> `docs/COMPREHENSIVE_GUIDE.md`
+- “I want the real research sources behind assumptions” -> `docs/EVIDENCE_BASE.md`
 - “I want predictor training” -> `research/README.md`
 - “I want step-by-step notebooks” -> `examples/notebooks/README.md`
 

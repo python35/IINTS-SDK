@@ -235,6 +235,15 @@ class ClinicalReportGenerator:
                     pdf.cell(col_widths[4], 6, str(row.get("bolus_interventions", 0)), border=1, align="C")
                     pdf.ln()
 
+            pdf.ln(3)
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.multi_cell(
+                0,
+                4,
+                "Research-use framing follows ADA 2026 glycemic goals and ATTD Time-in-Range consensus. "
+                "See docs/EVIDENCE_BASE.md and `iints sources` for full citations.",
+            )
+
             pdf.ln(4)
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(0, 8, "Glucose Trace", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -339,6 +348,14 @@ class ClinicalReportGenerator:
                 pdf.set_font("Helvetica", "", 10)
                 for reason, count in top_reasons.items():
                     pdf.cell(0, 5, f"- {reason}: {count}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+            pdf.ln(2)
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.multi_cell(
+                0,
+                4,
+                "Method references: docs/EVIDENCE_BASE.md | CLI: `iints sources`",
+            )
 
             pdf.output(str(output_file))
 

@@ -16,6 +16,7 @@ Then use role-specific docs:
 Reference and support docs:
 
 - Public doc index: `PUBLIC_DOCUMENTATION.md`
+- Evidence base: `EVIDENCE_BASE.md`
 - Emulator references: `emulation_references.md`
 - Manual pointer: `OFFICIAL_MANUAL.md`
 - Legal: `../PRIVACY_POLICY.md`, `../TERMS_OF_USE.md`

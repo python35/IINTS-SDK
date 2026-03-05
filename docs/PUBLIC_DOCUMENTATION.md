@@ -1,4 +1,4 @@
-# IINTS-AF Public Documentation (v0.1.20)
+# IINTS-AF Public Documentation (v0.1.21)
 
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.
@@ -14,6 +14,7 @@ For non-technical readers, start with:
 ### Developer Docs
 - **Primary guide**: `COMPREHENSIVE_GUIDE.md`
 - **Technical details**: `TECHNICAL_README.md`
+- **Evidence base**: `EVIDENCE_BASE.md`
 - **API stability**: `../API_STABILITY.md`
 - **Change history**: `../CHANGELOG.md`
 
@@ -35,6 +36,7 @@ For non-technical readers, start with:
 - Archive `config.json`, `run_metadata.json`, `run_manifest.json`, and `results.csv` together.
 - Keep `report.pdf` + `audit/` for reviewability.
 - Cite datasets using `iints data cite <dataset_id>`.
+- Export literature sources using `iints sources --output-json results/source_manifest.json`.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
 ---

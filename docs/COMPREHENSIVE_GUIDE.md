@@ -23,6 +23,7 @@ What it does not do:
 Use this map if you are new to the SDK:
 - **Hands-on learning:** `examples/notebooks/README.md`
 - **CLI reference:** `docs/TECHNICAL_README.md`
+- **Evidence base:** `docs/EVIDENCE_BASE.md`
 - **Research pipeline:** `research/README.md`
 - **PDF manual:** `docs/manuals/IINTS-AF_SDK_Manual.pdf`
 
