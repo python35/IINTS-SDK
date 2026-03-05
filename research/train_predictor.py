@@ -33,6 +33,7 @@ from iints.research.dataset import (
 from iints.research.metrics import band_regression_metrics, regression_metrics
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
 from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
+from iints.research.model_registry import append_registry_entry
 
 
 # ---------------------------------------------------------------------------
@@ -130,18 +131,7 @@ def _sha256_str(s: str) -> str:
 
 def _update_registry(registry_path: Path, entry: dict) -> None:
     """Append a training run entry to the model registry JSON."""
-    registry_path.parent.mkdir(parents=True, exist_ok=True)
-    if registry_path.exists():
-        try:
-            runs = json.loads(registry_path.read_text())
-            if not isinstance(runs, list):
-                runs = []
-        except (json.JSONDecodeError, OSError):
-            runs = []
-    else:
-        runs = []
-    runs.append(entry)
-    registry_path.write_text(json.dumps(runs, indent=2))
+    append_registry_entry(registry_path, entry)
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +561,7 @@ def main() -> None:
     registry_path = args.registry or args.out.parent / "registry.json"
     registry_entry = {
         "run_id": time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()),
+        "stage": "candidate",
         "model_path": str(model_path.resolve()),
         "sdk_version": report["sdk_version"],
         "data_sha256": data_sha256,

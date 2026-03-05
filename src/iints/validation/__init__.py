@@ -27,6 +27,17 @@ from iints.validation.safety_contract import (
     apply_contract_to_config,
     verify_safety_contract,
 )
+from iints.validation.replay import (
+    ReplayRunDigest,
+    ReplayCheckResult,
+    run_deterministic_replay_check,
+)
+from iints.validation.golden import (
+    GoldenScenarioSpec,
+    GoldenBenchmarkPack,
+    load_golden_benchmark_pack,
+    evaluate_expected_ranges,
+)
 
 
 def _convert_legacy_scenario(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -176,6 +187,13 @@ __all__ = [
     "load_contract_spec",
     "apply_contract_to_config",
     "verify_safety_contract",
+    "ReplayRunDigest",
+    "ReplayCheckResult",
+    "run_deterministic_replay_check",
+    "GoldenScenarioSpec",
+    "GoldenBenchmarkPack",
+    "load_golden_benchmark_pack",
+    "evaluate_expected_ranges",
     "format_validation_error",
     "migrate_scenario_dict",
 ]

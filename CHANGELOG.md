@@ -2,7 +2,15 @@
 
 ## Unreleased
 
-- No unreleased entries.
+- Added deterministic replay validation (`iints replay-check`) with stable output hashing.
+- Added golden benchmark packs and CLI runner (`iints golden-benchmark`) for scenario-range regression checks.
+- Added calibration gate profiles and gate-aware forecast evaluation (`iints research evaluate-forecast --gate-profile ...`).
+- Expanded formal safety contract schema with explicit max IOB / max bolus / hypo-cutoff limits.
+- Added model registry stage promotion flow (`candidate -> validated -> production`) and CLI utilities.
+- Added CI ONNX parity smoke checks for predictor export and runtime drift validation.
+- Added docs-as-tests CLI smoke checker (`tools/ci/check_docs_examples.py`).
+- Added public API surface stability checker with tracked baseline (`tools/ci/check_api_surface.py`).
+- Added governance checks for license presence, SBOM structure, dataset licensing metadata, and manifest hashing.
 
 ## v0.1.20
 

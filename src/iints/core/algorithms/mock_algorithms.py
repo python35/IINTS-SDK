@@ -145,7 +145,7 @@ class StackingAIAlgorithm(InsulinAlgorithm):
         self._remaining = 0
 
     def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
-        if self._remaining <= 0 and data.current_glucose >= self.trigger_glucose:
+        if self._remaining <= 0 and data.current_glucose is not None and data.current_glucose >= self.trigger_glucose:
             self._remaining = self.stack_steps
 
         if self._remaining > 0:

@@ -34,6 +34,7 @@ jobs:
         pip install -e ".[research]"
         # CPU-only torch to keep CI fast
         pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install onnxruntime
 
     - name: Lint with Flake8
       run: |
@@ -61,9 +62,22 @@ jobs:
           --cov-report=term-missing \
           tests/
 
+    - name: Docs command smoke checks
+      run: |
+        python tools/ci/check_docs_examples.py
+
+    - name: API surface stability check
+      run: |
+        python tools/ci/check_api_surface.py
+
     - name: Performance budget gate (p95/p99)
       run: |
         pytest tests/performance/test_latency_budget.py -q
+
+    - name: ONNX parity smoke check
+      if: matrix.python-version == '3.11'
+      run: |
+        python tools/ci/run_onnx_parity_smoke.py
 
     - name: Upload coverage report
       uses: actions/upload-artifact@v4
@@ -90,6 +104,10 @@ jobs:
           ls -la "$(dirname "$SBOM_BOM_BIN")"
           exit 1
         fi
+
+    - name: Governance policy checks (license/sbom/provenance)
+      run: |
+        python tools/ci/check_governance.py
 
     - name: Build package
       run: |

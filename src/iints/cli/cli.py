@@ -1,7 +1,7 @@
 import typer  # type: ignore
 import concurrent.futures
 from pathlib import Path
-from typing import Dict, Any, Union, List, Tuple, Optional
+from typing import Dict, Any, Union, List, Tuple, Optional, cast
 from dataclasses import asdict
 from typing_extensions import Annotated
 from pydantic import ValidationError
@@ -57,10 +57,13 @@ from iints.validation import (
     apply_contract_to_config,
     build_stress_events,
     compute_run_metrics,
+    evaluate_expected_ranges,
     evaluate_run,
     format_validation_error,
+    load_golden_benchmark_pack,
     load_contract_spec,
     load_validation_profiles,
+    run_deterministic_replay_check,
     load_scenario,
     load_patient_config,
     load_patient_config_by_name,
@@ -520,6 +523,194 @@ def validation_profiles(
     console.print(table)
 
 
+@app.command("replay-check")
+def replay_check(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
+    patient_config_name: Annotated[str, typer.Option(help="Patient config name")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Patient config YAML path")] = None,
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Path to scenario JSON")] = None,
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 240,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    seed: Annotated[int, typer.Option(help="Deterministic seed")] = 42,
+    repeats: Annotated[int, typer.Option(help="Replay runs to compare")] = 2,
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional output JSON path")] = None,
+    fail_on_mismatch: Annotated[bool, typer.Option(help="Exit code 1 if replay mismatch is detected")] = True,
+):
+    """
+    Deterministic replay suite: same seed, same config, same output hashes.
+    """
+    console = Console()
+    algorithm_instance = _load_algorithm_instance(algo, console)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
+
+    patient_config: Union[str, Path]
+    if patient_config_path:
+        if not patient_config_path.is_file():
+            console.print(f"[bold red]Patient config file not found: {patient_config_path}[/bold red]")
+            raise typer.Exit(code=1)
+        patient_config = patient_config_path
+    else:
+        patient_config = patient_config_name
+
+    scenario_payload: Optional[Dict[str, Any]] = None
+    if scenario_path:
+        if not scenario_path.is_file():
+            console.print(f"[bold red]Scenario file not found: {scenario_path}[/bold red]")
+            raise typer.Exit(code=1)
+        scenario_payload = load_scenario(scenario_path).model_dump()
+
+    result = run_deterministic_replay_check(
+        algorithm=algorithm_instance,
+        scenario=scenario_payload,
+        patient_config=patient_config,
+        duration_minutes=duration,
+        time_step=time_step,
+        seed=seed,
+        repeats=max(2, repeats),
+        predictor=predictor,
+    )
+
+    table = Table(title="Deterministic Replay Check")
+    table.add_column("Run", style="cyan")
+    table.add_column("Rows", justify="right")
+    table.add_column("Results Hash")
+    table.add_column("Safety Hash")
+    for idx, digest in enumerate(result.digests, start=1):
+        table.add_row(str(idx), str(digest.rows), digest.results_hash[:16], digest.safety_hash[:16])
+    console.print(table)
+    console.print("[green]PASS[/green]" if result.passed else "[red]FAIL[/red]")
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(result.to_dict(), indent=2))
+        console.print(f"[green]Replay report written:[/green] {output_json}")
+
+    if fail_on_mismatch and not result.passed:
+        raise typer.Exit(code=1)
+
+
+@app.command("golden-benchmark")
+def golden_benchmark(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
+    pack_path: Annotated[Optional[Path], typer.Option(help="Optional golden benchmark YAML path")] = None,
+    output_dir: Annotated[Optional[Path], typer.Option(help="Optional output directory for benchmark runs")] = None,
+    seed: Annotated[int, typer.Option(help="Random seed")] = 42,
+    duration_override: Annotated[Optional[int], typer.Option(help="Optional duration override (minutes)")] = None,
+    output_json: Annotated[Optional[Path], typer.Option(help="Write benchmark report JSON")] = None,
+    fail_on_check: Annotated[bool, typer.Option(help="Exit code 1 when any scenario fails")] = True,
+):
+    """
+    Run a golden scenario pack and validate metrics against expected ranges.
+    """
+    console = Console()
+    algorithm_instance = _load_algorithm_instance(algo, console)
+    predictor = _load_predictor_service_from_path(predictor_path, console)
+
+    try:
+        pack = load_golden_benchmark_pack(pack_path)
+    except Exception as exc:
+        console.print(f"[bold red]Could not load golden benchmark pack: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    if not pack.scenarios:
+        console.print("[bold red]Golden benchmark pack contains no scenarios.[/bold red]")
+        raise typer.Exit(code=1)
+
+    run_root = output_dir
+    temp_dir: Optional[tempfile.TemporaryDirectory[str]] = None
+    if run_root is None:
+        temp_dir = tempfile.TemporaryDirectory(prefix="iints_golden_")
+        run_root = Path(temp_dir.name)
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    scenario_results: List[Dict[str, Any]] = []
+    all_passed = True
+
+    for idx, scenario_spec in enumerate(pack.scenarios):
+        algorithm_instance.reset()
+        try:
+            preset = _get_preset(scenario_spec.preset)
+        except KeyError:
+            console.print(f"[bold red]Unknown preset in golden pack: {scenario_spec.preset}[/bold red]")
+            if temp_dir is not None:
+                temp_dir.cleanup()
+            raise typer.Exit(code=1)
+
+        duration_minutes = int(duration_override if duration_override is not None else preset.get("duration_minutes", 720))
+        time_step_minutes = int(preset.get("time_step_minutes", 5))
+        scenario_output = run_root / f"{idx+1:02d}_{scenario_spec.preset}"
+
+        outputs = iints.run_simulation(
+            algorithm=algorithm_instance,
+            scenario=preset.get("scenario"),
+            patient_config=str(preset.get("patient_config", "default_patient")),
+            duration_minutes=duration_minutes,
+            time_step=time_step_minutes,
+            seed=seed,
+            output_dir=scenario_output,
+            compare_baselines=False,
+            export_audit=False,
+            generate_report=False,
+            predictor=predictor,
+        )
+
+        metrics = compute_run_metrics(
+            outputs["results"],
+            safety_report=outputs.get("safety_report"),
+            duration_minutes=duration_minutes,
+        )
+        checks = evaluate_expected_ranges(metrics, scenario_spec.expected)
+        passed = all(item.get("passed", False) for item in checks.values())
+        all_passed = all_passed and passed
+
+        scenario_results.append(
+            {
+                "preset": scenario_spec.preset,
+                "description": scenario_spec.description,
+                "passed": passed,
+                "metrics": metrics,
+                "checks": checks,
+                "output_dir": str(scenario_output),
+            }
+        )
+
+    table = Table(title=f"Golden Benchmark Pack — {pack.name} v{pack.version}")
+    table.add_column("Preset", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Checks", justify="right")
+    table.add_column("Failed Metrics")
+    for row in scenario_results:
+        failed_metrics = [metric for metric, check in row["checks"].items() if not check.get("passed", False)]
+        table.add_row(
+            row["preset"],
+            "[green]PASS[/green]" if row["passed"] else "[red]FAIL[/red]",
+            str(len(row["checks"])),
+            ", ".join(failed_metrics) if failed_metrics else "-",
+        )
+    console.print(table)
+    console.print("[green]Golden benchmark PASS[/green]" if all_passed else "[red]Golden benchmark FAIL[/red]")
+
+    payload = {
+        "pack": {"name": pack.name, "version": pack.version},
+        "seed": seed,
+        "duration_override": duration_override,
+        "passed": all_passed,
+        "scenarios": scenario_results,
+    }
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(payload, indent=2))
+        console.print(f"[green]Golden benchmark report written:[/green] {output_json}")
+
+    if temp_dir is not None:
+        temp_dir.cleanup()
+
+    if fail_on_check and not all_passed:
+        raise typer.Exit(code=1)
+
+
 @app.command("validate-run")
 def validate_run(
     results_csv: Annotated[Path, typer.Option(help="Path to simulation results CSV")],
@@ -635,6 +826,7 @@ def contract_verify(
     trend_max: Annotated[float, typer.Option(help="Maximum trend to test (mg/dL/min)")] = 3.0,
     trend_step: Annotated[float, typer.Option(help="Trend grid step (mg/dL/min)")] = 0.5,
     proposed_doses: Annotated[str, typer.Option(help="Comma-separated proposed insulin doses (U)")] = "0.0,0.5,1.0,2.0,4.0",
+    iob_values: Annotated[Optional[str], typer.Option(help="Optional comma-separated current IOB values (U)")] = None,
     output_json: Annotated[Optional[Path], typer.Option(help="Write contract verification report JSON")] = None,
     fail_on_violation: Annotated[bool, typer.Option(help="Exit with code 1 when any contract violation is found")] = True,
 ):
@@ -657,6 +849,13 @@ def contract_verify(
     except ValueError as exc:
         console.print(f"[bold red]{exc}[/bold red]")
         raise typer.Exit(code=1)
+    iob_grid = None
+    if iob_values is not None:
+        try:
+            iob_grid = _parse_float_csv(iob_values, "iob-values")
+        except ValueError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
+            raise typer.Exit(code=1)
 
     glucose_values = np.arange(glucose_min, glucose_max + 1e-9, glucose_step).tolist()
     trend_values = np.arange(trend_min, trend_max + 1e-9, trend_step).tolist()
@@ -665,6 +864,7 @@ def contract_verify(
         glucose_values=glucose_values,
         trend_values=trend_values,
         proposed_doses=dose_values,
+        iob_values=iob_grid,
     )
 
     table = Table(title="Safety Contract Verification")
@@ -673,6 +873,9 @@ def contract_verify(
     table.add_row("Contract enabled", str(spec.contract_enabled))
     table.add_row("Glucose threshold", f"{spec.contract_glucose_threshold:.2f} mg/dL")
     table.add_row("Trend threshold", f"{spec.contract_trend_threshold_mgdl_min:.2f} mg/dL/min")
+    table.add_row("Max IOB", f"{spec.contract_max_iob_units:.2f} U")
+    table.add_row("Max bolus", f"{spec.contract_max_bolus_units:.2f} U")
+    table.add_row("Hypo cutoff", f"{spec.contract_hypo_cutoff_mgdl:.2f} mg/dL")
     table.add_row("Total cases", str(report.total_cases))
     table.add_row("Expected blocked cases", str(report.expected_block_cases))
     table.add_row("Blocked cases", str(report.blocked_cases))
@@ -2738,6 +2941,9 @@ def research_evaluate_forecast(
     observed_column: Annotated[str, typer.Option(help="Observed glucose column")] = "glucose_actual_mgdl",
     predicted_column: Annotated[str, typer.Option(help="Predicted glucose column")] = "predicted_glucose_ai_30min",
     predicted_std_column: Annotated[Optional[str], typer.Option(help="Optional prediction std column")] = "predictor_uncertainty_std_mgdl",
+    gate_profile: Annotated[Optional[str], typer.Option(help="Optional calibration gate profile id")] = None,
+    gate_profiles_path: Annotated[Optional[Path], typer.Option(help="Optional calibration gate profiles YAML path")] = None,
+    fail_on_gate: Annotated[bool, typer.Option(help="Exit code 1 when calibration gate fails")] = False,
     output_json: Annotated[Optional[Path], typer.Option(help="Write metrics JSON")] = None,
 ):
     """
@@ -2795,10 +3001,53 @@ def research_evaluate_forecast(
         )
     console.print(band_table)
 
+    gate_failed = False
+    if gate_profile:
+        from iints.research.calibration_gate import (
+            evaluate_calibration_gate,
+            load_calibration_gate_profiles,
+        )
+
+        try:
+            profiles = load_calibration_gate_profiles(gate_profiles_path)
+        except Exception as exc:
+            console.print(f"[bold red]Could not load calibration gate profiles: {exc}[/bold red]")
+            raise typer.Exit(code=1)
+        gate = profiles.get(gate_profile)
+        if gate is None:
+            available = ", ".join(sorted(profiles.keys()))
+            console.print(f"[bold red]Unknown calibration gate '{gate_profile}'. Available: {available}[/bold red]")
+            raise typer.Exit(code=1)
+
+        checks = evaluate_calibration_gate(report, gate)
+        gate_passed = all(check.get("passed", False) for check in checks.values()) if checks else True
+        gate_failed = not gate_passed
+        report["calibration_gate"] = {
+            "profile": gate_profile,
+            "passed": gate_passed,
+            "checks": checks,
+        }
+
+        gate_table = Table(title=f"Calibration Gate — {gate_profile}")
+        gate_table.add_column("Status", style="bold")
+        gate_table.add_column("Metric", style="cyan")
+        gate_table.add_column("Value", justify="right")
+        gate_table.add_column("Threshold", justify="right")
+        gate_table.add_column("Reason")
+        for metric, check in checks.items():
+            status = "[green]PASS[/green]" if check.get("passed", False) else "[red]FAIL[/red]"
+            value = "n/a" if check.get("value") is None else f"{float(check['value']):.3f}"
+            threshold = "n/a" if check.get("threshold") is None else f"{float(check['threshold']):.3f}"
+            gate_table.add_row(status, metric, value, threshold, str(check.get("reason", "")))
+        console.print(gate_table)
+
     if output_json is not None:
         output_json.parent.mkdir(parents=True, exist_ok=True)
         output_json.write_text(json.dumps(report, indent=2))
         console.print(f"[green]Forecast metrics written:[/green] {output_json}")
+
+    if fail_on_gate and gate_failed:
+        raise typer.Exit(code=1)
 
 
 @research_app.command("parity-check")
@@ -2879,6 +3128,80 @@ def research_parity_check(
         console.print(f"[green]Parity report written:[/green] {output_json}")
 
     if not passed:
+        raise typer.Exit(code=1)
+
+
+@research_app.command("registry-list")
+def research_registry_list(
+    registry: Annotated[Path, typer.Option(help="Path to model registry JSON")] = Path("models/registry.json"),
+    stage: Annotated[Optional[str], typer.Option(help="Optional stage filter (candidate/validated/production/archived)")] = None,
+    limit: Annotated[int, typer.Option(help="Max rows to print")] = 30,
+):
+    """List model runs from the research registry."""
+    console = Console()
+    from iints.research.model_registry import list_registry
+
+    rows = list_registry(registry)
+    if stage:
+        rows = [row for row in rows if str(row.get("stage", "candidate")) == stage]
+
+    if not rows:
+        console.print(f"[yellow]No registry entries found at {registry}.[/yellow]")
+        return
+
+    rows = rows[-limit:] if limit > 0 else rows
+    rows = list(reversed(rows))
+
+    table = Table(title=f"Model Registry — {registry}")
+    table.add_column("Run ID", style="cyan")
+    table.add_column("Stage", style="bold")
+    table.add_column("RMSE", justify="right")
+    table.add_column("MAE", justify="right")
+    table.add_column("Timestamp")
+    table.add_column("Model Path")
+    for row in rows:
+        table.add_row(
+            str(row.get("run_id", "")),
+            str(row.get("stage", "candidate")),
+            "n/a" if row.get("test_rmse") is None else f"{float(row['test_rmse']):.3f}",
+            "n/a" if row.get("test_mae") is None else f"{float(row['test_mae']):.3f}",
+            str(row.get("timestamp_utc", "")),
+            str(row.get("model_path", "")),
+        )
+    console.print(table)
+
+
+@research_app.command("registry-promote")
+def research_registry_promote(
+    registry: Annotated[Path, typer.Option(help="Path to model registry JSON")] = Path("models/registry.json"),
+    run_id: Annotated[str, typer.Option(help="Run ID to promote")]= "",
+    stage: Annotated[str, typer.Option(help="Target stage (validated/production/archived/candidate)")] = "validated",
+    force: Annotated[bool, typer.Option(help="Allow production promotion without validated stage")] = False,
+    output_json: Annotated[Optional[Path], typer.Option(help="Write promotion result JSON")] = None,
+):
+    """Promote a model run through candidate -> validated -> production stages."""
+    console = Console()
+    from iints.research.model_registry import ModelStage, promote_registry_run
+
+    allowed = {"candidate", "validated", "production", "archived"}
+    if stage not in allowed:
+        console.print(f"[bold red]Invalid stage '{stage}'. Allowed: {', '.join(sorted(allowed))}[/bold red]")
+        raise typer.Exit(code=1)
+    if not run_id.strip():
+        console.print("[bold red]--run-id is required[/bold red]")
+        raise typer.Exit(code=1)
+
+    stage_literal = cast(ModelStage, stage)
+    result = promote_registry_run(registry, run_id=run_id.strip(), stage=stage_literal, force=force)
+    payload = result.to_dict()
+    console.print_json(json.dumps(payload, indent=2))
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(payload, indent=2))
+        console.print(f"[green]Promotion result written:[/green] {output_json}")
+
+    if not result.updated:
         raise typer.Exit(code=1)
 
 

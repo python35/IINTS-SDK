@@ -14,6 +14,19 @@ from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
 from .metrics import regression_metrics, band_regression_metrics, interval_coverage_metrics
 from .evaluation import forecast_error_report
 from .audit import audit_subject_split_and_leakage
+from .calibration_gate import (
+    ForecastCalibrationGate,
+    evaluate_calibration_gate,
+    load_calibration_gate_profiles,
+)
+from .model_registry import (
+    PromotionResult,
+    append_registry_entry,
+    list_registry,
+    load_registry,
+    promote_registry_run,
+    write_registry,
+)
 
 __all__ = [
     "PredictorConfig",
@@ -38,4 +51,13 @@ __all__ = [
     "interval_coverage_metrics",
     "forecast_error_report",
     "audit_subject_split_and_leakage",
+    "ForecastCalibrationGate",
+    "evaluate_calibration_gate",
+    "load_calibration_gate_profiles",
+    "PromotionResult",
+    "append_registry_entry",
+    "list_registry",
+    "load_registry",
+    "promote_registry_run",
+    "write_registry",
 ]

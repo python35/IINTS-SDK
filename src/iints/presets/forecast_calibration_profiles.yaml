@@ -1,0 +1,12 @@
+version: 1
+profiles:
+  research_default:
+    min_within_20_mgdl_pct: 60.0
+    max_false_hypo_alarm_rate_pct: 15.0
+    max_missed_hypo_rate_pct: 15.0
+
+  strict:
+    min_within_20_mgdl_pct: 70.0
+    max_false_hypo_alarm_rate_pct: 10.0
+    max_missed_hypo_rate_pct: 10.0
+    min_interval_95_coverage_pct: 80.0

@@ -1,0 +1,32 @@
+name: iints-golden-benchmark
+version: 1
+scenarios:
+  - preset: baseline_t1d
+    description: Stable daily profile with regular meals.
+    expected:
+      tir_70_180:
+        min: 55.0
+      tir_below_54:
+        max: 5.0
+      terminated_early:
+        max: 0.0
+
+  - preset: stress_test_meal
+    description: Meal stress profile with larger excursions.
+    expected:
+      tir_70_180:
+        min: 45.0
+      tir_below_54:
+        max: 8.0
+      terminated_early:
+        max: 0.0
+
+  - preset: hypo_prone_night
+    description: Hypo-prone overnight profile.
+    expected:
+      tir_below_70:
+        max: 20.0
+      tir_below_54:
+        max: 8.0
+      terminated_early:
+        max: 0.0

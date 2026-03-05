@@ -81,6 +81,8 @@ iints doctor --smoke-run
 iints validation-profiles
 iints validate-run --results-csv results/run_full/results.csv --profile research_default
 iints contract-verify --output-json results/contract_report.json
+iints replay-check --algo algorithms/example_algorithm.py --output-json results/replay_check.json
+iints golden-benchmark --algo algorithms/example_algorithm.py --output-json results/golden_benchmark.json
 
 # Scenario bank benchmark
 iints scorecard --algo algorithms/example_algorithm.py --profile research_default --output-dir results/scorecard
@@ -88,6 +90,9 @@ iints scorecard --algo algorithms/example_algorithm.py --profile research_defaul
 # Research diagnostics
 iints research audit-split --data data_packs/public/OhioT1DM/processed/ohio_merged.csv
 iints research evaluate-forecast --input-csv results/dual_guard/results.csv
+iints research evaluate-forecast --input-csv results/dual_guard/results.csv --gate-profile research_default
+iints research registry-list --registry models/registry.json
+iints research registry-promote --registry models/registry.json --run-id <run-id> --stage validated
 ```
 
 ## Demos and Notebooks
