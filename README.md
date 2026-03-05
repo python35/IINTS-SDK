@@ -89,14 +89,14 @@ iints research evaluate-forecast --input-csv results/dual_guard/results.csv
 ```
 
 ## Demos and Notebooks
-- Demo scripts: `examples/demos/`
-- Notebook tutorials: `examples/notebooks/`
+- Demo scripts: [examples/demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
+- Notebook tutorials: [examples/notebooks](https://github.com/python35/IINTS-SDK/tree/main/examples/notebooks)
 
 ## Documentation
-- Manual (PDF): `docs/manuals/IINTS-AF_SDK_Manual.pdf`
-- Comprehensive guide: `docs/COMPREHENSIVE_GUIDE.md`
-- Technical README: `docs/TECHNICAL_README.md`
-- Research track: `research/README.md`
+- Manual (PDF): [docs/manuals/IINTS-AF_SDK_Manual.pdf](https://github.com/python35/IINTS-SDK/blob/main/docs/manuals/IINTS-AF_SDK_Manual.pdf)
+- Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
+- Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)
+- Research track: [research/README.md](https://github.com/python35/IINTS-SDK/blob/main/research/README.md)
 
 ## Safety Notice
 This SDK is for research and validation only.  
