@@ -67,6 +67,19 @@ iints run-full --algo algorithms/example_algorithm.py \
   --output-dir results/run_full
 ```
 
+### One-Line Research Bundle (run + validate + sources + summary)
+```bash
+iints study-ready \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_ready
+```
+
+Creates:
+- `results.csv`, `clinical_report.pdf`, `audit/`, `run_manifest.json`
+- `validation_report.json`
+- `sources_manifest.json`
+- `SUMMARY.md`
+
 ### Parallel Batch Runner
 ```bash
 iints run-parallel --algo algorithms/example_algorithm.py \

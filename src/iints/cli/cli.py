@@ -165,6 +165,78 @@ def _load_evidence_sources() -> Dict[str, Any]:
     return raw
 
 
+def _filtered_evidence_sources(category: Optional[str] = None) -> Dict[str, Any]:
+    payload = _load_evidence_sources()
+    rows = payload.get("sources", [])
+    if not isinstance(rows, list):
+        raise ValueError("evidence_sources.yaml must contain a 'sources' list")
+    selected: List[Dict[str, Any]] = []
+    for entry in rows:
+        if not isinstance(entry, dict):
+            continue
+        if category and str(entry.get("category", "")).strip().lower() != category.strip().lower():
+            continue
+        selected.append(entry)
+    return {
+        "version": payload.get("version", 1),
+        "updated_utc": payload.get("updated_utc"),
+        "category": category,
+        "count": len(selected),
+        "sources": selected,
+    }
+
+
+def _write_certification_summary(
+    output_dir: Path,
+    outputs: Dict[str, Any],
+    profile: str,
+    report: Dict[str, Any],
+    source_manifest_path: Optional[Path],
+) -> Path:
+    checks = report.get("checks", [])
+    failed_checks = [check for check in checks if not bool(check.get("passed", False))]
+    status = "PASS" if bool(report.get("passed", False)) else "FAIL"
+    required_passed = report.get("required_checks_passed", 0)
+    required_total = report.get("required_checks_total", 0)
+
+    lines = [
+        "# IINTS-AF Certification Bundle",
+        "",
+        f"- Status: **{status}** ({required_passed}/{required_total} required checks passed)",
+        f"- Validation profile: `{profile}`",
+        f"- Results CSV: `{outputs.get('results_csv', '')}`",
+        f"- Validation report: `validation_report.json`",
+        f"- Run manifest: `{outputs.get('run_manifest_path', '')}`",
+    ]
+    if source_manifest_path is not None:
+        lines.append(f"- Source manifest: `{source_manifest_path}`")
+    if failed_checks:
+        lines.append("")
+        lines.append("## Failed Checks")
+        for check in failed_checks:
+            lines.append(
+                f"- `{check.get('label', check.get('metric', 'metric'))}`: "
+                f"value={check.get('value')} threshold {check.get('op')} {check.get('threshold')}"
+            )
+    else:
+        lines.append("")
+        lines.append("All required checks passed.")
+
+    lines.extend(
+        [
+            "",
+            "## Next Steps",
+            "1. Open `clinical_report.pdf` for visual review.",
+            "2. Inspect `validation_report.json` for gate-level details.",
+            "3. Archive `run_manifest.json`, `run_metadata.json`, and `sources_manifest.json` (if present).",
+        ]
+    )
+
+    summary_path = output_dir / "SUMMARY.md"
+    summary_path.write_text("\n".join(lines) + "\n")
+    return summary_path
+
+
 def _get_preset(name: str) -> Dict[str, Any]:
     presets = _load_presets()
     for preset in presets:
@@ -937,6 +1009,9 @@ def certify_run(
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("results/certified_run"),
     seed: Annotated[Optional[int], typer.Option(help="Random seed")] = None,
+    export_sources: Annotated[bool, typer.Option(help="Write sources_manifest.json with peer-reviewed references.")] = True,
+    source_category: Annotated[Optional[str], typer.Option(help="Optional evidence source category filter (guideline, trial, model, ...).")] = None,
+    write_summary: Annotated[bool, typer.Option(help="Write SUMMARY.md with key artifacts and next steps.")] = True,
     fail_on_check: Annotated[bool, typer.Option(help="Exit code 1 when validation profile fails")] = True,
 ):
     """
@@ -989,12 +1064,68 @@ def certify_run(
     )
 
     validation_path = Path(outputs["output_dir"]) / "validation_report.json"
-    validation_path.write_text(json.dumps(report.to_dict(), indent=2))
+    report_payload = report.to_dict()
+    validation_path.write_text(json.dumps(report_payload, indent=2))
     console.print(f"[green]Validation report:[/green] {validation_path}")
     console.print(f"[bold]{'PASS' if report.passed else 'FAIL'}[/bold] {report.required_checks_passed}/{report.required_checks_total} required checks passed")
 
+    source_manifest_path: Optional[Path] = None
+    if export_sources:
+        try:
+            source_manifest = _filtered_evidence_sources(category=source_category)
+            source_manifest_path = Path(outputs["output_dir"]) / "sources_manifest.json"
+            source_manifest_path.write_text(json.dumps(source_manifest, indent=2))
+            console.print(f"[green]Source manifest:[/green] {source_manifest_path}")
+        except Exception as exc:
+            console.print(f"[yellow]Could not export source manifest: {exc}[/yellow]")
+
+    if write_summary:
+        summary_path = _write_certification_summary(
+            Path(outputs["output_dir"]),
+            outputs,
+            profile,
+            report_payload,
+            source_manifest_path,
+        )
+        console.print(f"[green]Summary:[/green] {summary_path}")
+
     if fail_on_check and not report.passed:
         raise typer.Exit(code=1)
+
+
+@app.command("study-ready")
+def study_ready(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Path to scenario JSON")] = None,
+    output_dir: Annotated[Path, typer.Option(help="Directory to save outputs")] = Path("results/study_ready"),
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    seed: Annotated[Optional[int], typer.Option(help="Random seed")] = None,
+    profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
+    patient_config_name: Annotated[str, typer.Option(help="Patient configuration name")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Optional patient config YAML path")] = None,
+    fail_on_check: Annotated[bool, typer.Option(help="Exit code 1 when validation profile fails")] = True,
+):
+    """
+    Simplified one-command pipeline: run + validate + sources manifest + summary bundle.
+    """
+    certify_run(
+        algo=algo,
+        profile=profile,
+        predictor_path=predictor_path,
+        patient_config_name=patient_config_name,
+        patient_config_path=patient_config_path,
+        scenario_path=scenario_path,
+        duration=duration,
+        time_step=time_step,
+        output_dir=output_dir,
+        seed=seed,
+        export_sources=True,
+        source_category=None,
+        write_summary=True,
+        fail_on_check=fail_on_check,
+    )
 
 
 @app.command()
@@ -2550,23 +2681,15 @@ def sources(
     console = Console()
 
     try:
-        payload = _load_evidence_sources()
+        payload = _filtered_evidence_sources(category=category)
     except Exception as exc:
         console.print(f"[bold red]Could not load evidence sources: {exc}[/bold red]")
         raise typer.Exit(code=1)
 
-    rows = payload.get("sources", [])
-    if not isinstance(rows, list):
-        console.print("[bold red]Invalid evidence_sources.yaml: 'sources' must be a list[/bold red]")
+    filtered = payload.get("sources", [])
+    if not isinstance(filtered, list):
+        console.print("[bold red]Invalid evidence sources payload[/bold red]")
         raise typer.Exit(code=1)
-
-    filtered: List[Dict[str, Any]] = []
-    for entry in rows:
-        if not isinstance(entry, dict):
-            continue
-        if category and str(entry.get("category", "")).strip().lower() != category.strip().lower():
-            continue
-        filtered.append(entry)
 
     if not filtered:
         if category:
@@ -2604,14 +2727,7 @@ def sources(
 
     if output_json is not None:
         output_json.parent.mkdir(parents=True, exist_ok=True)
-        export_payload = {
-            "version": payload.get("version", 1),
-            "updated_utc": payload.get("updated_utc"),
-            "category": category,
-            "count": len(filtered),
-            "sources": filtered,
-        }
-        output_json.write_text(json.dumps(export_payload, indent=2))
+        output_json.write_text(json.dumps(payload, indent=2))
         console.print(f"[green]Saved source manifest: {output_json}[/green]")
 
 

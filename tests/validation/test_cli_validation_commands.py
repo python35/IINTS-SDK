@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from iints.cli.cli import app
 from iints.validation.replay import ReplayCheckResult, ReplayRunDigest
 from iints.validation.golden import GoldenBenchmarkPack, GoldenScenarioSpec
+from iints.validation.run_validation import ValidationProfile, ValidationRule, RunValidationReport
 
 
 runner = CliRunner()
@@ -287,3 +288,88 @@ def test_sources_command_writes_json_manifest(tmp_path) -> None:
     payload = json.loads(out_json.read_text())
     assert payload["category"] == "trial"
     assert payload["count"] >= 1
+
+
+def test_certify_run_writes_sources_and_summary(tmp_path, monkeypatch) -> None:
+    output_dir = tmp_path / "certified"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    results_csv = output_dir / "results.csv"
+    pd.DataFrame({"time_minutes": [0.0], "glucose_actual_mgdl": [120.0]}).to_csv(results_csv, index=False)
+    safety_summary = output_dir / "safety_summary.json"
+    safety_summary.write_text("{}")
+
+    def _fake_load_algo(path, console):
+        class _Algo:
+            pass
+
+        return _Algo()
+
+    def _fake_run_full(**kwargs):
+        return {
+            "results_csv": str(results_csv),
+            "output_dir": str(output_dir),
+            "run_manifest_path": str(output_dir / "run_manifest.json"),
+            "audit": {"summary": str(safety_summary)},
+        }
+
+    profile = ValidationProfile(
+        profile_id="research_default",
+        description="demo",
+        min_duration_minutes=0,
+        checks=[ValidationRule(metric="tir_70_180", op=">=", threshold=50.0, label="TIR")],
+    )
+    report = RunValidationReport(
+        profile=profile,
+        passed=True,
+        required_checks_passed=1,
+        required_checks_total=1,
+        score=1.0,
+        checks=[],
+        metrics={},
+    )
+
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_instance", _fake_load_algo)
+    monkeypatch.setattr("iints.cli.cli.iints.run_full", _fake_run_full)
+    monkeypatch.setattr("iints.cli.cli.load_validation_profiles", lambda: {"research_default": profile})
+    monkeypatch.setattr("iints.cli.cli.evaluate_run", lambda *args, **kwargs: report)
+
+    result = runner.invoke(
+        app,
+        [
+            "certify-run",
+            "--algo",
+            "examples/mytest_algorithm.py",
+            "--output-dir",
+            str(output_dir),
+            "--duration",
+            "60",
+            "--time-step",
+            "5",
+        ],
+    )
+    assert result.exit_code == 0
+    assert (output_dir / "validation_report.json").is_file()
+    assert (output_dir / "sources_manifest.json").is_file()
+    assert (output_dir / "SUMMARY.md").is_file()
+
+
+def test_study_ready_forwards_to_certify(monkeypatch) -> None:
+    called = {}
+
+    def _fake_certify_run(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.certify_run", _fake_certify_run)
+
+    result = runner.invoke(
+        app,
+        [
+            "study-ready",
+            "--algo",
+            "examples/mytest_algorithm.py",
+        ],
+    )
+    assert result.exit_code == 0
+    assert called["export_sources"] is True
+    assert called["write_summary"] is True

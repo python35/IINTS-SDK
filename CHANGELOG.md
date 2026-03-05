@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
+- Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
+- Added CLI/source helper utilities to export filtered evidence manifests programmatically.
+- Added tests for `study-ready` forwarding and certification bundle outputs.
+
 ## v0.1.21
 
 - Added evidence source manifest (`iints sources`) backed by peer-reviewed references in `src/iints/presets/evidence_sources.yaml`.

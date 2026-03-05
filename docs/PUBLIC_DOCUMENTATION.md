@@ -37,6 +37,7 @@ For non-technical readers, start with:
 - Keep `report.pdf` + `audit/` for reviewability.
 - Cite datasets using `iints data cite <dataset_id>`.
 - Export literature sources using `iints sources --output-json results/source_manifest.json`.
+- Use `iints study-ready` when you want a ready-to-review bundle in one command.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
 ---

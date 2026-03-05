@@ -79,6 +79,7 @@ outputs = iints.run_simulation(
 ```bash
 # Environment and validation checks
 iints doctor --smoke-run
+iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
 iints validation-profiles
 iints validate-run --results-csv results/run_full/results.csv --profile research_default
 iints contract-verify --output-json results/contract_report.json
@@ -95,6 +96,12 @@ iints research evaluate-forecast --input-csv results/dual_guard/results.csv --ga
 iints research registry-list --registry models/registry.json
 iints research registry-promote --registry models/registry.json --run-id <run-id> --stage validated
 ```
+
+`iints study-ready` produces a complete bundle by default:
+- simulation outputs
+- `validation_report.json`
+- `sources_manifest.json`
+- `SUMMARY.md` (human-readable quick review)
 
 ## Demos and Notebooks
 - Demo scripts: [examples/demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
