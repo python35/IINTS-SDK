@@ -3,6 +3,13 @@
 This folder contains the **AI research pipeline** for training a glucose predictor model
 that plugs into the IINTS-AF safety workflow.
 
+## Plain Summary
+- The predictor forecasts glucose.
+- The predictor does **not** dose insulin.
+- Safety decisions remain deterministic in the simulator supervisor.
+
+If this is your first time, read `docs/PLAIN_LANGUAGE_GUIDE.md` before this file.
+
 ## Goals
 - Train a **prediction model** (not a controller) that forecasts BG 30–120 minutes ahead.
 - Use synthetic simulator data for bootstrapping, then fine-tune on real-world datasets.

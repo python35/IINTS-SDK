@@ -2,6 +2,22 @@
 
 This document provides a complete, end-to-end manual for the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, data formats, safety features, profiling, examples, and development workflows.
 
+## Plain-Language Summary
+
+If this guide feels too technical, read `docs/PLAIN_LANGUAGE_GUIDE.md` first.
+
+In one sentence: **IINTS-AF is a safe simulation platform to test insulin algorithms before real-world use.**
+
+What it does:
+- Simulates patient glucose + insulin dynamics.
+- Lets your algorithm propose doses.
+- Applies deterministic safety checks before any simulated dose is accepted.
+- Produces traceable outputs (CSV, audit logs, reports).
+
+What it does not do:
+- It is not a medical device.
+- It is not for direct clinical dosing.
+
 ## Documentation Map (Start Here)
 
 Use this map if you are new to the SDK:

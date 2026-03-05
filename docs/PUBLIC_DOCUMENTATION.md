@@ -1,7 +1,11 @@
-# IINTS-AF Public Documentation (v0.1.18)
+# IINTS-AF Public Documentation (v0.1.20)
 
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.
+
+For non-technical readers, start with:
+- `PLAIN_LANGUAGE_GUIDE.md`
+- `../README.md`
 
 ---
 

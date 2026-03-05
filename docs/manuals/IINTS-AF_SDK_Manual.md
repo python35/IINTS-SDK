@@ -10,6 +10,17 @@ It has NOT received FDA clearance or CE marking for clinical use.
 
 ## How to Use This Manual (Read First)
 
+New users should first read:
+- `docs/PLAIN_LANGUAGE_GUIDE.md`
+- `README.md`
+
+In plain words, this SDK lets you:
+- run insulin algorithm simulations,
+- enforce deterministic safety constraints,
+- inspect audit trails and reports.
+
+It does not provide direct clinical dosing.
+
 This manual is long. Use this map to find what you need fast:
 - **Full SDK overview:** `docs/COMPREHENSIVE_GUIDE.md`
 - **CLI reference:** `docs/TECHNICAL_README.md`

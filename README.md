@@ -6,6 +6,8 @@
 IINTS-AF is a safety-first simulation SDK for insulin algorithm research.
 It helps you test controllers, validate safety behavior, and generate audit-ready artifacts.
 
+New here? Start with: [docs/PLAIN_LANGUAGE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/PLAIN_LANGUAGE_GUIDE.md)
+
 ## What You Get
 - Virtual patient simulation for insulin strategies.
 - Deterministic safety supervision (hard rules).
@@ -96,6 +98,7 @@ iints research evaluate-forecast --input-csv results/dual_guard/results.csv
 - Manual (PDF): [docs/manuals/IINTS-AF_SDK_Manual.pdf](https://github.com/python35/IINTS-SDK/blob/main/docs/manuals/IINTS-AF_SDK_Manual.pdf)
 - Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
 - Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)
+- Plain-language guide: [docs/PLAIN_LANGUAGE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/PLAIN_LANGUAGE_GUIDE.md)
 - Research track: [research/README.md](https://github.com/python35/IINTS-SDK/blob/main/research/README.md)
 
 ## Safety Notice

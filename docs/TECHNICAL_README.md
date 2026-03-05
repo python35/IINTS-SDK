@@ -2,6 +2,13 @@
 
 This document contains the full technical usage for the IINTS-AF SDK.
 
+If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
+
+## What This File Is For
+- Exact CLI commands.
+- Integration and development workflows.
+- Reproducible run artifacts and technical options.
+
 ## Installation
 
 ### System Requirements
