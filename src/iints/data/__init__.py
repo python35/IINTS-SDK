@@ -32,7 +32,16 @@ from .contracts import (
     parse_contract,
     load_contract_yaml,
 )
-from .runner import ContractRunner, ValidationResult, CheckResult, dataframe_fingerprint
+from .runner import (
+    ContractRunner,
+    ValidationResult,
+    CheckResult,
+    MDMP_PROTOCOL_VERSION,
+    MDMP_GRADE_ORDER,
+    classify_mdmp_grade,
+    mdmp_grade_meets_minimum,
+    dataframe_fingerprint,
+)
 
 __all__ = [
     'DataAdapter',
@@ -74,5 +83,9 @@ __all__ = [
     'ContractRunner',
     'ValidationResult',
     'CheckResult',
+    'MDMP_PROTOCOL_VERSION',
+    'MDMP_GRADE_ORDER',
+    'classify_mdmp_grade',
+    'mdmp_grade_meets_minimum',
     'dataframe_fingerprint',
 ]

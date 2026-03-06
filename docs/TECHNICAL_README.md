@@ -116,7 +116,15 @@ iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
 iints data contract-template --output-path data_contract.yaml
 iints data contract-run data_contract.yaml data/my_cgm.csv \
   --output-json results/contract_data_report.json
+iints data contract-run data_contract.yaml data/my_cgm.csv \
+  --min-mdmp-grade research_grade --fail-on-noncompliant
 ```
+`contract-run` reports:
+- `compliance_score`
+- `contract_fingerprint_sha256`
+- `dataset_fingerprint_sha256`
+- `mdmp_grade` (`draft`, `research_grade`, `clinical_grade`)
+- `certified_for_medical_research`
 
 ### Import Wizard (Interactive)
 ```bash

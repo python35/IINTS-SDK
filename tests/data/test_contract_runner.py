@@ -7,7 +7,11 @@ from typer.testing import CliRunner
 
 from iints.cli.cli import app
 from iints.data.contracts import parse_contract
-from iints.data.runner import ContractRunner
+from iints.data.runner import (
+    ContractRunner,
+    classify_mdmp_grade,
+    mdmp_grade_meets_minimum,
+)
 
 
 runner = CliRunner()
@@ -51,6 +55,9 @@ def test_contract_runner_passes_for_valid_dataframe() -> None:
 
     assert result.is_compliant is True
     assert result.compliance_score == 100.0
+    assert result.mdmp_grade == "clinical_grade"
+    assert result.mdmp_protocol_version == "1.0-draft"
+    assert result.certified_for_medical_research is True
 
 
 def test_contract_runner_fails_on_missing_column() -> None:
@@ -59,6 +66,8 @@ def test_contract_runner_fails_on_missing_column() -> None:
     result = runner_impl.run(df)
 
     assert result.is_compliant is False
+    assert result.mdmp_grade == "draft"
+    assert result.certified_for_medical_research is False
     schema_check = next(check for check in result.checks if check.name == "schema_columns")
     assert schema_check.passed is False
 
@@ -78,6 +87,15 @@ def test_contract_runner_applies_builtin_unit_conversion() -> None:
     result = runner_impl.run(df, apply_builtin_transforms=True)
 
     assert result.is_compliant is True
+
+
+def test_mdmp_grade_helpers() -> None:
+    assert classify_mdmp_grade(100.0, True) == "clinical_grade"
+    assert classify_mdmp_grade(75.0, False) == "research_grade"
+    assert classify_mdmp_grade(50.0, False) == "draft"
+    assert mdmp_grade_meets_minimum("clinical_grade", "research_grade") is True
+    assert mdmp_grade_meets_minimum("draft", "research_grade") is False
+    assert mdmp_grade_meets_minimum("draft", "invalid") is False
 
 
 def test_cli_data_contract_run_writes_report(tmp_path) -> None:
@@ -123,3 +141,47 @@ processes:
     payload = json.loads(out_json.read_text())
     assert payload["is_compliant"] is True
     assert payload["compliance_score"] == 100.0
+    assert payload["mdmp_grade"] == "clinical_grade"
+    assert payload["mdmp_protocol_version"] == "1.0-draft"
+
+
+def test_cli_data_contract_run_mdmp_gate_fails(tmp_path) -> None:
+    contract_path = tmp_path / "contract.yaml"
+    input_csv = tmp_path / "input.csv"
+
+    contract_path.write_text(
+        """
+version: 1
+streams:
+  - name: PatientHealth
+    source: sdk.iints_af.v1
+    metadata:
+      required_columns: [timestamp, glucose]
+      column_types:
+        glucose: float
+      ranges:
+        glucose:
+          min: 70
+          max: 250
+processes:
+  - name: GlucoseData
+    input_stream: PatientHealth.glucose
+    validations:
+      - expression: glucose is not null and glucose > 20
+""".strip()
+    )
+    pd.DataFrame({"timestamp": [1, 2], "glucose": [40.0, 45.0]}).to_csv(input_csv, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "data",
+            "contract-run",
+            str(contract_path),
+            str(input_csv),
+            "--min-mdmp-grade",
+            "clinical_grade",
+        ],
+    )
+    assert result.exit_code == 1
+    assert "MDMP gate failed" in result.stdout

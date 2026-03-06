@@ -14,6 +14,7 @@ For non-technical readers, start with:
 ### Developer Docs
 - **Primary guide**: `COMPREHENSIVE_GUIDE.md`
 - **Technical details**: `TECHNICAL_README.md`
+- **Data protocol (MDMP draft)**: `MDMP.md`
 - **Evidence base**: `EVIDENCE_BASE.md`
 - **API stability**: `../API_STABILITY.md`
 - **Change history**: `../CHANGELOG.md`

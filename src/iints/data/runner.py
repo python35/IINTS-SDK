@@ -23,6 +23,9 @@ _RESERVED_TOKENS = {
     "false",
 }
 
+MDMP_PROTOCOL_VERSION = "1.0-draft"
+MDMP_GRADE_ORDER = ("draft", "research_grade", "clinical_grade")
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -44,6 +47,9 @@ class CheckResult:
 class ValidationResult:
     is_compliant: bool
     compliance_score: float
+    mdmp_grade: str
+    mdmp_protocol_version: str
+    certified_for_medical_research: bool
     contract_fingerprint_sha256: str
     dataset_fingerprint_sha256: str
     row_count: int
@@ -54,6 +60,9 @@ class ValidationResult:
         return {
             "is_compliant": self.is_compliant,
             "compliance_score": self.compliance_score,
+            "mdmp_grade": self.mdmp_grade,
+            "mdmp_protocol_version": self.mdmp_protocol_version,
+            "certified_for_medical_research": self.certified_for_medical_research,
             "contract_fingerprint_sha256": self.contract_fingerprint_sha256,
             "dataset_fingerprint_sha256": self.dataset_fingerprint_sha256,
             "row_count": self.row_count,
@@ -218,6 +227,23 @@ def dataframe_fingerprint(df: pd.DataFrame) -> str:
     return digest.hexdigest()
 
 
+def classify_mdmp_grade(score: float, is_compliant: bool) -> str:
+    if is_compliant and score >= 90.0:
+        return "clinical_grade"
+    if score >= 75.0:
+        return "research_grade"
+    return "draft"
+
+
+def mdmp_grade_meets_minimum(actual_grade: str, minimum_grade: str) -> bool:
+    try:
+        actual_idx = MDMP_GRADE_ORDER.index(actual_grade)
+        minimum_idx = MDMP_GRADE_ORDER.index(minimum_grade)
+    except ValueError:
+        return False
+    return actual_idx >= minimum_idx
+
+
 class ContractRunner:
     """
     Lightweight executor for model-ready data contracts.
@@ -337,10 +363,15 @@ class ContractRunner:
 
         passed_count = sum(1 for check in checks if check.passed)
         compliance_score = round((passed_count / max(len(checks), 1)) * 100.0, 2)
+        is_compliant = all(check.passed for check in checks)
+        grade = classify_mdmp_grade(compliance_score, is_compliant)
 
         return ValidationResult(
-            is_compliant=all(check.passed for check in checks),
+            is_compliant=is_compliant,
             compliance_score=compliance_score,
+            mdmp_grade=grade,
+            mdmp_protocol_version=MDMP_PROTOCOL_VERSION,
+            certified_for_medical_research=grade in {"clinical_grade", "research_grade"},
             contract_fingerprint_sha256=self.contract.fingerprint(),
             dataset_fingerprint_sha256=dataframe_fingerprint(working),
             row_count=len(working),

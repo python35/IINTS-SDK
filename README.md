@@ -85,6 +85,7 @@ iints validate-run --results-csv results/run_full/results.csv --profile research
 iints contract-verify --output-json results/contract_report.json
 iints data contract-template --output-path data_contract.yaml
 iints data contract-run data_contract.yaml data/my_cgm.csv --output-json results/contract_data_report.json
+iints data contract-run data_contract.yaml data/my_cgm.csv --min-mdmp-grade research_grade --fail-on-noncompliant
 iints replay-check --algo algorithms/example_algorithm.py --output-json results/replay_check.json
 iints golden-benchmark --algo algorithms/example_algorithm.py --output-json results/golden_benchmark.json
 
@@ -105,6 +106,11 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - `sources_manifest.json`
 - `SUMMARY.md` (human-readable quick review)
 
+`iints data contract-run` writes deterministic fingerprints plus an MDMP grade:
+- `draft`
+- `research_grade`
+- `clinical_grade`
+
 ## Demos and Notebooks
 - Demo scripts: [examples/demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
 - Notebook tutorials: [examples/notebooks](https://github.com/python35/IINTS-SDK/tree/main/examples/notebooks)
@@ -114,6 +120,7 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
 - Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)
 - Plain-language guide: [docs/PLAIN_LANGUAGE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/PLAIN_LANGUAGE_GUIDE.md)
+- MDMP (draft): [docs/MDMP.md](https://github.com/python35/IINTS-SDK/blob/main/docs/MDMP.md)
 - Evidence base (peer-reviewed sources): [docs/EVIDENCE_BASE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/EVIDENCE_BASE.md)
 - Research track: [research/README.md](https://github.com/python35/IINTS-SDK/blob/main/research/README.md)
 

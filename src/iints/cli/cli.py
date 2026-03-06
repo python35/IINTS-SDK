@@ -45,7 +45,11 @@ from iints.data.registry import (
     DatasetRegistryError,
 )
 from iints.data.contracts import load_contract_yaml
-from iints.data.runner import ContractRunner
+from iints.data.runner import (
+    ContractRunner,
+    MDMP_GRADE_ORDER,
+    mdmp_grade_meets_minimum,
+)
 from iints.utils.run_io import (
     build_run_metadata,
     build_run_manifest,
@@ -2741,6 +2745,10 @@ def data_contract_run(
     output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
     apply_builtin_transforms: Annotated[bool, typer.Option(help="Apply built-in unit conversion transforms from the contract")] = True,
     fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when compliance checks fail")] = False,
+    min_mdmp_grade: Annotated[
+        Optional[str],
+        typer.Option(help="Optional MDMP grade gate (draft, research_grade, clinical_grade)"),
+    ] = None,
 ):
     """Validate a dataset against a model-ready contract and compute compliance score."""
     console = Console()
@@ -2766,6 +2774,12 @@ def data_contract_run(
     summary.add_row("Rows", str(report.row_count))
     summary.add_row("Compliance", f"{report.compliance_score:.2f}%")
     summary.add_row("Status", "[green]PASS[/green]" if report.is_compliant else "[red]FAIL[/red]")
+    summary.add_row("MDMP grade", report.mdmp_grade)
+    summary.add_row("MDMP protocol", report.mdmp_protocol_version)
+    summary.add_row(
+        "Certified",
+        "yes" if report.certified_for_medical_research else "no",
+    )
     summary.add_row("Contract fingerprint", report.contract_fingerprint_sha256[:16] + "...")
     summary.add_row("Dataset fingerprint", report.dataset_fingerprint_sha256[:16] + "...")
     console.print(summary)
@@ -2788,6 +2802,18 @@ def data_contract_run(
         output_json.parent.mkdir(parents=True, exist_ok=True)
         output_json.write_text(json.dumps(report.to_dict(), indent=2))
         console.print(f"[green]Contract report written:[/green] {output_json}")
+
+    if min_mdmp_grade is not None:
+        normalized = min_mdmp_grade.strip().lower()
+        if normalized not in MDMP_GRADE_ORDER:
+            allowed = ", ".join(MDMP_GRADE_ORDER)
+            console.print(f"[bold red]Invalid --min-mdmp-grade value: {min_mdmp_grade}. Use one of: {allowed}[/bold red]")
+            raise typer.Exit(code=1)
+        if not mdmp_grade_meets_minimum(report.mdmp_grade, normalized):
+            console.print(
+                f"[bold red]MDMP gate failed:[/bold red] got {report.mdmp_grade}, requires at least {normalized}"
+            )
+            raise typer.Exit(code=1)
 
     if fail_on_noncompliant and not report.is_compliant:
         raise typer.Exit(code=1)
