@@ -1,49 +1,14 @@
 # IINTS-AF SDK Documentation
 
-<div class="iints-hero">
-  <div class="iints-hero-left">
-    <img src="assets/iints-logo.png" alt="IINTS-AF logo" />
-  </div>
-  <div class="iints-hero-right">
-    <h2>Safety-first research platform for insulin algorithm validation</h2>
-    <p>Use IINTS-AF to simulate algorithms, enforce deterministic safety checks, and produce audit-ready artifacts.</p>
-  </div>
-</div>
+IINTS-AF is a safety-first research SDK for insulin algorithm simulation, validation, and audit-ready reporting.
 
-<div class="iints-actions">
-  <a href="GETTING_STARTED/" class="iints-action">Get Started</a>
-  <a href="MDMP_QUICKSTART/" class="iints-action">MDMP Quickstart</a>
-  <a href="https://github.com/python35/IINTS-SDK/tree/main/examples/demos" class="iints-action">Demos</a>
-</div>
+## Start Here
 
-## Choose Your Path
-
-<div class="iints-grid">
-  <a class="iints-card-link" href="PLAIN_LANGUAGE_GUIDE/">
-    <div class="iints-card">
-      <h3>New to IINTS</h3>
-      <p>Read a simple explanation of what the SDK does and what it does not do.</p>
-    </div>
-  </a>
-  <a class="iints-card-link" href="GETTING_STARTED/">
-    <div class="iints-card">
-      <h3>Build First Run</h3>
-      <p>Install, run a baseline scenario, and inspect generated outputs.</p>
-    </div>
-  </a>
-  <a class="iints-card-link" href="MDMP_QUICKSTART/">
-    <div class="iints-card">
-      <h3>Validate Data (MDMP)</h3>
-      <p>Apply contracts, compute grades, and export dashboards for audits.</p>
-    </div>
-  </a>
-  <a class="iints-card-link" href="TECHNICAL_README/">
-    <div class="iints-card">
-      <h3>Engineering Reference</h3>
-      <p>Use the full command reference and technical integration details.</p>
-    </div>
-  </a>
-</div>
+- [Quick Start](GETTING_STARTED.md)
+- [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md)
+- [Documentation Map](DOCUMENTATION_INDEX.md)
+- [MDMP Quickstart](MDMP_QUICKSTART.md)
+- [Demos (GitHub)](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
 
 ## 10-Minute Quick Start
 
@@ -56,7 +21,7 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-Expected outputs include:
+Expected outputs:
 - `results.csv`
 - `clinical_report.pdf`
 - `audit/`
