@@ -1,60 +1,79 @@
 # IINTS-AF SDK Documentation
 
 <div class="iints-hero">
-  <img src="assets/iints-logo.png" alt="IINTS-AF logo" />
-  <div>
-    <strong>Safety-first insulin algorithm research SDK</strong><br/>
-    Simulation, validation, and audit-ready reporting.
+  <div class="iints-hero-left">
+    <img src="assets/iints-logo.png" alt="IINTS-AF logo" />
+  </div>
+  <div class="iints-hero-right">
+    <h2>Safety-first research platform for insulin algorithm validation</h2>
+    <p>Use IINTS-AF to simulate algorithms, enforce deterministic safety checks, and produce audit-ready artifacts.</p>
   </div>
 </div>
 
 <div class="iints-actions">
-  <a href="PLAIN_LANGUAGE_GUIDE/" class="iints-action">Start</a>
-  <a href="MDMP/" class="iints-action">MDMP</a>
+  <a href="GETTING_STARTED/" class="iints-action">Get Started</a>
+  <a href="MDMP_QUICKSTART/" class="iints-action">MDMP Quickstart</a>
   <a href="https://github.com/python35/IINTS-SDK/tree/main/examples/demos" class="iints-action">Demos</a>
 </div>
 
-## Start Here
-
-Use this order if you are new:
-
-1. **Plain Language Guide**: concept overview.
-2. **Technical README**: architecture + command reference.
-3. **MDMP (Draft)**: data quality protocol and compliance grading.
-
-## Quick Paths
+## Choose Your Path
 
 <div class="iints-grid">
-  <div class="iints-card">
-    <h3>Run a First Simulation</h3>
-    <p>Create a scaffold and execute a baseline scenario.</p>
-  </div>
-  <div class="iints-card">
-    <h3>Validate Data (MDMP)</h3>
-    <p>Apply a contract, compute grade, and export reproducible report artifacts.</p>
-  </div>
-  <div class="iints-card">
-    <h3>Build Audit Outputs</h3>
-    <p>Generate JSON/CSV/PDF/HTML outputs for research review.</p>
-  </div>
-  <div class="iints-card">
-    <h3>Use Demos and Notebooks</h3>
-    <p>Follow concrete end-to-end examples in scripts and notebook tutorials.</p>
-  </div>
+  <a class="iints-card-link" href="PLAIN_LANGUAGE_GUIDE/">
+    <div class="iints-card">
+      <h3>New to IINTS</h3>
+      <p>Read a simple explanation of what the SDK does and what it does not do.</p>
+    </div>
+  </a>
+  <a class="iints-card-link" href="GETTING_STARTED/">
+    <div class="iints-card">
+      <h3>Build First Run</h3>
+      <p>Install, run a baseline scenario, and inspect generated outputs.</p>
+    </div>
+  </a>
+  <a class="iints-card-link" href="MDMP_QUICKSTART/">
+    <div class="iints-card">
+      <h3>Validate Data (MDMP)</h3>
+      <p>Apply contracts, compute grades, and export dashboards for audits.</p>
+    </div>
+  </a>
+  <a class="iints-card-link" href="TECHNICAL_README/">
+    <div class="iints-card">
+      <h3>Engineering Reference</h3>
+      <p>Use the full command reference and technical integration details.</p>
+    </div>
+  </a>
 </div>
 
-## Core Commands
+## 10-Minute Quick Start
 
 ```bash
-# 1) Quick scaffold + baseline run
+pip install iints-sdk-python35
+
+iints doctor --smoke-run
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
 
-# 2) Study-ready package
-iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
+Expected outputs include:
+- `results.csv`
+- `clinical_report.pdf`
+- `audit/`
+- `run_manifest.json`
 
-# 3) MDMP validation + dashboard
+## MDMP in 60 Seconds
+
+MDMP is the IINTS data-quality protocol.
+
+- `Contract`: required columns, types, units, and value bounds.
+- `Validation`: dataset is checked against contract rules.
+- `Grading`: output receives `draft`, `research_grade`, or `clinical_grade`.
+- `Fingerprinting`: deterministic hashes support reproducibility and audits.
+
+Use MDMP with:
+
+```bash
 iints mdmp template --output-path mdmp_contract.yaml
 iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
 iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html

@@ -5,15 +5,35 @@
 
 .iints-hero {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin: 0.5rem 0 1rem;
+  align-items: stretch;
+  gap: 1.2rem;
+  margin: 0.5rem 0 1.2rem;
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  background: linear-gradient(140deg, rgba(38, 133, 255, 0.12), rgba(66, 184, 131, 0.12));
 }
 
-.iints-hero img {
-  width: 72px;
-  height: 72px;
+.iints-hero-left {
+  display: flex;
+  align-items: center;
+}
+
+.iints-hero-left img {
+  width: 92px;
+  height: 92px;
   object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.iints-hero-right h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.iints-hero-right p {
+  margin: 0;
+  opacity: 0.9;
 }
 
 .iints-actions {
@@ -54,6 +74,7 @@
   border-radius: 8px;
   padding: 0.75rem 0.9rem;
   background: rgba(127, 127, 127, 0.05);
+  height: 100%;
 }
 
 .iints-card h3 {
@@ -65,4 +86,26 @@
 .iints-card p {
   margin: 0;
   font-size: 0.85rem;
+}
+
+.iints-card-link {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.iints-card-link:hover .iints-card {
+  border-color: rgba(38, 133, 255, 0.55);
+  background: rgba(38, 133, 255, 0.08);
+}
+
+@media (max-width: 700px) {
+  .iints-hero {
+    flex-direction: column;
+    padding: 0.85rem;
+  }
+
+  .iints-hero-left img {
+    width: 72px;
+    height: 72px;
+  }
 }

@@ -28,6 +28,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting Started: GETTING_STARTED.md
+  - MDMP Quickstart: MDMP_QUICKSTART.md
   - Public Overview: PUBLIC_DOCUMENTATION.md
   - Plain Language Guide: PLAIN_LANGUAGE_GUIDE.md
   - Technical README: TECHNICAL_README.md
