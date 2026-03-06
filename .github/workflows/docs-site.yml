@@ -46,23 +46,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Check Pages is enabled on repo
-        id: pages_check
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Setup Pages
+        id: setup_pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+      - name: Pages setup guidance
+        if: ${{ steps.setup_pages.outcome != 'success' }}
         run: |
-          status="$(curl -s -o /tmp/pages.json -w '%{http_code}' \
-            -H \"Authorization: Bearer ${GH_TOKEN}\" \
-            -H \"Accept: application/vnd.github+json\" \
-            \"https://api.github.com/repos/${{ github.repository }}/pages\")"
-          if [ "$status" = "200" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "GitHub Pages is not enabled for this repository yet."
-            echo "Enable it once in: Settings > Pages > Build and deployment > Source: GitHub Actions."
-          fi
+          echo "Skipping deploy: GitHub Pages is not enabled or this workflow lacks permissions."
+          echo "Enable once in repository settings:"
+          echo "Settings > Pages > Build and deployment > Source: GitHub Actions"
       - name: Deploy to GitHub Pages
         id: deployment
-        if: ${{ steps.pages_check.outputs.enabled == 'true' }}
+        if: ${{ steps.setup_pages.outcome == 'success' }}
         uses: actions/deploy-pages@v4
