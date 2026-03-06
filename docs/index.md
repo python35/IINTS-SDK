@@ -10,6 +10,13 @@ IINTS-AF is a safety-first research SDK for insulin algorithm simulation, valida
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
 - [Demos (GitHub)](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
 
+## Choose Your Path
+
+| New to IINTS | Build First Run | Validate Data (MDMP) | Engineering Reference |
+|---|---|---|---|
+| [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Quick Start](GETTING_STARTED.md) | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Developer CLI Guide](TECHNICAL_README.md) |
+| Understand what the SDK does and does not do. | Install, run baseline, inspect outputs. | Validate contracts, compute grades, export dashboard. | Full command reference and technical integration details. |
+
 ## 10-Minute Quick Start
 
 ```bash
