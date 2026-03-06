@@ -21,6 +21,17 @@ from .universal_parser import UniversalParser, StandardDataPack, ParseResult
 from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
 from .nightscout import NightscoutConfig, import_nightscout
 from .tidepool import TidepoolClient, load_openapi_spec
+from .contracts import (
+    StreamSpec,
+    FeatureSpec,
+    LabelSpec,
+    ValidationSpec,
+    ProcessSpec,
+    ModelReadyContract,
+    compile_contract,
+    parse_contract,
+    load_contract_yaml,
+)
 
 __all__ = [
     'DataAdapter',
@@ -50,4 +61,13 @@ __all__ = [
     'import_nightscout',
     'TidepoolClient',
     'load_openapi_spec',
+    'StreamSpec',
+    'FeatureSpec',
+    'LabelSpec',
+    'ValidationSpec',
+    'ProcessSpec',
+    'ModelReadyContract',
+    'compile_contract',
+    'parse_contract',
+    'load_contract_yaml',
 ]
