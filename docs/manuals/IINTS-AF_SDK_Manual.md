@@ -1,5 +1,5 @@
 # IINTS-AF SDK Technical Reference Manual
-Version 0.1.21 | Python SDK
+Version 0.1.22 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -1697,7 +1697,7 @@ SafetyConfig(
   author = {Bobbaers, Rune},
   title = {IINTS-AF: Intelligent Insulin Titration System for Artificial Pancreas},
   year = {2026},
-  version = {0.1.21},
+  version = {0.1.22},
   url = {https://github.com/python35/IINTS-SDK},
   note = {Pre-clinical research software for insulin dosing algorithm validation}
 }

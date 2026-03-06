@@ -2,29 +2,22 @@
 
 ## Unreleased
 
-- Added data contract runner (`iints data contract-run`) with schema checks, constraint checks, deterministic dataset fingerprinting, and compliance score output.
-- Added starter contract generator (`iints data contract-template`) for quick model-ready data gate setup.
-- Added built-in unit conversion hooks in contract execution (e.g., mmol/L to mg/dL).
-- Added data contract runner test coverage under `tests/data/test_contract_runner.py`.
-- Added MDMP grading fields to contract reports (`mdmp_grade`, `mdmp_protocol_version`, `certified_for_medical_research`).
-- Added MDMP grade helper utilities and CLI gate option (`--min-mdmp-grade`) for CI enforcement.
-- Added MDMP draft documentation in `docs/MDMP.md`.
-- Added MDMP certification visualizer command (`iints data mdmp-visualizer`) to generate a single-file interactive HTML audit dashboard.
-- Added MDMP visualizer tests under `tests/data/test_mdmp_visualizer.py`.
-- Added MDMP Auto-Guardian decorator (`iints.mdmp_gate`) to enforce grade/compliance checks before function execution.
-- Added `iints init --template clinical-trial` scaffold with MDMP contract + demo dataset + audit folders.
-- Added test coverage for guardians and clinical-trial project scaffold CLI.
-- Added Synthetic Mirror generator (`iints data synthetic-mirror`) for privacy-safe, contract-validated synthetic dataset creation.
-- Added synthetic mirror API (`generate_synthetic_mirror`) and report artifact model.
-- Added synthetic mirror test coverage under `tests/data/test_synthetic_mirror.py`.
-- Added MkDocs documentation site configuration (`mkdocs.yml`) and GitHub Pages deployment workflow.
-- Added docs landing page (`docs/index.md`) and docs-site CI badge in README.
-- Fixed UTC timestamp generation in clinical report code to use timezone-aware datetime.
-- Removed non-ASCII alert glyph in cockpit visualization to avoid font rendering warnings.
-- Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
-- Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
-- Added CLI/source helper utilities to export filtered evidence manifests programmatically.
-- Added tests for `study-ready` forwarding and certification bundle outputs.
+- No entries yet.
+
+## v0.1.22
+
+- Added dedicated MDMP namespace:
+  - Python imports: `iints.mdmp`
+  - CLI commands: `iints mdmp ...` (`template`, `validate`, `synthetic-mirror`, `visualizer`)
+- Added MDMP runtime Auto-Guardians (`mdmp_gate`) for in-memory compliance gating before pipeline execution.
+- Added MDMP Synthetic Mirror generation (`generate_synthetic_mirror`, `iints data synthetic-mirror`) with contract-aware validation output.
+- Added MDMP certification visualizer (`iints data mdmp-visualizer`) for single-file interactive HTML audit dashboards.
+- Added MDMP grading metadata and gating support (`mdmp_grade`, `mdmp_protocol_version`, `certified_for_medical_research`, `--min-mdmp-grade`).
+- Added clinical-trial scaffold template via `iints init --template clinical-trial`.
+- Added `iints study-ready` one-command bundle flow and enhanced `iints certify-run` outputs (`sources_manifest.json`, `SUMMARY.md`).
+- Added MkDocs documentation site (`mkdocs.yml`, `docs/index.md`) and GitHub Pages deployment workflow.
+- Fixed report UTC timestamp generation to timezone-aware datetime.
+- Removed non-ASCII cockpit alert glyph to avoid font rendering warnings.
 
 ## v0.1.21
 

@@ -89,12 +89,14 @@ docs_app = typer.Typer(help="Generate documentation and technical summaries for 
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 data_app = typer.Typer(help="Official datasets and data packs.")
+mdmp_app = typer.Typer(help="MDMP protocol commands (separate namespace).")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
+app.add_typer(mdmp_app, name="mdmp")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
 
@@ -2997,6 +2999,76 @@ def data_synthetic_mirror(
 
     if fail_on_noncompliant and not artifact.validation.is_compliant:
         raise typer.Exit(code=1)
+
+
+@mdmp_app.command("template")
+def mdmp_template(
+    output_path: Annotated[Path, typer.Option(help="Where to write the MDMP contract YAML")] = Path("mdmp_contract.yaml"),
+):
+    """Write an MDMP contract template (preferred MDMP namespace)."""
+    data_contract_template(output_path=output_path)
+
+
+@mdmp_app.command("validate")
+def mdmp_validate(
+    contract_path: Annotated[Path, typer.Argument(help="Path to MDMP contract YAML")],
+    input_csv: Annotated[Path, typer.Argument(help="Path to input CSV")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
+    apply_builtin_transforms: Annotated[
+        bool,
+        typer.Option(help="Apply built-in unit conversion transforms (default: off for explicit MDMP operation)"),
+    ] = False,
+    fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when compliance checks fail")] = False,
+    min_mdmp_grade: Annotated[
+        Optional[str],
+        typer.Option(help="Optional MDMP grade gate (draft, research_grade, clinical_grade)"),
+    ] = None,
+):
+    """Validate dataset against MDMP contract (preferred MDMP namespace)."""
+    data_contract_run(
+        contract_path=contract_path,
+        input_csv=input_csv,
+        output_json=output_json,
+        apply_builtin_transforms=apply_builtin_transforms,
+        fail_on_noncompliant=fail_on_noncompliant,
+        min_mdmp_grade=min_mdmp_grade,
+    )
+
+
+@mdmp_app.command("visualizer")
+def mdmp_visualizer(
+    report_json: Annotated[Path, typer.Argument(help="Path to MDMP validation report JSON")],
+    output_html: Annotated[Path, typer.Option(help="Output HTML path")] = Path("results/mdmp_dashboard.html"),
+    title: Annotated[str, typer.Option(help="Dashboard title")] = "IINTS MDMP Certification Dashboard",
+):
+    """Generate MDMP dashboard from report JSON (preferred MDMP namespace)."""
+    data_mdmp_visualizer(report_json=report_json, output_html=output_html, title=title)
+
+
+@mdmp_app.command("synthetic-mirror")
+def mdmp_synthetic_mirror(
+    input_csv: Annotated[Path, typer.Argument(help="Source CSV")],
+    contract_path: Annotated[Path, typer.Argument(help="MDMP contract YAML")],
+    output_csv: Annotated[Path, typer.Option(help="Output synthetic CSV path")] = Path("data/synthetic_mirror.csv"),
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional synthetic mirror report JSON")] = Path("results/synthetic_mirror_report.json"),
+    rows: Annotated[Optional[int], typer.Option(help="Optional number of rows to generate")] = None,
+    seed: Annotated[int, typer.Option(help="Random seed")] = 42,
+    noise_scale: Annotated[float, typer.Option(help="Numeric perturbation scale")] = 0.05,
+    min_mdmp_grade: Annotated[Optional[str], typer.Option(help="Optional MDMP grade gate")] = "research_grade",
+    fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when generated dataset fails compliance")] = True,
+):
+    """Generate synthetic mirror dataset (preferred MDMP namespace)."""
+    data_synthetic_mirror(
+        input_csv=input_csv,
+        contract_path=contract_path,
+        output_csv=output_csv,
+        output_json=output_json,
+        rows=rows,
+        seed=seed,
+        noise_scale=noise_scale,
+        min_mdmp_grade=min_mdmp_grade,
+        fail_on_noncompliant=fail_on_noncompliant,
+    )
 
 
 @app.command("sources")

@@ -34,6 +34,7 @@ nav:
   - Emulation References: emulation_references.md
   - Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Release Notes:
+      - v0.1.22: releases/v0.1.22.md
       - v0.0.18: releases/v0.0.18.md
       - v0.1.4: releases/v0.1.4.md
       - v0.1.5: releases/v0.1.5.md

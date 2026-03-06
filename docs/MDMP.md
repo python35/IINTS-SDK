@@ -6,6 +6,10 @@ It standardizes how datasets are validated, fingerprinted, and scored before mod
 MDMP is designed for traceability and reproducibility in research settings.  
 It does **not** certify a model for clinical use on its own.
 
+MDMP has a dedicated SDK namespace:
+- Python: `iints.mdmp`
+- CLI: `iints mdmp ...`
+
 ## Scope
 
 MDMP currently covers:

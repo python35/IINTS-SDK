@@ -138,6 +138,14 @@ iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
   --output-json results/synthetic_mirror_report.json
 iints data mdmp-visualizer results/contract_data_report.json \
   --output-html results/mdmp_dashboard.html
+iints mdmp template --output-path mdmp_contract.yaml
+iints mdmp validate mdmp_contract.yaml data/my_cgm.csv \
+  --output-json results/mdmp_report.json
+iints mdmp synthetic-mirror data/my_cgm.csv mdmp_contract.yaml \
+  --output-csv data/synthetic_mirror.csv \
+  --output-json results/synthetic_mirror_report.json
+iints mdmp visualizer results/mdmp_report.json \
+  --output-html results/mdmp_dashboard.html
 ```
 `contract-run` reports:
 - `compliance_score`
@@ -150,6 +158,8 @@ iints data mdmp-visualizer results/contract_data_report.json \
 
 `synthetic-mirror` generates a synthetic dataset from a validated source CSV, preserving schema and broad numeric behavior, then validates the synthetic output against the same contract.
 
+`iints mdmp ...` is the preferred protocol namespace for MDMP. `iints data ...` MDMP commands remain available for compatibility.
+
 ### MDMP Auto-Guardian Decorator
 ```python
 import pandas as pd
@@ -159,6 +169,7 @@ from iints import mdmp_gate
 def train_step(df: pd.DataFrame) -> int:
     return len(df)
 ```
+You can also import from `iints.mdmp` for protocol-specific code boundaries.
 Behavior:
 - `fail_mode="raise"` (default): blocks execution with `MDMPGateError`
 - `fail_mode="warn"`: continues with `RuntimeWarning`

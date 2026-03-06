@@ -1,4 +1,4 @@
-# IINTS-AF Public Documentation (v0.1.21)
+# IINTS-AF Public Documentation (v0.1.22)
 
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.
@@ -44,6 +44,7 @@ For non-technical readers, start with:
 - Use `iints data mdmp-visualizer` to turn `contract_data_report.json` into a shareable single-file audit dashboard.
 - Use `iints init --template clinical-trial` for a ready-made MDMP scaffold (contract + demo data + audit folders).
 - Use `iints data synthetic-mirror` to build privacy-safe synthetic datasets from validated source data.
+- Prefer `iints mdmp ...` commands and `iints.mdmp` imports for protocol-specific workflows.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
 ---
