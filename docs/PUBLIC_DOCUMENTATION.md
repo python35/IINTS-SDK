@@ -3,6 +3,8 @@
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.
 
+Public docs site: `https://python35.github.io/IINTS-SDK/`
+
 For non-technical readers, start with:
 - `PLAIN_LANGUAGE_GUIDE.md`
 - `../README.md`

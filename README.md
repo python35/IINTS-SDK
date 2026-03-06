@@ -1,6 +1,7 @@
 # IINTS-AF SDK
 [![PyPI version](https://badge.fury.io/py/iints-sdk-python35.svg)](https://badge.fury.io/py/iints-sdk-python35)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
+[![Docs Site](https://github.com/python35/IINTS-SDK/actions/workflows/docs-site.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/docs-site.yml)
 [![Site](https://img.shields.io/badge/site-IINTS--AF-0a66c2?style=flat&logo=firefox-browser&logoColor=white)](https://python35.github.io/IINTS-Site/index.html)
 
 IINTS-AF is a safety-first simulation SDK for insulin algorithm research.
@@ -142,6 +143,7 @@ def process(df: pd.DataFrame) -> int:
 - Notebook tutorials: [examples/notebooks](https://github.com/python35/IINTS-SDK/tree/main/examples/notebooks)
 
 ## Documentation
+- Docs site (GitHub Pages): [https://python35.github.io/IINTS-SDK/](https://python35.github.io/IINTS-SDK/)
 - Manual (PDF): [docs/manuals/IINTS-AF_SDK_Manual.pdf](https://github.com/python35/IINTS-SDK/blob/main/docs/manuals/IINTS-AF_SDK_Manual.pdf)
 - Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
 - Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)

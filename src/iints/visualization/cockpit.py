@@ -313,7 +313,7 @@ class ClinicalCockpit:
                 ax.text(0.5, y_pos, f"{marker} t={time_min:.0f}m {reason}", fontsize=8)
             ax.text(0.5, 1.0, f"Overrides: {len(safety_timeline)}", fontsize=9, fontweight='bold')
         else:
-            ax.text(0.5, 5, "✅ No active alerts", fontsize=10, ha='center', color='green')
+            ax.text(0.5, 5, "No active alerts", fontsize=10, ha='center', color='green')
         
         return ax
     

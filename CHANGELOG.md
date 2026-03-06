@@ -17,6 +17,10 @@
 - Added Synthetic Mirror generator (`iints data synthetic-mirror`) for privacy-safe, contract-validated synthetic dataset creation.
 - Added synthetic mirror API (`generate_synthetic_mirror`) and report artifact model.
 - Added synthetic mirror test coverage under `tests/data/test_synthetic_mirror.py`.
+- Added MkDocs documentation site configuration (`mkdocs.yml`) and GitHub Pages deployment workflow.
+- Added docs landing page (`docs/index.md`) and docs-site CI badge in README.
+- Fixed UTC timestamp generation in clinical report code to use timezone-aware datetime.
+- Removed non-ASCII alert glyph in cockpit visualization to avoid font rendering warnings.
 - Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
 - Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
 - Added CLI/source helper utilities to export filtered evidence manifests programmatically.

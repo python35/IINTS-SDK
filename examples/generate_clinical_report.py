@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import argparse
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 import seaborn as sns
@@ -135,7 +135,8 @@ class ClinicalReportPDF(FPDF):
         self.cell(0, 10, f'Session ID: {session_id}', 0, 1, 'C')
         self.cell(0, 10, f'Subject ID (de-identified): {patient_id}', 0, 1, 'C')
         self.cell(0, 10, 'Evaluation Mode: Retrospective forecast (no therapy changes)', 0, 1, 'C')
-        self.cell(0, 10, f'Report Date (UTC): {datetime.utcnow().strftime("%Y-%m-%d %H:%M")}', 0, 1, 'C')
+        timestamp_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        self.cell(0, 10, f'Report Date (UTC): {timestamp_utc}', 0, 1, 'C')
         
         self.ln(30)
         

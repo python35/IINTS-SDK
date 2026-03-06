@@ -1,0 +1,44 @@
+site_name: IINTS-AF SDK Documentation
+site_description: Safety-first simulation SDK for insulin algorithm research.
+site_url: https://python35.github.io/IINTS-SDK/
+repo_url: https://github.com/python35/IINTS-SDK
+repo_name: python35/IINTS-SDK
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Public Overview: PUBLIC_DOCUMENTATION.md
+  - Plain Language Guide: PLAIN_LANGUAGE_GUIDE.md
+  - Technical README: TECHNICAL_README.md
+  - Comprehensive Guide: COMPREHENSIVE_GUIDE.md
+  - MDMP (Draft): MDMP.md
+  - Evidence Base: EVIDENCE_BASE.md
+  - Documentation Index: DOCUMENTATION_INDEX.md
+  - Official Manual: OFFICIAL_MANUAL.md
+  - Emulation References: emulation_references.md
+  - Technical Manual: manuals/IINTS-AF_SDK_Manual.md
+  - Release Notes:
+      - v0.0.18: releases/v0.0.18.md
+      - v0.1.4: releases/v0.1.4.md
+      - v0.1.5: releases/v0.1.5.md
+      - v0.1.15: releases/v0.1.15.md
+      - v0.1.17: releases/v0.1.17.md
+      - v0.1.18: releases/v0.1.18.md
+      - v0.1.21: releases/v0.1.21.md
+      - v0.1.20: releases/v0.1.20.md

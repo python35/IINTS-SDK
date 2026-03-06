@@ -4,6 +4,21 @@ This document contains the full technical usage for the IINTS-AF SDK.
 
 If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
 
+## Documentation Site
+
+Local preview:
+
+```bash
+python3 -m pip install mkdocs mkdocs-material
+mkdocs serve
+```
+
+Static build:
+
+```bash
+mkdocs build
+```
+
 ## What This File Is For
 - Exact CLI commands.
 - Integration and development workflows.
