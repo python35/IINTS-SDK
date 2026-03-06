@@ -58,11 +58,25 @@ def _extract_iints_help_target(command: str) -> Tuple[str, ...] | None:
         return None
     if not tokens or tokens[0] != "iints":
         return None
+
+    root = typer.main.get_command(app)
+    command_obj: click.Command = root
     path_tokens: List[str] = []
+
     for token in tokens[1:]:
         if token.startswith("-"):
             break
+        if not isinstance(command_obj, click.Group):
+            # Remaining tokens are positional arguments for a leaf command.
+            break
+        context = click.Context(command_obj)
+        next_command = command_obj.get_command(context, token)
+        if next_command is None:
+            # Token is not a subcommand; treat as positional argument.
+            break
         path_tokens.append(token)
+        command_obj = next_command
+
     return tuple(path_tokens)
 
 
