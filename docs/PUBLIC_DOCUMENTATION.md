@@ -40,6 +40,7 @@ For non-technical readers, start with:
 - Export literature sources using `iints sources --output-json results/source_manifest.json`.
 - Use `iints study-ready` when you want a ready-to-review bundle in one command.
 - Use `iints data mdmp-visualizer` to turn `contract_data_report.json` into a shareable single-file audit dashboard.
+- Use `iints init --template clinical-trial` for a ready-made MDMP scaffold (contract + demo data + audit folders).
 - Record the SDK version + git SHA from `run_metadata.json`.
 
 ---

@@ -130,6 +130,29 @@ iints data mdmp-visualizer results/contract_data_report.json \
 
 `mdmp-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
 
+### MDMP Auto-Guardian Decorator
+```python
+import pandas as pd
+from iints import mdmp_gate
+
+@mdmp_gate("contracts/clinical_mdmp_contract.yaml", min_grade="clinical_grade")
+def train_step(df: pd.DataFrame) -> int:
+    return len(df)
+```
+Behavior:
+- `fail_mode="raise"` (default): blocks execution with `MDMPGateError`
+- `fail_mode="warn"`: continues with `RuntimeWarning`
+- `fail_mode="log"`: continues and logs warning
+
+### Clinical-Trial Scaffold
+```bash
+iints init --project-name iints_trial --template clinical-trial
+```
+This template creates:
+- `contracts/clinical_mdmp_contract.yaml`
+- `data/demo/diabetes_cgm.csv`
+- `audit/`, `reports/`, `notebooks/`, `results/`
+
 ### Import Wizard (Interactive)
 ```bash
 iints import-wizard

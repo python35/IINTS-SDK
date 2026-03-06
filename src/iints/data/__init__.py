@@ -43,6 +43,7 @@ from .runner import (
     dataframe_fingerprint,
 )
 from .mdmp_visualizer import build_mdmp_dashboard_html
+from .guardians import mdmp_gate, MDMPGateError
 
 __all__ = [
     'DataAdapter',
@@ -90,4 +91,6 @@ __all__ = [
     'mdmp_grade_meets_minimum',
     'dataframe_fingerprint',
     'build_mdmp_dashboard_html',
+    'mdmp_gate',
+    'MDMPGateError',
 ]

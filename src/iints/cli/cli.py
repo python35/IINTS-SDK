@@ -1138,25 +1138,38 @@ def study_ready(
 @app.command()
 def init(
     project_name: Annotated[str, typer.Option(help="Name of the project directory")] = "my_iints_project",
+    template: Annotated[str, typer.Option(help="Project template: research or clinical-trial")] = "research",
 ):
     """
-    Initialize a new IINTS-AF research project with a standard folder structure.
+    Initialize a new IINTS-AF project with a standard folder structure.
     """
     console = Console()
     project_path = Path(project_name)
-    
+
     if project_path.exists():
-         console.print(f"[bold red]Error: Directory '{project_name}' already exists.[/bold red]")
-         raise typer.Exit(code=1)
-    
-    console.print(f"[bold blue]Initializing IINTS-AF Project: {project_name}[/bold blue]")
-    
-    # Create Directories
+        console.print(f"[bold red]Error: Directory '{project_name}' already exists.[/bold red]")
+        raise typer.Exit(code=1)
+
+    selected_template = template.strip().lower()
+    if selected_template not in {"research", "clinical-trial"}:
+        console.print("[bold red]Invalid --template. Use 'research' or 'clinical-trial'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"[bold blue]Initializing IINTS-AF Project: {project_name} ({selected_template})[/bold blue]")
+
+    # Base directories
     (project_path / "algorithms").mkdir(parents=True)
     (project_path / "scenarios").mkdir(parents=True)
     (project_path / "data").mkdir(parents=True)
     (project_path / "results").mkdir(parents=True)
-    
+
+    if selected_template == "clinical-trial":
+        (project_path / "contracts").mkdir(parents=True)
+        (project_path / "audit").mkdir(parents=True)
+        (project_path / "notebooks").mkdir(parents=True)
+        (project_path / "reports").mkdir(parents=True)
+        (project_path / "data" / "demo").mkdir(parents=True)
+
     # Copy Default Algorithm
     try:
         if sys.version_info >= (3, 9):
@@ -1176,7 +1189,7 @@ def init(
     except Exception as e:
         console.print(f"[bold red]Error reading template files: {e}[/bold red]")
         raise typer.Exit(code=1)
-        
+
     # Instantiate the default algorithm template
     algo_content = algo_content.replace("{{ALGO_NAME}}", "ExampleAlgorithm")
     algo_content = algo_content.replace("{{AUTHOR_NAME}}", "IINTS User")
@@ -1192,10 +1205,63 @@ def init(
         f.write(stacking_content)
     with open(project_path / "scenarios" / "chaos_runaway_ai.json", "w") as f:
         f.write(runaway_content)
-        
+
+    if selected_template == "clinical-trial":
+        contract_path = project_path / "contracts" / "clinical_mdmp_contract.yaml"
+        contract_payload = _build_data_contract_template()
+        contract_path.write_text(yaml.safe_dump(contract_payload, sort_keys=False))
+
+        demo_df = pd.DataFrame(
+            {
+                "timestamp": [
+                    "2026-01-01T00:00:00Z",
+                    "2026-01-01T00:05:00Z",
+                    "2026-01-01T00:10:00Z",
+                    "2026-01-01T00:15:00Z",
+                    "2026-01-01T00:20:00Z",
+                    "2026-01-01T00:25:00Z",
+                ],
+                "glucose": [118.0, 120.0, 122.0, 124.0, 123.0, 121.0],
+                "carbs": [0.0, 0.0, 0.0, 12.0, 0.0, 0.0],
+                "insulin": [0.0, 0.0, 0.1, 0.0, 0.0, 0.0],
+            }
+        )
+        demo_path = project_path / "data" / "demo" / "diabetes_cgm.csv"
+        demo_df.to_csv(demo_path, index=False)
+
     # Create README
-    readme_content = f"""# {project_name}
-    
+    if selected_template == "clinical-trial":
+        readme_content = f"""# {project_name}
+
+Powered by IINTS-AF SDK (clinical-trial scaffold).
+
+## Structure
+- `algorithms/`: Algorithms under evaluation.
+- `scenarios/`: Simulation scenarios.
+- `contracts/`: MDMP contracts.
+- `data/demo/`: Synthetic-safe starter dataset.
+- `audit/`: Validation JSON + MDMP dashboards.
+- `reports/`: Study outputs for sharing.
+- `results/`: Raw simulation outputs.
+
+## MDMP Quick Path
+```bash
+iints data contract-run contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv \\
+  --output-json audit/contract_data_report.json \\
+  --min-mdmp-grade research_grade --fail-on-noncompliant
+
+iints data mdmp-visualizer audit/contract_data_report.json \\
+  --output-html audit/mdmp_dashboard.html
+```
+
+## Run Simulation
+```bash
+iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/example_scenario.json
+```
+"""
+    else:
+        readme_content = f"""# {project_name}
+
 Powered by IINTS-AF SDK.
 
 ## Structure
@@ -1218,9 +1284,18 @@ Powered by IINTS-AF SDK.
 """
     with open(project_path / "README.md", "w") as f:
         f.write(readme_content)
-    
+
     console.print(f"[green]Project initialized successfully in '{project_name}'[/green]")
-    console.print(f"To get started:\n  cd {project_name}\n  iints run --algo algorithms/example_algorithm.py")
+    if selected_template == "clinical-trial":
+        console.print(
+            "To get started:\n"
+            f"  cd {project_name}\n"
+            "  iints data contract-run contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv "
+            "--output-json audit/contract_data_report.json\n"
+            "  iints data mdmp-visualizer audit/contract_data_report.json --output-html audit/mdmp_dashboard.html"
+        )
+    else:
+        console.print(f"To get started:\n  cd {project_name}\n  iints run --algo algorithms/example_algorithm.py")
 
 @app.command()
 def quickstart(
@@ -2679,13 +2754,8 @@ def data_fetch(
         raise typer.Exit(code=1)
 
 
-@data_app.command("contract-template")
-def data_contract_template(
-    output_path: Annotated[Path, typer.Option(help="Where to write the starter contract YAML")] = Path("data_contract.yaml"),
-):
-    """Write a starter data contract template for model-ready validation."""
-    console = Console()
-    template = {
+def _build_data_contract_template() -> Dict[str, Any]:
+    return {
         "version": 1,
         "streams": [
             {
@@ -2734,6 +2804,15 @@ def data_contract_template(
             }
         ],
     }
+
+
+@data_app.command("contract-template")
+def data_contract_template(
+    output_path: Annotated[Path, typer.Option(help="Where to write the starter contract YAML")] = Path("data_contract.yaml"),
+):
+    """Write a starter data contract template for model-ready validation."""
+    console = Console()
+    template = _build_data_contract_template()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(yaml.safe_dump(template, sort_keys=False))
     console.print(f"[green]Contract template written:[/green] {output_path}")

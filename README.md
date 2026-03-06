@@ -43,6 +43,16 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
+Clinical-trial scaffold (MDMP-ready):
+```bash
+iints init --project-name iints_trial --template clinical-trial
+cd iints_trial
+iints data contract-run contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv \
+  --output-json audit/contract_data_report.json \
+  --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data mdmp-visualizer audit/contract_data_report.json --output-html audit/mdmp_dashboard.html
+```
+
 One full run with artifacts:
 ```bash
 iints run-full \
@@ -113,6 +123,16 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - `clinical_grade`
 
 `iints data mdmp-visualizer` turns a contract report JSON into a shareable single-file HTML dashboard for audit review.
+
+MDMP Auto-Guardians enforce quality gates directly in Python pipelines:
+```python
+import pandas as pd
+from iints import mdmp_gate
+
+@mdmp_gate("contracts/clinical_mdmp_contract.yaml", min_grade="clinical_grade")
+def process(df: pd.DataFrame) -> int:
+    return len(df)
+```
 
 ## Demos and Notebooks
 - Demo scripts: [examples/demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)

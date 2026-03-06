@@ -32,6 +32,10 @@ Implemented in:
 - Every run returns `compliance_score` and pass/fail checks.
 - MDMP grade is derived from score + hard compliance.
 
+4. Runtime Guardians
+- `mdmp_gate` can enforce MDMP checks directly before function execution.
+- This supports in-memory pipeline protection for research workloads.
+
 ## MDMP Grades
 
 - `clinical_grade`: compliant and score >= 90
@@ -51,6 +55,16 @@ Certification dashboard generation:
 ```bash
 iints data mdmp-visualizer results/contract_data_report.json \
   --output-html results/mdmp_dashboard.html
+```
+
+Runtime function gate:
+
+```python
+from iints import mdmp_gate
+
+@mdmp_gate("contracts/clinical_mdmp_contract.yaml", min_grade="clinical_grade")
+def process_dataframe(df):
+    ...
 ```
 
 ## Recommended Workflow
