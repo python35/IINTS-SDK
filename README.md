@@ -86,6 +86,7 @@ iints contract-verify --output-json results/contract_report.json
 iints data contract-template --output-path data_contract.yaml
 iints data contract-run data_contract.yaml data/my_cgm.csv --output-json results/contract_data_report.json
 iints data contract-run data_contract.yaml data/my_cgm.csv --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data mdmp-visualizer results/contract_data_report.json --output-html results/mdmp_dashboard.html
 iints replay-check --algo algorithms/example_algorithm.py --output-json results/replay_check.json
 iints golden-benchmark --algo algorithms/example_algorithm.py --output-json results/golden_benchmark.json
 
@@ -110,6 +111,8 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - `draft`
 - `research_grade`
 - `clinical_grade`
+
+`iints data mdmp-visualizer` turns a contract report JSON into a shareable single-file HTML dashboard for audit review.
 
 ## Demos and Notebooks
 - Demo scripts: [examples/demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)

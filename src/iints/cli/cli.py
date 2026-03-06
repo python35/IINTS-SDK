@@ -50,6 +50,7 @@ from iints.data.runner import (
     MDMP_GRADE_ORDER,
     mdmp_grade_meets_minimum,
 )
+from iints.data.mdmp_visualizer import build_mdmp_dashboard_html
 from iints.utils.run_io import (
     build_run_metadata,
     build_run_manifest,
@@ -2817,6 +2818,31 @@ def data_contract_run(
 
     if fail_on_noncompliant and not report.is_compliant:
         raise typer.Exit(code=1)
+
+
+@data_app.command("mdmp-visualizer")
+def data_mdmp_visualizer(
+    report_json: Annotated[Path, typer.Argument(help="Path to contract-run JSON report")],
+    output_html: Annotated[Path, typer.Option(help="Output HTML path")] = Path("results/mdmp_dashboard.html"),
+    title: Annotated[str, typer.Option(help="Dashboard title")] = "IINTS MDMP Certification Dashboard",
+):
+    """Build a single-file interactive MDMP certification dashboard."""
+    console = Console()
+
+    if not report_json.is_file():
+        console.print(f"[bold red]Report JSON not found: {report_json}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        payload = json.loads(report_json.read_text())
+        html_text = build_mdmp_dashboard_html(payload, title=title)
+    except Exception as exc:
+        console.print(f"[bold red]Could not build MDMP visualizer: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_html.parent.mkdir(parents=True, exist_ok=True)
+    output_html.write_text(html_text)
+    console.print(f"[green]MDMP dashboard written:[/green] {output_html}")
 
 
 @app.command("sources")

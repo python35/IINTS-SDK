@@ -9,6 +9,8 @@
 - Added MDMP grading fields to contract reports (`mdmp_grade`, `mdmp_protocol_version`, `certified_for_medical_research`).
 - Added MDMP grade helper utilities and CLI gate option (`--min-mdmp-grade`) for CI enforcement.
 - Added MDMP draft documentation in `docs/MDMP.md`.
+- Added MDMP certification visualizer command (`iints data mdmp-visualizer`) to generate a single-file interactive HTML audit dashboard.
+- Added MDMP visualizer tests under `tests/data/test_mdmp_visualizer.py`.
 - Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
 - Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
 - Added CLI/source helper utilities to export filtered evidence manifests programmatically.

@@ -118,6 +118,8 @@ iints data contract-run data_contract.yaml data/my_cgm.csv \
   --output-json results/contract_data_report.json
 iints data contract-run data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data mdmp-visualizer results/contract_data_report.json \
+  --output-html results/mdmp_dashboard.html
 ```
 `contract-run` reports:
 - `compliance_score`
@@ -125,6 +127,8 @@ iints data contract-run data_contract.yaml data/my_cgm.csv \
 - `dataset_fingerprint_sha256`
 - `mdmp_grade` (`draft`, `research_grade`, `clinical_grade`)
 - `certified_for_medical_research`
+
+`mdmp-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
 
 ### Import Wizard (Interactive)
 ```bash

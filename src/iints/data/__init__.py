@@ -42,6 +42,7 @@ from .runner import (
     mdmp_grade_meets_minimum,
     dataframe_fingerprint,
 )
+from .mdmp_visualizer import build_mdmp_dashboard_html
 
 __all__ = [
     'DataAdapter',
@@ -88,4 +89,5 @@ __all__ = [
     'classify_mdmp_grade',
     'mdmp_grade_meets_minimum',
     'dataframe_fingerprint',
+    'build_mdmp_dashboard_html',
 ]

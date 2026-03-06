@@ -46,6 +46,13 @@ iints data contract-run data_contract.yaml data/my_cgm.csv \
   --fail-on-noncompliant
 ```
 
+Certification dashboard generation:
+
+```bash
+iints data mdmp-visualizer results/contract_data_report.json \
+  --output-html results/mdmp_dashboard.html
+```
+
 ## Recommended Workflow
 
 1. Write `data_contract.yaml` for your dataset.
