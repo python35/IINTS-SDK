@@ -10,13 +10,6 @@ theme:
   language: en
   logo: assets/iints-logo.png
   favicon: assets/iints-logo.png
-  font:
-    text: Inter
-    code: Fira Code
-  palette:
-    - scheme: default
-      primary: white
-      accent: blue
   features:
     - navigation.sections
     - navigation.expand
