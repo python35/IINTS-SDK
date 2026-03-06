@@ -34,6 +34,7 @@ nav:
       - Documentation Map: DOCUMENTATION_INDEX.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
+      - MDMP Full Guide: MDMP_FULL_GUIDE.md
       - MDMP Specification (Draft): MDMP.md
   - Developer Guides:
       - Developer CLI Guide: TECHNICAL_README.md

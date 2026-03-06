@@ -3,6 +3,8 @@
 The IINTS MDMP is a data-governance layer for AI research pipelines.  
 It standardizes how datasets are validated, fingerprinted, and scored before model training or evaluation.
 
+For the complete operational guide (commands, rules, scoring, gates, and pitfalls), see `MDMP_FULL_GUIDE.md`.
+
 MDMP is designed for traceability and reproducibility in research settings.  
 It does **not** certify a model for clinical use on its own.
 
