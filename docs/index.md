@@ -8,6 +8,12 @@
   </div>
 </div>
 
+<div class="iints-actions">
+  <a href="PLAIN_LANGUAGE_GUIDE/" class="iints-action">Start</a>
+  <a href="MDMP/" class="iints-action">MDMP</a>
+  <a href="https://github.com/python35/IINTS-SDK/tree/main/examples/demos" class="iints-action">Demos</a>
+</div>
+
 ## Start Here
 
 Use this order if you are new:

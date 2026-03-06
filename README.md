@@ -6,6 +6,8 @@
 IINTS-AF is a safety-first SDK for insulin-algorithm research.
 It lets you simulate, validate, and report results with reproducible artifacts.
 
+Docs (GitHub Pages): [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
+
 ## What You Can Do
 - Run virtual patient simulations.
 - Test algorithm safety gates (deterministic supervisor).
