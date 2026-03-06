@@ -28,25 +28,32 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Started: GETTING_STARTED.md
-  - MDMP Quickstart: MDMP_QUICKSTART.md
-  - Public Overview: PUBLIC_DOCUMENTATION.md
-  - Plain Language Guide: PLAIN_LANGUAGE_GUIDE.md
-  - Technical README: TECHNICAL_README.md
-  - Comprehensive Guide: COMPREHENSIVE_GUIDE.md
-  - MDMP (Draft): MDMP.md
-  - Evidence Base: EVIDENCE_BASE.md
-  - Documentation Index: DOCUMENTATION_INDEX.md
-  - Official Manual: OFFICIAL_MANUAL.md
-  - Emulation References: emulation_references.md
-  - Technical Manual: manuals/IINTS-AF_SDK_Manual.md
+  - Start Here:
+      - Quick Start: GETTING_STARTED.md
+      - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
+      - Documentation Map: DOCUMENTATION_INDEX.md
+  - Data Quality (MDMP):
+      - MDMP Quickstart: MDMP_QUICKSTART.md
+      - MDMP Specification (Draft): MDMP.md
+  - Developer Guides:
+      - Developer CLI Guide: TECHNICAL_README.md
+      - Architecture & Deep Dive: COMPREHENSIVE_GUIDE.md
+      - Emulation Notes: emulation_references.md
+  - Manuals:
+      - Manual Overview: OFFICIAL_MANUAL.md
+      - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
+  - Governance & Evidence:
+      - Public Documentation Overview: PUBLIC_DOCUMENTATION.md
+      - Scientific Evidence & Sources: EVIDENCE_BASE.md
   - Release Notes:
-      - v0.1.22: releases/v0.1.22.md
-      - v0.0.18: releases/v0.0.18.md
-      - v0.1.4: releases/v0.1.4.md
-      - v0.1.5: releases/v0.1.5.md
-      - v0.1.15: releases/v0.1.15.md
-      - v0.1.17: releases/v0.1.17.md
-      - v0.1.18: releases/v0.1.18.md
-      - v0.1.21: releases/v0.1.21.md
-      - v0.1.20: releases/v0.1.20.md
+      - Latest (v0.1.22): releases/v0.1.22.md
+      - Release Archive: releases/INDEX.md
+      - Older Releases:
+          - v0.1.21: releases/v0.1.21.md
+          - v0.1.20: releases/v0.1.20.md
+          - v0.1.18: releases/v0.1.18.md
+          - v0.1.17: releases/v0.1.17.md
+          - v0.1.15: releases/v0.1.15.md
+          - v0.1.5: releases/v0.1.5.md
+          - v0.1.4: releases/v0.1.4.md
+          - v0.0.18: releases/v0.0.18.md
