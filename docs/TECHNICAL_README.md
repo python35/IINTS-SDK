@@ -19,6 +19,10 @@ Static build:
 mkdocs build
 ```
 
+GitHub Actions deployment notes:
+- Set repository Pages source to **GitHub Actions** once in repository settings.
+- Set repository variable `ENABLE_PAGES_DEPLOY=true` to enable deploy job.
+
 ## What This File Is For
 - Exact CLI commands.
 - Integration and development workflows.

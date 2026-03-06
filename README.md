@@ -156,6 +156,7 @@ def process(df: pd.DataFrame) -> int:
 
 ## Documentation
 - Docs site (GitHub Pages): [https://python35.github.io/IINTS-SDK/](https://python35.github.io/IINTS-SDK/)
+  - Deploys from Actions when repository variable `ENABLE_PAGES_DEPLOY=true` and Pages is set to "GitHub Actions".
 - Manual (PDF): [docs/manuals/IINTS-AF_SDK_Manual.pdf](https://github.com/python35/IINTS-SDK/blob/main/docs/manuals/IINTS-AF_SDK_Manual.pdf)
 - Comprehensive guide: [docs/COMPREHENSIVE_GUIDE.md](https://github.com/python35/IINTS-SDK/blob/main/docs/COMPREHENSIVE_GUIDE.md)
 - Technical README: [docs/TECHNICAL_README.md](https://github.com/python35/IINTS-SDK/blob/main/docs/TECHNICAL_README.md)
