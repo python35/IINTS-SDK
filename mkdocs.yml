@@ -8,10 +8,15 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   language: en
+  logo: assets/iints-logo.png
+  favicon: assets/iints-logo.png
   features:
     - navigation.sections
     - navigation.top
     - content.code.copy
+
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition

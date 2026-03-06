@@ -1,0 +1,42 @@
+/* Keep docs homepage clean and readable */
+.md-typeset h1 {
+  margin-bottom: 0.4rem;
+}
+
+.iints-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.iints-hero img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.iints-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+  margin: 0.8rem 0 1rem;
+}
+
+.iints-card {
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  background: rgba(127, 127, 127, 0.05);
+}
+
+.iints-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.iints-card p {
+  margin: 0;
+  font-size: 0.85rem;
+}

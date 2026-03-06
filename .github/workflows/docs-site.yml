@@ -46,8 +46,23 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Check Pages is enabled on repo
+        id: pages_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status="$(curl -s -o /tmp/pages.json -w '%{http_code}' \
+            -H \"Authorization: Bearer ${GH_TOKEN}\" \
+            -H \"Accept: application/vnd.github+json\" \
+            \"https://api.github.com/repos/${{ github.repository }}/pages\")"
+          if [ "$status" = "200" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages is not enabled for this repository yet."
+            echo "Enable it once in: Settings > Pages > Build and deployment > Source: GitHub Actions."
+          fi
       - name: Deploy to GitHub Pages
         id: deployment
+        if: ${{ steps.pages_check.outputs.enabled == 'true' }}
         uses: actions/deploy-pages@v4

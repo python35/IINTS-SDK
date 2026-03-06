@@ -1,32 +1,61 @@
-# IINTS-AF SDK Docs
+# IINTS-AF SDK Documentation
 
-IINTS-AF is a safety-first SDK for insulin algorithm simulation and validation.
-
-This documentation site is organized for both technical and non-technical readers.
+<div class="iints-hero">
+  <img src="assets/iints-logo.png" alt="IINTS-AF logo" />
+  <div>
+    <strong>Safety-first insulin algorithm research SDK</strong><br/>
+    Simulation, validation, and audit-ready reporting.
+  </div>
+</div>
 
 ## Start Here
 
-- If you are new: read `Plain Language Guide`.
-- If you need architecture and CLI details: read `Technical README`.
-- If you are preparing research/audit artifacts: read `MDMP (Draft)` and `Public Overview`.
+Use this order if you are new:
 
-## Core Workflows
+1. **Plain Language Guide**: concept overview.
+2. **Technical README**: architecture + command reference.
+3. **MDMP (Draft)**: data quality protocol and compliance grading.
 
-1. Create a project scaffold:
-   - `iints quickstart --project-name iints_quickstart`
-   - or `iints init --project-name iints_trial --template clinical-trial`
-2. Run a simulation and validate:
-   - `iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready`
-3. Validate dataset contracts:
-   - `iints data contract-run data_contract.yaml data/my_cgm.csv --output-json results/contract_data_report.json`
-4. Build audit dashboard:
-   - `iints data mdmp-visualizer results/contract_data_report.json --output-html results/mdmp_dashboard.html`
-5. Generate synthetic-safe mirror data:
-   - `iints data synthetic-mirror data/my_cgm.csv data_contract.yaml --output-csv data/synthetic_mirror.csv --output-json results/synthetic_mirror_report.json`
+## Quick Paths
 
-## Safety and Scope
+<div class="iints-grid">
+  <div class="iints-card">
+    <h3>Run a First Simulation</h3>
+    <p>Create a scaffold and execute a baseline scenario.</p>
+  </div>
+  <div class="iints-card">
+    <h3>Validate Data (MDMP)</h3>
+    <p>Apply a contract, compute grade, and export reproducible report artifacts.</p>
+  </div>
+  <div class="iints-card">
+    <h3>Build Audit Outputs</h3>
+    <p>Generate JSON/CSV/PDF/HTML outputs for research review.</p>
+  </div>
+  <div class="iints-card">
+    <h3>Use Demos and Notebooks</h3>
+    <p>Follow concrete end-to-end examples in scripts and notebook tutorials.</p>
+  </div>
+</div>
+
+## Core Commands
+
+```bash
+# 1) Quick scaffold + baseline run
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+
+# 2) Study-ready package
+iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
+
+# 3) MDMP validation + dashboard
+iints mdmp template --output-path mdmp_contract.yaml
+iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
+iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html
+```
+
+## Scope
 
 - Research use only.
 - Not a medical device.
 - No clinical dosing advice.
-
