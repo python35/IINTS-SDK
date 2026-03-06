@@ -1,4 +1,4 @@
-# IINTS-AF SDK Technical README
+# Developer CLI Guide
 
 This document contains the full technical usage for the IINTS-AF SDK.
 

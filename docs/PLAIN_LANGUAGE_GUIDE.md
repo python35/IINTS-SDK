@@ -1,4 +1,4 @@
-# IINTS-AF in Plain Language
+# Plain Language Overview
 
 This page explains the SDK in simple terms.
 

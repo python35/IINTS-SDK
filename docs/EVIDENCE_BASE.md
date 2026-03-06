@@ -1,4 +1,4 @@
-# Evidence Base (Real Articles and Guidelines)
+# Scientific Evidence & Sources
 
 This file documents the scientific sources used to shape IINTS-AF defaults, validation targets, and report framing.
 

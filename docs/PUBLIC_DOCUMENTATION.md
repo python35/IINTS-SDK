@@ -1,4 +1,4 @@
-# IINTS-AF Public Documentation (v0.1.22)
+# Public Documentation Overview
 
 This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
 **software**, **data**, **content**, and **AI system** documentation in one place.

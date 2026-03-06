@@ -1,4 +1,4 @@
-# Commercial Algorithm Emulation References (v0.1.15)
+# Emulation Notes
 
 This document summarizes the **best‑effort** references used for the emulator models in IINTS‑AF.
 These emulators are **approximations**, intended for research comparisons — not clinical use.

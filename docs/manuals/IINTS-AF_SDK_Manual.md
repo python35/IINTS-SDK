@@ -1,4 +1,4 @@
-# IINTS-AF SDK Technical Reference Manual
+# Full Technical Manual
 Version 0.1.22 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**

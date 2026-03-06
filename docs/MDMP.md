@@ -1,4 +1,4 @@
-# IINTS Medical Data Management Protocol (MDMP) - Draft 1.0
+# MDMP Specification (Draft)
 
 The IINTS MDMP is a data-governance layer for AI research pipelines.  
 It standardizes how datasets are validated, fingerprinted, and scored before model training or evaluation.
