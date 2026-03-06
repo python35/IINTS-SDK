@@ -1,13 +1,155 @@
-/* Keep docs homepage clean and readable */
-.md-typeset h1 {
-  margin-bottom: 0.4rem;
+:root {
+  --iints-blue: #2563eb;
+  --iints-blue-dark: #0f2d52;
+  --iints-text: #334155;
+  --iints-muted: #64748b;
+  --iints-surface: #f8fafc;
+  --iints-border: #e2e8f0;
+  --iints-code-bg: #334155;
+  --iints-code-fg: #f1f5f9;
 }
 
+/* Global layout and typography */
+.md-main {
+  background: var(--iints-surface);
+}
+
+.md-content__inner {
+  max-width: 1100px;
+}
+
+.md-typeset {
+  color: var(--iints-text);
+}
+
+.md-typeset h1 {
+  color: var(--iints-blue-dark);
+  font-weight: 800;
+  margin-bottom: 0.6rem;
+}
+
+.md-typeset h2 {
+  color: var(--iints-blue-dark);
+  border-bottom: 2px solid #f1f5f9;
+  padding-bottom: 0.4rem;
+  margin-top: 2.3rem;
+}
+
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--iints-blue-dark);
+}
+
+.md-typeset p,
+.md-typeset li {
+  color: var(--iints-text);
+  line-height: 1.7;
+}
+
+/* Header and top chrome */
+.md-header {
+  background: #ffffff;
+  color: var(--iints-text);
+  border-bottom: 1px solid var(--iints-border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.md-header__title,
+.md-ellipsis,
+.md-header__button {
+  color: var(--iints-text);
+}
+
+.md-search__form {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.md-search__input {
+  color: var(--iints-text);
+}
+
+/* Sidebar styling */
+.md-sidebar--primary .md-sidebar__scrollwrap {
+  background: var(--iints-surface);
+  border-right: 1px solid var(--iints-border);
+}
+
+.md-nav--primary .md-nav__title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  background: transparent;
+  box-shadow: none;
+  padding-top: 1rem;
+}
+
+.md-nav--primary .md-nav__link {
+  margin: 0;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+  border-left: 2px solid transparent;
+  padding-left: 0.7rem;
+  color: var(--iints-text);
+}
+
+.md-nav--primary .md-nav__item--active > .md-nav__link,
+.md-nav--primary .md-nav__link:hover {
+  color: var(--iints-blue-dark);
+  border-left-color: var(--iints-blue);
+  font-weight: 600;
+}
+
+/* Link color */
+.md-typeset a {
+  color: var(--iints-blue);
+}
+
+.md-typeset a:hover {
+  color: #1d4ed8;
+}
+
+/* Tables */
+.md-typeset table:not([class]) {
+  border: 1px solid var(--iints-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.md-typeset table:not([class]) th {
+  background: #f8fafc;
+  color: var(--iints-blue-dark);
+}
+
+/* Inline code and code blocks */
+.md-typeset code {
+  background: var(--iints-code-bg);
+  color: var(--iints-code-fg);
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+}
+
+.md-typeset pre > code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.md-typeset pre {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+/* Home page hero and cards */
 .iints-hero {
   display: flex;
   align-items: stretch;
   gap: 1.2rem;
-  margin: 0.5rem 0 1.2rem;
+  margin: 0.6rem 0 1.2rem;
   padding: 1rem;
   border-radius: 12px;
   border: 1px solid rgba(127, 127, 127, 0.3);
@@ -28,12 +170,13 @@
 
 .iints-hero-right h2 {
   margin: 0 0 0.35rem;
-  font-size: 1.25rem;
+  font-size: 1.3rem;
+  color: var(--iints-blue-dark);
 }
 
 .iints-hero-right p {
   margin: 0;
-  opacity: 0.9;
+  color: var(--iints-text);
 }
 
 .iints-actions {
@@ -45,13 +188,13 @@
 
 .iints-action {
   display: inline-block;
-  min-width: 110px;
+  min-width: 120px;
   text-align: center;
   padding: 0.55rem 0.9rem;
   border-radius: 999px;
   border: 1px solid rgba(38, 133, 255, 0.45);
   background: rgba(38, 133, 255, 0.12);
-  color: inherit;
+  color: var(--iints-blue-dark) !important;
   text-decoration: none !important;
   font-weight: 600;
   transition: transform 0.08s ease, background 0.2s ease;
@@ -72,7 +215,7 @@
 .iints-card {
   border: 1px solid rgba(127, 127, 127, 0.3);
   border-radius: 8px;
-  padding: 0.75rem 0.9rem;
+  padding: 0.85rem 0.95rem;
   background: rgba(127, 127, 127, 0.05);
   height: 100%;
 }
@@ -80,12 +223,14 @@
 .iints-card h3 {
   margin-top: 0;
   margin-bottom: 0.35rem;
-  font-size: 0.95rem;
+  font-size: 0.98rem;
+  color: var(--iints-blue-dark);
 }
 
 .iints-card p {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  color: var(--iints-text);
 }
 
 .iints-card-link {
@@ -96,6 +241,13 @@
 .iints-card-link:hover .iints-card {
   border-color: rgba(38, 133, 255, 0.55);
   background: rgba(38, 133, 255, 0.08);
+}
+
+/* Responsive */
+@media (max-width: 1219px) {
+  .md-sidebar--primary {
+    display: block;
+  }
 }
 
 @media (max-width: 700px) {
