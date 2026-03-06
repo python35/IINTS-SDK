@@ -2,6 +2,28 @@
 
 This document provides a complete, end-to-end manual for the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, data formats, safety features, profiling, examples, and development workflows.
 
+## Who This Page Is For
+
+- Researchers building reproducible simulation studies.
+- Engineers integrating custom insulin algorithms.
+- Technical reviewers checking safety and traceability controls.
+
+## Terminology Used Consistently In This Guide
+
+- `Algorithm`: dosing logic plugin that proposes insulin.
+- `Forecast model`: optional AI predictor signal (advisory only).
+- `Safety Supervisor`: deterministic rule layer that can override unsafe dosing.
+- `Run bundle`: output package (`results.csv`, reports, audit artifacts, metadata).
+- `MDMP`: dataset quality protocol with contract validation + grading.
+
+## Section Structure
+
+Most sections follow the same reading pattern:
+- `Purpose`: why this section exists.
+- `When to use`: when you should apply it.
+- `How to run`: commands or API usage.
+- `Output`: files or artifacts you should expect.
+
 ## Plain-Language Summary
 
 If this guide feels too technical, read `docs/PLAIN_LANGUAGE_GUIDE.md` first.
@@ -40,9 +62,21 @@ Recommended notebook order:
 
 ## 1. Introduction to IINTS-AF SDK
 
+**Purpose**
+- Explain what the SDK is designed to do and where it fits in a research workflow.
+
+**When to use**
+- At project kickoff and during onboarding of new collaborators.
+
 The IINTS-AF SDK is designed for researchers and developers to create, simulate, and benchmark insulin delivery algorithms for artificial pancreas systems. It provides a robust framework for patient simulation, data handling, and algorithm evaluation, alongside tools for documentation and continuous integration.
 
 ## 2. Installation
+
+**Purpose**
+- Set up the SDK and development environment correctly.
+
+**When to use**
+- Before running CLI commands, notebooks, or research training scripts.
 
 ### 2.1 System Requirements
 
@@ -73,7 +107,16 @@ python3 -m pip install -e ".[dev]"
 
 This installs PyTest, Flake8, MyPy, and type stubs for a smooth developer workflow.
 
+**Output**
+- Working `iints` CLI, importable Python package, and optional developer tooling.
+
 ## 3. Project Structure
+
+**Purpose**
+- Clarify where simulation, safety, data, and reporting modules live.
+
+**When to use**
+- When extending the SDK or locating implementation points for debugging.
 
 The core of the SDK's source code is located within the `src/iints/` directory. This structure ensures that all modules are properly packaged and discoverable when the SDK is installed.
 

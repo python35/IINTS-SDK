@@ -4,6 +4,28 @@ This document contains the full technical usage for the IINTS-AF SDK.
 
 If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
 
+## Who This Page Is For
+
+- Engineers integrating SDK runs into applications or CI pipelines.
+- Researchers needing exact commands and reproducible artifact expectations.
+- Technical reviewers validating run traceability and data-quality gates.
+
+## Terminology Used Consistently In This Page
+
+- `Algorithm`: insulin-dosing logic under test.
+- `Forecast model`: optional AI predictor signal (advisory only).
+- `Safety Supervisor`: deterministic safety gate enforcing hard rules.
+- `Run bundle`: output folder containing result traces + metadata + reports.
+- `MDMP`: data contract validation protocol and grading system.
+
+## Reading Structure
+
+Workflow chapters are organized with:
+- `Purpose`
+- `When to use`
+- `Commands`
+- `Output`
+
 ## Documentation Site
 
 Local preview:
@@ -48,6 +70,82 @@ python3 -m pip install -e ".[dev]"
 ```
 
 ## CLI Workflow
+
+### Core Workflow Chapter A: Initialize a Project
+
+**Purpose**
+- Create a standard SDK workspace with expected folder structure.
+
+**When to use**
+- At the start of a new study, benchmark, or algorithm experiment.
+
+**Commands**
+```bash
+iints init --project-name my_research
+cd my_research
+```
+
+**Output**
+- Project folders for algorithms, scenarios, and results.
+
+### Core Workflow Chapter B: Baseline Simulation
+
+**Purpose**
+- Run a known-good baseline to verify end-to-end simulation behavior.
+
+**When to use**
+- After setup, before introducing custom algorithms.
+
+**Commands**
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+**Output**
+- Initial run bundle with `results.csv`, report PDF, and audit logs.
+
+### Core Workflow Chapter C: Study-Ready Bundle
+
+**Purpose**
+- Generate one reproducible package for review and validation.
+
+**When to use**
+- Before internal review, external sharing, or paper-support artifacts.
+
+**Commands**
+```bash
+iints study-ready \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_ready
+```
+
+**Output**
+- `results.csv`, `clinical_report.pdf`, `audit/`, `run_manifest.json`
+- `validation_report.json`, `sources_manifest.json`, `SUMMARY.md`
+
+### Core Workflow Chapter D: MDMP Data Validation
+
+**Purpose**
+- Validate dataset quality before training or evaluation.
+
+**When to use**
+- Whenever new raw CGM data is introduced into your pipeline.
+
+**Commands**
+```bash
+iints mdmp template --output-path mdmp_contract.yaml
+iints mdmp validate mdmp_contract.yaml data/my_cgm.csv \
+  --output-json results/mdmp_report.json
+iints mdmp visualizer results/mdmp_report.json \
+  --output-html results/mdmp_dashboard.html
+```
+
+**Output**
+- Contract validation report, MDMP grade, fingerprints, and HTML dashboard.
+
+### Detailed Command Reference
 
 ### Initialize a Project
 ```bash

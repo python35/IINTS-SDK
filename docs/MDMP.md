@@ -10,7 +10,34 @@ MDMP has a dedicated SDK namespace:
 - Python: `iints.mdmp`
 - CLI: `iints mdmp ...`
 
+## Who This Page Is For
+
+- Researchers defining pre-model data quality gates.
+- Engineers implementing reproducible data pipelines.
+- Reviewers checking traceability and dataset provenance evidence.
+
+## Terminology Used Consistently In This Page
+
+- `Contract`: machine-readable schema + constraint definition.
+- `Validation run`: one execution of contract checks against a dataset.
+- `Grade`: MDMP level (`draft`, `research_grade`, `clinical_grade`).
+- `Fingerprint`: deterministic SHA-256 hash for contract and dataset.
+
+## Section Structure
+
+This page is structured as:
+- `Purpose`
+- `When to use`
+- `Commands`
+- `Output / Artifacts`
+
 ## Scope
+
+**Purpose**
+- Define what MDMP currently governs inside IINTS.
+
+**When to use**
+- Before model training, fine-tuning, benchmarking, or report generation.
 
 MDMP currently covers:
 - tabular/time-series ingestion via data contracts
@@ -48,6 +75,8 @@ Implemented in:
 
 Grade gating can be enforced in CI:
 
+**Commands**
+
 ```bash
 iints data contract-run data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade \
@@ -80,6 +109,12 @@ def process_dataframe(df):
 ```
 
 ## Recommended Workflow
+
+**Output / Artifacts**
+- `contract_data_report.json` / `mdmp_report.json`
+- MDMP grade + compliance score
+- contract and dataset fingerprints
+- optional HTML dashboard for audit sharing
 
 1. Write `data_contract.yaml` for your dataset.
 2. Run `iints data contract-run` and store JSON output.
