@@ -44,6 +44,8 @@ from iints.data.registry import (
     DatasetFetchError,
     DatasetRegistryError,
 )
+from iints.data.contracts import load_contract_yaml
+from iints.data.runner import ContractRunner
 from iints.utils.run_io import (
     build_run_metadata,
     build_run_manifest,
@@ -2669,6 +2671,125 @@ def data_fetch(
         console.print(f"[green]Downloaded {len(downloaded)} file(s) to {output_dir}[/green]")
     except DatasetFetchError as e:
         console.print(f"[bold red]{e}[/bold red]")
+        raise typer.Exit(code=1)
+
+
+@data_app.command("contract-template")
+def data_contract_template(
+    output_path: Annotated[Path, typer.Option(help="Where to write the starter contract YAML")] = Path("data_contract.yaml"),
+):
+    """Write a starter data contract template for model-ready validation."""
+    console = Console()
+    template = {
+        "version": 1,
+        "streams": [
+            {
+                "name": "PatientHealth",
+                "source": "sdk.iints_af.v1",
+                "security": "PII_ENCRYPTED",
+                "metadata": {
+                    "required_columns": ["timestamp", "glucose"],
+                    "column_types": {
+                        "glucose": "float",
+                    },
+                    "ranges": {
+                        "glucose": {"min": 40, "max": 400},
+                    },
+                    "unit_conversions": {
+                        "glucose": {"from": "mmol/L", "to": "mg/dL"},
+                    },
+                },
+            }
+        ],
+        "processes": [
+            {
+                "name": "GlucoseData",
+                "input_stream": "PatientHealth.glucose",
+                "features": [
+                    {
+                        "name": "rolling_avg_15m",
+                        "operation": "moving_average",
+                        "source": "PatientHealth.glucose",
+                        "window": "15m",
+                    }
+                ],
+                "labels": [
+                    {
+                        "name": "hyper_event",
+                        "expression": "glucose > 180",
+                        "classes": ["Critical", "Normal"],
+                    }
+                ],
+                "validations": [
+                    {
+                        "expression": "glucose is not null and glucose > 20",
+                        "on_fail": "DISCARD_AND_LOG",
+                    }
+                ],
+            }
+        ],
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(yaml.safe_dump(template, sort_keys=False))
+    console.print(f"[green]Contract template written:[/green] {output_path}")
+
+
+@data_app.command("contract-run")
+def data_contract_run(
+    contract_path: Annotated[Path, typer.Argument(help="Path to contract YAML")],
+    input_csv: Annotated[Path, typer.Argument(help="Path to input CSV")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
+    apply_builtin_transforms: Annotated[bool, typer.Option(help="Apply built-in unit conversion transforms from the contract")] = True,
+    fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when compliance checks fail")] = False,
+):
+    """Validate a dataset against a model-ready contract and compute compliance score."""
+    console = Console()
+    if not contract_path.is_file():
+        console.print(f"[bold red]Contract file not found: {contract_path}[/bold red]")
+        raise typer.Exit(code=1)
+    if not input_csv.is_file():
+        console.print(f"[bold red]Input CSV not found: {input_csv}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        contract = load_contract_yaml(contract_path)
+        df = pd.read_csv(input_csv)
+        runner = ContractRunner(contract)
+        report = runner.run(df, apply_builtin_transforms=apply_builtin_transforms)
+    except Exception as exc:
+        console.print(f"[bold red]Contract runner failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    summary = Table(title="Data Contract Compliance")
+    summary.add_column("Field", style="cyan")
+    summary.add_column("Value")
+    summary.add_row("Rows", str(report.row_count))
+    summary.add_row("Compliance", f"{report.compliance_score:.2f}%")
+    summary.add_row("Status", "[green]PASS[/green]" if report.is_compliant else "[red]FAIL[/red]")
+    summary.add_row("Contract fingerprint", report.contract_fingerprint_sha256[:16] + "...")
+    summary.add_row("Dataset fingerprint", report.dataset_fingerprint_sha256[:16] + "...")
+    console.print(summary)
+
+    checks_table = Table(title="Checks")
+    checks_table.add_column("Check", style="green")
+    checks_table.add_column("Passed")
+    checks_table.add_column("Failed rows", justify="right")
+    checks_table.add_column("Detail")
+    for check in report.checks:
+        checks_table.add_row(
+            check.name,
+            "[green]yes[/green]" if check.passed else "[red]no[/red]",
+            str(check.failed_rows),
+            check.detail,
+        )
+    console.print(checks_table)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report.to_dict(), indent=2))
+        console.print(f"[green]Contract report written:[/green] {output_json}")
+
+    if fail_on_noncompliant and not report.is_compliant:
         raise typer.Exit(code=1)
 
 

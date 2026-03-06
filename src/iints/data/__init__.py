@@ -32,6 +32,7 @@ from .contracts import (
     parse_contract,
     load_contract_yaml,
 )
+from .runner import ContractRunner, ValidationResult, CheckResult, dataframe_fingerprint
 
 __all__ = [
     'DataAdapter',
@@ -70,4 +71,8 @@ __all__ = [
     'compile_contract',
     'parse_contract',
     'load_contract_yaml',
+    'ContractRunner',
+    'ValidationResult',
+    'CheckResult',
+    'dataframe_fingerprint',
 ]

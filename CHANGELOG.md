@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added data contract runner (`iints data contract-run`) with schema checks, constraint checks, deterministic dataset fingerprinting, and compliance score output.
+- Added starter contract generator (`iints data contract-template`) for quick model-ready data gate setup.
+- Added built-in unit conversion hooks in contract execution (e.g., mmol/L to mg/dL).
+- Added data contract runner test coverage under `tests/data/test_contract_runner.py`.
 - Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
 - Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
 - Added CLI/source helper utilities to export filtered evidence manifests programmatically.

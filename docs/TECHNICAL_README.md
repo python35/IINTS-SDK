@@ -111,6 +111,13 @@ iints sources --output-json results/source_manifest.json
 iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
 ```
 
+### Data Contract Runner (Model-Ready Gate)
+```bash
+iints data contract-template --output-path data_contract.yaml
+iints data contract-run data_contract.yaml data/my_cgm.csv \
+  --output-json results/contract_data_report.json
+```
+
 ### Import Wizard (Interactive)
 ```bash
 iints import-wizard

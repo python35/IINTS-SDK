@@ -83,6 +83,8 @@ iints study-ready --algo algorithms/example_algorithm.py --output-dir results/st
 iints validation-profiles
 iints validate-run --results-csv results/run_full/results.csv --profile research_default
 iints contract-verify --output-json results/contract_report.json
+iints data contract-template --output-path data_contract.yaml
+iints data contract-run data_contract.yaml data/my_cgm.csv --output-json results/contract_data_report.json
 iints replay-check --algo algorithms/example_algorithm.py --output-json results/replay_check.json
 iints golden-benchmark --algo algorithms/example_algorithm.py --output-json results/golden_benchmark.json
 
