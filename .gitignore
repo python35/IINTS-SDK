@@ -71,3 +71,4 @@ venv/
 
 # Documentation Build Output
 docssphinx/_build/
+site/
