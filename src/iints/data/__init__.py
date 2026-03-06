@@ -44,6 +44,7 @@ from .runner import (
 )
 from .mdmp_visualizer import build_mdmp_dashboard_html
 from .guardians import mdmp_gate, MDMPGateError
+from .synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 
 __all__ = [
     'DataAdapter',
@@ -93,4 +94,6 @@ __all__ = [
     'build_mdmp_dashboard_html',
     'mdmp_gate',
     'MDMPGateError',
+    'generate_synthetic_mirror',
+    'SyntheticMirrorArtifact',
 ]

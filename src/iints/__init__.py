@@ -57,6 +57,7 @@ from .data.importer import (
 from .data.nightscout import NightscoutConfig, import_nightscout
 from .data.tidepool import TidepoolClient, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
+from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
@@ -161,6 +162,8 @@ __all__ = [
     "load_openapi_spec",
     "mdmp_gate",
     "MDMPGateError",
+    "generate_synthetic_mirror",
+    "SyntheticMirrorArtifact",
     # Analysis Metrics
     "generate_benchmark_metrics",
     "ClinicalReportGenerator",

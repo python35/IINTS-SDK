@@ -57,6 +57,14 @@ iints data mdmp-visualizer results/contract_data_report.json \
   --output-html results/mdmp_dashboard.html
 ```
 
+Synthetic mirror generation:
+
+```bash
+iints data synthetic-mirror data/real.csv contracts/clinical_mdmp_contract.yaml \
+  --output-csv data/synthetic_mirror.csv \
+  --output-json audit/synthetic_mirror_report.json
+```
+
 Runtime function gate:
 
 ```python

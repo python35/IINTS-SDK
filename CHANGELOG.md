@@ -14,6 +14,9 @@
 - Added MDMP Auto-Guardian decorator (`iints.mdmp_gate`) to enforce grade/compliance checks before function execution.
 - Added `iints init --template clinical-trial` scaffold with MDMP contract + demo dataset + audit folders.
 - Added test coverage for guardians and clinical-trial project scaffold CLI.
+- Added Synthetic Mirror generator (`iints data synthetic-mirror`) for privacy-safe, contract-validated synthetic dataset creation.
+- Added synthetic mirror API (`generate_synthetic_mirror`) and report artifact model.
+- Added synthetic mirror test coverage under `tests/data/test_synthetic_mirror.py`.
 - Added `iints study-ready` one-command workflow for researchers (run + validate + sources + summary).
 - Enhanced `iints certify-run` to emit `sources_manifest.json` and `SUMMARY.md` by default.
 - Added CLI/source helper utilities to export filtered evidence manifests programmatically.

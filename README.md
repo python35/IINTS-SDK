@@ -96,6 +96,7 @@ iints contract-verify --output-json results/contract_report.json
 iints data contract-template --output-path data_contract.yaml
 iints data contract-run data_contract.yaml data/my_cgm.csv --output-json results/contract_data_report.json
 iints data contract-run data_contract.yaml data/my_cgm.csv --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data synthetic-mirror data/my_cgm.csv data_contract.yaml --output-csv data/synthetic_mirror.csv --output-json results/synthetic_mirror_report.json
 iints data mdmp-visualizer results/contract_data_report.json --output-html results/mdmp_dashboard.html
 iints replay-check --algo algorithms/example_algorithm.py --output-json results/replay_check.json
 iints golden-benchmark --algo algorithms/example_algorithm.py --output-json results/golden_benchmark.json
@@ -123,6 +124,8 @@ iints research registry-promote --registry models/registry.json --run-id <run-id
 - `clinical_grade`
 
 `iints data mdmp-visualizer` turns a contract report JSON into a shareable single-file HTML dashboard for audit review.
+
+`iints data synthetic-mirror` generates a privacy-safe synthetic dataset that keeps schema and broad statistical behavior, then validates it with the same MDMP gates.
 
 MDMP Auto-Guardians enforce quality gates directly in Python pipelines:
 ```python

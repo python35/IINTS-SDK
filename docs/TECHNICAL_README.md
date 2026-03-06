@@ -118,6 +118,9 @@ iints data contract-run data_contract.yaml data/my_cgm.csv \
   --output-json results/contract_data_report.json
 iints data contract-run data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
+  --output-csv data/synthetic_mirror.csv \
+  --output-json results/synthetic_mirror_report.json
 iints data mdmp-visualizer results/contract_data_report.json \
   --output-html results/mdmp_dashboard.html
 ```
@@ -129,6 +132,8 @@ iints data mdmp-visualizer results/contract_data_report.json \
 - `certified_for_medical_research`
 
 `mdmp-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
+
+`synthetic-mirror` generates a synthetic dataset from a validated source CSV, preserving schema and broad numeric behavior, then validates the synthetic output against the same contract.
 
 ### MDMP Auto-Guardian Decorator
 ```python

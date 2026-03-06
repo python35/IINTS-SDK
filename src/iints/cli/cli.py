@@ -51,6 +51,7 @@ from iints.data.runner import (
     mdmp_grade_meets_minimum,
 )
 from iints.data.mdmp_visualizer import build_mdmp_dashboard_html
+from iints.data.synthetic_mirror import generate_synthetic_mirror
 from iints.utils.run_io import (
     build_run_metadata,
     build_run_manifest,
@@ -2922,6 +2923,80 @@ def data_mdmp_visualizer(
     output_html.parent.mkdir(parents=True, exist_ok=True)
     output_html.write_text(html_text)
     console.print(f"[green]MDMP dashboard written:[/green] {output_html}")
+
+
+@data_app.command("synthetic-mirror")
+def data_synthetic_mirror(
+    input_csv: Annotated[Path, typer.Argument(help="Source CSV (validated real dataset)")],
+    contract_path: Annotated[Path, typer.Argument(help="Contract YAML path used as schema/range guard")],
+    output_csv: Annotated[Path, typer.Option(help="Output synthetic CSV path")] = Path("data/synthetic_mirror.csv"),
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional synthetic mirror report JSON")] = Path("results/synthetic_mirror_report.json"),
+    rows: Annotated[Optional[int], typer.Option(help="Optional number of rows to generate")] = None,
+    seed: Annotated[int, typer.Option(help="Random seed for deterministic synthesis")] = 42,
+    noise_scale: Annotated[float, typer.Option(help="Numeric perturbation scale as fraction of source std-dev")] = 0.05,
+    min_mdmp_grade: Annotated[
+        Optional[str],
+        typer.Option(help="Optional MDMP grade gate for generated synthetic dataset"),
+    ] = "research_grade",
+    fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when generated dataset fails compliance")] = True,
+):
+    """Generate a privacy-safe synthetic mirror dataset and validate it against MDMP contract gates."""
+    console = Console()
+    if not input_csv.is_file():
+        console.print(f"[bold red]Input CSV not found: {input_csv}[/bold red]")
+        raise typer.Exit(code=1)
+    if not contract_path.is_file():
+        console.print(f"[bold red]Contract file not found: {contract_path}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        source_df = pd.read_csv(input_csv)
+        contract = load_contract_yaml(contract_path)
+        synthetic_df, artifact = generate_synthetic_mirror(
+            source_df,
+            contract,
+            rows=rows,
+            seed=seed,
+            noise_scale=noise_scale,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Synthetic mirror generation failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
+    synthetic_df.to_csv(output_csv, index=False)
+    console.print(f"[green]Synthetic mirror CSV written:[/green] {output_csv}")
+
+    summary = Table(title="Synthetic Mirror Summary")
+    summary.add_column("Field", style="cyan")
+    summary.add_column("Value")
+    summary.add_row("Source rows", str(artifact.summary.get("source_rows", 0)))
+    summary.add_row("Synthetic rows", str(artifact.summary.get("synthetic_rows", 0)))
+    summary.add_row("Noise scale", str(artifact.summary.get("noise_scale", 0.0)))
+    summary.add_row("MDMP grade", artifact.validation.mdmp_grade)
+    summary.add_row("Compliance", f"{artifact.validation.compliance_score:.2f}%")
+    summary.add_row("Status", "[green]PASS[/green]" if artifact.validation.is_compliant else "[red]FAIL[/red]")
+    console.print(summary)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(artifact.to_dict(), indent=2))
+        console.print(f"[green]Synthetic mirror report written:[/green] {output_json}")
+
+    if min_mdmp_grade is not None:
+        normalized = min_mdmp_grade.strip().lower()
+        if normalized not in MDMP_GRADE_ORDER:
+            allowed = ", ".join(MDMP_GRADE_ORDER)
+            console.print(f"[bold red]Invalid --min-mdmp-grade value: {min_mdmp_grade}. Use one of: {allowed}[/bold red]")
+            raise typer.Exit(code=1)
+        if not mdmp_grade_meets_minimum(artifact.validation.mdmp_grade, normalized):
+            console.print(
+                f"[bold red]MDMP gate failed:[/bold red] got {artifact.validation.mdmp_grade}, requires at least {normalized}"
+            )
+            raise typer.Exit(code=1)
+
+    if fail_on_noncompliant and not artifact.validation.is_compliant:
+        raise typer.Exit(code=1)
 
 
 @app.command("sources")
