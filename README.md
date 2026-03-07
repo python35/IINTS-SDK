@@ -71,6 +71,7 @@ Full process: `docs/DUAL_REPO_WORKFLOW.md`
 
 MDMP sync CI gate:
 - `.github/workflows/mdmp-sync.yml`
+- Requires GitHub secret: `MDMP_REPO_TOKEN` (read access to `python35/MDMP`)
 
 ## Typical Workflow
 1. Prepare or import data.

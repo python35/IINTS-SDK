@@ -36,9 +36,24 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .
 
+    - name: Require MDMP repo token
+      run: |
+        if [ -z "${{ secrets.MDMP_REPO_TOKEN }}" ]; then
+          echo "::error::Missing secret MDMP_REPO_TOKEN (PAT with read access to python35/MDMP)."
+          exit 1
+        fi
+
+    - name: Checkout standalone MDMP repo
+      uses: actions/checkout@v4
+      with:
+        repository: python35/MDMP
+        ref: main
+        path: external/mdmp
+        token: ${{ secrets.MDMP_REPO_TOKEN }}
+
     - name: Install standalone MDMP package
       run: |
-        pip install "mdmp-protocol @ git+https://github.com/python35/MDMP.git@main"
+        pip install -e external/mdmp
 
     - name: Run MDMP sync check
       env:

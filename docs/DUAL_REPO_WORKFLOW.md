@@ -21,6 +21,10 @@ It installs the standalone MDMP package from `python35/MDMP` and runs:
 The gate fails if SDK MDMP backend behavior diverges from standalone `mdmp_core`
 (grade order, validation result surface, fingerprints, or dashboard generation contract).
 
+Required secret in `python35/IINTS-SDK`:
+
+- `MDMP_REPO_TOKEN` (GitHub PAT with read access to `python35/MDMP`)
+
 ## Local layout
 
 ```text
