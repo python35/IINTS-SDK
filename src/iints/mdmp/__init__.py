@@ -29,6 +29,16 @@ from ..data.runner import (
 from ..data.guardians import mdmp_gate, MDMPGateError
 from ..data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from ..data.mdmp_visualizer import build_mdmp_dashboard_html
+from .backend import (
+    MDMPValidationResult,
+    MDMPCheckResult,
+    MDMP_GRADE_ORDER as BACKEND_MDMP_GRADE_ORDER,
+    mdmp_grade_meets_minimum as backend_mdmp_grade_meets_minimum,
+    active_mdmp_backend,
+    load_mdmp_contract,
+    run_mdmp_validation,
+    build_mdmp_dashboard_html as build_mdmp_dashboard_html_with_backend,
+)
 
 __all__ = [
     "StreamSpec",
@@ -53,5 +63,12 @@ __all__ = [
     "generate_synthetic_mirror",
     "SyntheticMirrorArtifact",
     "build_mdmp_dashboard_html",
+    "MDMPValidationResult",
+    "MDMPCheckResult",
+    "BACKEND_MDMP_GRADE_ORDER",
+    "backend_mdmp_grade_meets_minimum",
+    "active_mdmp_backend",
+    "load_mdmp_contract",
+    "run_mdmp_validation",
+    "build_mdmp_dashboard_html_with_backend",
 ]
-

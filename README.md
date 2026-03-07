@@ -43,6 +43,22 @@ iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdm
 iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html
 ```
 
+Use standalone MDMP backend (optional):
+
+```bash
+export IINTS_MDMP_BACKEND=mdmp_core
+```
+
+## Dual Repo Workflow
+- SDK repo: `python35/IINTS-SDK`
+- MDMP repo: `python35/MDMP`
+
+Local helper scripts:
+- `tools/local/dual_repo_status.sh`
+- `tools/local/dual_repo_commit_push.sh`
+
+Full process: `docs/DUAL_REPO_WORKFLOW.md`
+
 ## Typical Workflow
 1. Prepare or import data.
 2. Validate data with MDMP.

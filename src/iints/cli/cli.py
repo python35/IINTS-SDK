@@ -45,13 +45,15 @@ from iints.data.registry import (
     DatasetRegistryError,
 )
 from iints.data.contracts import load_contract_yaml
-from iints.data.runner import (
-    ContractRunner,
-    MDMP_GRADE_ORDER,
-    mdmp_grade_meets_minimum,
-)
-from iints.data.mdmp_visualizer import build_mdmp_dashboard_html
 from iints.data.synthetic_mirror import generate_synthetic_mirror
+from iints.mdmp.backend import (
+    MDMP_GRADE_ORDER,
+    active_mdmp_backend,
+    build_mdmp_dashboard_html,
+    load_mdmp_contract,
+    mdmp_grade_meets_minimum,
+    run_mdmp_validation,
+)
 from iints.utils.run_io import (
     build_run_metadata,
     build_run_manifest,
@@ -2809,16 +2811,37 @@ def _build_data_contract_template() -> Dict[str, Any]:
     }
 
 
+def _build_mdmp_core_contract_template() -> Dict[str, Any]:
+    return {
+        "schema": {
+            "name": "cgm_dataset",
+            "version": "1.0",
+            "industry": "health",
+            "columns": [
+                {"name": "timestamp", "type": "datetime", "required": True},
+                {"name": "glucose", "type": "float", "unit": "mg/dL", "bounds": [40, 400], "required": True},
+            ],
+        },
+        "consent": {
+            "ai_training_allowed": True,
+            "jurisdiction": "GDPR",
+            "anonymized": True,
+        },
+    }
+
+
 @data_app.command("contract-template")
 def data_contract_template(
     output_path: Annotated[Path, typer.Option(help="Where to write the starter contract YAML")] = Path("data_contract.yaml"),
 ):
     """Write a starter data contract template for model-ready validation."""
     console = Console()
-    template = _build_data_contract_template()
+    backend = active_mdmp_backend()
+    template = _build_mdmp_core_contract_template() if backend == "mdmp_core" else _build_data_contract_template()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(yaml.safe_dump(template, sort_keys=False))
     console.print(f"[green]Contract template written:[/green] {output_path}")
+    console.print(f"[cyan]Template backend:[/cyan] {backend}")
 
 
 @data_app.command("contract-run")
@@ -2843,10 +2866,13 @@ def data_contract_run(
         raise typer.Exit(code=1)
 
     try:
-        contract = load_contract_yaml(contract_path)
+        contract = load_mdmp_contract(contract_path)
         df = pd.read_csv(input_csv)
-        runner = ContractRunner(contract)
-        report = runner.run(df, apply_builtin_transforms=apply_builtin_transforms)
+        report = run_mdmp_validation(
+            contract,
+            df,
+            apply_builtin_transforms=apply_builtin_transforms,
+        )
     except Exception as exc:
         console.print(f"[bold red]Contract runner failed: {exc}[/bold red]")
         raise typer.Exit(code=1)
@@ -2857,6 +2883,7 @@ def data_contract_run(
     summary.add_row("Rows", str(report.row_count))
     summary.add_row("Compliance", f"{report.compliance_score:.2f}%")
     summary.add_row("Status", "[green]PASS[/green]" if report.is_compliant else "[red]FAIL[/red]")
+    summary.add_row("Backend", active_mdmp_backend())
     summary.add_row("MDMP grade", report.mdmp_grade)
     summary.add_row("MDMP protocol", report.mdmp_protocol_version)
     summary.add_row(

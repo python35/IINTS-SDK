@@ -59,6 +59,9 @@ research = [
   "onnx>=1.16.0",
   "onnxscript>=0.1.0",
 ]
+mdmp = [
+  "mdmp-protocol @ git+https://github.com/python35/MDMP.git",
+]
 
 [project.scripts]
 iints = "iints.cli.cli:app"
