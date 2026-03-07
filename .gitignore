@@ -47,6 +47,7 @@ coverage.xml
 # Temporary files
 *.tmp
 *.log
+local/
 .DS_Store
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/
