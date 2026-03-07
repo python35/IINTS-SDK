@@ -69,6 +69,9 @@ Local helper scripts:
 
 Full process: `docs/DUAL_REPO_WORKFLOW.md`
 
+MDMP sync CI gate:
+- `.github/workflows/mdmp-sync.yml`
+
 ## Typical Workflow
 1. Prepare or import data.
 2. Validate data with MDMP.

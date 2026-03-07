@@ -1,0 +1,47 @@
+name: MDMP Sync Gate
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "src/iints/mdmp/**"
+      - "src/iints/cli/cli.py"
+      - "tools/ci/check_mdmp_sync.py"
+      - ".github/workflows/mdmp-sync.yml"
+      - "pyproject.toml"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "src/iints/mdmp/**"
+      - "src/iints/cli/cli.py"
+      - "tools/ci/check_mdmp_sync.py"
+      - ".github/workflows/mdmp-sync.yml"
+      - "pyproject.toml"
+  workflow_dispatch:
+
+jobs:
+  mdmp-sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install SDK
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e .
+
+    - name: Install standalone MDMP package
+      run: |
+        pip install "mdmp-protocol @ git+https://github.com/python35/MDMP.git@main"
+
+    - name: Run MDMP sync check
+      env:
+        IINTS_MDMP_BACKEND: mdmp_core
+      run: |
+        python tools/ci/check_mdmp_sync.py

@@ -8,6 +8,19 @@ This project now runs with two repositories:
 ## Goal
 Keep simulation/runtime concerns in SDK and protocol/provenance concerns in MDMP, while shipping both in lockstep.
 
+## CI sync gate
+
+SDK now contains a dedicated workflow:
+
+- `.github/workflows/mdmp-sync.yml`
+
+It installs the standalone MDMP package from `python35/MDMP` and runs:
+
+- `tools/ci/check_mdmp_sync.py`
+
+The gate fails if SDK MDMP backend behavior diverges from standalone `mdmp_core`
+(grade order, validation result surface, fingerprints, or dashboard generation contract).
+
 ## Local layout
 
 ```text
