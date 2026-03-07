@@ -60,4 +60,6 @@ For stale lineage handling with standalone MDMP:
 mdmp fingerprint-record data/my_cgm.csv --output-json results/fingerprint.json --expires-days 365
 mdmp fingerprint-check results/fingerprint.json data/my_cgm.csv
 mdmp lineage-card-refresh results/mdmp_model_card.yaml
+mdmp registry init --registry registry/mdmp_registry.json
+mdmp registry push --registry registry/mdmp_registry.json --report results/mdmp_report.json
 ```
