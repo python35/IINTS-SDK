@@ -53,3 +53,11 @@ iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdm
 ```
 
 The command summary prints the active backend so provenance is explicit.
+
+For stale lineage handling with standalone MDMP:
+
+```bash
+mdmp fingerprint-record data/my_cgm.csv --output-json results/fingerprint.json --expires-days 365
+mdmp fingerprint-check results/fingerprint.json data/my_cgm.csv
+mdmp lineage-card-refresh results/mdmp_model_card.yaml
+```

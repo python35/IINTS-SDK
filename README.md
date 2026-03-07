@@ -49,6 +49,14 @@ Use standalone MDMP backend (optional):
 export IINTS_MDMP_BACKEND=mdmp_core
 ```
 
+Staleness / lineage checks (standalone MDMP CLI):
+
+```bash
+mdmp fingerprint-record data/my_cgm.csv --output-json results/fingerprint.json --expires-days 365
+mdmp fingerprint-check results/fingerprint.json data/my_cgm.csv
+mdmp lineage-card-refresh results/mdmp_model_card.yaml
+```
+
 ## Dual Repo Workflow
 - SDK repo: `python35/IINTS-SDK`
 - MDMP repo: `python35/MDMP`
