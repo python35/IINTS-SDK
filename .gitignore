@@ -50,7 +50,9 @@ coverage.xml
 .DS_Store
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/
-tools/local/
+tools/local/*
+!tools/local/dual_repo_status.sh
+!tools/local/dual_repo_commit_push.sh
 Thumbs.db
 
 # IDE
