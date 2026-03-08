@@ -2,7 +2,17 @@
 
 This page gives the fastest reliable path from install to a validated run.
 
-## 1) Install
+## 1) Create and Activate a Virtual Environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+```
+
+All commands below assume this `.venv` is active.
+
+## 2) Install
 
 ```bash
 pip install iints-sdk-python35
@@ -15,7 +25,7 @@ pip install "iints-sdk-python35[research]"
 pip install "iints-sdk-python35[nightscout]"
 ```
 
-## 2) Verify Environment
+## 3) Verify Environment
 
 ```bash
 iints doctor --smoke-run
@@ -23,7 +33,7 @@ iints doctor --smoke-run
 
 If this fails, fix environment issues before running long experiments.
 
-## 3) Create a Project
+## 4) Create a Project
 
 ```bash
 iints quickstart --project-name iints_quickstart
@@ -35,13 +45,13 @@ Generated structure includes:
 - `scenarios/`
 - `results/`
 
-## 4) Run a Baseline Simulation
+## 5) Run a Baseline Simulation
 
 ```bash
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-## 5) Check Outputs
+## 6) Check Outputs
 
 A typical run writes:
 - `results.csv`: time-series simulation output.
@@ -50,7 +60,7 @@ A typical run writes:
 - `run_manifest.json`: file hashes for reproducibility.
 - `run_metadata.json`: run config and environment details.
 
-## 6) Build a Study-Ready Bundle
+## 7) Build a Study-Ready Bundle
 
 ```bash
 iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
@@ -61,7 +71,7 @@ Adds:
 - `sources_manifest.json`
 - `SUMMARY.md`
 
-## 7) Next Steps
+## 8) Next Steps
 
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)

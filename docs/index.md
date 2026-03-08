@@ -2,6 +2,10 @@
 
 IINTS-AF is a safety-first research SDK for insulin algorithm simulation, validation, and audit-ready reporting.
 
+!!! important "Use a Virtual Environment"
+    Always run SDK commands from an active Python virtual environment (`.venv`).
+    This avoids package conflicts and missing dependency issues.
+
 ## Start Here
 
 - [Quick Start](GETTING_STARTED.md)
@@ -21,6 +25,9 @@ IINTS-AF is a safety-first research SDK for insulin algorithm simulation, valida
 ## 10-Minute Quick Start
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
 pip install iints-sdk-python35
 
 iints doctor --smoke-run

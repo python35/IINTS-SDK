@@ -2,6 +2,18 @@
 
 Use this page to choose the right manual quickly.
 
+## Environment Baseline
+
+Before following any manual, activate a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+```
+
+All command examples in the documentation assume `.venv` is active.
+
 ## Best Entry Points
 
 - `GETTING_STARTED.md`: fastest route to a working run.

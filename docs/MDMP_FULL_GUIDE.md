@@ -2,6 +2,16 @@
 
 This page is the complete implementation guide for MDMP in IINTS-AF.
 
+## Environment Requirement
+
+Use an active virtual environment for all commands in this guide:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+```
+
 ## Who This Page Is For
 
 - Researchers who need reproducible data validation before model training/evaluation.

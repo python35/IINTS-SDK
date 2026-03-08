@@ -2,6 +2,10 @@
 
 MDMP is the IINTS protocol for validating data quality before modeling or evaluation.
 
+!!! important "Use a Virtual Environment"
+    Run all commands from an active `.venv`:
+    `python3 -m venv .venv && source .venv/bin/activate`
+
 ## What MDMP Produces
 
 - Contract validation results (pass/fail per rule)

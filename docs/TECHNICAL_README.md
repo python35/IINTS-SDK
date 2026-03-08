@@ -4,6 +4,18 @@ This document contains the full technical usage for the IINTS-AF SDK.
 
 If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
 
+## Environment Requirement (Important)
+
+Run all SDK commands from an active virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+```
+
+This guide assumes `.venv` is active for every command.
+
 ## Who This Page Is For
 
 - Engineers integrating SDK runs into applications or CI pipelines.
@@ -65,6 +77,9 @@ pip install -i https://test.pypi.org/simple/ iints-sdk-python35
 ```bash
 git clone https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
 python3 -m pip install -e .
 python3 -m pip install -e ".[dev]"
 ```
