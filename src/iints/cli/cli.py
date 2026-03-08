@@ -15,6 +15,7 @@ import time
 import yaml # Added for Virtual Patient Registry
 import pandas as pd # Added for DataFrame in benchmark results
 import numpy as np
+from typer.core import TyperGroup
 
 from rich.console import Console  # type: ignore # For pretty printing
 from rich.table import Table  # type: ignore # For comparison table
@@ -86,7 +87,33 @@ from iints.validation import (
 )
 
 
-app = typer.Typer(help="IINTS-AF SDK CLI - Intelligent Insulin Titration System for Artificial Pancreas research.")
+IINTS_ASCII_LOGO = r"""
+ /$$$$$$ /$$$$$$ /$$   /$$ /$$$$$$$$ /$$$$$$           /$$$$$$  /$$$$$$$  /$$   /$$
+|_  $$_/|_  $$_/| $$$ | $$|__  $$__//$$__  $$         /$$__  $$| $$__  $$| $$  /$$/
+  | $$    | $$  | $$$$| $$   | $$  | $$  \__/        | $$  \__/| $$  \ $$| $$ /$$/
+  | $$    | $$  | $$ $$ $$   | $$  |  $$$$$$  /$$$$$$|  $$$$$$ | $$  | $$| $$$$$/
+  | $$    | $$  | $$  $$$$   | $$   \____  $$|______/ \____  $$| $$  | $$| $$  $$
+  | $$    | $$  | $$\  $$$   | $$   /$$  \ $$         /$$  \ $$| $$  | $$| $$\  $$
+ /$$$$$$ /$$$$$$| $$ \  $$   | $$  |  $$$$$$/        |  $$$$$$/| $$$$$$$/| $$ \  $$
+|______/|______/|__/  \__/   |__/   \______/          \______/ |_______/ |__/  \__/
+"""
+
+APP_HELP = (
+    "IINTS-AF SDK CLI - Intelligent Insulin Titration System for Artificial Pancreas research."
+)
+
+
+class BrandedTyperGroup(TyperGroup):
+    def get_help(self, ctx):  # type: ignore[override]
+        return f"{IINTS_ASCII_LOGO}\n\n{super().get_help(ctx)}"
+
+
+app = typer.Typer(
+    help=APP_HELP,
+    context_settings={"max_content_width": 120},
+    cls=BrandedTyperGroup,
+    rich_markup_mode=None,
+)
 docs_app = typer.Typer(help="Generate documentation and technical summaries for IINTS-AF components.")
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
