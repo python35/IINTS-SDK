@@ -4,7 +4,7 @@
 
 - Fixed MDMP sync workflow to support two sources:
   - private-repo checkout when `MDMP_REPO_TOKEN` is available
-  - automatic PyPI fallback (`mdmp-protocol>=0.2.1`) when checkout is not available.
+  - automatic PyPI fallback (`mdmp-protocol>=0.2.0`) when checkout is not available.
 - MDMP roadmap note (post `v1.0.0`): deeper protocol expansion is planned; some new features and bug-fix turnarounds may take longer while the MDMP surface is stabilized.
 
 ## v1.0.0
@@ -14,7 +14,7 @@
 - Standardized documentation to require active virtual environments across quickstarts/manual pages.
 - Added branded CLI help header (ASCII IINTS logo in `iints --help`).
 - Hardened MDMP integration for release stability:
-  - optional dependency now uses published `mdmp-protocol>=0.2.1`
+  - optional dependency now uses published `mdmp-protocol>=0.2.0`
   - MDMP sync gate supports token checkout and public-package fallback
   - added automatic dependency update flow via Dependabot for MDMP package changes.
 - Added release notes page for `v1.0.0` and updated docs navigation.
