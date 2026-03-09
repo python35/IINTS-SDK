@@ -74,7 +74,8 @@ Full process: `docs/DUAL_REPO_WORKFLOW.md`
 
 MDMP sync CI gate:
 - `.github/workflows/mdmp-sync.yml`
-- Pulls the public `python35/MDMP` repo directly.
+- Uses private-repo checkout when `MDMP_REPO_TOKEN` is configured.
+- Falls back to `mdmp-protocol` from PyPI when checkout is unavailable.
 - Auto dependency updates for MDMP are handled via Dependabot (`.github/dependabot.yml`).
 
 ## Typical Workflow

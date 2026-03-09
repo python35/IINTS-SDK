@@ -21,7 +21,11 @@ It installs the standalone MDMP package from `python35/MDMP` and runs:
 The gate fails if SDK MDMP backend behavior diverges from standalone `mdmp_core`
 (grade order, validation result surface, fingerprints, or dashboard generation contract).
 
-The gate now tracks the public MDMP repository directly and also runs on a daily schedule.
+The gate runs daily and supports both source modes:
+
+- Repo mode: checkout `python35/MDMP` with `MDMP_REPO_TOKEN` when configured.
+- Package mode: fallback to `mdmp-protocol` from PyPI when repo checkout is unavailable.
+
 Dependency refresh for MDMP package updates is handled by Dependabot (`.github/dependabot.yml`).
 
 ## Local layout
