@@ -68,7 +68,7 @@ jobs:
     - name: Install standalone MDMP package (PyPI fallback)
       if: steps.mdmp_source.outputs.mode == 'pypi'
       run: |
-        pip install "mdmp-protocol>=0.2.0"
+        pip install "mdmp-protocol>=0.3.1"
 
     - name: Run MDMP sync check
       env:

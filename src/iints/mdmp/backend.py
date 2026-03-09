@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+import importlib
 import os
 from pathlib import Path
-from typing import Any, Iterable, List, Optional
+from typing import Any, Iterable, List
 
 import pandas as pd
 import yaml
@@ -13,14 +15,8 @@ from iints.data.mdmp_visualizer import build_mdmp_dashboard_html as _build_iints
 from iints.data.runner import ContractRunner as _IintsContractRunner
 
 
-try:  # Optional standalone MDMP backend
-    from mdmp_core.contracts import load_contract as _load_external_contract
-    from mdmp_core.runner import ContractRunner as _ExternalContractRunner
-    from mdmp_core.visualizer import build_dashboard_html as _build_external_dashboard_html
-
-    _EXTERNAL_MDMP_AVAILABLE = True
-except Exception:  # pragma: no cover - depends on optional install
-    _EXTERNAL_MDMP_AVAILABLE = False
+BACKEND_BUILTIN = "iints"
+BACKEND_MDMP = "mdmp_core"
 
 
 MDMP_GRADE_ORDER = ("raw", "draft", "research_grade", "clinical_grade", "ai_ready")
@@ -90,21 +86,52 @@ def _normalize_grade(grade: str) -> str:
 
 
 def _requested_backend() -> str:
-    return os.getenv("IINTS_MDMP_BACKEND", "iints").strip().lower()
+    return os.getenv("IINTS_MDMP_BACKEND", BACKEND_BUILTIN).strip().lower()
+
+
+def is_mdmp_available() -> bool:
+    try:
+        importlib.import_module("mdmp_core")
+        return True
+    except Exception:
+        return False
+
+
+@lru_cache(maxsize=1)
+def _load_external_symbols() -> tuple[Any, Any, Any]:
+    contracts_mod = importlib.import_module("mdmp_core.contracts")
+    runner_mod = importlib.import_module("mdmp_core.runner")
+    visualizer_mod = importlib.import_module("mdmp_core.visualizer")
+    return (
+        getattr(contracts_mod, "load_contract"),
+        getattr(runner_mod, "ContractRunner"),
+        getattr(visualizer_mod, "build_dashboard_html"),
+    )
+
+
+def get_backend() -> str:
+    requested = _requested_backend()
+    if requested in {BACKEND_MDMP, "mdmp", "external"}:
+        if not is_mdmp_available():
+            raise ImportError(
+                "mdmp_core not found.\n"
+                "Install with: pip install iints-sdk-python35[mdmp]\n"
+                "or: pip install 'mdmp-protocol>=0.3.1'"
+            )
+        return BACKEND_MDMP
+    if requested == "auto" and is_mdmp_available():
+        return BACKEND_MDMP
+    return BACKEND_BUILTIN
 
 
 def active_mdmp_backend() -> str:
-    requested = _requested_backend()
-    if requested in {"mdmp", "mdmp_core", "external"} and _EXTERNAL_MDMP_AVAILABLE:
-        return "mdmp_core"
-    if requested == "auto" and _EXTERNAL_MDMP_AVAILABLE:
-        return "mdmp_core"
-    return "iints"
+    return get_backend()
 
 
 def load_mdmp_contract(path: Path) -> Any:
     backend = active_mdmp_backend()
-    if backend == "mdmp_core":
+    if backend == BACKEND_MDMP:
+        load_external_contract, _, _ = _load_external_symbols()
         try:
             payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         except Exception:
@@ -113,7 +140,7 @@ def load_mdmp_contract(path: Path) -> Any:
             # Legacy IINTS contract format.
             return _load_iints_contract_yaml(path)
         try:
-            return _load_external_contract(path)
+            return load_external_contract(path)
         except Exception:
             # Backward compatibility: legacy IINTS contract format.
             return _load_iints_contract_yaml(path)
@@ -141,9 +168,10 @@ def run_mdmp_validation(
     apply_builtin_transforms: bool = True,
 ) -> MDMPValidationResult:
     backend = active_mdmp_backend()
-    if backend == "mdmp_core":
+    if backend == BACKEND_MDMP:
+        _, external_contract_runner, _ = _load_external_symbols()
         try:
-            raw_result = _ExternalContractRunner(contract).run(df)
+            raw_result = external_contract_runner(contract).run(df)
             grade = _normalize_grade(str(getattr(raw_result, "grade", "draft")))
             checks = _normalize_checks(getattr(raw_result, "checks", []))
             return MDMPValidationResult(
@@ -180,6 +208,7 @@ def run_mdmp_validation(
 
 
 def build_mdmp_dashboard_html(report: dict[str, Any], *, title: str) -> str:
-    if active_mdmp_backend() == "mdmp_core":
-        return _build_external_dashboard_html(report, title=title)
+    if active_mdmp_backend() == BACKEND_MDMP:
+        _, _, external_dashboard_html = _load_external_symbols()
+        return external_dashboard_html(report, title=title)
     return _build_iints_dashboard_html(report, title=title)
