@@ -80,7 +80,7 @@ jobs:
         python tools/ci/run_onnx_parity_smoke.py
 
     - name: Upload coverage report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: coverage-py${{ matrix.python-version }}
         path: coverage.xml
@@ -120,7 +120,7 @@ jobs:
         ./.venv_ci_test/bin/iints --help
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: iints-package-py${{ matrix.python-version }}
         path: |
@@ -162,7 +162,7 @@ jobs:
           -v
 
     - name: Upload research coverage
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: research-coverage-py${{ matrix.python-version }}
         path: coverage-research.xml
