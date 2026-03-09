@@ -47,9 +47,10 @@ nav:
       - Public Documentation Overview: PUBLIC_DOCUMENTATION.md
       - Scientific Evidence & Sources: EVIDENCE_BASE.md
   - Release Notes:
-      - Latest (v0.1.22): releases/v0.1.22.md
+      - Latest (v1.0.0): releases/v1.0.0.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v0.1.22: releases/v0.1.22.md
           - v0.1.21: releases/v0.1.21.md
           - v0.1.20: releases/v0.1.20.md
           - v0.1.18: releases/v0.1.18.md

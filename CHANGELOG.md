@@ -4,6 +4,18 @@
 
 - No entries yet.
 
+## v1.0.0
+
+- First public production release of IINTS-AF SDK.
+- Promoted package maturity classifier to `Production/Stable`.
+- Standardized documentation to require active virtual environments across quickstarts/manual pages.
+- Added branded CLI help header (ASCII IINTS logo in `iints --help`).
+- Hardened MDMP integration for release stability:
+  - optional dependency now uses published `mdmp-protocol>=0.2.1`
+  - MDMP sync gate no longer requires private-repo token
+  - added automatic dependency update flow via Dependabot for MDMP package changes.
+- Added release notes page for `v1.0.0` and updated docs navigation.
+
 ## v0.1.22
 
 - Added dedicated MDMP namespace:

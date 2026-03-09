@@ -17,6 +17,9 @@ Docs (GitHub Pages): [python35.github.io/IINTS-SDK](https://python35.github.io/I
 
 ## Quick Start
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
 pip install iints-sdk-python35
 ```
 
@@ -71,7 +74,8 @@ Full process: `docs/DUAL_REPO_WORKFLOW.md`
 
 MDMP sync CI gate:
 - `.github/workflows/mdmp-sync.yml`
-- Requires GitHub secret: `MDMP_REPO_TOKEN` (read access to `python35/MDMP`)
+- Pulls the public `python35/MDMP` repo directly.
+- Auto dependency updates for MDMP are handled via Dependabot (`.github/dependabot.yml`).
 
 ## Typical Workflow
 1. Prepare or import data.

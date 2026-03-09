@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "0.1.22"
+version = "1.0.0"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
 ]
 dependencies = [
     "fpdf2>=2.8.0",
@@ -60,7 +60,7 @@ research = [
   "onnxscript>=0.1.0",
 ]
 mdmp = [
-  "mdmp-protocol @ git+https://github.com/python35/MDMP.git",
+  "mdmp-protocol>=0.2.1",
 ]
 
 [project.scripts]
