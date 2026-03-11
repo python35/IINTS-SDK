@@ -28,6 +28,11 @@ jobs:
         pip install -r requirements-dev.txt
         pip install -e .
 
+    - name: Install MDMP extra smoke check
+      if: matrix.python-version == '3.11'
+      run: |
+        pip install -e ".[mdmp]"
+
     # P2-8: Install research extras (PyTorch CPU + pyarrow) for research tests
     - name: Install research extras
       run: |
