@@ -60,7 +60,7 @@ research = [
   "onnxscript>=0.1.0",
 ]
 mdmp = [
-  "mdmp-protocol>=0.3.1",
+  "mdmp-protocol>=0.3.0",
 ]
 
 [project.scripts]

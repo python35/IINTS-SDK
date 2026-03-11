@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+- Fixed MDMP package floor to match published versions:
+  - SDK optional extra now uses `mdmp-protocol>=0.3.0`
+  - MDMP sync PyPI fallback now uses `mdmp-protocol>=0.3.0`.
 - Fixed MDMP sync workflow to support two sources:
   - private-repo checkout when `MDMP_REPO_TOKEN` is available
-  - automatic PyPI fallback (`mdmp-protocol>=0.2.0`) when checkout is not available.
+  - automatic PyPI fallback (`mdmp-protocol>=0.3.0`) when checkout is not available.
 - MDMP roadmap note (post `v1.0.0`): deeper protocol expansion is planned; some new features and bug-fix turnarounds may take longer while the MDMP surface is stabilized.
 
 ## v1.0.0
