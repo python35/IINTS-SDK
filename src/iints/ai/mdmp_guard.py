@@ -9,9 +9,6 @@ from typing import Any
 from iints.mdmp.backend import mdmp_grade_meets_minimum
 
 
-RESEARCH_ONLY_NOTICE = "No medical advice. Research use only."
-
-
 def _load_mdmp_verifier() -> type[Any]:
     try:
         module = importlib.import_module("mdmp_core")
@@ -49,6 +46,9 @@ class GuardResult:
 
 class MDMPGuard:
     """Enforce a valid MDMP-signed artifact before AI analysis can run."""
+
+    DISCLAIMER = "\n\nWARNING: For research use only. Not medical advice."
+    RESEARCH_ONLY_NOTICE = "For research use only. Not medical advice."
 
     def __init__(
         self,
@@ -88,7 +88,7 @@ class MDMPGuard:
             error = raw_result.get("error", "verification_failed")
             raise PermissionError(
                 f"MDMP verification failed: {error}. Cannot run AI analysis on uncertified data. "
-                f"{RESEARCH_ONLY_NOTICE}"
+                f"{self.RESEARCH_ONLY_NOTICE}"
             )
 
         raw_grade = raw_result.get("grade") or signed_artifact.get("grade") or signed_artifact.get("mdmp_grade") or "raw"
@@ -96,7 +96,7 @@ class MDMPGuard:
         if not mdmp_grade_meets_minimum(grade, self.minimum_grade):
             raise PermissionError(
                 f"MDMP grade '{grade}' does not meet required minimum '{self.minimum_grade}'. "
-                f"Cannot run AI analysis on uncertified data. {RESEARCH_ONLY_NOTICE}"
+                f"Cannot run AI analysis on uncertified data. {self.RESEARCH_ONLY_NOTICE}"
             )
 
         return GuardResult(
@@ -107,3 +107,6 @@ class MDMPGuard:
             key_id=raw_result.get("key_id"),
             raw_result=raw_result,
         )
+
+    def wrap(self, response: str) -> str:
+        return response.rstrip() + self.DISCLAIMER

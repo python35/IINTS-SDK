@@ -91,7 +91,9 @@ class IINTSAssistant:
     def _run_task(self, task: TaskName, payload: Any) -> AIResponse:
         certification = self.guard.check()
         system_prompt, user_prompt = build_prompt(task, payload)
-        text = self.backend.complete(system_prompt=system_prompt, user_prompt=user_prompt)
+        text = self.guard.wrap(
+            self.backend.complete(system_prompt=system_prompt, user_prompt=user_prompt)
+        )
         return AIResponse(
             task=task,
             text=text,

@@ -39,6 +39,9 @@ class _FakeGuard:
             raw_result={"valid": True, "grade": "research_grade"},
         )
 
+    def wrap(self, response: str) -> str:
+        return response + "\n\nWARNING: For research use only. Not medical advice."
+
 
 def test_assistant_runs_with_injected_backend_and_guard() -> None:
     guard = _FakeGuard()
@@ -51,7 +54,7 @@ def test_assistant_runs_with_injected_backend_and_guard() -> None:
     response = assistant.explain_decision({"glucose": 145, "decision": {"insulin": 0.3}})
 
     assert isinstance(response, AIResponse)
-    assert response.text == "Research-only explanation."
+    assert response.text.endswith("WARNING: For research use only. Not medical advice.")
     assert response.backend == "fake"
     assert response.model == DEFAULT_MINISTRAL_MODEL
     assert response.certification.grade == "research_grade"
@@ -104,3 +107,9 @@ def test_guard_enforces_minimum_grade(monkeypatch: pytest.MonkeyPatch, tmp_path:
     guard = MDMPGuard(cert_path, minimum_grade="research_grade")
     with pytest.raises(PermissionError):
         guard.check()
+
+
+def test_guard_wrap_appends_disclaimer() -> None:
+    guard = MDMPGuard("cert.json")
+    wrapped = guard.wrap("Generated report body.")
+    assert wrapped.endswith("WARNING: For research use only. Not medical advice.")
