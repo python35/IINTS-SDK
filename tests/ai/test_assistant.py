@@ -14,6 +14,7 @@ from iints.ai.mdmp_guard import GuardResult
 class _FakeBackend:
     backend_name = "fake"
     model_name = DEFAULT_MINISTRAL_MODEL
+    resolved_model_name = "mistral/ministral-8b-instruct"
 
     def available(self) -> bool:
         return True
@@ -56,7 +57,7 @@ def test_assistant_runs_with_injected_backend_and_guard() -> None:
     assert isinstance(response, AIResponse)
     assert response.text.endswith("WARNING: For research use only. Not medical advice.")
     assert response.backend == "fake"
-    assert response.model == DEFAULT_MINISTRAL_MODEL
+    assert response.model == "mistral/ministral-8b-instruct"
     assert response.certification.grade == "research_grade"
     assert guard.calls == 1
 

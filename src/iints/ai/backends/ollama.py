@@ -28,6 +28,7 @@ class OllamaBackend:
         self.model_name = model_name
         self.base_url = (base_url or os.getenv("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST).rstrip("/")
         self.timeout_seconds = timeout_seconds
+        self.resolved_model_name: str | None = None
 
     def _pull_hint(self) -> str:
         return f"ollama pull {self.model_name}"
@@ -123,6 +124,7 @@ class OllamaBackend:
             raise RuntimeError(f"Failed to inspect local Ollama models: {exc}") from exc
 
         if resolved is None:
+            self.resolved_model_name = None
             installed = self.list_models()
             installed_hint = ", ".join(installed) if installed else "none"
             raise RuntimeError(
@@ -131,6 +133,7 @@ class OllamaBackend:
                 f"Installed: {installed_hint}\n"
                 f"Run: {self._pull_hint()}"
             )
+        self.resolved_model_name = resolved
         return resolved
 
     def healthcheck(self) -> dict[str, object]:
@@ -144,6 +147,7 @@ class OllamaBackend:
             "installed_models": installed,
             "ready": resolved is not None,
             "pull_command": None if resolved is not None else self._pull_hint(),
+            "timeout_seconds": self.timeout_seconds,
         }
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:

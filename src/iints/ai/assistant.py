@@ -40,7 +40,7 @@ class IINTSAssistant:
         public_key_path: str | Path | None = None,
         trust_store_path: str | Path | None = None,
         ollama_host: str | None = None,
-        timeout_seconds: float = 60.0,
+        timeout_seconds: float = 120.0,
         backend: CompletionBackend | None = None,
         guard: MDMPGuard | None = None,
     ) -> None:
@@ -97,11 +97,17 @@ class IINTSAssistant:
         text = self.guard.wrap(
             self.backend.complete(system_prompt=system_prompt, user_prompt=user_prompt)
         )
+        resolved_model = getattr(self.backend, "resolved_model_name", None)
+        response_model = (
+            str(resolved_model)
+            if isinstance(resolved_model, str) and resolved_model.strip()
+            else str(getattr(self.backend, "model_name", DEFAULT_MINISTRAL_MODEL))
+        )
         return AIResponse(
             task=task,
             text=text,
             backend=getattr(self.backend, "backend_name", type(self.backend).__name__),
-            model=getattr(self.backend, "model_name", DEFAULT_MINISTRAL_MODEL),
+            model=response_model,
             certification=certification,
         )
 

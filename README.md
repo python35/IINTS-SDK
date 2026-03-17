@@ -65,6 +65,7 @@ iints ai report results/simulation_run.json \
 Notes:
 - AI analysis is blocked if the MDMP artifact is invalid.
 - Minimum required MDMP grade defaults to `research_grade`.
+- Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - Output is research-only and not medical advice.
 
 ## MDMP (Short)

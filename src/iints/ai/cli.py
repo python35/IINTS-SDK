@@ -64,6 +64,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
                     f"Endpoint: {status.get('base_url')}",
                     f"Requested model: {status.get('requested_model')}",
                     f"Resolved local model: {resolved_model}",
+                    f"Timeout (s): {status.get('timeout_seconds')}",
                     f"Installed models: {installed_text}",
                     (
                         f"Pull command: {status.get('pull_command')}"
@@ -91,6 +92,7 @@ def _build_assistant(
     public_key: Path | None,
     trust_store: Path | None,
     ollama_host: str | None,
+    timeout_seconds: float,
 ) -> IINTSAssistant:
     _validate_trust_inputs(public_key, trust_store)
     return IINTSAssistant(
@@ -101,6 +103,7 @@ def _build_assistant(
         public_key_path=public_key,
         trust_store_path=trust_store,
         ollama_host=ollama_host,
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -108,9 +111,10 @@ def _build_assistant(
 def local_check(
     model: Annotated[str, typer.Option(help="Ollama model name to validate locally.")] = DEFAULT_MINISTRAL_MODEL,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama health checks.")] = 120.0,
 ) -> None:
     console = Console()
-    backend = OllamaBackend(model_name=model, base_url=ollama_host)
+    backend = OllamaBackend(model_name=model, base_url=ollama_host, timeout_seconds=timeout_seconds)
     try:
         if not backend.available():
             console.print(
@@ -139,6 +143,7 @@ def explain(
     public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
     trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
     output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the explanation.")] = None,
 ) -> None:
     console = Console()
@@ -152,6 +157,7 @@ def explain(
             public_key=public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
         )
         response = assistant.explain_decision(payload)
         _write_output(output, response)
@@ -171,6 +177,7 @@ def trends(
     public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
     trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
     output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the analysis.")] = None,
 ) -> None:
     console = Console()
@@ -184,6 +191,7 @@ def trends(
             public_key=public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
         )
         response = assistant.analyze_trends(payload)
         _write_output(output, response)
@@ -203,6 +211,7 @@ def anomalies(
     public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
     trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
     output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the anomaly summary.")] = None,
 ) -> None:
     console = Console()
@@ -216,6 +225,7 @@ def anomalies(
             public_key=public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
         )
         response = assistant.detect_anomalies(payload)
         _write_output(output, response)
@@ -235,6 +245,7 @@ def report(
     public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
     trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
     output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the markdown report.")] = None,
 ) -> None:
     console = Console()
@@ -248,6 +259,7 @@ def report(
             public_key=public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
         )
         response = assistant.generate_report(payload)
         _write_output(output, response)

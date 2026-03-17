@@ -2,13 +2,41 @@
 
 ## Unreleased
 
+- No entries yet.
+
+## v1.1.0
+
+- Added the local research AI assistant release for Ministral via Ollama:
+  - `iints ai explain`
+  - `iints ai trends`
+  - `iints ai anomalies`
+  - `iints ai report`
+  - `iints ai local-check`
+- Hardened local Ministral readiness checks:
+  - verifies Ollama reachability before generation
+  - verifies that a compatible local Ministral tag is installed
+  - resolves friendly aliases such as `ministral` to the installed Ollama tag
+  - records the resolved local model identity in the AI response path
+- Improved edge-device stability for local inference:
+  - increased default AI timeout to `120` seconds
+  - exposed `--timeout-seconds` on AI CLI commands
+  - clipped oversized JSON payloads before prompt construction to reduce local inference failures
+- Expanded AI test coverage for:
+  - alias resolution
+  - missing-model failure behavior
+  - CLI local-check success/failure paths
+  - prompt truncation
+- Added a dedicated AI guide and updated the manuals so the release documents:
+  - how the AI layer works
+  - how MDMP gating works
+  - how to debug the local Ollama/Ministral flow
 - Fixed MDMP package floor to match published versions:
   - SDK optional extra now uses `mdmp-protocol>=0.3.0`
-  - MDMP sync PyPI fallback now uses `mdmp-protocol>=0.3.0`.
+  - MDMP sync PyPI fallback now uses `mdmp-protocol>=0.3.0`
 - Fixed MDMP sync workflow to support two sources:
   - private-repo checkout when `MDMP_REPO_TOKEN` is available
-  - automatic PyPI fallback (`mdmp-protocol>=0.3.0`) when checkout is not available.
-- MDMP roadmap note (post `v1.0.0`): deeper protocol expansion is planned; some new features and bug-fix turnarounds may take longer while the MDMP surface is stabilized.
+  - automatic PyPI fallback (`mdmp-protocol>=0.3.0`) when checkout is not available
+- MDMP roadmap note (post `v1.1.0`): deeper protocol expansion is planned; some new features and bug-fix turnarounds may take longer while the MDMP surface is stabilized.
 
 ## v1.0.0
 

@@ -32,6 +32,7 @@ nav:
       - Quick Start: GETTING_STARTED.md
       - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Documentation Map: DOCUMENTATION_INDEX.md
+      - AI Assistant Guide: AI_ASSISTANT.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
       - MDMP Full Guide: MDMP_FULL_GUIDE.md
@@ -39,6 +40,7 @@ nav:
   - Developer Guides:
       - Developer CLI Guide: TECHNICAL_README.md
       - Architecture & Deep Dive: COMPREHENSIVE_GUIDE.md
+      - Dual-Repo Workflow: DUAL_REPO_WORKFLOW.md
       - Emulation Notes: emulation_references.md
   - Manuals:
       - Manual Overview: OFFICIAL_MANUAL.md
@@ -47,9 +49,10 @@ nav:
       - Public Documentation Overview: PUBLIC_DOCUMENTATION.md
       - Scientific Evidence & Sources: EVIDENCE_BASE.md
   - Release Notes:
-      - Latest (v1.0.0): releases/v1.0.0.md
+      - Latest (v1.1.0): releases/v1.1.0.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.0.0: releases/v1.0.0.md
           - v0.1.22: releases/v0.1.22.md
           - v0.1.21: releases/v0.1.21.md
           - v0.1.20: releases/v0.1.20.md

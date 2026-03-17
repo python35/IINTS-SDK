@@ -185,6 +185,12 @@ iints ai report results/simulation_run.json \
 **Output**
 - Plain-language explanation or markdown report generated from local Ministral inference.
 - The command fails closed if MDMP verification does not pass.
+- The command also fails early if Ollama is reachable but the local Ministral tag is missing.
+
+**How it works**
+- `MDMPGuard` verifies the signed artifact before any LLM call is allowed.
+- `OllamaBackend` resolves common local aliases such as `ministral` to the installed Ollama tag.
+- Oversized JSON payloads are clipped automatically before prompt generation so local inference stays practical on slower hardware.
 
 ### Detailed Command Reference
 
@@ -258,6 +264,7 @@ Options:
 - `--mode local` to require the local Ollama backend explicitly.
 - `--model mistral/ministral-8b-instruct` to pin the local model tag.
 - `iints ai local-check --model ministral` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
+- `--timeout-seconds 120` to support slower local hardware such as edge devices.
 - `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.
 - `--minimum-grade research_grade` to enforce the certification floor.
 

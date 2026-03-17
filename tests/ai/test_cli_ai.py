@@ -105,6 +105,7 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
                 "installed_models": ["mistral/ministral-8b-instruct"],
                 "ready": True,
                 "pull_command": None,
+                "timeout_seconds": 120.0,
             }
 
     monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
@@ -114,6 +115,7 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
     assert result.exit_code == 0
     assert "Local Ollama backend is ready" in result.stdout
     assert "mistral/ministral-8b-instruct" in result.stdout
+    assert "120.0" in result.stdout
 
 
 def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
@@ -133,6 +135,7 @@ def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
                 "installed_models": ["llama3.2:latest"],
                 "ready": False,
                 "pull_command": "ollama pull ministral",
+                "timeout_seconds": 120.0,
             }
 
     monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)

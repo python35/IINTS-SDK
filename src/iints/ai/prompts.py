@@ -5,6 +5,7 @@ from typing import Any, Literal
 
 
 TaskName = Literal["explain_decision", "analyze_trends", "detect_anomalies", "generate_report"]
+MAX_PROMPT_PAYLOAD_CHARS = 12000
 
 SYSTEM_PROMPT = (
     "You are the IINTS-AF research assistant for closed-loop insulin delivery simulations. "
@@ -54,7 +55,18 @@ TASK_TEMPLATES: dict[TaskName, str] = {
 
 
 def _serialize_payload(payload: Any) -> str:
-    return json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True, default=str)
+    text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True, default=str)
+    if len(text) <= MAX_PROMPT_PAYLOAD_CHARS:
+        return text
+
+    head_chars = MAX_PROMPT_PAYLOAD_CHARS // 2
+    tail_chars = MAX_PROMPT_PAYLOAD_CHARS - head_chars
+    omitted = len(text) - MAX_PROMPT_PAYLOAD_CHARS
+    return (
+        f"{text[:head_chars]}\n"
+        f"... [payload truncated for local AI inference, omitted {omitted} characters] ...\n"
+        f"{text[-tail_chars:]}"
+    )
 
 
 def build_prompt(task: TaskName, payload: Any) -> tuple[str, str]:

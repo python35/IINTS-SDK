@@ -1,5 +1,5 @@
 # Full Technical Manual
-Version 0.1.22 | Python SDK
+Version 1.1.0 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -43,6 +43,7 @@ Quick task routing:
 - **Customize safety limits:** Section 4.2
 - **Generate audit report:** Section 5.4
 - **Train an AI predictor:** Section 8.2 + `research/README.md`
+- **Use the local AI assistant:** Section 8.6 + `docs/AI_ASSISTANT.md`
 
 Evidence routing:
 - **Peer-reviewed source mapping:** `docs/EVIDENCE_BASE.md`
@@ -111,6 +112,7 @@ Evidence routing:
 8.3 Reproducibility Techniques
 8.4 Performance Profiling
 8.5 Custom Metrics Calculation
+8.6 Local AI Assistant (Ministral via Ollama)
 
 ### 9. Troubleshooting
 9.1 Common Installation Issues
@@ -521,52 +523,52 @@ generator.generate_pdf(
 
 ### 3.1 System Components
 
-```
-┌───────────────────────────────────────────────────┐
-│                 IINTS-AF SDK Architecture            │
-├───────────────────┬───────────────────┬───────────┤
-│   Algorithm Layer  │  Safety Layer      │ Output    │
-│                   │                   │ Layer     │
-├───────────────────┼───────────────────┼───────────┤
-│ - Custom Algorithm │ - Input Validator  │ - Results │
-│ - PID Controller   │ - Safety Supervisor│ - Reports │
-│ - ML Predictor     │ - Safety Config    │ - Audit   │
-│ - Pump Emulators   │                   │ - Metrics │
-└───────────────────┴───────────────────┴───────────┘
-                       │
-                       ▼
-┌───────────────────────────────────────────────────┐
-│                 Patient Simulation                 │
-│                                                   │
-│ - Virtual Patient Model                           │
-│ - CGM Sensor Model (noise, lag, dropout)          │
-│ - Insulin Pump Model (limits, quantization)       │
-│ - Pharmacokinetics (insulin absorption)           │
-│ - Pharmacodynamics (glucose response)            │
-└───────────────────────────────────────────────────┘
+```text
++---------------------------------------------------+
+|              IINTS-AF SDK Architecture            |
++-------------------+-------------------+-----------+
+| Algorithm Layer   | Safety Layer      | Output    |
+|                   |                   | Layer     |
++-------------------+-------------------+-----------+
+| - Custom Algorithm| - Input Validator | - Results |
+| - PID Controller  | - Safety Supervisor| - Reports|
+| - ML Predictor    | - Safety Config   | - Audit   |
+| - Pump Emulators  |                   | - Metrics |
++-------------------+-------------------+-----------+
+                       |
+                       v
++---------------------------------------------------+
+|               Patient Simulation                  |
+|                                                   |
+| - Virtual Patient Model                           |
+| - CGM Sensor Model (noise, lag, dropout)          |
+| - Insulin Pump Model (limits, quantization)       |
+| - Pharmacokinetics (insulin absorption)           |
+| - Pharmacodynamics (glucose response)             |
++---------------------------------------------------+
 ```
 
 ### 3.2 Data Flow
 
 ```
 1. Algorithm requests insulin dose
-   ↓
+   v
 2. Input Validator checks glucose values
-   ↓
+   v
 3. Safety Supervisor applies 9 safety checks
-   ↓
+   v
 4. Approved dose sent to pump model
-   ↓
+   v
 5. Pump model simulates delivery (with possible errors)
-   ↓
+   v
 6. Patient model calculates glucose impact
-   ↓
+   v
 7. CGM sensor model adds noise/lag
-   ↓
+   v
 8. New glucose reading returned to algorithm
-   ↓
+   v
 9. Audit trail logs all decisions
-   ↓
+   v
 10. Repeat every time step (default: 5 minutes)
 ```
 
@@ -589,7 +591,7 @@ The Independent Safety Supervisor runs **deterministically** and can:
 
 **Safety-First Principles:**
 
-1. **Deterministic Overrides**: Same input → same safety decision
+1. **Deterministic Overrides**: Same input -> same safety decision
 2. **Fail-Safe Defaults**: When in doubt, reduce insulin
 3. **Audit Everything**: Every decision logged for accountability
 4. **Transparent Logic**: Clear reasons for all interventions
@@ -998,7 +1000,7 @@ class AlgorithmInput:
     
     # Trends
     glucose_trend: float  # mg/dL per 5 minutes
-    glucose_acceleration: float  # mg/dL per 5 minutes²
+    glucose_acceleration: float  # mg/dL per 5 minutes^2
     
     # Patient info
     patient_config: dict  # ISF, ICR, basal rates, etc.
@@ -1409,6 +1411,79 @@ metrics = calculate_custom_metric(results_df)
 print(f"Custom Score: {metrics['composite_score']:.1f}")
 ```
 
+### 8.6 Local AI Assistant (Ministral via Ollama)
+
+The SDK includes a research-only local AI assistant for simulation explanation and summary generation.
+
+**What it is for:**
+- Explain a single decision step in plain language
+- Summarize glycemic trends from a run payload
+- Detect anomalies in a result summary
+- Generate a short markdown run report
+
+**What it is not for:**
+- Clinical dosing advice
+- Live patient-facing recommendations
+- Medical decision support
+
+**Safety gate before any LLM call**
+
+Every AI command is blocked unless the MDMP artifact verifies successfully and meets the minimum required grade.
+
+The AI flow is:
+1. Load simulation JSON from disk
+2. Verify signed MDMP artifact with `MDMPGuard`
+3. Check that Ollama is reachable
+4. Resolve the requested local Ministral model tag
+5. Generate a response
+6. Append a hard-coded research-only disclaimer
+
+**Recommended setup**
+
+Always use an active virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e ".[mdmp]"
+```
+
+Pull and validate the local model:
+
+```bash
+ollama pull mistral/ministral-8b-instruct
+iints ai local-check --model ministral
+```
+
+**Inference commands**
+
+```bash
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai trends results/glucose_payload.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai anomalies results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+**Operational notes**
+- The default local model is `mistral/ministral-8b-instruct`.
+- Friendly aliases like `ministral` are resolved automatically against installed Ollama tags.
+- Oversized JSON payloads are clipped automatically before prompt construction so local inference stays practical on smaller systems.
+- Use `--timeout-seconds 120` or higher for slower edge hardware.
+
+**Troubleshooting**
+- If `iints ai local-check` fails, first confirm Ollama is running.
+- If Ollama is reachable but the model is missing, run the exact `ollama pull ...` command shown by the SDK.
+- If generation is slow, increase `--timeout-seconds` and use a smaller JSON payload.
+
 ---
 
 ## 9. Troubleshooting
@@ -1582,6 +1657,12 @@ iints scenarios generate --name "Stress Test"
 
 # Validate files
 iints validate --scenario-path scenarios/my_scenario.json
+
+# Check local Ministral backend
+iints ai local-check --model ministral
+
+# Generate AI explanation
+iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
 ```
 
 ### 10.2 Python Code Snippets
@@ -1710,4 +1791,4 @@ SafetyConfig(
 This document is provided for research and educational purposes only.
 The IINTS-AF SDK is not a medical device and should not be used for clinical decision-making.
 
-© 2026 IINTS-AF Project. Licensed under MIT License.
+(C) 2026 IINTS-AF Project. Licensed under MIT License.
