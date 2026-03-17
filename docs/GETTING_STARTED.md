@@ -78,6 +78,7 @@ Adds:
 ```bash
 python -m pip install -e ".[mdmp]"
 ollama pull mistral/ministral-8b-instruct
+iints ai local-check --model ministral
 iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
 ```
 

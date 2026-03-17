@@ -10,7 +10,7 @@ from rich.panel import Panel
 from typing_extensions import Annotated
 
 from .assistant import AIResponse, IINTSAssistant
-from .backends import DEFAULT_MINISTRAL_MODEL
+from .backends import DEFAULT_MINISTRAL_MODEL, OllamaBackend
 
 
 app = typer.Typer(help="Research-only AI assistant commands gated by MDMP certification.")
@@ -52,6 +52,36 @@ def _render_response(console: Console, title: str, response: AIResponse, output:
         console.print(f"[green]Saved:[/green] {output}")
 
 
+def _render_local_check(console: Console, status: dict[str, object]) -> None:
+    installed = status.get("installed_models", [])
+    installed_text = ", ".join(str(item) for item in installed) if isinstance(installed, list) and installed else "none"
+    ready = bool(status.get("ready"))
+    resolved_model = status.get("resolved_model") or "not found"
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Endpoint: {status.get('base_url')}",
+                    f"Requested model: {status.get('requested_model')}",
+                    f"Resolved local model: {resolved_model}",
+                    f"Installed models: {installed_text}",
+                    (
+                        f"Pull command: {status.get('pull_command')}"
+                        if status.get("pull_command")
+                        else "Pull command: not needed"
+                    ),
+                ]
+            ),
+            title="IINTS AI Local Check",
+            border_style="cyan" if ready else "yellow",
+        )
+    )
+    if ready:
+        console.print("[green]Local Ollama backend is ready for Ministral inference.[/green]")
+    else:
+        console.print("[bold red]Local Ollama backend is reachable, but the requested model is missing.[/bold red]")
+
+
 def _build_assistant(
     *,
     mdmp_cert: Path,
@@ -72,6 +102,31 @@ def _build_assistant(
         trust_store_path=trust_store,
         ollama_host=ollama_host,
     )
+
+
+@app.command("local-check")
+def local_check(
+    model: Annotated[str, typer.Option(help="Ollama model name to validate locally.")] = DEFAULT_MINISTRAL_MODEL,
+    ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+) -> None:
+    console = Console()
+    backend = OllamaBackend(model_name=model, base_url=ollama_host)
+    try:
+        if not backend.available():
+            console.print(
+                "[bold red]Error:[/bold red] "
+                f"Could not reach Ollama at {backend.base_url}. Start Ollama and try again."
+            )
+            raise typer.Exit(code=1)
+        status = backend.healthcheck()
+        _render_local_check(console, status)
+        if not bool(status.get("ready")):
+            raise typer.Exit(code=1)
+    except typer.Exit:
+        raise
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
 
 
 @app.command("explain")

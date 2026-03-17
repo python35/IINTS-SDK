@@ -67,17 +67,20 @@ class IINTSAssistant:
     ) -> CompletionBackend:
         requested = mode.strip().lower()
         if requested in {"auto", "local", "ollama"}:
-            local_backend: CompletionBackend = OllamaBackend(
+            ollama_backend = OllamaBackend(
                 model_name=model,
                 base_url=ollama_host,
                 timeout_seconds=timeout_seconds,
             )
-            if local_backend.available():
-                return local_backend
-            raise RuntimeError(
-                "No local Ollama backend is available. Start Ollama and pull the Ministral model with:\n"
-                f"  ollama pull {model}"
-            )
+            local_backend: CompletionBackend = ollama_backend
+            if not ollama_backend.available():
+                raise RuntimeError(
+                    "No local Ollama backend is available. "
+                    f"Could not reach {ollama_backend.base_url}. "
+                    "Start Ollama and try again."
+                )
+            ollama_backend.ensure_model_ready()
+            return local_backend
         if requested == "api":
             api_backend: CompletionBackend = MistralAPIBackend()
             if api_backend.available():

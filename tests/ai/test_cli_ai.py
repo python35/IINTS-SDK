@@ -86,3 +86,59 @@ def test_ai_command_rejects_public_key_and_trust_store_together(tmp_path) -> Non
 
     assert result.exit_code != 0
     assert "either --public-key or --trust-store" in result.stdout
+
+
+def test_ai_local_check_reports_ready(monkeypatch) -> None:
+    class _FakeBackend:
+        def __init__(self, *args, **kwargs) -> None:
+            self.base_url = "http://127.0.0.1:11434"
+
+        def available(self) -> bool:
+            return True
+
+        def healthcheck(self) -> dict[str, object]:
+            return {
+                "available": True,
+                "base_url": self.base_url,
+                "requested_model": "ministral",
+                "resolved_model": "mistral/ministral-8b-instruct",
+                "installed_models": ["mistral/ministral-8b-instruct"],
+                "ready": True,
+                "pull_command": None,
+            }
+
+    monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
+
+    result = runner.invoke(app, ["ai", "local-check", "--model", "ministral"])
+
+    assert result.exit_code == 0
+    assert "Local Ollama backend is ready" in result.stdout
+    assert "mistral/ministral-8b-instruct" in result.stdout
+
+
+def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
+    class _FakeBackend:
+        def __init__(self, *args, **kwargs) -> None:
+            self.base_url = "http://127.0.0.1:11434"
+
+        def available(self) -> bool:
+            return True
+
+        def healthcheck(self) -> dict[str, object]:
+            return {
+                "available": True,
+                "base_url": self.base_url,
+                "requested_model": "ministral",
+                "resolved_model": None,
+                "installed_models": ["llama3.2:latest"],
+                "ready": False,
+                "pull_command": "ollama pull ministral",
+            }
+
+    monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
+
+    result = runner.invoke(app, ["ai", "local-check", "--model", "ministral"])
+
+    assert result.exit_code == 1
+    assert "requested model is missing" in result.stdout.lower()
+    assert "ollama pull ministral" in result.stdout

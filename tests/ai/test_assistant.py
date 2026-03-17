@@ -63,6 +63,11 @@ def test_assistant_runs_with_injected_backend_and_guard() -> None:
 
 def test_assistant_auto_detects_ollama_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(OllamaBackend, "available", lambda self: True)
+    monkeypatch.setattr(
+        OllamaBackend,
+        "ensure_model_ready",
+        lambda self: "mistral/ministral-8b-instruct",
+    )
     assistant = IINTSAssistant(
         "cert.json",
         guard=_FakeGuard(),  # type: ignore[arg-type]
@@ -71,6 +76,22 @@ def test_assistant_auto_detects_ollama_backend(monkeypatch: pytest.MonkeyPatch) 
 
     assert isinstance(assistant.backend, OllamaBackend)
     assert assistant.backend.model_name == DEFAULT_MINISTRAL_MODEL
+
+
+def test_assistant_local_mode_fails_if_model_is_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(OllamaBackend, "available", lambda self: True)
+
+    def _raise_missing(self) -> str:
+        raise RuntimeError("requested Ministral model is not installed locally")
+
+    monkeypatch.setattr(OllamaBackend, "ensure_model_ready", _raise_missing)
+
+    with pytest.raises(RuntimeError, match="not installed locally"):
+        IINTSAssistant(
+            "cert.json",
+            guard=_FakeGuard(),  # type: ignore[arg-type]
+            mode="local",
+        )
 
 
 def test_guard_rejects_invalid_certificate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

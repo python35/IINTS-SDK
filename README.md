@@ -48,6 +48,7 @@ Run Ministral locally with Ollama:
 
 ```bash
 ollama pull mistral/ministral-8b-instruct
+iints ai local-check --model ministral
 ```
 
 Example commands:

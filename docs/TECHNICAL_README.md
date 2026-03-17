@@ -172,6 +172,7 @@ iints mdmp visualizer results/mdmp_report.json \
 ```bash
 python -m pip install -e ".[mdmp]"
 ollama pull mistral/ministral-8b-instruct
+iints ai local-check --model ministral
 
 iints ai explain results/step.json \
   --mdmp-cert results/report.signed.mdmp
@@ -256,6 +257,7 @@ iints ai report results/simulation_run.json \
 Options:
 - `--mode local` to require the local Ollama backend explicitly.
 - `--model mistral/ministral-8b-instruct` to pin the local model tag.
+- `iints ai local-check --model ministral` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
 - `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.
 - `--minimum-grade research_grade` to enforce the certification floor.
 
