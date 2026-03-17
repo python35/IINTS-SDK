@@ -61,6 +61,7 @@ from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArt
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.reporting import ClinicalReportGenerator
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
+from .ai import AIResponse, IINTSAssistant, MDMPGuard
 from .highlevel import run_simulation, run_full, run_population
 from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
 
@@ -169,6 +170,9 @@ __all__ = [
     "ClinicalReportGenerator",
     "EnergyEstimate",
     "estimate_energy_per_decision",
+    "AIResponse",
+    "IINTSAssistant",
+    "MDMPGuard",
     # Reporting
     "generate_report",
     "generate_quickstart_report",

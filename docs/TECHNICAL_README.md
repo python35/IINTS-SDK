@@ -160,6 +160,31 @@ iints mdmp visualizer results/mdmp_report.json \
 **Output**
 - Contract validation report, MDMP grade, fingerprints, and HTML dashboard.
 
+### Core Workflow Chapter E: AI Assistant (Ministral via Ollama)
+
+**Purpose**
+- Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.
+
+**When to use**
+- After a run is complete and you have a signed MDMP artifact available.
+
+**Commands**
+```bash
+python -m pip install -e ".[mdmp]"
+ollama pull mistral/ministral-8b-instruct
+
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+**Output**
+- Plain-language explanation or markdown report generated from local Ministral inference.
+- The command fails closed if MDMP verification does not pass.
+
 ### Detailed Command Reference
 
 ### Initialize a Project
@@ -211,6 +236,28 @@ Creates:
 - `validation_report.json`
 - `sources_manifest.json`
 - `SUMMARY.md`
+
+### AI Assistant Commands
+```bash
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai trends results/glucose_payload.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai anomalies results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+Options:
+- `--mode local` to require the local Ollama backend explicitly.
+- `--model mistral/ministral-8b-instruct` to pin the local model tag.
+- `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.
+- `--minimum-grade research_grade` to enforce the certification floor.
 
 ### Parallel Batch Runner
 ```bash

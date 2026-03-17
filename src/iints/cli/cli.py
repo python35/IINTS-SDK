@@ -22,6 +22,7 @@ from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
+from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
@@ -126,6 +127,7 @@ app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
 app.add_typer(mdmp_app, name="mdmp")
+app.add_typer(ai_app, name="ai")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
 
