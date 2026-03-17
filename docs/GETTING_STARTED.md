@@ -73,6 +73,14 @@ Adds:
 
 ## 8) Next Steps
 
+- Optional AI assistant (Ministral via Ollama):
+
+```bash
+python -m pip install -e ".[mdmp]"
+ollama pull mistral/ministral-8b-instruct
+iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
+```
+
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)
 - End-to-end examples: [Demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)

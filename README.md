@@ -30,6 +30,42 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
+## AI Assistant (Ministral via Ollama)
+
+The SDK now includes a research-only AI assistant layer for explanations and run summaries.
+It is gated by MDMP verification before any LLM call is allowed.
+
+Use an active virtual environment for the full flow:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e ".[mdmp]"
+```
+
+Run Ministral locally with Ollama:
+
+```bash
+ollama pull mistral/ministral-8b-instruct
+```
+
+Example commands:
+
+```bash
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+Notes:
+- AI analysis is blocked if the MDMP artifact is invalid.
+- Minimum required MDMP grade defaults to `research_grade`.
+- Output is research-only and not medical advice.
+
 ## MDMP (Short)
 MDMP is the data-quality protocol used by IINTS.
 
