@@ -598,6 +598,27 @@ make lint
 ./scripts/run_demo.sh
 ```
 
+## Tools Layout
+
+The repository separates short user-facing entrypoints from maintainer utilities:
+
+- `scripts/`: quick wrappers for common local workflows
+- `tools/ci/`: CI validation helpers
+- `tools/dev/`: local maintainer scripts
+- `tools/docs/`: manual and docs builders
+- `tools/data/`: dataset ingestion and conversion helpers
+- `tools/analysis/`: plotting and reporting utilities
+- `tools/assets/`: project branding generators
+
+Examples:
+
+```bash
+python tools/data/import_ohio.py /path/to/ohio/dataset
+python tools/analysis/attach_ai_predictions.py --results results.csv --model predictor.pt --out results_with_ai.csv
+tools/dev/dual_repo_status.sh
+tools/docs/build_manuals.sh
+```
+
 ## Safety Architecture
 * **IndependentSupervisor**: deterministic safety layer that caps insulin, blocks dangerous doses, and logs interventions.
 * **InputValidator**: filters CGM noise and blocks physiologically impossible glucose values.

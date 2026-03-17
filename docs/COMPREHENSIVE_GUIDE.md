@@ -152,6 +152,10 @@ tools/
   assets/                        # Branding and asset generation
 ```
 
+Rule of thumb:
+- keep quick user-facing wrappers in `scripts/`
+- keep maintainer and specialist utilities in `tools/<category>/`
+
 ## 4. Key API Components
 
 The SDK provides several key classes and functions for interaction. The most important ones are often re-exported directly in `iints/__init__.py` for easy access.

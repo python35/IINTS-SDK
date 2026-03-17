@@ -114,6 +114,20 @@ MDMP sync CI gate:
 - Falls back to `mdmp-protocol` from PyPI when checkout is unavailable.
 - Auto dependency updates for MDMP are handled via Dependabot (`.github/dependabot.yml`).
 
+## Tools Layout
+
+Repository helpers are now grouped by purpose:
+
+- `scripts/`: simple user-facing shortcuts like test, lint, and demo entrypoints
+- `tools/ci/`: CI gates and policy checks
+- `tools/dev/`: maintainer workflows and multi-repo helpers
+- `tools/docs/`: manual and documentation builders
+- `tools/data/`: dataset import and conversion utilities
+- `tools/analysis/`: plotting, diagnostics, and report helpers
+- `tools/assets/`: branding and asset generation helpers
+
+Reference: `tools/README.md`
+
 ## Typical Workflow
 1. Prepare or import data.
 2. Validate data with MDMP.
