@@ -67,21 +67,21 @@ class IINTSAssistant:
     ) -> CompletionBackend:
         requested = mode.strip().lower()
         if requested in {"auto", "local", "ollama"}:
-            backend = OllamaBackend(
+            local_backend: CompletionBackend = OllamaBackend(
                 model_name=model,
                 base_url=ollama_host,
                 timeout_seconds=timeout_seconds,
             )
-            if backend.available():
-                return backend
+            if local_backend.available():
+                return local_backend
             raise RuntimeError(
                 "No local Ollama backend is available. Start Ollama and pull the Ministral model with:\n"
                 f"  ollama pull {model}"
             )
         if requested == "api":
-            backend = MistralAPIBackend()
-            if backend.available():
-                return backend
+            api_backend: CompletionBackend = MistralAPIBackend()
+            if api_backend.available():
+                return api_backend
             raise RuntimeError(
                 "Cloud API fallback is not enabled in this SDK build yet. "
                 "Use mode='local' with Ollama."
