@@ -103,8 +103,8 @@ mdmp registry push --registry registry/mdmp_registry.json --report results/mdmp_
 - MDMP repo: `python35/MDMP`
 
 Local helper scripts:
-- `tools/local/dual_repo_status.sh`
-- `tools/local/dual_repo_commit_push.sh`
+- `tools/dev/dual_repo_status.sh`
+- `tools/dev/dual_repo_commit_push.sh`
 
 Full process: `docs/DUAL_REPO_WORKFLOW.md`
 

@@ -8,13 +8,14 @@ import sys
 from pathlib import Path
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(project_root / "src"))
 sys.path.insert(0, str(project_root))
 
 def main():
     """Generate clinical report for first available patient"""
-    from scripts.generate_clinical_report import ClinicalReportGenerator
-    from src.data.adapter import DataAdapter
+    from examples.generate_clinical_report import ClinicalReportGenerator
+    from iints.data.adapter import DataAdapter
     import pandas as pd
     
     print("IINTS-AF Clinical Report Generator")
@@ -26,7 +27,7 @@ def main():
     
     if not patients:
         print(" No Ohio T1DM patients found")
-        print("Run: python tools/import_ohio.py /path/to/ohio/dataset")
+        print("Run: python tools/data/import_ohio.py /path/to/ohio/dataset")
         return
     
     # Use first available patient

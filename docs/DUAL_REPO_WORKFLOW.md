@@ -40,7 +40,7 @@ IINTS-SDK-main/
 1. Check both repos:
 
 ```bash
-tools/local/dual_repo_status.sh
+tools/dev/dual_repo_status.sh
 ```
 
 2. Implement SDK changes and/or MDMP changes.
@@ -48,7 +48,7 @@ tools/local/dual_repo_status.sh
 4. Commit/push both:
 
 ```bash
-tools/local/dual_repo_commit_push.sh \
+tools/dev/dual_repo_commit_push.sh \
   --sdk-msg "SDK: <change summary>" \
   --mdmp-msg "MDMP: <change summary>"
 ```

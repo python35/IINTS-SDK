@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MANUAL_DIR="$ROOT_DIR/docs/manuals"
 
 PANDOC_CONFIG="$MANUAL_DIR/pandoc.yaml"

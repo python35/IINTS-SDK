@@ -5,9 +5,11 @@ import time
 import pandas as pd
 import numpy as np
 from typing import Dict
+from pathlib import Path
 
 # Ensure src is in path so we can import the SDK modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from iints.core.simulator import Simulator
 from iints.api.template_algorithm import TemplateAlgorithm

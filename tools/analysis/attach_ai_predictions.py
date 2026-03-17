@@ -3,7 +3,7 @@
 Attach model-based glucose predictions to a results CSV.
 
 Usage:
-  PYTHONPATH=src python3 tools/attach_ai_predictions.py \
+  PYTHONPATH=src python3 tools/analysis/attach_ai_predictions.py \
     --results results/realistic_run/results.csv \
     --model models/hupa_finetuned_v2/predictor.pt \
     --out results/realistic_run/results_with_ai.csv

@@ -59,7 +59,7 @@ sbom:
 	fi
 
 manuals:
-	tools/build_manuals.sh
+	tools/docs/build_manuals.sh
 
 clean:
 	rm -rf dist build src/*.egg-info .pytest_cache

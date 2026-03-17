@@ -36,7 +36,7 @@ class ClinicalBenchmark:
         
         if not patients:
             self.console.print("[red] No Ohio T1DM patients found[/red]")
-            self.console.print("Run: [cyan]python tools/import_ohio.py /path/to/ohio/dataset[/cyan]")
+            self.console.print("Run: [cyan]python tools/data/import_ohio.py /path/to/ohio/dataset[/cyan]")
             return
         
         self.console.print(f"[green] Found {len(patients)} Ohio T1DM patients[/green]")

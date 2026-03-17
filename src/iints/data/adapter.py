@@ -59,7 +59,9 @@ class DataAdapter:
         ohio_path = Path(f"data_packs/public/ohio_t1dm/patient_{patient_id}")
         
         if not ohio_path.exists():
-            raise FileNotFoundError(f"Ohio patient {patient_id} not found. Run: python tools/import_ohio.py")
+            raise FileNotFoundError(
+                f"Ohio patient {patient_id} not found. Run: python tools/data/import_ohio.py"
+            )
         
         # Load timeseries data
         timeseries_file = ohio_path / "timeseries.csv"

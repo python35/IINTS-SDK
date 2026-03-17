@@ -143,6 +143,13 @@ scenarios/                       # JSON scenario definitions
 data_packs/                      # Data packs and schema docs
 models/                          # Saved model artifacts (if any)
 scripts/                         # Helper scripts (tests, lint, demo)
+tools/
+  ci/                            # CI gates and policy checks
+  dev/                           # Local maintainer workflows
+  docs/                          # Manual and documentation builders
+  data/                          # Dataset import and conversion helpers
+  analysis/                      # Plotting, diagnostics, and report helpers
+  assets/                        # Branding and asset generation
 ```
 
 ## 4. Key API Components
