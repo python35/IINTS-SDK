@@ -178,3 +178,28 @@ iints ai report results/simulation_run.json \
 ### Large Run Payloads
 
 The assistant now clips oversized payloads automatically before sending them to the model. If you want tighter control, pass a smaller JSON summary rather than a full raw run dump.
+
+### `No such command 'ai'`
+
+If the CLI says `No such command 'ai'`, the most common cause is a legacy `iints` package still being installed beside `iints-sdk-python35`. That older package can shadow the newer SDK command tree.
+
+Run the install doctor:
+
+```bash
+iints-sdk-doctor
+```
+
+If it reports a package ownership conflict, repair the environment:
+
+```bash
+python -m pip uninstall -y iints iints-sdk-python35
+python -m pip install -U "iints-sdk-python35[mdmp]==1.1.1"
+hash -r
+```
+
+Then retry:
+
+```bash
+iints ai models
+iints ai local-check --model ministral-3:8b
+```

@@ -78,6 +78,17 @@ Notes:
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - Output is research-only and not medical advice.
 
+Troubleshooting:
+- If `iints ai ...` says `No such command 'ai'`, your environment usually still has a legacy `iints` package installed alongside `iints-sdk-python35`.
+- Run `iints-sdk-doctor` first.
+- If it reports a conflict, repair the environment with:
+
+```bash
+python -m pip uninstall -y iints iints-sdk-python35
+python -m pip install -U "iints-sdk-python35[mdmp]==1.1.1"
+hash -r
+```
+
 ## MDMP (Short)
 MDMP is the data-quality protocol used by IINTS.
 

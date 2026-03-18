@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- No entries yet.
+- Added `iints-sdk-doctor` to diagnose legacy-package conflicts when `iints ai` is missing.
+- Fixed the exported `iints.__version__` value to follow the installed SDK distribution metadata.
+- Documented the repair flow for environments where an older `iints` package shadows `iints-sdk-python35`.
 
 ## v1.1.1
 

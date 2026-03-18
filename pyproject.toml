@@ -65,6 +65,7 @@ mdmp = [
 
 [project.scripts]
 iints = "iints.cli.cli:app"
+iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 
 [project.entry-points."iints.algorithms"]
 "PID Controller" = "iints.core.algorithms.pid_controller:PIDController"
