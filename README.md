@@ -30,7 +30,7 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-## AI Assistant (Ministral via Ollama)
+## AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 The SDK now includes a research-only AI assistant layer for explanations and run summaries.
 It is gated by MDMP verification before any LLM call is allowed.
@@ -44,11 +44,11 @@ python -m pip install -U pip
 python -m pip install -e ".[mdmp]"
 ```
 
-Run Ministral locally with Ollama:
+Run the open local Mistral model locally with Ollama:
 
 ```bash
-ollama pull mistral/ministral-8b-instruct
-iints ai local-check --model ministral
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
 ```
 
 Example commands:
@@ -65,6 +65,7 @@ iints ai report results/simulation_run.json \
 Notes:
 - AI analysis is blocked if the MDMP artifact is invalid.
 - Minimum required MDMP grade defaults to `research_grade`.
+- The SDK now targets the open local `Ministral 3` Ollama model by default.
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - Output is research-only and not medical advice.
 

@@ -19,7 +19,7 @@ All command examples in the documentation assume `.venv` is active.
 - `GETTING_STARTED.md`: fastest route to a working run.
 - `PLAIN_LANGUAGE_GUIDE.md`: non-technical explanation.
 - `TECHNICAL_README.md`: command and integration reference.
-- `AI_ASSISTANT.md`: how the local Ministral assistant works, how it is gated, and how to debug it.
+- `AI_ASSISTANT.md`: how the local open-weight Ministral 3 assistant works, how it is gated, and how to debug it.
 
 ## Full Manuals
 

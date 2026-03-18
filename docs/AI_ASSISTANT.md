@@ -1,6 +1,6 @@
 # AI Assistant Guide
 
-This guide explains how the local Ministral-powered AI layer works inside IINTS-AF.
+This guide explains how the local open-weight Ministral 3 AI layer works inside IINTS-AF.
 
 ## Scope
 
@@ -27,7 +27,7 @@ The flow is:
 1. `iints ai ...` loads a JSON payload from disk.
 2. `MDMPGuard` verifies the signed MDMP artifact and enforces the minimum grade.
 3. `IINTSAssistant` selects the backend.
-4. `OllamaBackend` checks that Ollama is reachable and that a local Ministral tag is installed.
+4. `OllamaBackend` checks that Ollama is reachable and that a local open Ministral 3 tag is installed.
 5. The prompt is built from a fixed system instruction plus a serialized payload.
 6. The response is wrapped with a hard-coded research-only disclaimer before output is shown or saved.
 
@@ -38,12 +38,14 @@ The SDK defaults to local inference through Ollama.
 Default model:
 
 ```bash
-mistral/ministral-8b-instruct
+ministral-3:8b
 ```
 
 Supported convenience aliases include:
 
 - `ministral`
+- `ministral-3`
+- `ministral-3:8b`
 - `ministral-8b`
 - `ministral-8b-instruct`
 
@@ -63,11 +65,13 @@ python -m pip install -e ".[mdmp]"
 Install and check the local model:
 
 ```bash
-ollama pull mistral/ministral-8b-instruct
-iints ai local-check --model ministral
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
 ```
 
 If the model is missing, the command fails with the exact `ollama pull ...` command to run next.
+If your Ollama runtime is too old for the open Ministral 3 line, `local-check` now tells you that as well.
+The current Ollama listing for `ministral-3` expects Ollama `0.13.1` or newer.
 
 ## Generation Commands
 
@@ -89,7 +93,7 @@ iints ai report results/simulation_run.json \
 Useful options:
 
 - `--mode local` to require Ollama explicitly
-- `--model ministral` or `--model mistral/ministral-8b-instruct`
+- `--model ministral-3:8b` or `--model ministral`
 - `--ollama-host http://127.0.0.1:11434` to override the endpoint
 - `--timeout-seconds 120` for slower local hardware
 - `--minimum-grade research_grade` to raise or lower the MDMP floor
@@ -99,9 +103,10 @@ Useful options:
 For local robustness, the SDK now does four checks before a real generation call:
 
 - verifies that the Ollama HTTP endpoint is reachable
-- verifies that a compatible local Ministral model is installed
+- verifies that a compatible local open Ministral 3 model is installed
 - normalizes common local model aliases to the installed tag
 - truncates oversized JSON payloads before prompt construction so large run artifacts do not overwhelm local inference
+- flags too-old Ollama runtimes when they do not meet the minimum version expected for the open Ministral 3 line
 
 If a generation succeeds, the response records the actual resolved model name used by the local backend.
 
@@ -124,13 +129,13 @@ That means the research-only warning is not dependent on the prompt and cannot b
 Run:
 
 ```bash
-iints ai local-check --model ministral
+iints ai local-check --model ministral-3:8b
 ```
 
 If the endpoint is wrong, retry with:
 
 ```bash
-iints ai local-check --model ministral --ollama-host http://127.0.0.1:11434
+iints ai local-check --model ministral-3:8b --ollama-host http://127.0.0.1:11434
 ```
 
 ### Model Missing
@@ -138,7 +143,7 @@ iints ai local-check --model ministral --ollama-host http://127.0.0.1:11434
 Pull the model shown in the error output:
 
 ```bash
-ollama pull mistral/ministral-8b-instruct
+ollama pull ministral-3:8b
 ```
 
 ### Local Inference Is Slow

@@ -112,7 +112,7 @@ Evidence routing:
 8.3 Reproducibility Techniques
 8.4 Performance Profiling
 8.5 Custom Metrics Calculation
-8.6 Local AI Assistant (Ministral via Ollama)
+8.6 Local AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 ### 9. Troubleshooting
 9.1 Common Installation Issues
@@ -1411,7 +1411,7 @@ metrics = calculate_custom_metric(results_df)
 print(f"Custom Score: {metrics['composite_score']:.1f}")
 ```
 
-### 8.6 Local AI Assistant (Ministral via Ollama)
+### 8.6 Local AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 The SDK includes a research-only local AI assistant for simulation explanation and summary generation.
 
@@ -1434,7 +1434,7 @@ The AI flow is:
 1. Load simulation JSON from disk
 2. Verify signed MDMP artifact with `MDMPGuard`
 3. Check that Ollama is reachable
-4. Resolve the requested local Ministral model tag
+4. Resolve the requested local Ministral 3 model tag
 5. Generate a response
 6. Append a hard-coded research-only disclaimer
 
@@ -1452,8 +1452,8 @@ python -m pip install -e ".[mdmp]"
 Pull and validate the local model:
 
 ```bash
-ollama pull mistral/ministral-8b-instruct
-iints ai local-check --model ministral
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
 ```
 
 **Inference commands**
@@ -1474,8 +1474,9 @@ iints ai report results/simulation_run.json \
 ```
 
 **Operational notes**
-- The default local model is `mistral/ministral-8b-instruct`.
+- The default local model is `ministral-3:8b`.
 - Friendly aliases like `ministral` are resolved automatically against installed Ollama tags.
+- Older `Ministral 8B` tags remain accepted as backward-compatible fallbacks if they are already installed locally.
 - Oversized JSON payloads are clipped automatically before prompt construction so local inference stays practical on smaller systems.
 - Use `--timeout-seconds 120` or higher for slower edge hardware.
 

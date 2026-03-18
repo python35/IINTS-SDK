@@ -6,12 +6,19 @@ from urllib import error, request
 
 
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
-DEFAULT_MINISTRAL_MODEL = "mistral/ministral-8b-instruct"
+DEFAULT_MINISTRAL_MODEL = "ministral-3:8b"
+LEGACY_MINISTRAL_MODEL = "mistral/ministral-8b-instruct"
+MIN_OLLAMA_VERSION_FOR_MINISTRAL_3 = (0, 13, 1)
 MINISTRAL_MODEL_ALIASES = (
     DEFAULT_MINISTRAL_MODEL,
+    "ministral-3",
+    "ministral-3:latest",
+    "ministral-3:8b",
+    "ministral-3:8b-instruct",
     "ministral",
     "ministral-8b",
     "ministral-8b-instruct",
+    LEGACY_MINISTRAL_MODEL,
 )
 
 
@@ -23,7 +30,7 @@ class OllamaBackend:
         *,
         model_name: str = DEFAULT_MINISTRAL_MODEL,
         base_url: str | None = None,
-        timeout_seconds: float = 60.0,
+        timeout_seconds: float = 120.0,
     ) -> None:
         self.model_name = model_name
         self.base_url = (base_url or os.getenv("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST).rstrip("/")
@@ -32,6 +39,28 @@ class OllamaBackend:
 
     def _pull_hint(self) -> str:
         return f"ollama pull {self.model_name}"
+
+    def _requires_ministral_3_runtime(self) -> bool:
+        requested = self.model_name.strip().lower()
+        return requested.startswith("ministral-3") or requested == "ministral"
+
+    @staticmethod
+    def _parse_version(raw_version: str) -> tuple[int, ...] | None:
+        value = raw_version.strip().lower().lstrip("v")
+        numeric_parts: list[int] = []
+        for part in value.split("."):
+            digits = ""
+            for char in part:
+                if char.isdigit():
+                    digits += char
+                else:
+                    break
+            if not digits:
+                break
+            numeric_parts.append(int(digits))
+        if not numeric_parts:
+            return None
+        return tuple(numeric_parts)
 
     def _request_json(
         self,
@@ -79,6 +108,27 @@ class OllamaBackend:
             return False
         return True
 
+    def server_version(self) -> str | None:
+        try:
+            response = self._request_json("/api/version", method="GET")
+        except Exception:
+            return None
+        raw_version = response.get("version")
+        if isinstance(raw_version, str) and raw_version.strip():
+            return raw_version.strip()
+        return None
+
+    def version_supported(self) -> tuple[bool | None, str | None]:
+        version = self.server_version()
+        if version is None:
+            return None, None
+        if not self._requires_ministral_3_runtime():
+            return True, version
+        parsed = self._parse_version(version)
+        if parsed is None:
+            return None, version
+        return parsed >= MIN_OLLAMA_VERSION_FOR_MINISTRAL_3, version
+
     def list_models(self) -> list[str]:
         response = self._request_json("/api/tags", method="GET")
         raw_models = response.get("models", [])
@@ -102,12 +152,24 @@ class OllamaBackend:
             return installed_lookup[self.model_name.lower()]
 
         requested = self.model_name.strip().lower()
-        if requested in {"ministral", "ministral-8b", "ministral-8b-instruct"}:
+        if requested in {
+            "ministral",
+            "ministral-3",
+            "ministral-3:latest",
+            "ministral-3:8b",
+            "ministral-3:8b-instruct",
+            "ministral-8b",
+            "ministral-8b-instruct",
+        }:
             for alias in MINISTRAL_MODEL_ALIASES:
                 resolved = installed_lookup.get(alias.lower())
                 if resolved is not None:
                     return resolved
 
+        for installed_name in installed:
+            lowered = installed_name.lower()
+            if "ministral-3" in lowered and "8b" in lowered:
+                return installed_name
         for installed_name in installed:
             lowered = installed_name.lower()
             if "ministral" in lowered and "8b" in lowered:
@@ -116,6 +178,14 @@ class OllamaBackend:
         return None
 
     def ensure_model_ready(self) -> str:
+        version_ok, version = self.version_supported()
+        if version_ok is False:
+            required_version = ".".join(str(part) for part in MIN_OLLAMA_VERSION_FOR_MINISTRAL_3)
+            raise RuntimeError(
+                "The open Ministral 3 local model requires a newer Ollama runtime.\n"
+                f"Detected Ollama: {version}\n"
+                f"Required Ollama: >= {required_version}"
+            )
         try:
             resolved = self.resolve_model_name()
         except RuntimeError:
@@ -137,6 +207,7 @@ class OllamaBackend:
         return resolved
 
     def healthcheck(self) -> dict[str, object]:
+        version_ok, version = self.version_supported()
         installed = self.list_models()
         resolved = self.resolve_model_name() if installed else None
         return {
@@ -148,6 +219,8 @@ class OllamaBackend:
             "ready": resolved is not None,
             "pull_command": None if resolved is not None else self._pull_hint(),
             "timeout_seconds": self.timeout_seconds,
+            "server_version": version,
+            "version_ok": version_ok,
         }
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:

@@ -73,12 +73,12 @@ Adds:
 
 ## 8) Next Steps
 
-- Optional AI assistant (Ministral via Ollama):
+- Optional AI assistant (Ministral 3 via Ollama):
 
 ```bash
 python -m pip install -e ".[mdmp]"
-ollama pull mistral/ministral-8b-instruct
-iints ai local-check --model ministral
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
 iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
 ```
 

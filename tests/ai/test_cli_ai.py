@@ -28,7 +28,7 @@ def test_ai_explain_command_writes_output(tmp_path, monkeypatch) -> None:
                 task="explain_decision",
                 text="The controller delivered a small corrective dose.",
                 backend="fake",
-                model="mistral/ministral-8b-instruct",
+                model="ministral-3:8b",
                 certification=GuardResult(
                     cert_path=str(cert_json),
                     grade="research_grade",
@@ -101,11 +101,13 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
                 "available": True,
                 "base_url": self.base_url,
                 "requested_model": "ministral",
-                "resolved_model": "mistral/ministral-8b-instruct",
-                "installed_models": ["mistral/ministral-8b-instruct"],
+                "resolved_model": "ministral-3:8b",
+                "installed_models": ["ministral-3:8b"],
                 "ready": True,
                 "pull_command": None,
                 "timeout_seconds": 120.0,
+                "server_version": "0.13.1",
+                "version_ok": True,
             }
 
     monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
@@ -114,8 +116,9 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert "Local Ollama backend is ready" in result.stdout
-    assert "mistral/ministral-8b-instruct" in result.stdout
+    assert "ministral-3:8b" in result.stdout
     assert "120.0" in result.stdout
+    assert "0.13.1" in result.stdout
 
 
 def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
@@ -136,6 +139,8 @@ def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
                 "ready": False,
                 "pull_command": "ollama pull ministral",
                 "timeout_seconds": 120.0,
+                "server_version": "0.13.1",
+                "version_ok": True,
             }
 
     monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)

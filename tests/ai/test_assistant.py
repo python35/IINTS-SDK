@@ -14,7 +14,7 @@ from iints.ai.mdmp_guard import GuardResult
 class _FakeBackend:
     backend_name = "fake"
     model_name = DEFAULT_MINISTRAL_MODEL
-    resolved_model_name = "mistral/ministral-8b-instruct"
+    resolved_model_name = "ministral-3:8b"
 
     def available(self) -> bool:
         return True
@@ -57,7 +57,7 @@ def test_assistant_runs_with_injected_backend_and_guard() -> None:
     assert isinstance(response, AIResponse)
     assert response.text.endswith("WARNING: For research use only. Not medical advice.")
     assert response.backend == "fake"
-    assert response.model == "mistral/ministral-8b-instruct"
+    assert response.model == "ministral-3:8b"
     assert response.certification.grade == "research_grade"
     assert guard.calls == 1
 
@@ -67,7 +67,7 @@ def test_assistant_auto_detects_ollama_backend(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(
         OllamaBackend,
         "ensure_model_ready",
-        lambda self: "mistral/ministral-8b-instruct",
+        lambda self: "ministral-3:8b",
     )
     assistant = IINTSAssistant(
         "cert.json",

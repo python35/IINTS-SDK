@@ -13,5 +13,5 @@ class MistralAPIBackend:
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
         raise RuntimeError(
             "Cloud fallback is not enabled in this SDK build yet. "
-            "Use mode='local' with Ollama for Ministral."
+            "Use mode='local' with Ollama for the open Ministral 3 model."
         )

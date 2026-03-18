@@ -64,6 +64,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
                     f"Endpoint: {status.get('base_url')}",
                     f"Requested model: {status.get('requested_model')}",
                     f"Resolved local model: {resolved_model}",
+                    f"Server version: {status.get('server_version') or 'unknown'}",
                     f"Timeout (s): {status.get('timeout_seconds')}",
                     f"Installed models: {installed_text}",
                     (
@@ -78,9 +79,11 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
         )
     )
     if ready:
-        console.print("[green]Local Ollama backend is ready for Ministral inference.[/green]")
+        console.print("[green]Local Ollama backend is ready for open Ministral 3 inference.[/green]")
     else:
         console.print("[bold red]Local Ollama backend is reachable, but the requested model is missing.[/bold red]")
+    if status.get("version_ok") is False:
+        console.print("[bold red]Ollama is too old for the open Ministral 3 runtime.[/bold red]")
 
 
 def _build_assistant(

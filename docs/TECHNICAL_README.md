@@ -160,7 +160,7 @@ iints mdmp visualizer results/mdmp_report.json \
 **Output**
 - Contract validation report, MDMP grade, fingerprints, and HTML dashboard.
 
-### Core Workflow Chapter E: AI Assistant (Ministral via Ollama)
+### Core Workflow Chapter E: AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 **Purpose**
 - Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.
@@ -171,8 +171,8 @@ iints mdmp visualizer results/mdmp_report.json \
 **Commands**
 ```bash
 python -m pip install -e ".[mdmp]"
-ollama pull mistral/ministral-8b-instruct
-iints ai local-check --model ministral
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
 
 iints ai explain results/step.json \
   --mdmp-cert results/report.signed.mdmp
@@ -183,7 +183,7 @@ iints ai report results/simulation_run.json \
 ```
 
 **Output**
-- Plain-language explanation or markdown report generated from local Ministral inference.
+- Plain-language explanation or markdown report generated from local Ministral 3 inference.
 - The command fails closed if MDMP verification does not pass.
 - The command also fails early if Ollama is reachable but the local Ministral tag is missing.
 
@@ -262,8 +262,9 @@ iints ai report results/simulation_run.json \
 
 Options:
 - `--mode local` to require the local Ollama backend explicitly.
-- `--model mistral/ministral-8b-instruct` to pin the local model tag.
-- `iints ai local-check --model ministral` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
+- `--model ministral-3:8b` to pin the open local model tag.
+- `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
+- `--model ministral` remains supported as a friendly alias.
 - `--timeout-seconds 120` to support slower local hardware such as edge devices.
 - `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.
 - `--minimum-grade research_grade` to enforce the certification floor.
