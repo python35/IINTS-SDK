@@ -22,6 +22,7 @@ from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 
 import iints # Import the top-level SDK package
+from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.api.registry import list_algorithm_plugins
@@ -276,6 +277,30 @@ def _write_certification_summary(
     summary_path = output_dir / "SUMMARY.md"
     summary_path.write_text("\n".join(lines) + "\n")
     return summary_path
+
+
+def _maybe_prepare_ai_artifacts(output_dir: Path, console: Console) -> None:
+    try:
+        outputs = prepare_ai_ready_artifacts(output_dir, create_dev_mdmp_cert=True)
+        console.print(f"[green]AI-ready artifacts:[/green] {output_dir / 'ai'}")
+        if "mdmp_cert" in outputs:
+            console.print(f"[green]AI quick start:[/green] iints ai report {output_dir}")
+        return
+    except ImportError as exc:
+        console.print(f"[yellow]AI dev certificate skipped:[/yellow] {exc}")
+    except Exception as exc:
+        console.print(f"[yellow]AI-ready export skipped:[/yellow] {exc}")
+        return
+
+    try:
+        prepare_ai_ready_artifacts(output_dir, create_dev_mdmp_cert=False)
+        console.print(f"[green]AI-ready payloads:[/green] {output_dir / 'ai'}")
+        console.print(
+            "[yellow]Tip:[/yellow] Install the MDMP extra or rerun "
+            f"`iints ai prepare {output_dir}` to generate a local development certificate."
+        )
+    except Exception as exc:
+        console.print(f"[yellow]AI-ready payload export skipped:[/yellow] {exc}")
 
 
 def _get_preset(name: str) -> Dict[str, Any]:
@@ -1698,9 +1723,11 @@ def presets_run(
     run_manifest_path = output_dir / "run_manifest.json"
     write_json(run_manifest_path, run_manifest)
     console.print(f"Run manifest: {run_manifest_path}")
+    _maybe_prepare_ai_artifacts(output_dir, console)
     signature_path = maybe_sign_manifest(run_manifest_path)
     if signature_path:
         console.print(f"Run manifest signature: {signature_path}")
+    _maybe_prepare_ai_artifacts(output_dir, console)
 
 
 @presets_app.command("create")
@@ -2295,6 +2322,8 @@ def run_full(
         console.print(f"Profiling report: {outputs['profiling_path']}")
     if "run_manifest_signature" in outputs:
         console.print(f"Run manifest signature: {outputs['run_manifest_signature']}")
+    if "output_dir" in outputs:
+        _maybe_prepare_ai_artifacts(Path(outputs["output_dir"]), console)
 
 
 @app.command("run-parallel")

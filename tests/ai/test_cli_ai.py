@@ -159,3 +159,58 @@ def test_ai_models_command_lists_profiles() -> None:
     assert "ministral-3:3b" in result.stdout
     assert "ministral-3:8b" in result.stdout
     assert "ministral-3:14b" in result.stdout
+
+
+def test_ai_prepare_command_reports_generated_artifacts(tmp_path, monkeypatch) -> None:
+    ai_dir = tmp_path / "ai"
+    ai_dir.mkdir()
+    fake_outputs = {
+        "report_payload": str(ai_dir / "report_payload.json"),
+        "mdmp_cert": str(ai_dir / "report.signed.mdmp"),
+    }
+    monkeypatch.setattr("iints.ai.cli.prepare_ai_ready_artifacts", lambda *args, **kwargs: fake_outputs)
+
+    result = runner.invoke(app, ["ai", "prepare", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Prepared AI payloads are ready" in result.stdout
+    assert "iints ai report" in result.stdout
+
+
+def test_ai_report_command_auto_resolves_prepared_run_directory(tmp_path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    ai_dir = run_dir / "ai"
+    key_dir = ai_dir / "keys"
+    key_dir.mkdir(parents=True)
+    (ai_dir / "report_payload.json").write_text(json.dumps({"summary": {"steps": 10}}), encoding="utf-8")
+    (ai_dir / "report.signed.mdmp").write_text(json.dumps({"signature": "demo"}), encoding="utf-8")
+    (key_dir / "mdmp_pub_v1.pem").write_text("public", encoding="utf-8")
+
+    class _FakeAssistant:
+        def __init__(self, mdmp_cert, **kwargs) -> None:
+            assert str(mdmp_cert).endswith("report.signed.mdmp")
+            assert str(kwargs["public_key_path"]).endswith("mdmp_pub_v1.pem")
+
+        def generate_report(self, payload):
+            assert payload["summary"]["steps"] == 10
+            return AIResponse(
+                task="generate_report",
+                text="Prepared report body.",
+                backend="fake",
+                model="ministral-3:8b",
+                certification=GuardResult(
+                    cert_path=str(ai_dir / "report.signed.mdmp"),
+                    grade="research_grade",
+                    issued_by="IINTS-Local-AI",
+                    verification_mode="explicit_key",
+                    key_id="iints_local_ai_v1",
+                    raw_result={"valid": True},
+                ),
+            )
+
+    monkeypatch.setattr("iints.ai.cli.IINTSAssistant", _FakeAssistant)
+
+    result = runner.invoke(app, ["ai", "report", str(run_dir)])
+
+    assert result.exit_code == 0
+    assert "Prepared report body" in result.stdout

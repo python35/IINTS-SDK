@@ -59,15 +59,21 @@ ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
 
-Example commands:
+Recommended flow:
+
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints ai prepare results/<run_id>
+iints ai report results/<run_id>
+```
+
+Direct JSON mode still works if you already have your own payloads and signed MDMP artifact:
 
 ```bash
 iints ai explain results/step.json \
   --mdmp-cert results/report.signed.mdmp
-
-iints ai report results/simulation_run.json \
-  --mdmp-cert results/report.signed.mdmp \
-  --output results/ai_report.md
 ```
 
 Notes:
@@ -76,6 +82,8 @@ Notes:
 - The SDK now targets the open local `Ministral 3` Ollama model by default.
 - Users can choose a larger or smaller local Mistral-family model with `--model ...`.
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
+- `iints ai prepare <run_dir>` now creates AI-ready JSON payloads and, when MDMP is installed, a local development certificate plus keypair in `<run_dir>/ai/`.
+- After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report` directly at the run directory.
 - Output is research-only and not medical advice.
 
 Troubleshooting:
@@ -85,7 +93,7 @@ Troubleshooting:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.1.1"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.1.2"
 hash -r
 ```
 

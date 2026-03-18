@@ -13,6 +13,7 @@ from typing_extensions import Annotated
 from .assistant import AIResponse, IINTSAssistant
 from .backends import DEFAULT_MINISTRAL_MODEL, OllamaBackend
 from .model_catalog import list_local_mistral_models
+from .prepare import prepare_ai_ready_artifacts
 
 
 app = typer.Typer(help="Research-only AI assistant commands gated by MDMP certification.")
@@ -34,6 +35,57 @@ def _load_json_payload(path: Path, label: str) -> Any:
     except json.JSONDecodeError as exc:
         raise typer.BadParameter(f"{label} must be valid JSON: {path}") from exc
     return payload
+
+
+def _default_prepared_payload(task: str, ai_dir: Path) -> Path:
+    candidates = {
+        "explain": ["step_riskiest.json", "step_latest.json"],
+        "trends": ["trends_payload.json"],
+        "anomalies": ["anomalies_payload.json"],
+        "report": ["report_payload.json"],
+    }.get(task, [])
+    for filename in candidates:
+        candidate = ai_dir / filename
+        if candidate.is_file():
+            return candidate
+    expected = ", ".join(candidates) if candidates else "prepared payload"
+    raise typer.BadParameter(
+        f"No prepared AI payload found in {ai_dir}. Expected one of: {expected}. "
+        "Run `iints ai prepare <run_dir>` first."
+    )
+
+
+def _resolve_cli_inputs(
+    *,
+    task: str,
+    input_path: Path,
+    mdmp_cert: Path | None,
+    public_key: Path | None,
+    trust_store: Path | None,
+) -> tuple[Path, Path, Path | None]:
+    resolved_input = input_path
+    resolved_cert = mdmp_cert
+    resolved_public_key = public_key
+
+    if input_path.is_dir():
+        ai_dir = input_path / "ai"
+        resolved_input = _default_prepared_payload(task, ai_dir)
+        if resolved_cert is None:
+            candidate_cert = ai_dir / "report.signed.mdmp"
+            if candidate_cert.is_file():
+                resolved_cert = candidate_cert
+        if resolved_public_key is None and trust_store is None:
+            candidate_public_key = ai_dir / "keys" / "mdmp_pub_v1.pem"
+            if candidate_public_key.is_file():
+                resolved_public_key = candidate_public_key
+
+    if resolved_cert is None:
+        raise typer.BadParameter(
+            "No MDMP certificate provided. Pass --mdmp-cert or run "
+            "`iints ai prepare <run_dir>` to generate a local development certificate."
+        )
+
+    return resolved_input, resolved_cert, resolved_public_key
 
 
 def _write_output(path: Path | None, response: AIResponse) -> None:
@@ -117,6 +169,47 @@ def models() -> None:
     )
 
 
+@app.command("prepare")
+def prepare(
+    run_dir: Annotated[Path, typer.Argument(help="Run output directory containing results.csv and run_metadata.json.")],
+    create_dev_mdmp_cert: Annotated[
+        bool,
+        typer.Option(
+            "--create-dev-mdmp-cert/--no-create-dev-mdmp-cert",
+            help="Generate a local development MDMP certificate and keypair for AI commands.",
+        ),
+    ] = True,
+    grade: Annotated[str, typer.Option(help="Grade to embed in the local development MDMP certificate.")] = "research_grade",
+    expires_days: Annotated[int, typer.Option(help="Certificate expiry window in days for local development certs.")] = 30,
+    key_dir: Annotated[Optional[Path], typer.Option(help="Optional directory to store the generated local MDMP keypair.")] = None,
+) -> None:
+    console = Console()
+    try:
+        outputs = prepare_ai_ready_artifacts(
+            run_dir,
+            create_dev_mdmp_cert=create_dev_mdmp_cert,
+            grade=grade,
+            expires_days=expires_days,
+            key_dir=key_dir,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS AI Prepared Artifacts")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key, value in outputs.items():
+        table.add_row(key, value)
+    console.print(table)
+    console.print("[green]Prepared AI payloads are ready.[/green]")
+    if "mdmp_cert" in outputs:
+        console.print(
+            "[green]You can now run:[/green] "
+            f"`iints ai report {run_dir}` or `iints ai explain {run_dir}`"
+        )
+
+
 def _build_assistant(
     *,
     mdmp_cert: Path,
@@ -169,8 +262,8 @@ def local_check(
 
 @app.command("explain")
 def explain(
-    input_json: Annotated[Path, typer.Argument(help="JSON file with a single simulation step or decision context.")],
-    mdmp_cert: Annotated[Path, typer.Option(help="Signed MDMP artifact required before AI analysis can run.")],
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with a single simulation step or decision context.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
     mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
     model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
     minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
@@ -182,13 +275,20 @@ def explain(
 ) -> None:
     console = Console()
     try:
-        payload = _load_json_payload(input_json, "Input JSON")
-        assistant = _build_assistant(
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="explain",
+            input_path=input_json,
             mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
             mode=mode,
             model=model,
             minimum_grade=minimum_grade,
-            public_key=public_key,
+            public_key=resolved_public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
             timeout_seconds=timeout_seconds,
@@ -203,8 +303,8 @@ def explain(
 
 @app.command("trends")
 def trends(
-    input_json: Annotated[Path, typer.Argument(help="JSON file with glucose trace data or a run payload.")],
-    mdmp_cert: Annotated[Path, typer.Option(help="Signed MDMP artifact required before AI analysis can run.")],
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with glucose trace data or a run payload.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
     mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
     model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
     minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
@@ -216,13 +316,20 @@ def trends(
 ) -> None:
     console = Console()
     try:
-        payload = _load_json_payload(input_json, "Input JSON")
-        assistant = _build_assistant(
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="trends",
+            input_path=input_json,
             mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
             mode=mode,
             model=model,
             minimum_grade=minimum_grade,
-            public_key=public_key,
+            public_key=resolved_public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
             timeout_seconds=timeout_seconds,
@@ -237,8 +344,8 @@ def trends(
 
 @app.command("anomalies")
 def anomalies(
-    input_json: Annotated[Path, typer.Argument(help="JSON file with simulation results or run summary.")],
-    mdmp_cert: Annotated[Path, typer.Option(help="Signed MDMP artifact required before AI analysis can run.")],
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with simulation results or run summary.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
     mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
     model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
     minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
@@ -250,13 +357,20 @@ def anomalies(
 ) -> None:
     console = Console()
     try:
-        payload = _load_json_payload(input_json, "Input JSON")
-        assistant = _build_assistant(
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="anomalies",
+            input_path=input_json,
             mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
             mode=mode,
             model=model,
             minimum_grade=minimum_grade,
-            public_key=public_key,
+            public_key=resolved_public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
             timeout_seconds=timeout_seconds,
@@ -271,8 +385,8 @@ def anomalies(
 
 @app.command("report")
 def report(
-    input_json: Annotated[Path, typer.Argument(help="JSON file with run-level simulation outputs.")],
-    mdmp_cert: Annotated[Path, typer.Option(help="Signed MDMP artifact required before AI analysis can run.")],
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with run-level simulation outputs.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
     mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
     model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
     minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
@@ -284,13 +398,20 @@ def report(
 ) -> None:
     console = Console()
     try:
-        payload = _load_json_payload(input_json, "Input JSON")
-        assistant = _build_assistant(
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="report",
+            input_path=input_json,
             mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
             mode=mode,
             model=model,
             minimum_grade=minimum_grade,
-            public_key=public_key,
+            public_key=resolved_public_key,
             trust_store=trust_store,
             ollama_host=ollama_host,
             timeout_seconds=timeout_seconds,

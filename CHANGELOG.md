@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- No entries yet.
+
+## v1.1.2
+
+- Added `iints ai prepare <run_dir>` to generate AI-ready payloads from an existing run.
+- AI commands can now point directly at a run directory and auto-resolve prepared payloads, the local development MDMP certificate, and the companion public key.
+- `run`, `run-full`, and `presets run` now attempt to export AI-ready artifacts into the run bundle automatically.
 - Added `iints-sdk-doctor` to diagnose legacy-package conflicts when `iints ai` is missing.
 - Fixed the exported `iints.__version__` value to follow the installed SDK distribution metadata.
 - Documented the repair flow for environments where an older `iints` package shadows `iints-sdk-python35`.

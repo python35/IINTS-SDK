@@ -90,7 +90,44 @@ General advice:
 - Choose `ministral-3:14b` only if your machine can comfortably absorb the extra RAM and latency.
 - Run `iints ai models` in the CLI to see the same recommendations in a terminal-friendly table.
 
+## Recommended Workflow
+
+After a run completes, prepare the run directory once:
+
+```bash
+iints ai prepare results/<run_id>
+```
+
+That command creates:
+
+- `ai/report_payload.json`
+- `ai/anomalies_payload.json`
+- `ai/trends_payload.json`
+- `ai/step_riskiest.json`
+- `ai/step_latest.json`
+- `ai/report.signed.mdmp` plus `ai/keys/` when the MDMP extra is installed
+
+After that, you can point the AI commands directly at the run directory:
+
+```bash
+iints ai explain results/<run_id>
+iints ai trends results/<run_id>
+iints ai anomalies results/<run_id>
+iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
+
 ## Generation Commands
+
+Prepared run directory mode:
+
+```bash
+iints ai explain results/<run_id>
+iints ai trends results/<run_id>
+iints ai anomalies results/<run_id>
+iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
+
+Direct JSON mode:
 
 ```bash
 iints ai explain results/step.json \
@@ -179,6 +216,16 @@ iints ai report results/simulation_run.json \
 
 The assistant now clips oversized payloads automatically before sending them to the model. If you want tighter control, pass a smaller JSON summary rather than a full raw run dump.
 
+### No `report.signed.mdmp` In My Run Folder
+
+That is now expected for a fresh raw run. The easiest fix is:
+
+```bash
+iints ai prepare results/<run_id>
+```
+
+This creates a local development certificate for AI use when the MDMP extra is available, so you do not have to hand-build `step.json` and `report.signed.mdmp` yourself.
+
 ### `No such command 'ai'`
 
 If the CLI says `No such command 'ai'`, the most common cause is a legacy `iints` package still being installed beside `iints-sdk-python35`. That older package can shadow the newer SDK command tree.
@@ -193,7 +240,7 @@ If it reports a package ownership conflict, repair the environment:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.1.1"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.1.2"
 hash -r
 ```
 

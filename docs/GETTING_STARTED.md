@@ -80,7 +80,11 @@ python -m pip install -e ".[mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
-iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints ai prepare results/<run_id>
+iints ai report results/<run_id>
 ```
 
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)

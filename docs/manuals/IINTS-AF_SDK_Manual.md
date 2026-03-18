@@ -1,5 +1,5 @@
 # Full Technical Manual
-Version 1.1.1 | Python SDK
+Version 1.1.2 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -1458,7 +1458,31 @@ ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
 
+**Recommended run workflow**
+
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints ai prepare results/<run_id>
+iints ai report results/<run_id>
+```
+
+`iints ai prepare` creates AI-ready JSON payloads in `results/<run_id>/ai/` and, when the MDMP extra is installed, also generates a local development MDMP certificate plus companion keypair so the assistant can run without hand-building `step.json` and `report.signed.mdmp`.
+
 **Inference commands**
+
+Prepared run directory mode:
+
+```bash
+iints ai explain results/<run_id>
+iints ai trends results/<run_id>
+iints ai anomalies results/<run_id>
+iints ai report results/<run_id> \
+  --output results/<run_id>/ai/ai_report.md
+```
+
+Direct JSON mode:
 
 ```bash
 iints ai explain results/step.json \
@@ -1678,8 +1702,11 @@ iints validate --scenario-path scenarios/my_scenario.json
 # Check local Ministral backend
 iints ai local-check --model ministral
 
+# Prepare a finished run for AI
+iints ai prepare results/<run_id>
+
 # Generate AI explanation
-iints ai explain results/step.json --mdmp-cert results/report.signed.mdmp
+iints ai explain results/<run_id>
 ```
 
 ### 10.2 Python Code Snippets

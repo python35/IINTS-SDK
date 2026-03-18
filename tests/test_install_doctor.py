@@ -16,7 +16,7 @@ def test_diagnose_install_detects_package_conflict(monkeypatch):
     )
 
     def fake_version(name: str) -> str:
-        versions = {"iints": "0.1.1", "iints-sdk-python35": "1.1.1"}
+        versions = {"iints": "0.1.1", "iints-sdk-python35": "1.1.2"}
         if name in versions:
             return versions[name]
         raise metadata.PackageNotFoundError
@@ -27,6 +27,6 @@ def test_diagnose_install_detects_package_conflict(monkeypatch):
     diagnosis = diagnose_install()
 
     assert diagnosis.has_conflict is True
-    assert diagnosis.installed_sdk_version == "1.1.1"
+    assert diagnosis.installed_sdk_version == "1.1.2"
     assert diagnosis.installed_legacy_version == "0.1.1"
     assert diagnosis.imported_module_version == "0.1.1"

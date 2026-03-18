@@ -166,7 +166,7 @@ iints mdmp visualizer results/mdmp_report.json \
 - Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.
 
 **When to use**
-- After a run is complete and you have a signed MDMP artifact available.
+- After a run is complete. The recommended path is now `iints ai prepare <run_dir>` followed by direct AI commands against that run directory.
 
 **Commands**
 ```bash
@@ -174,7 +174,16 @@ python -m pip install -e ".[mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints ai prepare results/<run_id>
+iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
 
+Direct JSON mode is still available:
+
+```bash
 iints ai explain results/step.json \
   --mdmp-cert results/report.signed.mdmp
 
