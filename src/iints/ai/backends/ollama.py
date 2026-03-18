@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+from http.client import IncompleteRead, RemoteDisconnected
+from time import sleep
 from urllib import error, request
 
 
@@ -40,6 +42,20 @@ class OllamaBackend:
     def _pull_hint(self) -> str:
         return f"ollama pull {self.model_name}"
 
+    def _generation_failure_hint(self) -> str:
+        resolved = self.resolved_model_name or self.model_name
+        return (
+            "Ollama closed the generation connection before returning a response.\n"
+            f"Endpoint: {self.base_url}\n"
+            f"Model: {resolved}\n"
+            "This usually means the model crashed while loading, the daemon restarted, "
+            "or the machine ran out of memory.\n"
+            "Try one of these:\n"
+            f"  1. Run `ollama run {resolved} \"Reply with OK.\"` to confirm direct inference works.\n"
+            "  2. Run `iints ai local-check --smoke-test` to validate a real generation path.\n"
+            "  3. Switch to a smaller local model such as `ministral-3:3b` if memory is tight."
+        )
+
     def _requires_ministral_3_runtime(self) -> bool:
         requested = self.model_name.strip().lower()
         return requested.startswith("ministral-3") or requested == "ministral"
@@ -69,6 +85,15 @@ class OllamaBackend:
         *,
         method: str = "POST",
     ) -> dict[str, object]:
+        return self._request_json_once(path, payload, method=method)
+
+    def _request_json_once(
+        self,
+        path: str,
+        payload: dict[str, object] | None = None,
+        *,
+        method: str = "POST",
+    ) -> dict[str, object]:
         url = f"{self.base_url}{path}"
         body = None
         headers = {"Accept": "application/json"}
@@ -91,6 +116,12 @@ class OllamaBackend:
             raise RuntimeError(
                 f"Could not reach Ollama at {self.base_url}. "
                 "Start Ollama or set OLLAMA_HOST to the correct endpoint."
+            ) from exc
+        except (RemoteDisconnected, ConnectionResetError, IncompleteRead) as exc:
+            if path == "/api/generate":
+                raise RuntimeError(self._generation_failure_hint()) from exc
+            raise RuntimeError(
+                f"Ollama connection closed unexpectedly while calling {path} at {self.base_url}."
             ) from exc
 
         try:
@@ -223,6 +254,43 @@ class OllamaBackend:
             "version_ok": version_ok,
         }
 
+    def smoke_test(self) -> dict[str, object]:
+        resolved_model = self.ensure_model_ready()
+        payload = {
+            "model": resolved_model,
+            "system": "You are a health check. Reply with exactly: OK",
+            "prompt": "Reply with exactly: OK",
+            "stream": False,
+            "options": {
+                "temperature": 0,
+                "num_predict": 8,
+            },
+        }
+
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                response = self._request_json_once("/api/generate", payload)
+                text = response.get("response")
+                if not isinstance(text, str) or not text.strip():
+                    raise RuntimeError("Ollama returned an empty smoke-test completion.")
+                return {
+                    "ok": True,
+                    "response": text.strip(),
+                    "attempts": attempt + 1,
+                }
+            except (RuntimeError, RemoteDisconnected, ConnectionResetError, IncompleteRead) as exc:
+                if not isinstance(exc, RuntimeError):
+                    exc = RuntimeError(self._generation_failure_hint())
+                last_error = exc
+                if attempt == 0:
+                    sleep(1.0)
+                    continue
+                break
+
+        assert last_error is not None
+        raise last_error
+
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
         resolved_model = self.ensure_model_ready()
         payload = {
@@ -231,7 +299,22 @@ class OllamaBackend:
             "prompt": user_prompt,
             "stream": False,
         }
-        response = self._request_json("/api/generate", payload)
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                response = self._request_json_once("/api/generate", payload)
+                break
+            except (RuntimeError, RemoteDisconnected, ConnectionResetError, IncompleteRead) as exc:
+                if not isinstance(exc, RuntimeError):
+                    exc = RuntimeError(self._generation_failure_hint())
+                last_error = exc
+                if attempt == 0:
+                    sleep(1.0)
+                    continue
+                raise exc
+        else:
+            assert last_error is not None
+            raise last_error
         text = response.get("response")
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("Ollama returned an empty completion.")

@@ -110,6 +110,9 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
                 "version_ok": True,
             }
 
+        def smoke_test(self) -> dict[str, object]:
+            return {"ok": True, "response": "OK", "attempts": 1}
+
     monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
 
     result = runner.invoke(app, ["ai", "local-check", "--model", "ministral"])
@@ -119,6 +122,7 @@ def test_ai_local_check_reports_ready(monkeypatch) -> None:
     assert "ministral-3:8b" in result.stdout
     assert "120.0" in result.stdout
     assert "0.13.1" in result.stdout
+    assert "Generate smoke-test: OK" in result.stdout
 
 
 def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
@@ -150,6 +154,40 @@ def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
     assert result.exit_code == 1
     assert "requested model is missing" in result.stdout.lower()
     assert "ollama pull ministral" in result.stdout
+    assert "skipped (model not ready)" in result.stdout
+
+
+def test_ai_local_check_reports_smoke_test_failure(monkeypatch) -> None:
+    class _FakeBackend:
+        def __init__(self, *args, **kwargs) -> None:
+            self.base_url = "http://127.0.0.1:11434"
+
+        def available(self) -> bool:
+            return True
+
+        def healthcheck(self) -> dict[str, object]:
+            return {
+                "available": True,
+                "base_url": self.base_url,
+                "requested_model": "ministral-3:8b",
+                "resolved_model": "ministral-3:8b",
+                "installed_models": ["ministral-3:8b"],
+                "ready": True,
+                "pull_command": None,
+                "timeout_seconds": 120.0,
+                "server_version": "0.15.2",
+                "version_ok": True,
+            }
+
+        def smoke_test(self) -> dict[str, object]:
+            raise RuntimeError("Ollama closed the generation connection before returning a response.")
+
+    monkeypatch.setattr("iints.ai.cli.OllamaBackend", _FakeBackend)
+
+    result = runner.invoke(app, ["ai", "local-check", "--model", "ministral-3:8b"])
+
+    assert result.exit_code == 1
+    assert "generation connection" in result.stdout.lower()
 
 
 def test_ai_models_command_lists_profiles() -> None:

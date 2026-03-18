@@ -71,6 +71,7 @@ iints ai local-check --model ministral-3:8b
 
 If the model is missing, the command fails with the exact `ollama pull ...` command to run next.
 If your Ollama runtime is too old for the open Ministral 3 line, `local-check` now tells you that as well.
+`local-check` also runs a tiny generation smoke-test by default, so it catches the common case where `/api/tags` works but the model crashes during real inference.
 The current Ollama listing for `ministral-3` expects Ollama `0.13.1` or newer.
 
 ## Hardware Recommendations
@@ -89,6 +90,7 @@ General advice:
 - Choose `ministral-3:3b` if latency and memory matter more than answer quality.
 - Choose `ministral-3:14b` only if your machine can comfortably absorb the extra RAM and latency.
 - Run `iints ai models` in the CLI to see the same recommendations in a terminal-friendly table.
+- If `ministral-3:8b` closes the connection during generation, try `ministral-3:3b` first before assuming something is wrong with the SDK.
 
 ## Recommended Workflow
 
@@ -188,6 +190,8 @@ Run:
 iints ai local-check --model ministral-3:8b
 ```
 
+This now checks both basic reachability and a tiny real generation.
+
 If the endpoint is wrong, retry with:
 
 ```bash
@@ -210,6 +214,14 @@ Increase the timeout:
 iints ai report results/simulation_run.json \
   --mdmp-cert results/report.signed.mdmp \
   --timeout-seconds 180
+```
+
+If the server disconnects instead of timing out, the model may be too heavy for the machine at that moment. In that case try:
+
+```bash
+ollama pull ministral-3:3b
+iints ai local-check --model ministral-3:3b
+iints ai report results/<run_id> --model ministral-3:3b
 ```
 
 ### Large Run Payloads

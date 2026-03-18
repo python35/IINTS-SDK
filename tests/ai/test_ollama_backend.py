@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from http.client import RemoteDisconnected
+
 import pytest
 
 from iints.ai.backends.ollama import OllamaBackend
@@ -22,6 +24,7 @@ def test_ollama_backend_complete_returns_response(monkeypatch) -> None:
         return {"response": "Local explanation from Ollama."}
 
     monkeypatch.setattr(backend, "_request_json", _fake_request_json)
+    monkeypatch.setattr(backend, "_request_json_once", _fake_request_json)
 
     text = backend.complete(system_prompt="system", user_prompt="prompt")
     assert text == "Local explanation from Ollama."
@@ -108,3 +111,35 @@ def test_ollama_backend_rejects_old_ollama_for_ministral_3(monkeypatch) -> None:
 
     with pytest.raises(RuntimeError, match="requires a newer Ollama runtime"):
         backend.ensure_model_ready()
+
+
+def test_ollama_backend_smoke_test_returns_ok(monkeypatch) -> None:
+    backend = OllamaBackend(model_name="ministral-3:8b")
+
+    monkeypatch.setattr(backend, "ensure_model_ready", lambda: "ministral-3:8b")
+
+    def _fake_request_json_once(path, payload=None, *, method="POST"):
+        assert path == "/api/generate"
+        assert payload["model"] == "ministral-3:8b"
+        return {"response": "OK"}
+
+    monkeypatch.setattr(backend, "_request_json_once", _fake_request_json_once)
+
+    result = backend.smoke_test()
+
+    assert result["ok"] is True
+    assert result["response"] == "OK"
+
+
+def test_ollama_backend_complete_gives_clear_disconnect_hint(monkeypatch) -> None:
+    backend = OllamaBackend(model_name="ministral-3:8b")
+
+    monkeypatch.setattr(backend, "ensure_model_ready", lambda: "ministral-3:8b")
+
+    def _boom(path, payload=None, *, method="POST"):
+        raise RemoteDisconnected("closed")
+
+    monkeypatch.setattr(backend, "_request_json_once", _boom)
+
+    with pytest.raises(RuntimeError, match="closed the generation connection"):
+        backend.complete(system_prompt="system", user_prompt="prompt")

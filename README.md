@@ -59,6 +59,8 @@ ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
 
+`local-check` now performs a tiny generation smoke-test by default, so it verifies both model presence and real inference readiness.
+
 Recommended flow:
 
 ```bash
@@ -83,6 +85,7 @@ Notes:
 - Users can choose a larger or smaller local Mistral-family model with `--model ...`.
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - `iints ai prepare <run_dir>` now creates AI-ready JSON payloads and, when MDMP is installed, a local development certificate plus keypair in `<run_dir>/ai/`.
+- If Ollama closes the connection during generation, the SDK now surfaces an explicit recovery hint and points users toward `ministral-3:3b` for lower-memory systems.
 - After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report` directly at the run directory.
 - Output is research-only and not medical advice.
 

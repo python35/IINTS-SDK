@@ -111,6 +111,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
     installed_text = ", ".join(str(item) for item in installed) if isinstance(installed, list) and installed else "none"
     ready = bool(status.get("ready"))
     resolved_model = status.get("resolved_model") or "not found"
+    smoke_text = status.get("smoke_test") or "not run"
     console.print(
         Panel(
             "\n".join(
@@ -126,6 +127,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
                         if status.get("pull_command")
                         else "Pull command: not needed"
                     ),
+                    f"Generate smoke-test: {smoke_text}",
                 ]
             ),
             title="IINTS AI Local Check",
@@ -239,6 +241,13 @@ def local_check(
     model: Annotated[str, typer.Option(help="Ollama model name to validate locally.")] = DEFAULT_MINISTRAL_MODEL,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
     timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama health checks.")] = 120.0,
+    smoke_test: Annotated[
+        bool,
+        typer.Option(
+            "--smoke-test/--no-smoke-test",
+            help="Run a tiny generation request after health checks to prove the model can actually answer.",
+        ),
+    ] = True,
 ) -> None:
     console = Console()
     backend = OllamaBackend(model_name=model, base_url=ollama_host, timeout_seconds=timeout_seconds)
@@ -250,6 +259,13 @@ def local_check(
             )
             raise typer.Exit(code=1)
         status = backend.healthcheck()
+        if smoke_test and bool(status.get("ready")):
+            smoke = backend.smoke_test()
+            status["smoke_test"] = f"OK ({smoke.get('response')})"
+        elif smoke_test:
+            status["smoke_test"] = "skipped (model not ready)"
+        else:
+            status["smoke_test"] = "disabled"
         _render_local_check(console, status)
         if not bool(status.get("ready")):
             raise typer.Exit(code=1)

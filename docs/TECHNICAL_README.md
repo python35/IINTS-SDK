@@ -181,6 +181,8 @@ iints ai prepare results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
 ```
 
+`iints ai local-check` now runs a tiny generation smoke-test by default, so it validates real inference readiness instead of only checking model tags.
+
 Direct JSON mode is still available:
 
 ```bash
@@ -282,7 +284,7 @@ Options:
 - `--mode local` to require the local Ollama backend explicitly.
 - `--model ministral-3:8b` to pin the open local model tag.
 - `iints ai models` to inspect recommended local Mistral-family options for your hardware.
-- `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
+- `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable, the local Ministral tag is installed, and a tiny real generation succeeds before a real run.
 - `--model ministral` remains supported as a friendly alias.
 - `--timeout-seconds 120` to support slower local hardware such as edge devices.
 - `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.

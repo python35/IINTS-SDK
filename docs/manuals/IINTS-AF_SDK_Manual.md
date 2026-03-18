@@ -1458,6 +1458,8 @@ ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
 
+`local-check` now includes a small generation smoke-test by default, so it verifies real model inference readiness and not just basic Ollama reachability.
+
 **Recommended run workflow**
 
 ```bash
@@ -1469,6 +1471,8 @@ iints ai report results/<run_id>
 ```
 
 `iints ai prepare` creates AI-ready JSON payloads in `results/<run_id>/ai/` and, when the MDMP extra is installed, also generates a local development MDMP certificate plus companion keypair so the assistant can run without hand-building `step.json` and `report.signed.mdmp`.
+
+If local generation still disconnects, the first practical fallback is to switch from `ministral-3:8b` to `ministral-3:3b`.
 
 **Inference commands**
 
