@@ -47,6 +47,14 @@ python -m pip install -e ".[mdmp]"
 Run the open local Mistral model locally with Ollama:
 
 ```bash
+python -m pip install -e ".[mdmp]"
+ollama pull ministral-3:8b
+iints ai models
+```
+
+Recommended first-time setup:
+
+```bash
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
@@ -66,6 +74,7 @@ Notes:
 - AI analysis is blocked if the MDMP artifact is invalid.
 - Minimum required MDMP grade defaults to `research_grade`.
 - The SDK now targets the open local `Ministral 3` Ollama model by default.
+- Users can choose a larger or smaller local Mistral-family model with `--model ...`.
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - Output is research-only and not medical advice.
 

@@ -7,10 +7,12 @@ from typing import Any, Optional
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 from typing_extensions import Annotated
 
 from .assistant import AIResponse, IINTSAssistant
 from .backends import DEFAULT_MINISTRAL_MODEL, OllamaBackend
+from .model_catalog import list_local_mistral_models
 
 
 app = typer.Typer(help="Research-only AI assistant commands gated by MDMP certification.")
@@ -84,6 +86,35 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
         console.print("[bold red]Local Ollama backend is reachable, but the requested model is missing.[/bold red]")
     if status.get("version_ok") is False:
         console.print("[bold red]Ollama is too old for the open Ministral 3 runtime.[/bold red]")
+
+
+@app.command("models")
+def models() -> None:
+    console = Console()
+    table = Table(title="IINTS AI Local Mistral Model Guide")
+    table.add_column("Model Tag", style="cyan", no_wrap=True)
+    table.add_column("Best For", style="green")
+    table.add_column("Approx Download")
+    table.add_column("System RAM")
+    table.add_column("GPU VRAM")
+    table.add_column("Notes", overflow="fold")
+
+    for profile in list_local_mistral_models():
+        vram = f"{profile.recommended_vram_gb}+ GB" if profile.recommended_vram_gb is not None else "CPU-only"
+        table.add_row(
+            profile.tag,
+            profile.fit,
+            f"{profile.approx_download_gb:.1f} GB",
+            f"{profile.recommended_system_ram_gb}+ GB",
+            vram,
+            profile.notes,
+        )
+
+    console.print(table)
+    console.print(
+        "[dim]Tip:[/dim] start with "
+        f"`{DEFAULT_MINISTRAL_MODEL}` unless you know your hardware can comfortably run a larger local model."
+    )
 
 
 def _build_assistant(

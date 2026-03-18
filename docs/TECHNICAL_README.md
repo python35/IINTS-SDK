@@ -171,6 +171,7 @@ iints mdmp visualizer results/mdmp_report.json \
 **Commands**
 ```bash
 python -m pip install -e ".[mdmp]"
+iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 
@@ -191,6 +192,12 @@ iints ai report results/simulation_run.json \
 - `MDMPGuard` verifies the signed artifact before any LLM call is allowed.
 - `OllamaBackend` resolves common local aliases such as `ministral` to the installed Ollama tag.
 - Oversized JSON payloads are clipped automatically before prompt generation so local inference stays practical on slower hardware.
+
+**Hardware guidance**
+- `iints ai models` prints the curated local model list with RAM and VRAM recommendations.
+- Use `ministral-3:3b` for smaller laptops or CPU-only systems.
+- Use `ministral-3:8b` as the default balanced choice.
+- Use `ministral-3:14b` only on stronger workstations with plenty of memory.
 
 ### Detailed Command Reference
 
@@ -246,6 +253,8 @@ Creates:
 
 ### AI Assistant Commands
 ```bash
+iints ai models
+
 iints ai explain results/step.json \
   --mdmp-cert results/report.signed.mdmp
 
@@ -263,6 +272,7 @@ iints ai report results/simulation_run.json \
 Options:
 - `--mode local` to require the local Ollama backend explicitly.
 - `--model ministral-3:8b` to pin the open local model tag.
+- `iints ai models` to inspect recommended local Mistral-family options for your hardware.
 - `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable and the local Ministral tag is installed before a real run.
 - `--model ministral` remains supported as a friendly alias.
 - `--timeout-seconds 120` to support slower local hardware such as edge devices.

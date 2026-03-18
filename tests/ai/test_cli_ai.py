@@ -150,3 +150,12 @@ def test_ai_local_check_fails_when_model_missing(monkeypatch) -> None:
     assert result.exit_code == 1
     assert "requested model is missing" in result.stdout.lower()
     assert "ollama pull ministral" in result.stdout
+
+
+def test_ai_models_command_lists_profiles() -> None:
+    result = runner.invoke(app, ["ai", "models"])
+
+    assert result.exit_code == 0
+    assert "ministral-3:3b" in result.stdout
+    assert "ministral-3:8b" in result.stdout
+    assert "ministral-3:14b" in result.stdout

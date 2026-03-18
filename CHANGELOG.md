@@ -6,6 +6,9 @@
   - default local model now targets the open-weight `Ministral 3` line (`ministral-3:8b`)
   - legacy `Ministral 8B` Ollama tags remain accepted as backward-compatible fallbacks
   - local health checks now surface Ollama runtime version compatibility for the open `Ministral 3` model family
+- Added local model selection guidance for users with different hardware profiles:
+  - new `iints ai models` command lists curated local Mistral-family options
+  - docs and manuals now include PC spec recommendations for `3B`, `8B`, and `14B` variants
 
 ## v1.1.0
 

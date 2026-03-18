@@ -73,6 +73,23 @@ If the model is missing, the command fails with the exact `ollama pull ...` comm
 If your Ollama runtime is too old for the open Ministral 3 line, `local-check` now tells you that as well.
 The current Ollama listing for `ministral-3` expects Ollama `0.13.1` or newer.
 
+## Hardware Recommendations
+
+Use this as a practical starting point:
+
+| Model | Good Fit | Recommended System RAM | Recommended GPU VRAM | Approx Download |
+|---|---|---:|---:|---:|
+| `ministral-3:3b` | smaller laptops, CPU-first setups, entry-level edge boxes | 16 GB | 6 GB | ~3 GB |
+| `ministral-3:8b` | balanced desktop or strong laptop | 24 GB | 10 GB | ~6 GB |
+| `ministral-3:14b` | high-end workstation | 32 GB | 16 GB | ~10 GB |
+
+General advice:
+
+- Start with `ministral-3:8b` unless you have a specific reason to go smaller or larger.
+- Choose `ministral-3:3b` if latency and memory matter more than answer quality.
+- Choose `ministral-3:14b` only if your machine can comfortably absorb the extra RAM and latency.
+- Run `iints ai models` in the CLI to see the same recommendations in a terminal-friendly table.
+
 ## Generation Commands
 
 ```bash
@@ -94,6 +111,8 @@ Useful options:
 
 - `--mode local` to require Ollama explicitly
 - `--model ministral-3:8b` or `--model ministral`
+- `--model ministral-3:3b` for lighter machines
+- `--model ministral-3:14b` for stronger workstations
 - `--ollama-host http://127.0.0.1:11434` to override the endpoint
 - `--timeout-seconds 120` for slower local hardware
 - `--minimum-grade research_grade` to raise or lower the MDMP floor

@@ -1452,6 +1452,8 @@ python -m pip install -e ".[mdmp]"
 Pull and validate the local model:
 
 ```bash
+python -m pip install -e ".[mdmp]"
+iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
@@ -1477,6 +1479,20 @@ iints ai report results/simulation_run.json \
 - The default local model is `ministral-3:8b`.
 - Friendly aliases like `ministral` are resolved automatically against installed Ollama tags.
 - Older `Ministral 8B` tags remain accepted as backward-compatible fallbacks if they are already installed locally.
+- Users can select a different local model with `--model`, for example `ministral-3:3b` or `ministral-3:14b`.
+
+**PC specification guidance**
+
+| Model | Best fit | Recommended system RAM | Recommended GPU VRAM | Approx download |
+|------|-------------|------------------------|----------------------|-----------------|
+| `ministral-3:3b` | Smaller laptop / CPU-first setup | 16 GB | 6 GB | ~3 GB |
+| `ministral-3:8b` | Balanced desktop / strong laptop | 24 GB | 10 GB | ~6 GB |
+| `ministral-3:14b` | High-end workstation | 32 GB | 16 GB | ~10 GB |
+
+Suggested rule:
+- start with `ministral-3:8b`
+- move down to `ministral-3:3b` if memory or latency is tight
+- move up to `ministral-3:14b` only if you have headroom and want better answer quality
 - Oversized JSON payloads are clipped automatically before prompt construction so local inference stays practical on smaller systems.
 - Use `--timeout-seconds 120` or higher for slower edge hardware.
 
