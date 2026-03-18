@@ -4,6 +4,16 @@
 
 - No entries yet.
 
+## v1.1.3
+
+- Hardened the local Ollama path for Mistral-family models:
+  - `iints ai local-check` now runs a tiny generation smoke-test by default instead of only checking reachability and installed tags
+  - local generation now retries once on transient disconnects before failing
+  - disconnect failures now explain that the daemon likely restarted or the model was too heavy for available memory
+- Improved the troubleshooting guidance for local AI inference:
+  - docs now recommend stepping down to `ministral-3:3b` when `ministral-3:8b` closes the connection during generation
+  - the AI guide, quickstart docs, technical docs, and manual all reflect the new smoke-test behavior
+
 ## v1.1.2
 
 - Added `iints ai prepare <run_dir>` to generate AI-ready payloads from an existing run.

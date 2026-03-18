@@ -96,7 +96,7 @@ Troubleshooting:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.1.2"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.1.3"
 hash -r
 ```
 
