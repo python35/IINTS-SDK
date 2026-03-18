@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- No entries yet.
+
+## v1.1.1
+
 - Fixed the local Mistral/Ollama default model selection for the AI assistant:
   - default local model now targets the open-weight `Ministral 3` line (`ministral-3:8b`)
   - legacy `Ministral 8B` Ollama tags remain accepted as backward-compatible fallbacks
