@@ -293,7 +293,7 @@ If it reports a package ownership conflict, repair the environment:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.1.3"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.2.0"
 hash -r
 ```
 

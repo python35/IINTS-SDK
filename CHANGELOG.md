@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.2.0
+
+Release date: 2026-03-21
+
 - Added poster-ready results export for demos and juries:
   - new `iints poster` CLI command
   - new `generate_results_poster(...)` Python API
