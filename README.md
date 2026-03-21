@@ -47,6 +47,30 @@ This writes:
 
 It extracts glucose, carb, and insulin events from the CareLink event log and aligns them onto an IINTS-ready timeline.
 
+If you want a reusable personal-data workspace in one command, build a CareLink workbench:
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+```
+
+This adds:
+- `carelink_timeline.csv`
+- `carelink_metrics.json`
+- `carelink_dashboard.png`
+- `carelink_poster.png`
+- `carelink_dashboard.html`
+- `ai/report_payload.json`
+- `ai/trends_payload.json`
+- `ai/anomalies_payload.json`
+- `ai/step_riskiest.json`
+
+That workbench is designed for three things:
+- inspect your own data visually
+- reuse the generated `scenario.json` inside IINTS experiments
+- let the local AI assistant explain what the imported patterns mean
+
 ## AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 The SDK now includes a research-only AI assistant layer for explanations and run summaries.
@@ -88,6 +112,18 @@ iints ai prepare results/<run_id>
 iints ai report results/<run_id>
 ```
 
+For imported CareLink data, the matching flow is:
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
+```
+
 Direct JSON mode still works if you already have your own payloads and signed MDMP artifact:
 
 ```bash
@@ -102,8 +138,10 @@ Notes:
 - Users can choose a larger or smaller local Mistral-family model with `--model ...`.
 - Large JSON payloads are clipped automatically before prompt generation to keep local inference stable.
 - `iints ai prepare <run_dir>` now creates AI-ready JSON payloads and, when MDMP is installed, a local development certificate plus keypair in `<run_dir>/ai/`.
+- `iints carelink-workbench` now does the same kind of AI preparation for imported personal CareLink data and also generates a dashboard PNG/HTML pair.
 - If Ollama closes the connection during generation, the SDK now surfaces an explicit recovery hint and points users toward `ministral-3:3b` for lower-memory systems.
 - After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report` directly at the run directory.
+- After `iints carelink-workbench`, you can point those same AI commands directly at the generated CareLink workspace directory.
 - Output is research-only and not medical advice.
 
 ## Jury Poster / Demo Graphic

@@ -18,7 +18,7 @@ The local AI assistant is designed for four narrow tasks:
 - `anomalies`: call out unusual or safety-relevant patterns
 - `report`: generate a short markdown run summary
 
-The assistant is intentionally conservative. It explains simulation behavior; it does not produce treatment advice.
+The assistant is intentionally conservative. It explains simulation behavior or imported glucose data patterns; it does not produce treatment advice.
 
 ## Architecture
 
@@ -118,6 +118,35 @@ iints ai anomalies results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
 ```
 
+For imported CareLink data, generate a personal workspace first:
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+```
+
+That creates:
+
+- `carelink_dashboard.png`
+- `carelink_poster.png`
+- `carelink_dashboard.html`
+- `carelink_timeline.csv`
+- `carelink_metrics.json`
+- `ai/report_payload.json`
+- `ai/trends_payload.json`
+- `ai/anomalies_payload.json`
+- `ai/step_riskiest.json`
+- `ai/report.signed.mdmp` when the MDMP extra is installed
+
+After that, the same AI commands work directly on the CareLink workspace directory:
+
+```bash
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
+```
+
 ## Generation Commands
 
 Prepared run directory mode:
@@ -127,6 +156,18 @@ iints ai explain results/<run_id>
 iints ai trends results/<run_id>
 iints ai anomalies results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
+
+Prepared CareLink workspace mode:
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
 ```
 
 Direct JSON mode:

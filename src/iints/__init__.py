@@ -57,8 +57,10 @@ from .data.importer import (
     export_standard_csv,
     guess_column_mapping,
     import_carelink_csv,
+    import_carelink_timeline,
     import_cgm_csv,
     import_cgm_dataframe,
+    load_carelink_event_log,
     load_demo_dataframe,
     scenario_from_csv,
     scenario_from_dataframe,
@@ -69,6 +71,7 @@ from .data.tidepool import TidepoolClient, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
+from .analysis.carelink_workbench import build_carelink_workbench
 from .analysis.poster import generate_results_poster
 from .analysis.reporting import ClinicalReportGenerator
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
@@ -164,8 +167,10 @@ __all__ = [
     "export_standard_csv",
     "guess_column_mapping",
     "import_carelink_csv",
+    "import_carelink_timeline",
     "import_cgm_csv",
     "import_cgm_dataframe",
+    "load_carelink_event_log",
     "load_demo_dataframe",
     "scenario_from_csv",
     "scenario_from_dataframe",
@@ -180,6 +185,7 @@ __all__ = [
     "SyntheticMirrorArtifact",
     # Analysis Metrics
     "generate_benchmark_metrics",
+    "build_carelink_workbench",
     "ClinicalReportGenerator",
     "EnergyEstimate",
     "estimate_energy_per_decision",

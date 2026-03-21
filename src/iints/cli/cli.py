@@ -25,6 +25,7 @@ import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.analysis.carelink_workbench import build_carelink_workbench
 from iints.analysis.poster import generate_results_poster
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
@@ -4075,6 +4076,88 @@ def import_carelink(
     console.print(f"[green]Scenario saved:[/green] {scenario_path}")
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
     console.print(f"[green]Summary JSON saved:[/green] {summary_path}")
+
+
+@app.command("carelink-workbench")
+def carelink_workbench(
+    input_csv: Annotated[Path, typer.Option(help="Path to a Medtronic CareLink CSV export")],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Output directory for the personal CareLink workspace"),
+    ] = Path("./results/carelink_workbench"),
+    scenario_name: Annotated[str, typer.Option(help="Scenario name for the generated experiment scenario")] = "Imported CareLink Scenario",
+    scenario_version: Annotated[str, typer.Option(help="Scenario version")] = "1.0",
+    carb_threshold: Annotated[float, typer.Option(help="Minimum carbs (g) to create a meal event")] = 0.1,
+    create_dev_mdmp_cert: Annotated[
+        bool,
+        typer.Option(
+            "--create-dev-mdmp-cert/--no-create-dev-mdmp-cert",
+            help="Generate a local development MDMP certificate and keypair for the AI assistant.",
+        ),
+    ] = True,
+    grade: Annotated[str, typer.Option(help="Grade to embed in the local development MDMP certificate.")] = "research_grade",
+    expires_days: Annotated[int, typer.Option(help="Certificate expiry window in days for local development certs.")] = 30,
+    key_dir: Annotated[Optional[Path], typer.Option(help="Optional directory for the generated local MDMP keypair.")] = None,
+) -> None:
+    """Build a personal CareLink workspace with imports, visualization, and AI-ready payloads."""
+    console = Console()
+    if not input_csv.is_file():
+        console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        outputs = build_carelink_workbench(
+            input_csv,
+            output_dir=output_dir,
+            scenario_name=scenario_name,
+            scenario_version=scenario_version,
+            carb_threshold=carb_threshold,
+            create_dev_mdmp_cert=create_dev_mdmp_cert,
+            grade=grade,
+            expires_days=expires_days,
+            key_dir=key_dir,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]CareLink workbench failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS CareLink Workbench")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key in [
+        "standard_csv",
+        "scenario",
+        "summary",
+        "metrics",
+        "timeline",
+        "dashboard_png",
+        "poster_png",
+        "dashboard_html",
+        "report_payload",
+        "trends_payload",
+        "anomalies_payload",
+        "step_riskiest",
+        "step_latest",
+        "mdmp_cert",
+    ]:
+        if key in outputs:
+            table.add_row(key, outputs[key])
+    console.print(table)
+    console.print("[green]Personal CareLink workspace is ready.[/green]")
+    console.print(
+        "[green]Experiment with your data:[/green] "
+        f"`iints run --algo algorithms/example_algorithm.py --scenario-path {Path(outputs['scenario'])}`"
+    )
+    if "mdmp_cert" in outputs:
+        console.print(
+            "[green]Ask the local AI assistant to explain it:[/green] "
+            f"`iints ai report {output_dir}` and `iints ai explain {output_dir}`"
+        )
+    else:
+        console.print(
+            "[yellow]Note:[/yellow] no local MDMP certificate was generated, so AI commands will still need "
+            "`--mdmp-cert` unless you install the optional `mdmp` extra."
+        )
 
 
 @app.command("import-wizard")

@@ -8,8 +8,9 @@ TaskName = Literal["explain_decision", "analyze_trends", "detect_anomalies", "ge
 MAX_PROMPT_PAYLOAD_CHARS = 12000
 
 SYSTEM_PROMPT = (
-    "You are the IINTS-AF research assistant for closed-loop insulin delivery simulations. "
-    "Explain simulation behavior clearly, conservatively, and in plain language. "
+    "You are the IINTS-AF research assistant for closed-loop insulin delivery simulations "
+    "and imported glucose datasets. "
+    "Explain glycemic behavior clearly, conservatively, and in plain language. "
     "Do not give medical advice, treatment instructions, or patient-specific recommendations. "
     "State uncertainty when the input is incomplete. "
     "For research use only."
@@ -17,39 +18,39 @@ SYSTEM_PROMPT = (
 
 TASK_TEMPLATES: dict[TaskName, str] = {
     "explain_decision": (
-        "Given this single simulation step, explain:\n"
-        "1. What the algorithm decided and why\n"
-        "2. Whether the independent safety supervisor likely intervened\n"
-        "3. Whether the decision appears safe in context\n\n"
+        "Given this single decision step or noteworthy glucose snapshot, explain:\n"
+        "1. What is happening in the data and why it stands out\n"
+        "2. Whether there are safety signals, supervision, or notable context clues\n"
+        "3. What a research user should pay attention to next\n\n"
         "Respond in 3 short paragraphs.\n\n"
-        "Simulation step JSON:\n{data}"
+        "Input JSON:\n{data}"
     ),
     "analyze_trends": (
-        "Review this glucose-oriented simulation payload and summarize the main glycemic trends.\n"
+        "Review this glucose-oriented payload and summarize the main glycemic trends.\n"
         "Focus on direction, stability, excursions, and likely triggers.\n"
         "Respond with:\n"
         "- Trend summary\n"
         "- Main risk signals\n"
         "- Short operational takeaway\n\n"
-        "Simulation payload JSON:\n{data}"
+        "Payload JSON:\n{data}"
     ),
     "detect_anomalies": (
-        "Inspect this run summary and identify unusual patterns, inconsistent values, or clinically relevant anomalies.\n"
+        "Inspect this run or imported-data summary and identify unusual patterns, inconsistent values, or clinically relevant anomalies.\n"
         "Respond with:\n"
         "- Detected anomalies\n"
         "- Why each anomaly matters\n"
         "- Whether follow-up validation is recommended\n\n"
-        "Run summary JSON:\n{data}"
+        "Summary JSON:\n{data}"
     ),
     "generate_report": (
-        "Write a concise markdown report for this IINTS-AF simulation run.\n"
+        "Write a concise markdown report for this IINTS-AF simulation run or imported personal glucose dataset.\n"
         "Include sections:\n"
         "1. Executive summary\n"
         "2. Glycemic behavior\n"
-        "3. Safety and supervisor behavior\n"
-        "4. Notable events or anomalies\n"
+        "3. Safety, supervision, or device behavior\n"
+        "4. Notable events, patterns, or anomalies\n"
         "5. Research-only conclusion\n\n"
-        "Simulation run JSON:\n{data}"
+        "Input JSON:\n{data}"
     ),
 }
 

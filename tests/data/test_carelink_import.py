@@ -7,7 +7,12 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from iints.cli.cli import app
-from iints.data.importer import import_carelink_csv, summarize_carelink_csv
+from iints.data.importer import (
+    import_carelink_csv,
+    import_carelink_timeline,
+    load_carelink_event_log,
+    summarize_carelink_csv,
+)
 
 
 CARELINK_HEADER = [
@@ -163,6 +168,29 @@ def test_summarize_carelink_csv_reads_metadata(tmp_path: Path) -> None:
     assert summary["meal_rows"] == 1
     assert summary["bolus_rows"] == 1
     assert summary["alert_rows"] == 1
+
+
+def test_load_carelink_event_log_returns_events_and_metadata(tmp_path: Path) -> None:
+    sample = tmp_path / "carelink.csv"
+    _write_carelink_sample(sample)
+
+    raw_df, metadata = load_carelink_event_log(sample)
+
+    assert len(raw_df) == 5
+    assert "timestamp_dt" in raw_df.columns
+    assert metadata["patient_name"] == "Rune Bobbaers"
+
+
+def test_import_carelink_timeline_preserves_datetime_context(tmp_path: Path) -> None:
+    sample = tmp_path / "carelink.csv"
+    _write_carelink_sample(sample)
+
+    timeline = import_carelink_timeline(sample)
+
+    assert "timestamp_dt" in timeline.columns
+    assert timeline["timestamp_dt"].dt.strftime("%Y-%m-%dT%H:%M:%S").iloc[0] == "2026-03-21T18:00:00"
+    assert abs(timeline["carbs"].sum() - 24.0) < 1e-6
+    assert timeline["insulin"].max() > 4.5
 
 
 def test_cli_import_carelink_writes_outputs(tmp_path: Path) -> None:

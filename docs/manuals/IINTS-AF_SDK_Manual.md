@@ -1474,6 +1474,33 @@ iints ai report results/<run_id>
 
 If local generation still disconnects, the first practical fallback is to switch from `ministral-3:8b` to `ministral-3:3b`.
 
+**Personal CareLink workflow**
+
+If you imported your own MiniMed / CareLink data, you can build a personal workspace that combines:
+- a standard IINTS timeline
+- a scenario for experiments
+- a visual dashboard
+- AI-ready payloads
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+```
+
+This creates:
+- `carelink_timeline.csv`
+- `carelink_metrics.json`
+- `carelink_dashboard.png`
+- `carelink_poster.png`
+- `carelink_dashboard.html`
+- `ai/report_payload.json`
+- `ai/trends_payload.json`
+- `ai/anomalies_payload.json`
+- `ai/step_riskiest.json`
+
+If the MDMP extra is installed, the workbench also generates a local development certificate so the assistant can explain imported personal data without any manual JSON preparation.
+
 **Inference commands**
 
 Prepared run directory mode:
@@ -1484,6 +1511,14 @@ iints ai trends results/<run_id>
 iints ai anomalies results/<run_id>
 iints ai report results/<run_id> \
   --output results/<run_id>/ai/ai_report.md
+```
+
+Prepared personal CareLink workspace mode:
+
+```bash
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
 ```
 
 Direct JSON mode:

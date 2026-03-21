@@ -225,21 +225,30 @@ def summarize_carelink_csv(path: Union[str, Path]) -> Dict[str, Any]:
     return summary
 
 
-def import_carelink_csv(
+def load_carelink_event_log(path: Union[str, Path]) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    """
+    Load the raw Medtronic CareLink / MiniMed event log plus parsed metadata.
+
+    Returns:
+        A tuple of `(event_dataframe, metadata)` where the event dataframe contains
+        the raw CareLink event table with a parsed `timestamp_dt` column.
+    """
+    return _read_carelink_event_frame(path)
+
+
+def import_carelink_timeline(
     path: Union[str, Path],
     *,
     source: Optional[str] = None,
     event_tolerance_minutes: float = 7.5,
 ) -> pd.DataFrame:
     """
-    Import a Medtronic CareLink / MiniMed export into the universal IINTS schema.
+    Import a CareLink export into an enriched glucose timeline with real datetimes.
 
-    The CareLink export is an event log, not a simple one-row-per-reading CSV.
-    This parser:
-    - skips the CareLink metadata preamble
-    - extracts glucose values from sensor glucose and SMBG rows
-    - aligns carb and bolus events to the nearest CGM timestamp
-    - estimates basal insulin between glucose samples from the reported basal rate
+    Returns:
+        DataFrame with columns:
+        `timestamp_dt`, `timestamp`, `glucose`, `carbs`, `insulin`,
+        `bolus_units`, `basal_units`, `basal_rate_u_per_hr`, `source`
     """
     raw_df, _metadata = _read_carelink_event_frame(path)
 
@@ -269,7 +278,10 @@ def import_carelink_csv(
         & (bolus_df["bolus_units"] > 0)
         & (bolus_df["bolus_source"] != "CLOSED_LOOP_AUTO_INSULIN")
     ].copy()
-    bolus_df["bolus_key"] = bolus_df["bolus_number"].where(bolus_df["bolus_number"].str.len() > 0, bolus_df["timestamp_dt"].astype(str))
+    bolus_df["bolus_key"] = bolus_df["bolus_number"].where(
+        bolus_df["bolus_number"].str.len() > 0,
+        bolus_df["timestamp_dt"].astype(str),
+    )
     bolus_df = (
         bolus_df.groupby(["timestamp_dt", "bolus_key"], as_index=False)["bolus_units"].max()
         .groupby("timestamp_dt", as_index=False)["bolus_units"]
@@ -317,16 +329,62 @@ def import_carelink_csv(
     typical_step = raw_step_minutes[(raw_step_minutes > 0) & (raw_step_minutes <= 15)].median()
     if pd.isna(typical_step):
         typical_step = 5.0
-    capped_step_minutes = raw_step_minutes.fillna(float(typical_step)).clip(lower=0.0, upper=max(float(typical_step) * 1.5, 15.0))
+    capped_step_minutes = raw_step_minutes.fillna(float(typical_step)).clip(
+        lower=0.0,
+        upper=max(float(typical_step) * 1.5, 15.0),
+    )
+
+    glucose_df["carbs"] = glucose_df.get("carbs", 0.0)
+    glucose_df["bolus_units"] = glucose_df.get("bolus_units", 0.0)
     glucose_df["basal_units"] = glucose_df["basal_rate_u_per_hr"] * capped_step_minutes.div(60.0)
-    bolus_series = glucose_df["bolus_units"] if "bolus_units" in glucose_df.columns else pd.Series(0.0, index=glucose_df.index)
-    glucose_df["insulin"] = bolus_series.fillna(0.0) + glucose_df["basal_units"].fillna(0.0)
+    glucose_df["insulin"] = glucose_df["bolus_units"].fillna(0.0) + glucose_df["basal_units"].fillna(0.0)
     glucose_df["timestamp"] = (
         glucose_df["timestamp_dt"] - glucose_df["timestamp_dt"].iloc[0]
     ).dt.total_seconds() / 60.0
     glucose_df["source"] = source or "carelink_minimed"
 
-    standard = glucose_df[["timestamp", "glucose", "carbs", "insulin", "source"]].copy()
+    enriched = glucose_df[
+        [
+            "timestamp_dt",
+            "timestamp",
+            "glucose",
+            "carbs",
+            "insulin",
+            "bolus_units",
+            "basal_units",
+            "basal_rate_u_per_hr",
+            "source",
+        ]
+    ].copy()
+    enriched["carbs"] = enriched["carbs"].fillna(0.0)
+    enriched["insulin"] = enriched["insulin"].fillna(0.0)
+    enriched["bolus_units"] = enriched["bolus_units"].fillna(0.0)
+    enriched["basal_units"] = enriched["basal_units"].fillna(0.0)
+    return enriched
+
+
+def import_carelink_csv(
+    path: Union[str, Path],
+    *,
+    source: Optional[str] = None,
+    event_tolerance_minutes: float = 7.5,
+) -> pd.DataFrame:
+    """
+    Import a Medtronic CareLink / MiniMed export into the universal IINTS schema.
+
+    The CareLink export is an event log, not a simple one-row-per-reading CSV.
+    This parser:
+    - skips the CareLink metadata preamble
+    - extracts glucose values from sensor glucose and SMBG rows
+    - aligns carb and bolus events to the nearest CGM timestamp
+    - estimates basal insulin between glucose samples from the reported basal rate
+    """
+    enriched = import_carelink_timeline(
+        path,
+        source=source,
+        event_tolerance_minutes=event_tolerance_minutes,
+    )
+    standard = enriched[["timestamp", "glucose", "carbs", "insulin", "source"]].copy()
     standard["carbs"] = standard["carbs"].fillna(0.0)
     standard["insulin"] = standard["insulin"].fillna(0.0)
 

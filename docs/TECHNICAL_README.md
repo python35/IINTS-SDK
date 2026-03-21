@@ -173,12 +173,20 @@ iints mdmp visualizer results/mdmp_report.json \
 iints import-carelink \
   --input-csv "/path/to/CareLink export.csv" \
   --output-dir results/imported_carelink
+
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
 ```
 
 **Output**
 - `cgm_standard.csv` in the universal IINTS schema
 - `scenario.json` with meal events derived from carb entries
 - `carelink_summary.json` with device metadata and import counts
+- `carelink_timeline.csv` with real timestamps preserved for personal analysis
+- `carelink_metrics.json` with personal glucose metrics
+- `carelink_dashboard.png`, `carelink_poster.png`, and `carelink_dashboard.html` for direct visual review
+- `ai/*.json` payloads so the local AI assistant can explain imported personal data
 
 **How it works**
 - Skips the CareLink metadata preamble
@@ -193,7 +201,7 @@ iints import-carelink \
 - Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.
 
 **When to use**
-- After a run is complete. The recommended path is now `iints ai prepare <run_dir>` followed by direct AI commands against that run directory.
+- After a run is complete, or after a CareLink workbench has been generated from imported personal data.
 
 **Commands**
 ```bash
@@ -206,6 +214,20 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 iints ai prepare results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
+
+For imported personal CareLink data:
+
+```bash
+python -m pip install -e ".[mdmp]"
+ollama pull ministral-3:3b
+iints ai local-check --model ministral-3:3b
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
 ```
 
 `iints ai local-check` now runs a tiny generation smoke-test by default, so it validates real inference readiness instead of only checking model tags.
@@ -222,7 +244,7 @@ iints ai report results/simulation_run.json \
 ```
 
 **Output**
-- Plain-language explanation or markdown report generated from local Ministral 3 inference.
+- Plain-language explanation or markdown report generated from local Ministral 3 inference, either from simulation runs or imported personal glucose workspaces.
 - The command fails closed if MDMP verification does not pass.
 - The command also fails early if Ollama is reachable but the local Ministral tag is missing.
 

@@ -10,6 +10,12 @@
   - new `iints import-carelink` CLI command
   - `import-data --data-format carelink` now works for CareLink exports
   - import pipeline converts event logs into the standard IINTS glucose/carb/insulin timeline plus a CareLink summary JSON
+- Expanded the personal CareLink workflow:
+  - new `iints carelink-workbench` CLI command
+  - new `build_carelink_workbench(...)` Python API
+  - new `load_carelink_event_log(...)` and `import_carelink_timeline(...)` APIs for experiments with real MiniMed data
+  - workbench now generates `carelink_dashboard.png`, `carelink_poster.png`, `carelink_dashboard.html`, `carelink_metrics.json`, `carelink_timeline.csv`, and AI-ready payloads for local Mistral explanations
+- Updated the AI layer docs and prompts so local Mistral explanations also cover imported personal glucose datasets, not only simulation runs
 
 ## v1.1.3
 

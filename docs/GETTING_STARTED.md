@@ -81,6 +81,14 @@ iints import-carelink \
   --output-dir results/imported_carelink
 ```
 
+- Or build the full personal-data workspace at once:
+
+```bash
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+```
+
 - Optional AI assistant (Ministral 3 via Ollama):
 
 ```bash
@@ -93,6 +101,18 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 iints ai prepare results/<run_id>
 iints ai report results/<run_id>
+```
+
+- CareLink + local AI flow:
+
+```bash
+python -m pip install -e ".[mdmp]"
+ollama pull ministral-3:3b
+iints ai local-check --model ministral-3:3b
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+iints ai report results/personal_carelink --model ministral-3:3b
 ```
 
 `iints ai local-check` now runs a tiny smoke-test generation by default. If it reports that Ollama closed the generation connection, the most likely causes are a restarting daemon or insufficient memory; in that case, try `ministral-3:3b`.
