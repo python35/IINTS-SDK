@@ -208,6 +208,37 @@ iints ai report results/simulation_run.json \
 - `iints ai models` prints the curated local model list with RAM and VRAM recommendations.
 - Use `ministral-3:3b` for smaller laptops or CPU-only systems.
 - Use `ministral-3:8b` as the default balanced choice.
+
+### Core Workflow Chapter F: Poster-Ready Results Graphic
+
+**Purpose**
+- Turn one to three completed IINTS run bundles into a single poster-style PNG for jury demos, expos, or slide decks.
+
+**When to use**
+- After you already have representative runs such as a normal run, a meal stress test, and a supervisor override case.
+
+**Commands**
+```bash
+iints poster \
+  --run-dir results/normal_run \
+  --run-dir results/meal_stress \
+  --run-dir results/supervisor_override \
+  --label "Normal Run" \
+  --label "Meal Stress Test" \
+  --label "Supervisor Override" \
+  --output-path results/posters/iints_results_poster.png
+```
+
+**Output**
+- `iints_results_poster.png` with one panel per scenario
+- `iints_results_poster.json` with the poster summary metrics
+
+**What the poster includes**
+- Glucose curve for each scenario
+- Highlighted target band (`70-180 mg/dL`)
+- Meal-event markers when carbs are present in the run
+- Supervisor intervention markers when the safety layer triggered
+- Per-panel summary block with TIR, time below range, meals, and intervention count
 - Use `ministral-3:14b` only on stronger workstations with plenty of memory.
 
 ### Detailed Command Reference

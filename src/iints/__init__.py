@@ -67,6 +67,7 @@ from .data.tidepool import TidepoolClient, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
+from .analysis.poster import generate_results_poster
 from .analysis.reporting import ClinicalReportGenerator
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
 from .ai import AIResponse, IINTSAssistant, MDMPGuard
@@ -185,6 +186,7 @@ __all__ = [
     "generate_report",
     "generate_quickstart_report",
     "generate_demo_report",
+    "generate_results_poster",
     # High-level API
     "run_simulation",
     "run_full",

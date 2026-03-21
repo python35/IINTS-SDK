@@ -89,6 +89,29 @@ Notes:
 - After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report` directly at the run directory.
 - Output is research-only and not medical advice.
 
+## Jury Poster / Demo Graphic
+
+You can now generate a poster-style PNG directly from one to three real run bundles:
+
+```bash
+iints poster \
+  --run-dir results/normal_run \
+  --run-dir results/meal_stress \
+  --run-dir results/supervisor_override \
+  --label "Normal Run" \
+  --label "Meal Stress Test" \
+  --label "Supervisor Override" \
+  --output-path results/posters/iints_results_poster.png
+```
+
+The poster shows:
+- glucose curves with the target range highlighted
+- meal events
+- supervisor interventions
+- panel summaries with TIR, hypo time, meal count, and intervention count
+
+If you omit `--run-dir`, the CLI auto-discovers the latest run bundles under `./results`.
+
 Troubleshooting:
 - If `iints ai ...` says `No such command 'ai'`, your environment usually still has a legacy `iints` package installed alongside `iints-sdk-python35`.
 - Run `iints-sdk-doctor` first.

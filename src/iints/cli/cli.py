@@ -25,6 +25,7 @@ import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.analysis.poster import generate_results_poster
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
 from iints.core.safety import SafetyConfig
@@ -2598,6 +2599,78 @@ def scorecard(
     console.print(table)
     console.print(f"[green]Scorecard CSV:[/green] {scorecard_csv}")
     console.print(f"[green]Scorecard JSON:[/green] {scorecard_json}")
+
+@app.command()
+def poster(
+    run_dir: Annotated[
+        List[Path],
+        typer.Option(
+            "--run-dir",
+            help="Run bundle directory containing results.csv. Repeat up to three times.",
+        ),
+    ] = [],
+    label: Annotated[
+        List[str],
+        typer.Option(
+            "--label",
+            help="Optional poster label aligned to each --run-dir (for example: Normal Run, Meal Stress Test, Supervisor Override).",
+        ),
+    ] = [],
+    output_path: Annotated[
+        Path,
+        typer.Option(help="PNG output path for the poster graphic."),
+    ] = Path("./results/posters/iints_results_poster.png"),
+    summary_output_path: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional JSON sidecar summary path."),
+    ] = None,
+    title: Annotated[
+        str,
+        typer.Option(help="Main poster headline."),
+    ] = "288 Decisions. Every Day. We Test Them All.",
+    subtitle: Annotated[
+        str,
+        typer.Option(help="Supporting poster subtitle."),
+    ] = "Three IINTS-AF scenarios showing control, stress handling, and supervisor protection.",
+    results_root: Annotated[
+        Path,
+        typer.Option(help="Root folder used when no --run-dir values are supplied."),
+    ] = Path("./results"),
+):
+    """Generate a poster-style PNG from one to three IINTS run bundles."""
+    console = Console()
+    try:
+        outputs = generate_results_poster(
+            run_dirs=run_dir,
+            labels=label,
+            output_path=output_path,
+            summary_output_path=summary_output_path,
+            poster_title=title,
+            subtitle=subtitle,
+            results_root=results_root,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Poster PNG: {outputs['poster_png']}",
+                    f"Summary JSON: {outputs['summary_json']}",
+                ]
+            ),
+            title="IINTS Poster Export",
+            border_style="cyan",
+        )
+    )
+    console.print(
+        "[green]Tip:[/green] Use "
+        "`--label \"Normal Run\" --label \"Meal Stress Test\" --label \"Supervisor Override\"` "
+        "to tell a clear jury story."
+    )
+
 
 @app.command()
 def report(

@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- No entries yet.
+- Added poster-ready results export for demos and juries:
+  - new `iints poster` CLI command
+  - new `generate_results_poster(...)` Python API
+  - poster PNG + JSON summary generated directly from one to three run bundles
 
 ## v1.1.3
 

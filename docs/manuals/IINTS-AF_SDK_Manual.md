@@ -1524,6 +1524,42 @@ Suggested rule:
 - Oversized JSON payloads are clipped automatically before prompt construction so local inference stays practical on smaller systems.
 - Use `--timeout-seconds 120` or higher for slower edge hardware.
 
+## 11. Poster-Ready Results for Jury Demos
+
+The SDK can now turn one to three completed run bundles into a single poster-style PNG.
+This is ideal for science fairs, thesis defenses, pitch decks, and jury presentations where you want three scenarios side by side.
+
+**Recommended story**
+- Normal run
+- Meal stress test
+- Supervisor override / safety intervention
+
+**Command**
+
+```bash
+iints poster \
+  --run-dir results/normal_run \
+  --run-dir results/meal_stress \
+  --run-dir results/supervisor_override \
+  --label "Normal Run" \
+  --label "Meal Stress Test" \
+  --label "Supervisor Override" \
+  --output-path results/posters/iints_results_poster.png
+```
+
+**What it includes**
+- Glucose curve for each run
+- Target range highlight (`70-180 mg/dL`)
+- Meal markers when carbs are present
+- Supervisor intervention markers when the safety layer triggered
+- Per-panel summary box with TIR, time below range, meal count, and intervention count
+
+**Outputs**
+- `results/posters/iints_results_poster.png`
+- `results/posters/iints_results_poster.json`
+
+If you omit `--run-dir`, the SDK auto-discovers the latest run bundles under `./results`.
+
 **Troubleshooting**
 - If `iints ai local-check` fails, first confirm Ollama is running.
 - If Ollama is reachable but the model is missing, run the exact `ollama pull ...` command shown by the SDK.

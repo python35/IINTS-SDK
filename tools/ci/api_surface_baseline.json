@@ -41,6 +41,7 @@
     "export_standard_csv",
     "generate_benchmark_metrics",
     "generate_demo_report",
+    "generate_results_poster",
     "generate_quickstart_report",
     "generate_random_scenario",
     "generate_report",

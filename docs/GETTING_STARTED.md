@@ -89,6 +89,19 @@ iints ai report results/<run_id>
 
 `iints ai local-check` now runs a tiny smoke-test generation by default. If it reports that Ollama closed the generation connection, the most likely causes are a restarting daemon or insufficient memory; in that case, try `ministral-3:3b`.
 
+- Jury/demo poster from real run bundles:
+
+```bash
+iints poster \
+  --run-dir results/normal_run \
+  --run-dir results/meal_stress \
+  --run-dir results/supervisor_override \
+  --label "Normal Run" \
+  --label "Meal Stress Test" \
+  --label "Supervisor Override" \
+  --output-path results/posters/iints_results_poster.png
+```
+
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)
 - End-to-end examples: [Demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
