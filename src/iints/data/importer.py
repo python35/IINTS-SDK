@@ -6,6 +6,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import io
 import re
 import sys
+import csv
 
 import pandas as pd
 
@@ -44,6 +45,12 @@ DEFAULT_MAPPINGS: Dict[str, Dict[str, List[str]]] = {
         "carbs": ["carbs", "carb", "carbohydrates"],
         "insulin": ["insulin", "insulinunits", "bolus", "basal"],
     },
+    "carelink": {
+        "timestamp": ["date", "time"],
+        "glucose": ["sensor glucose (mg/dl)", "bg reading (mg/dl)"],
+        "carbs": ["bwz carb input (grams)"],
+        "insulin": ["bolus volume delivered (u)", "basal rate (u/h)"],
+    },
 }
 
 IMPORT_FORMAT_SCHEMAS: Dict[str, Dict[str, List[str]]] = {
@@ -59,6 +66,10 @@ IMPORT_FORMAT_SCHEMAS: Dict[str, Dict[str, List[str]]] = {
         "required": ["timestamp", "glucose"],
         "optional": ["carbs", "insulin"],
     },
+    "carelink": {
+        "required": ["timestamp", "glucose"],
+        "optional": ["carbs", "insulin"],
+    },
 }
 
 
@@ -66,6 +77,262 @@ IMPORT_FORMAT_SCHEMAS: Dict[str, Dict[str, List[str]]] = {
 class ImportResult:
     dataframe: pd.DataFrame
     scenario: Dict[str, Any]
+
+
+def _parse_decimal_series(series: pd.Series) -> pd.Series:
+    cleaned = series.astype("string").str.strip()
+    cleaned = cleaned.mask(cleaned.isin(["", "nan", "None"]))
+    cleaned = cleaned.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
+    return pd.to_numeric(cleaned, errors="coerce")
+
+
+def _find_carelink_header_index(lines: List[str]) -> int:
+    for idx, line in enumerate(lines):
+        if line.startswith("Index;Date;Time;"):
+            return idx
+    raise ValueError("Could not find the CareLink event table header (Index;Date;Time;...).")
+
+
+def _parse_carelink_metadata(lines: List[str]) -> Dict[str, Any]:
+    metadata: Dict[str, Any] = {"raw_preamble_lines": [line for line in lines if line.strip()]}
+    parsed_lines: List[List[str]] = []
+    for line in lines:
+        if not line.strip() or line.startswith("-------"):
+            continue
+        parts = next(csv.reader([line], delimiter=";"))
+        cleaned = [part.strip().strip('"') for part in parts]
+        parsed_lines.append(cleaned)
+        for i in range(6, len(cleaned) - 1, 2):
+            key = cleaned[i]
+            value = cleaned[i + 1]
+            if not key:
+                continue
+            metadata[key] = value
+
+    if len(parsed_lines) >= 2:
+        line0 = parsed_lines[0]
+        line1 = parsed_lines[1]
+        for idx in range(min(6, len(line0), len(line1))):
+            key = line0[idx]
+            value = line1[idx]
+            if key:
+                metadata[key] = value
+
+    if parsed_lines:
+        line0 = parsed_lines[0]
+        if len(line0) >= 2 and line0[0] and line0[1] and "First Name" not in metadata:
+            metadata[line0[0]] = line0[1]
+
+    patient_name = " ".join(
+        part for part in [metadata.get("First Name", ""), metadata.get("Last Name", "")] if part
+    ).strip()
+    if patient_name:
+        metadata["patient_name"] = patient_name
+    return metadata
+
+
+def _read_carelink_event_frame(path: Union[str, Path]) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    file_path = Path(path)
+    lines = file_path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+    header_idx = _find_carelink_header_index(lines)
+    metadata = _parse_carelink_metadata(lines[:header_idx])
+
+    df = pd.read_csv(
+        file_path,
+        sep=";",
+        skiprows=header_idx,
+        encoding="utf-8-sig",
+        dtype=str,
+    )
+    df.columns = [str(col).strip() for col in df.columns]
+    for column in df.columns:
+        df[column] = df[column].astype("string").str.strip()
+
+    if {"Date", "Time"} - set(df.columns):
+        raise ValueError("CareLink export is missing the expected Date/Time columns.")
+
+    df = df[df["Date"].notna() & df["Time"].notna()].copy()
+    dt = pd.to_datetime(
+        df["Date"].fillna("") + " " + df["Time"].fillna(""),
+        format="%Y/%m/%d %H:%M:%S",
+        errors="coerce",
+    )
+    df = df[dt.notna()].copy()
+    df["timestamp_dt"] = dt[dt.notna()]
+    df = df.sort_values("timestamp_dt").reset_index(drop=True)
+    return df, metadata
+
+
+def _attach_events_to_glucose_timeline(
+    glucose_df: pd.DataFrame,
+    event_df: pd.DataFrame,
+    *,
+    value_column: str,
+    output_column: str,
+    tolerance_minutes: float,
+) -> pd.DataFrame:
+    if event_df.empty:
+        glucose_df[output_column] = glucose_df.get(output_column, 0.0)
+        return glucose_df
+
+    glucose_df = glucose_df.copy()
+    glucose_df[output_column] = glucose_df.get(output_column, 0.0)
+    timestamps = list(glucose_df["timestamp_dt"])
+    tolerance = pd.Timedelta(minutes=tolerance_minutes)
+
+    for row in event_df.itertuples(index=False):
+        event_time = getattr(row, "timestamp_dt")
+        amount = getattr(row, value_column)
+        if pd.isna(amount):
+            continue
+
+        insert_at = int(glucose_df["timestamp_dt"].searchsorted(event_time))
+        candidates: List[int] = []
+        if insert_at < len(timestamps):
+            candidates.append(insert_at)
+        if insert_at > 0:
+            candidates.append(insert_at - 1)
+        if not candidates:
+            continue
+
+        nearest_idx = min(candidates, key=lambda idx: abs(timestamps[idx] - event_time))
+        if abs(timestamps[nearest_idx] - event_time) <= tolerance:
+            current_value = pd.to_numeric(
+                pd.Series([glucose_df.at[nearest_idx, output_column]]),
+                errors="coerce",
+            ).fillna(0.0).iloc[0]
+            glucose_df.at[nearest_idx, output_column] = float(current_value) + float(amount)
+
+    return glucose_df
+
+
+def summarize_carelink_csv(path: Union[str, Path]) -> Dict[str, Any]:
+    raw_df, metadata = _read_carelink_event_frame(path)
+    summary = {
+        "patient_name": metadata.get("patient_name", ""),
+        "start_date": metadata.get("Start Date", ""),
+        "end_date": metadata.get("End Date", ""),
+        "device": metadata.get("Device", ""),
+        "cgm": metadata.get("CGM", ""),
+        "raw_event_rows": int(len(raw_df)),
+        "sensor_glucose_rows": int(_parse_decimal_series(raw_df.get("Sensor Glucose (mg/dL)", pd.Series(dtype="string"))).notna().sum()),
+        "bg_reading_rows": int(_parse_decimal_series(raw_df.get("BG Reading (mg/dL)", pd.Series(dtype="string"))).notna().sum()),
+        "bolus_rows": int(_parse_decimal_series(raw_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string"))).fillna(0).gt(0).sum()),
+        "meal_rows": int(_parse_decimal_series(raw_df.get("BWZ Carb Input (grams)", pd.Series(dtype="string"))).fillna(0).gt(0).sum()),
+        "alert_rows": int(raw_df.get("Alert", pd.Series(dtype="string")).fillna("").astype(str).str.len().gt(0).sum()),
+        "sensor_exception_rows": int(raw_df.get("Sensor Exception", pd.Series(dtype="string")).fillna("").astype(str).str.len().gt(0).sum()),
+    }
+    return summary
+
+
+def import_carelink_csv(
+    path: Union[str, Path],
+    *,
+    source: Optional[str] = None,
+    event_tolerance_minutes: float = 7.5,
+) -> pd.DataFrame:
+    """
+    Import a Medtronic CareLink / MiniMed export into the universal IINTS schema.
+
+    The CareLink export is an event log, not a simple one-row-per-reading CSV.
+    This parser:
+    - skips the CareLink metadata preamble
+    - extracts glucose values from sensor glucose and SMBG rows
+    - aligns carb and bolus events to the nearest CGM timestamp
+    - estimates basal insulin between glucose samples from the reported basal rate
+    """
+    raw_df, _metadata = _read_carelink_event_frame(path)
+
+    sensor_glucose = _parse_decimal_series(raw_df.get("Sensor Glucose (mg/dL)", pd.Series(dtype="string")))
+    bg_reading = _parse_decimal_series(raw_df.get("BG Reading (mg/dL)", pd.Series(dtype="string")))
+    raw_df["effective_glucose"] = sensor_glucose.combine_first(bg_reading)
+
+    glucose_df = (
+        raw_df.loc[raw_df["effective_glucose"].notna(), ["timestamp_dt", "effective_glucose"]]
+        .groupby("timestamp_dt", as_index=False)
+        .last()
+        .rename(columns={"effective_glucose": "glucose"})
+    )
+    if glucose_df.empty:
+        raise ValueError("No glucose readings were found in the CareLink export.")
+
+    carbs_df = raw_df.loc[:, ["timestamp_dt"]].copy()
+    carbs_df["carbs"] = _parse_decimal_series(raw_df.get("BWZ Carb Input (grams)", pd.Series(dtype="string")))
+    carbs_df = carbs_df[carbs_df["carbs"].notna() & (carbs_df["carbs"] > 0)].groupby("timestamp_dt", as_index=False).sum()
+
+    bolus_df = raw_df.loc[:, ["timestamp_dt"]].copy()
+    bolus_df["bolus_units"] = _parse_decimal_series(raw_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string")))
+    bolus_df["bolus_number"] = raw_df.get("Bolus Number", pd.Series(dtype="string")).astype("string").fillna("")
+    bolus_df["bolus_source"] = raw_df.get("Bolus Source", pd.Series(dtype="string")).astype("string").fillna("")
+    bolus_df = bolus_df[
+        bolus_df["bolus_units"].notna()
+        & (bolus_df["bolus_units"] > 0)
+        & (bolus_df["bolus_source"] != "CLOSED_LOOP_AUTO_INSULIN")
+    ].copy()
+    bolus_df["bolus_key"] = bolus_df["bolus_number"].where(bolus_df["bolus_number"].str.len() > 0, bolus_df["timestamp_dt"].astype(str))
+    bolus_df = (
+        bolus_df.groupby(["timestamp_dt", "bolus_key"], as_index=False)["bolus_units"].max()
+        .groupby("timestamp_dt", as_index=False)["bolus_units"]
+        .sum()
+    )
+
+    basal_df = raw_df.loc[:, ["timestamp_dt"]].copy()
+    basal_df["basal_rate_u_per_hr"] = _parse_decimal_series(raw_df.get("Basal Rate (U/h)", pd.Series(dtype="string")))
+    basal_df = (
+        basal_df[basal_df["basal_rate_u_per_hr"].notna()]
+        .groupby("timestamp_dt", as_index=False)
+        .last()
+        .sort_values("timestamp_dt")
+    )
+
+    glucose_df = glucose_df.sort_values("timestamp_dt").reset_index(drop=True)
+    glucose_df = _attach_events_to_glucose_timeline(
+        glucose_df,
+        carbs_df,
+        value_column="carbs",
+        output_column="carbs",
+        tolerance_minutes=event_tolerance_minutes,
+    )
+    glucose_df = _attach_events_to_glucose_timeline(
+        glucose_df,
+        bolus_df,
+        value_column="bolus_units",
+        output_column="bolus_units",
+        tolerance_minutes=event_tolerance_minutes,
+    )
+
+    if not basal_df.empty:
+        glucose_df = pd.merge_asof(
+            glucose_df.sort_values("timestamp_dt"),
+            basal_df,
+            on="timestamp_dt",
+            direction="backward",
+        )
+        glucose_df["basal_rate_u_per_hr"] = glucose_df["basal_rate_u_per_hr"].ffill().fillna(0.0)
+    else:
+        glucose_df["basal_rate_u_per_hr"] = 0.0
+
+    timestamp_series = pd.to_datetime(glucose_df["timestamp_dt"], errors="coerce")
+    raw_step_minutes = timestamp_series.diff().dt.total_seconds().div(60.0)
+    typical_step = raw_step_minutes[(raw_step_minutes > 0) & (raw_step_minutes <= 15)].median()
+    if pd.isna(typical_step):
+        typical_step = 5.0
+    capped_step_minutes = raw_step_minutes.fillna(float(typical_step)).clip(lower=0.0, upper=max(float(typical_step) * 1.5, 15.0))
+    glucose_df["basal_units"] = glucose_df["basal_rate_u_per_hr"] * capped_step_minutes.div(60.0)
+    bolus_series = glucose_df["bolus_units"] if "bolus_units" in glucose_df.columns else pd.Series(0.0, index=glucose_df.index)
+    glucose_df["insulin"] = bolus_series.fillna(0.0) + glucose_df["basal_units"].fillna(0.0)
+    glucose_df["timestamp"] = (
+        glucose_df["timestamp_dt"] - glucose_df["timestamp_dt"].iloc[0]
+    ).dt.total_seconds() / 60.0
+    glucose_df["source"] = source or "carelink_minimed"
+
+    standard = glucose_df[["timestamp", "glucose", "carbs", "insulin", "source"]].copy()
+    standard["carbs"] = standard["carbs"].fillna(0.0)
+    standard["insulin"] = standard["insulin"].fillna(0.0)
+
+    ingestor = DataIngestor()
+    ingestor._validate_schema(standard, ingestor.UNIVERSAL_SCHEMA)
+    return standard
 
 
 def guess_column_mapping(columns: Iterable[str], data_format: str = "generic") -> Dict[str, Optional[str]]:
@@ -184,6 +451,8 @@ def import_cgm_csv(
     """
     Import CGM data from CSV into the universal IINTS schema.
     """
+    if data_format == "carelink":
+        return import_carelink_csv(path, source=source)
     df = pd.read_csv(path)
     return import_cgm_dataframe(
         df,

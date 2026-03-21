@@ -37,6 +37,7 @@ from iints.data.importer import (
     export_standard_csv,
     guess_column_mapping,
     import_cgm_dataframe,
+    summarize_carelink_csv,
     load_demo_dataframe,
     scenario_from_csv,
     scenario_from_dataframe,
@@ -3972,7 +3973,7 @@ def research_registry_promote(
 def import_data(
     input_csv: Annotated[Path, typer.Option(help="Path to CGM CSV file")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + standard CSV")] = Path("./results/imported"),
-    data_format: Annotated[str, typer.Option(help="Data format preset: generic, dexcom, libre")] = "generic",
+    data_format: Annotated[str, typer.Option(help="Data format preset: generic, dexcom, libre, carelink")] = "generic",
     scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Imported CGM Scenario",
     scenario_version: Annotated[str, typer.Option(help="Scenario version")] = "1.0",
     time_unit: Annotated[str, typer.Option(help="Timestamp unit: minutes or seconds")] = "minutes",
@@ -4013,6 +4014,67 @@ def import_data(
     console.print(f"[green]Scenario saved:[/green] {scenario_path}")
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
     console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
+
+
+@app.command("import-carelink")
+def import_carelink(
+    input_csv: Annotated[Path, typer.Option(help="Path to a Medtronic CareLink CSV export")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for imported CareLink artifacts")] = Path("./results/imported_carelink"),
+    scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Imported CareLink Scenario",
+    scenario_version: Annotated[str, typer.Option(help="Scenario version")] = "1.0",
+    scenario_path: Annotated[Optional[Path], typer.Option(help="Optional output scenario path")] = None,
+    data_path: Annotated[Optional[Path], typer.Option(help="Optional output standard CSV path")] = None,
+    summary_path: Annotated[Optional[Path], typer.Option(help="Optional output summary JSON path")] = None,
+    carb_threshold: Annotated[float, typer.Option(help="Minimum carbs (g) to create a meal event")] = 0.1,
+):
+    """Import a Medtronic CareLink / MiniMed event export into the IINTS standard schema."""
+    console = Console()
+    if not input_csv.is_file():
+        console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        result = scenario_from_csv(
+            input_csv,
+            scenario_name=scenario_name,
+            scenario_version=scenario_version,
+            data_format="carelink",
+            carb_threshold=carb_threshold,
+        )
+        summary = summarize_carelink_csv(input_csv)
+    except Exception as exc:
+        console.print(f"[bold red]CareLink import failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = scenario_path or output_dir / "scenario.json"
+    data_path = data_path or output_dir / "cgm_standard.csv"
+    summary_path = summary_path or output_dir / "carelink_summary.json"
+
+    scenario_path.write_text(json.dumps(result.scenario, indent=2))
+    export_standard_csv(result.dataframe, data_path)
+    summary_path.write_text(json.dumps(summary, indent=2))
+
+    table = Table(title="CareLink Import Summary")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    for key in [
+        "patient_name",
+        "start_date",
+        "end_date",
+        "device",
+        "cgm",
+        "raw_event_rows",
+        "sensor_glucose_rows",
+        "bolus_rows",
+        "meal_rows",
+        "alert_rows",
+    ]:
+        table.add_row(key, str(summary.get(key, "")))
+    console.print(table)
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+    console.print(f"[green]Summary JSON saved:[/green] {summary_path}")
 
 
 @app.command("import-wizard")

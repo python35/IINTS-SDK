@@ -160,7 +160,34 @@ iints mdmp visualizer results/mdmp_report.json \
 **Output**
 - Contract validation report, MDMP grade, fingerprints, and HTML dashboard.
 
-### Core Workflow Chapter E: AI Assistant (Ministral 3 Open-Weight via Ollama)
+### Core Workflow Chapter E: CareLink / MiniMed Import
+
+**Purpose**
+- Convert Medtronic CareLink event exports into the standard IINTS timeline so users can reuse their own pump and CGM history.
+
+**When to use**
+- When a user exports a CSV from the MiniMed CareLink web app and wants to turn it into a standard CGM+carb+insulin dataset.
+
+**Commands**
+```bash
+iints import-carelink \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/imported_carelink
+```
+
+**Output**
+- `cgm_standard.csv` in the universal IINTS schema
+- `scenario.json` with meal events derived from carb entries
+- `carelink_summary.json` with device metadata and import counts
+
+**How it works**
+- Skips the CareLink metadata preamble
+- Parses the event table (`Index;Date;Time;...`)
+- Uses sensor glucose first, with SMBG fallback when needed
+- Aligns carb and bolus events onto the nearest glucose timestamp
+- Estimates basal insulin from the reported basal rate between glucose samples
+
+### Core Workflow Chapter F: AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 **Purpose**
 - Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.

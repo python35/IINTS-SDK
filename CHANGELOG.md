@@ -6,6 +6,10 @@
   - new `iints poster` CLI command
   - new `generate_results_poster(...)` Python API
   - poster PNG + JSON summary generated directly from one to three run bundles
+- Added Medtronic CareLink / MiniMed import support:
+  - new `iints import-carelink` CLI command
+  - `import-data --data-format carelink` now works for CareLink exports
+  - import pipeline converts event logs into the standard IINTS glucose/carb/insulin timeline plus a CareLink summary JSON
 
 ## v1.1.3
 

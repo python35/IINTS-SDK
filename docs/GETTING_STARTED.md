@@ -73,6 +73,14 @@ Adds:
 
 ## 8) Next Steps
 
+- Import a Medtronic CareLink / MiniMed CSV export:
+
+```bash
+iints import-carelink \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/imported_carelink
+```
+
 - Optional AI assistant (Ministral 3 via Ollama):
 
 ```bash

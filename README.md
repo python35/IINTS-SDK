@@ -30,6 +30,23 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
+## CareLink Import
+
+The SDK can now ingest Medtronic CareLink / MiniMed CSV exports and convert them into the standard IINTS schema:
+
+```bash
+iints import-carelink \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/imported_carelink
+```
+
+This writes:
+- `cgm_standard.csv`
+- `scenario.json`
+- `carelink_summary.json`
+
+It extracts glucose, carb, and insulin events from the CareLink event log and aligns them onto an IINTS-ready timeline.
+
 ## AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 The SDK now includes a research-only AI assistant layer for explanations and run summaries.
