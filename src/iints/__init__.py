@@ -71,6 +71,7 @@ from .data.tidepool import TidepoolClient, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
+from .analysis.booth_demo import build_booth_demo
 from .analysis.carelink_workbench import build_carelink_workbench
 from .analysis.poster import generate_results_poster
 from .analysis.reporting import ClinicalReportGenerator
@@ -185,6 +186,7 @@ __all__ = [
     "SyntheticMirrorArtifact",
     # Analysis Metrics
     "generate_benchmark_metrics",
+    "build_booth_demo",
     "build_carelink_workbench",
     "ClinicalReportGenerator",
     "EnergyEstimate",

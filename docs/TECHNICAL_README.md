@@ -290,6 +290,41 @@ iints poster \
 - Per-panel summary block with TIR, time below range, meals, and intervention count
 - Use `ministral-3:14b` only on stronger workstations with plenty of memory.
 
+### Core Workflow Chapter G: Booth / Jury Demo Bundle
+
+**Purpose**
+- Give you one public-facing command that creates a fair-ready demo with code, poster, and speaker notes.
+
+**When to use**
+- Before a science fair, jury presentation, thesis defense, expo booth, or sponsor demo.
+
+**Commands**
+```bash
+./scripts/run_booth_demo.sh
+```
+
+or
+
+```bash
+iints demo-booth --output-dir results/booth_demo
+```
+
+**Output**
+- `results/booth_demo/01_normal_run/`
+- `results/booth_demo/02_meal_stress_test/`
+- `results/booth_demo/03_supervisor_override/`
+- `results/booth_demo/booth_demo_poster.png`
+- `results/booth_demo/JURY_TALK_TRACK.md`
+- `results/booth_demo/run_commands.md`
+
+**What it demonstrates**
+- A clean control case
+- A harder stress scenario
+- A deliberately unsafe AI that gets blocked by the supervisor
+- Optional AI-ready artifacts for the safety case
+
+This is the recommended live-demo flow when you want to show the SDK clearly without manually stitching together runs and graphics.
+
 ### Detailed Command Reference
 
 ### Initialize a Project

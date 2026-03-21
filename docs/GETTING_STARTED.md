@@ -130,6 +130,14 @@ iints poster \
   --output-path results/posters/iints_results_poster.png
 ```
 
+- One-command booth / jury demo:
+
+```bash
+./scripts/run_booth_demo.sh
+```
+
+This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
+
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)
 - End-to-end examples: [Demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)

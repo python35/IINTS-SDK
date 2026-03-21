@@ -167,6 +167,27 @@ The poster shows:
 
 If you omit `--run-dir`, the CLI auto-discovers the latest run bundles under `./results`.
 
+## Fair / Jury Demo
+
+If you want one clean live demo for a booth, jury, or pitch session, use the built-in booth flow:
+
+```bash
+./scripts/run_booth_demo.sh
+```
+
+This generates:
+- three run bundles (`Normal Run`, `Meal Stress Test`, `Supervisor Override`)
+- a ready-to-show poster PNG
+- a markdown jury talk track
+- a plain-text live demo script for the stand
+- optional AI-ready artifacts for the safety case
+
+You can also run it through the CLI:
+
+```bash
+iints demo-booth --output-dir results/booth_demo
+```
+
 Troubleshooting:
 - If `iints ai ...` says `No such command 'ai'`, your environment usually still has a legacy `iints` package installed alongside `iints-sdk-python35`.
 - Run `iints-sdk-doctor` first.

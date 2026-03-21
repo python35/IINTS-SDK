@@ -25,6 +25,7 @@ import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.analysis.booth_demo import build_booth_demo
 from iints.analysis.carelink_workbench import build_carelink_workbench
 from iints.analysis.poster import generate_results_poster
 from iints.api.registry import list_algorithm_plugins
@@ -2671,6 +2672,71 @@ def poster(
         "[green]Tip:[/green] Use "
         "`--label \"Normal Run\" --label \"Meal Stress Test\" --label \"Supervisor Override\"` "
         "to tell a clear jury story."
+    )
+
+
+@app.command("demo-booth")
+def demo_booth(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory where the fair-ready demo bundle should be written."),
+    ] = Path("./results/booth_demo"),
+    duration: Annotated[
+        int,
+        typer.Option(help="Simulation duration in minutes for each booth scenario."),
+    ] = 360,
+    time_step: Annotated[
+        int,
+        typer.Option(help="Simulation step size in minutes."),
+    ] = 5,
+    seed: Annotated[
+        int,
+        typer.Option(help="Deterministic random seed."),
+    ] = 42,
+    prepare_ai: Annotated[
+        bool,
+        typer.Option(
+            "--prepare-ai/--no-prepare-ai",
+            help="Prepare AI-ready artifacts for the Supervisor Override run.",
+        ),
+    ] = True,
+) -> None:
+    """Build a full expo/jury demo bundle with runs, poster, and talk track."""
+    console = Console()
+    try:
+        outputs = build_booth_demo(
+            output_dir=output_dir,
+            duration_minutes=duration,
+            time_step=time_step,
+            seed=seed,
+            prepare_ai=prepare_ai,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Booth demo failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Booth Demo")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key in [
+        "poster_png",
+        "poster_summary_json",
+        "demo_summary_json",
+        "jury_talk_track",
+        "live_demo_script",
+        "run_commands",
+        "01_normal_run_dir",
+        "02_meal_stress_test_dir",
+        "03_supervisor_override_dir",
+        "mdmp_cert",
+    ]:
+        if key in outputs:
+            table.add_row(key, outputs[key])
+    console.print(table)
+    if "live_demo_script" in outputs:
+        console.print(f"[green]Live booth script:[/green] {outputs['live_demo_script']}")
+    console.print(
+        "[green]Next:[/green] open the poster and use the jury talk track to walk people through the story."
     )
 
 

@@ -33,6 +33,7 @@ nav:
       - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Documentation Map: DOCUMENTATION_INDEX.md
       - AI Assistant Guide: AI_ASSISTANT.md
+      - Booth Demo Guide: BOOTH_DEMO.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
       - MDMP Full Guide: MDMP_FULL_GUIDE.md

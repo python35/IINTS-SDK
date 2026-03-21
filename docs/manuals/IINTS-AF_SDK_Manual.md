@@ -1595,6 +1595,41 @@ iints poster \
 
 If you omit `--run-dir`, the SDK auto-discovers the latest run bundles under `./results`.
 
+## 12. Booth / Jury Demo Bundle
+
+If you need a live demo for a science fair, jury room, or expo booth, the SDK now includes a one-command flow that builds the whole story for you.
+
+**Command**
+
+```bash
+./scripts/run_booth_demo.sh
+```
+
+Or, if you want to stay inside the installed CLI:
+
+```bash
+iints demo-booth --output-dir results/booth_demo
+```
+
+**What it creates**
+- `Normal Run`
+- `Meal Stress Test`
+- `Supervisor Override`
+- a combined poster PNG
+- a markdown talk track for the jury
+- optional AI-ready artifacts for the safety scenario
+
+**Main outputs**
+- `results/booth_demo/booth_demo_poster.png`
+- `results/booth_demo/JURY_TALK_TRACK.md`
+- `results/booth_demo/run_commands.md`
+- `results/booth_demo/demo_summary.json`
+
+**Why this is useful**
+- You get real run bundles, not hand-built presentation images.
+- You can explain normal control, stress handling, and safety intervention in one pass.
+- The audience can see that the SDK is reproducible, visual, and safety-first.
+
 **Troubleshooting**
 - If `iints ai local-check` fails, first confirm Ollama is running.
 - If Ollama is reachable but the model is missing, run the exact `ollama pull ...` command shown by the SDK.

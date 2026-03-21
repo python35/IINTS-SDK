@@ -21,6 +21,8 @@ These scripts are reference-quality examples for showing the SDK to developers, 
    Benchmark one algorithm across multiple preset scenarios and generate a scorecard.
 5. `05_open_logic_architecture.py`  
    Presentation-focused proof of the three-layer “Open Logic” architecture.
+6. `06_booth_demo.py`  
+   Fair-ready script that runs three scenarios, generates a poster, and writes a jury talk track.
 
 ## Prerequisites
 
@@ -36,6 +38,7 @@ PYTHONPATH=src python3 examples/demos/02_dual_guard_predictor.py --predictor mod
 PYTHONPATH=src python3 examples/demos/03_validation_and_contracts.py
 PYTHONPATH=src python3 examples/demos/04_scenario_bank_scorecard.py --max-presets 3
 PYTHONPATH=src python3 examples/demos/05_open_logic_architecture.py
+PYTHONPATH=src python3 examples/demos/06_booth_demo.py
 ```
 
 All scripts write artifacts in `results/` and print a compact machine-readable summary to stdout.
