@@ -34,6 +34,12 @@ From the repository root, for the cleanest live on-stage flow:
 
 That script is backed by `examples/demos/07_live_stage_demo.py`, which is the best file to show first because the top of the file clearly exposes the patient profile, output directory, duration, and deterministic seed.
 
+It also visibly demonstrates these SDK features in code:
+
+- `run_full(...)`
+- `generate_results_poster(...)`
+- `prepare_ai_ready_artifacts(...)`
+
 You can also run the full booth bundle script directly:
 
 ```bash
@@ -93,6 +99,8 @@ Then run:
 ```bash
 ./scripts/run_live_stage_demo.sh
 ```
+
+That wrapper script resolves the repository root automatically, so you do not have to manually `cd` into the right place first if you launch it via its full path.
 
 Then open:
 

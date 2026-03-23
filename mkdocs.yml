@@ -30,6 +30,7 @@ nav:
   - Home: index.md
   - Start Here:
       - Quick Start: GETTING_STARTED.md
+      - Installation And Paths: INSTALLATION.md
       - Updating The SDK: UPDATING.md
       - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Documentation Map: DOCUMENTATION_INDEX.md

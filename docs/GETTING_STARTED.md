@@ -2,6 +2,8 @@
 
 This page gives the fastest reliable path from install to a validated run.
 
+If you mainly need help with folder choice and install mode, read [Installation And Paths](INSTALLATION.md) first.
+
 ## 1) Create and Activate a Virtual Environment
 
 ```bash
@@ -15,7 +17,7 @@ All commands below assume this `.venv` is active.
 ## 2) Install
 
 ```bash
-pip install iints-sdk-python35
+python -m pip install -U "iints-sdk-python35[mdmp]"
 ```
 
 Optional extras:
@@ -44,6 +46,11 @@ Generated structure includes:
 - `algorithms/`
 - `scenarios/`
 - `results/`
+
+Important:
+- before `iints quickstart`, commands can be run from any folder
+- after `iints quickstart`, move into the generated project folder
+- repo scripts such as `./scripts/run_live_stage_demo.sh` belong to the SDK repository, not the quickstart project
 
 ## 5) Run a Baseline Simulation
 
@@ -92,7 +99,6 @@ iints carelink-workbench \
 - Optional AI assistant (Ministral 3 via Ollama):
 
 ```bash
-python -m pip install -e ".[mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
@@ -106,7 +112,6 @@ iints ai report results/<run_id>
 - CareLink + local AI flow:
 
 ```bash
-python -m pip install -e ".[mdmp]"
 ollama pull ministral-3:3b
 iints ai local-check --model ministral-3:3b
 iints carelink-workbench \
@@ -138,6 +143,12 @@ iints poster \
 
 This is the easiest script to show on a fair stand because `examples/demos/07_live_stage_demo.py` exposes the patient profile and runtime knobs right at the top of the file.
 
+It also visibly shows these SDK features in one place:
+
+- `run_full(...)`
+- `generate_results_poster(...)`
+- `prepare_ai_ready_artifacts(...)`
+
 You can still use the full booth bundle command:
 
 ```bash
@@ -153,6 +164,8 @@ For a fair or jury table, the cleanest live flow is:
 3. run `./scripts/run_live_stage_demo.sh`
 4. open the generated poster and scenario folders under `results/booth_demo_live/`
 
+That wrapper script resolves the repository root automatically, so it is more forgiving than running raw relative Python commands by hand.
+
 - Updating an existing install to the latest release:
 
 ```bash
@@ -163,6 +176,7 @@ python -c "import iints; print(iints.__version__)"
 ```
 
 - Full update guide: [Updating The SDK](UPDATING.md)
+- Full install/path guide: [Installation And Paths](INSTALLATION.md)
 - Need a fixed environment for a demo or paper? Pin a specific version only when reproducibility matters.
 
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)

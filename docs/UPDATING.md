@@ -2,6 +2,8 @@
 
 Use this guide when you already have IINTS installed and want to move to the latest release cleanly.
 
+If you are not sure which folder you should be in, read [Installation And Paths](INSTALLATION.md) first.
+
 ## The safest upgrade path
 
 Always upgrade inside the virtual environment you actually use for IINTS:
@@ -47,6 +49,13 @@ ERROR: file:///home/your-user does not appear to be a Python project
 ```
 
 then you ran `pip install -e ".[mdmp]"` from the wrong folder. Move into the SDK repository root first, where `pyproject.toml` lives.
+
+The repository root is the folder containing:
+
+- `pyproject.toml`
+- `src/`
+- `scripts/`
+- `examples/`
 
 ## If `iints ai` is missing after upgrading
 

@@ -171,27 +171,30 @@ This SDK is intended for:
 #### Option 1: Install from PyPI (Recommended)
 
 ```bash
-# Create project folder
-mkdir my-aps-research && cd my-aps-research
-
-# Create virtual environment (recommended)
+# You can run this from any working folder
 python3 -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 # .venv\Scripts\activate   # Windows
 
-# Install SDK
-pip install iints-sdk-python35
+# Install SDK + MDMP support
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[mdmp]"
 
 # Verify installation
+iints doctor --smoke-run
 iints --help
 ```
 
 #### Option 2: Development Install
 
 ```bash
+# Must be run from the repository root (the folder with pyproject.toml)
 git clone https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
-pip install -e ".[dev]"
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U -e ".[mdmp]"
 ```
 
 #### Option 3: With Research Extras (AI Predictor)
@@ -199,6 +202,14 @@ pip install -e ".[dev]"
 ```bash
 pip install iints-sdk-python35[research]
 ```
+
+**Folder rule**
+
+- Installed `iints ...` commands can run from any folder.
+- `python -m pip install -e ".[mdmp]"` only works from the SDK repository root.
+- After `iints quickstart`, switch into the generated project folder before running `iints presets run ...`.
+
+For the detailed path guide, see `docs/INSTALLATION.md`.
 
 ### 2.2 Your First Simulation (60 seconds)
 
@@ -1452,7 +1463,7 @@ python -m pip install -e ".[mdmp]"
 Pull and validate the local model:
 
 ```bash
-python -m pip install -e ".[mdmp]"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
@@ -1632,20 +1643,21 @@ For a booth or jury table, the cleanest explanation is:
 
 1. Open `examples/demos/07_live_stage_demo.py`.
 2. Point to `PATIENT_CONFIG`, `OUTPUT_DIR`, `DURATION_MINUTES`, `TIME_STEP_MINUTES`, and `SEED`.
-3. Explain that swapping the patient profile reruns the same pipeline for another patient.
-4. Run:
+3. Point out that the script visibly calls `run_full(...)`, `generate_results_poster(...)`, and `prepare_ai_ready_artifacts(...)`.
+4. Explain that swapping the patient profile reruns the same pipeline for another patient.
+5. Run:
 
 ```bash
 ./scripts/run_live_stage_demo.sh
 ```
 
-5. Open:
+6. Open:
 
 - `results/booth_demo_live/booth_demo_poster.png`
 - `results/booth_demo_live/JURY_TALK_TRACK.md`
 - `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
 
-6. If someone wants more proof, open a scenario folder and show `results.csv`, `clinical_report.pdf`, and `run_manifest.json`.
+7. If someone wants more proof, open a scenario folder and show `results.csv`, `clinical_report.pdf`, and `run_manifest.json`.
 
 **Why this is useful**
 - You get real run bundles, not hand-built presentation images.

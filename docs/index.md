@@ -9,6 +9,7 @@ IINTS-AF is a safety-first research SDK for insulin algorithm simulation, valida
 ## Start Here
 
 - [Quick Start](GETTING_STARTED.md)
+- [Installation And Paths](INSTALLATION.md)
 - [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md)
 - [Documentation Map](DOCUMENTATION_INDEX.md)
 - [AI Assistant Guide](AI_ASSISTANT.md)
@@ -18,10 +19,10 @@ IINTS-AF is a safety-first research SDK for insulin algorithm simulation, valida
 
 ## Choose Your Path
 
-| New to IINTS | Build First Run | Validate Data (MDMP) | Engineering Reference |
+| New to IINTS | Install Correctly | Build First Run | Engineering Reference |
 |---|---|---|---|
-| [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Quick Start](GETTING_STARTED.md) | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Developer CLI Guide](TECHNICAL_README.md) |
-| Understand what the SDK does and does not do. | Install, run baseline, inspect outputs. | Validate contracts, compute grades, export dashboard. | Full command reference and technical integration details. |
+| [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Installation And Paths](INSTALLATION.md) | [Quick Start](GETTING_STARTED.md) | [Developer CLI Guide](TECHNICAL_README.md) |
+| Understand what the SDK does and does not do. | Know which folder to use and which install path fits your setup. | Install, run baseline, inspect outputs. | Full command reference and technical integration details. |
 
 For the local research assistant:
 - [AI Assistant Guide](AI_ASSISTANT.md)
@@ -32,7 +33,7 @@ For the local research assistant:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-pip install iints-sdk-python35
+python -m pip install -U "iints-sdk-python35[mdmp]"
 
 iints doctor --smoke-run
 iints quickstart --project-name iints_quickstart
@@ -45,6 +46,8 @@ Expected outputs:
 - `clinical_report.pdf`
 - `audit/`
 - `run_manifest.json`
+
+If you are unsure which folder these commands should run from, start with [Installation And Paths](INSTALLATION.md).
 
 ## MDMP in 60 Seconds
 

@@ -20,7 +20,7 @@ Docs (GitHub Pages): [python35.github.io/IINTS-SDK](https://python35.github.io/I
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-pip install iints-sdk-python35
+python -m pip install -U "iints-sdk-python35[mdmp]"
 ```
 
 ```bash
@@ -29,6 +29,14 @@ iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
+
+If you want the clearest install/path rules first, read:
+- `docs/INSTALLATION.md`
+
+Short rule:
+- installed `iints ...` commands can run from any folder
+- `python -m pip install -e ".[mdmp]"` only works from the SDK repo root
+- after `iints quickstart`, switch into the generated project folder
 
 ## CareLink Import
 
@@ -76,19 +84,27 @@ That workbench is designed for three things:
 The SDK now includes a research-only AI assistant layer for explanations and run summaries.
 It is gated by MDMP verification before any LLM call is allowed.
 
-Use an active virtual environment for the full flow:
+Use an active virtual environment for the full flow.
+
+If you installed the released SDK from PyPI, run:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -e ".[mdmp]"
+python -m pip install -U "iints-sdk-python35[mdmp]"
+```
+
+If you are developing from source instead, first move into the SDK repo root and then run:
+
+```bash
+cd /path/to/IINTS-SDK
+python -m pip install -U -e ".[mdmp]"
 ```
 
 Run the open local Mistral model locally with Ollama:
 
 ```bash
-python -m pip install -e ".[mdmp]"
 ollama pull ministral-3:8b
 iints ai models
 ```
@@ -207,10 +223,18 @@ Then run:
 ./scripts/run_live_stage_demo.sh
 ```
 
+That shell wrapper resolves the SDK repo root automatically, so it still works if you launch it from another working directory via its full path.
+
 And open:
 - `results/booth_demo_live/booth_demo_poster.png`
 - `results/booth_demo_live/JURY_TALK_TRACK.md`
 - `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
+
+What makes this script good for a booth:
+- it visibly calls `run_full(...)`
+- it visibly calls `generate_results_poster(...)`
+- it visibly calls `prepare_ai_ready_artifacts(...)`
+- you can point to one patient setting and explain how the same pipeline reruns for another patient
 
 ## Updating The SDK
 

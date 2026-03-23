@@ -43,11 +43,16 @@ Final dosing is always safety-constrained.
 
 ## 5-Minute Start
 ```bash
-pip install iints-sdk-python35
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[mdmp]"
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
+
+If you are unsure which folder to use for which command, see `docs/INSTALLATION.md`.
 
 You will get output files like:
 - `results.csv` (time-series outputs)

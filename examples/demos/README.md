@@ -24,7 +24,7 @@ These scripts are reference-quality examples for showing the SDK to developers, 
 6. `06_booth_demo.py`  
    Fair-ready script that runs three scenarios, generates a poster, and writes a jury talk track.
 7. `07_live_stage_demo.py`  
-   The smallest live-showcase script for a booth stand: point to the patient profile, run one command, and then open the poster plus scenario results.
+   The smallest live-showcase script for a booth stand: point to the patient profile, visibly show `run_full(...)`, `generate_results_poster(...)`, and `prepare_ai_ready_artifacts(...)`, then run one command and open the poster plus scenario results.
 
 ## Prerequisites
 
