@@ -1673,7 +1673,7 @@ python3 --version  # Must be 3.10+
 ```bash
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 hash -r
 python -c "import iints; print(iints.__version__)"
 iints-sdk-doctor
@@ -1683,11 +1683,11 @@ If `iints-sdk-doctor` reports a conflict:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 hash -r
 ```
 
-For the full upgrade walkthrough, see `docs/UPDATING.md`.
+For the full upgrade walkthrough, see `docs/UPDATING.md`. By default, the upgrade commands in that guide track the latest release. Only pin an exact version when you need reproducible packaging for a demo, paper, or audit.
 
 ### 9.2 Simulation Issues
 

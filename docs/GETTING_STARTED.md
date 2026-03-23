@@ -146,16 +146,17 @@ You can still use the full booth bundle command:
 
 This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
 
-- Updating an existing install:
+- Updating an existing install to the latest release:
 
 ```bash
 source .venv/bin/activate
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 hash -r
 python -c "import iints; print(iints.__version__)"
 ```
 
 - Full update guide: [Updating The SDK](UPDATING.md)
+- Need a fixed environment for a demo or paper? Pin a specific version only when reproducibility matters.
 
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)

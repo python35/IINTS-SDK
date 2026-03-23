@@ -10,7 +10,7 @@ Always upgrade inside the virtual environment you actually use for IINTS:
 source .venv/bin/activate
 python --version
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 hash -r
 ```
 
@@ -19,6 +19,12 @@ Then confirm the installed version:
 ```bash
 python -c "import iints; print(iints.__version__)"
 iints --help
+```
+
+If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
+
+```bash
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 ```
 
 ## If you installed from source
@@ -56,7 +62,7 @@ If it reports a conflict, repair it with:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 hash -r
 ```
 
@@ -75,7 +81,7 @@ If you are on Python `3.8` or `3.9`, create a fresh environment with Python `3.1
 ```bash
 python3.11 -m venv .venv-iints
 source .venv-iints/bin/activate
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 ```
 
 ## Recommended post-upgrade checks
@@ -103,7 +109,7 @@ iints demo-booth --output-dir results/booth_demo
 
 - activated the correct virtual environment
 - upgraded `pip`
-- installed `iints-sdk-python35[mdmp]==1.3.1`
+- installed the latest `iints-sdk-python35[mdmp]` release
 - ran `hash -r`
 - confirmed `python -c "import iints; print(iints.__version__)"`
 - ran `iints --help`
