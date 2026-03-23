@@ -138,6 +138,17 @@ iints poster \
 
 This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
 
+- Updating an existing install:
+
+```bash
+source .venv/bin/activate
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+hash -r
+python -c "import iints; print(iints.__version__)"
+```
+
+- Full update guide: [Updating The SDK](UPDATING.md)
+
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
 - Full command reference: [Technical README](TECHNICAL_README.md)
 - End-to-end examples: [Demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)

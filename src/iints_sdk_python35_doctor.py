@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
     import importlib_metadata as metadata  # type: ignore
 
 
-RECOMMENDED_VERSION = "1.2.0"
+RECOMMENDED_VERSION = "1.3.0"
 
 
 @dataclass(frozen=True)

@@ -188,6 +188,27 @@ You can also run it through the CLI:
 iints demo-booth --output-dir results/booth_demo
 ```
 
+## Updating The SDK
+
+If another machine is missing newer commands like `iints ai ...` or `iints demo-booth`, upgrade inside the active virtual environment:
+
+```bash
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+hash -r
+python -c "import iints; print(iints.__version__)"
+```
+
+If that machine still behaves like an old install, run:
+
+```bash
+iints-sdk-doctor
+```
+
+Full guide:
+- `docs/UPDATING.md`
+
 Troubleshooting:
 - If `iints ai ...` says `No such command 'ai'`, your environment usually still has a legacy `iints` package installed alongside `iints-sdk-python35`.
 - Run `iints-sdk-doctor` first.
@@ -195,7 +216,7 @@ Troubleshooting:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.2.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
 hash -r
 ```
 

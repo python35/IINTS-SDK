@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## v1.3.0
+
+Release date: 2026-03-23
+
+- Added a fair-ready booth demo workflow:
+  - new `iints demo-booth` CLI command
+  - new `build_booth_demo(...)` Python API
+  - new `examples/demos/06_booth_demo.py` showcase script
+  - new `scripts/run_booth_demo.sh` helper for fast live demos
+- Added complete demo outputs for public presentations:
+  - combined poster PNG
+  - markdown jury talk track
+  - plain-text live demo script
+  - demo summary JSON and command cheat sheet
+- Added a dedicated SDK update guide:
+  - new `docs/UPDATING.md`
+  - docs now explain how to upgrade in a virtual environment
+  - docs now cover conflict repair when legacy `iints` shadows `iints-sdk-python35`
+- Updated installation troubleshooting and doctor guidance so multi-machine upgrades are easier to verify.
+
 ## v1.2.0
 
 Release date: 2026-03-21
