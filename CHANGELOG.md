@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## v1.3.1
+
+Release date: 2026-03-23
+
+### Added
+
+- new live-showcase script: `examples/demos/07_live_stage_demo.py`
+- new shell runner: `scripts/run_live_stage_demo.sh`
+
+### Improved
+
+- booth demo guidance now follows the clearer show-code -> run -> results flow
+- live demo notes explicitly show how to swap the patient profile on stage
+- update documentation now covers the common editable-install mistake of running `pip install -e ".[mdmp]"` outside the SDK repo root
+
+### Why it matters
+
+This patch makes the SDK easier to install on a second machine and easier to demonstrate live at a fair or jury table.
+
 ## v1.3.0
 
 Release date: 2026-03-23

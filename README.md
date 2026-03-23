@@ -195,7 +195,7 @@ If another machine is missing newer commands like `iints ai ...` or `iints demo-
 ```bash
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 hash -r
 python -c "import iints; print(iints.__version__)"
 ```
@@ -216,7 +216,7 @@ Troubleshooting:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 hash -r
 ```
 

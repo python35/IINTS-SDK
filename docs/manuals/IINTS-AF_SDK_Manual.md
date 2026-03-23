@@ -1,5 +1,5 @@
 # Full Technical Manual
-Version 1.3.0 | Python SDK
+Version 1.3.1 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -1673,7 +1673,7 @@ python3 --version  # Must be 3.10+
 ```bash
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 hash -r
 python -c "import iints; print(iints.__version__)"
 iints-sdk-doctor
@@ -1683,7 +1683,7 @@ If `iints-sdk-doctor` reports a conflict:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 hash -r
 ```
 

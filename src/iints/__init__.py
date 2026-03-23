@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.3.0"
+    __version__ = "1.3.1"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.

@@ -150,7 +150,7 @@ This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `
 
 ```bash
 source .venv/bin/activate
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.0"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.3.1"
 hash -r
 python -c "import iints; print(iints.__version__)"
 ```
