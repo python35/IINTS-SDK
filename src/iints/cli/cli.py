@@ -27,7 +27,6 @@ from iints.ai.cli import app as ai_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.booth_demo import build_booth_demo
 from iints.analysis.carelink_workbench import build_carelink_workbench
-from iints.analysis.demo_cockpit import build_demo_cockpit
 from iints.analysis.poster import generate_results_poster
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
@@ -2738,74 +2737,6 @@ def demo_booth(
         console.print(f"[green]Live booth script:[/green] {outputs['live_demo_script']}")
     console.print(
         "[green]Next:[/green] open the poster and use the jury talk track to walk people through the story."
-    )
-
-
-@app.command("demo-cockpit")
-def demo_cockpit(
-    output_dir: Annotated[
-        Path,
-        typer.Option(help="Directory where the visual demo cockpit should be written."),
-    ] = Path("./results/demo_cockpit"),
-    patient_config: Annotated[
-        str,
-        typer.Option(help="Packaged patient configuration name or path to a YAML file."),
-    ] = "default_patient",
-    duration: Annotated[
-        int,
-        typer.Option(help="Simulation duration in minutes for each demo scenario."),
-    ] = 360,
-    time_step: Annotated[
-        int,
-        typer.Option(help="Simulation step size in minutes."),
-    ] = 5,
-    seed: Annotated[
-        int,
-        typer.Option(help="Deterministic random seed."),
-    ] = 42,
-    prepare_ai: Annotated[
-        bool,
-        typer.Option(
-            "--prepare-ai/--no-prepare-ai",
-            help="Prepare AI-ready artifacts for the Supervisor Override run.",
-        ),
-    ] = True,
-) -> None:
-    """Build a self-contained visual HTML cockpit for fair and jury demos."""
-    console = Console()
-    try:
-        outputs = build_demo_cockpit(
-            output_dir=output_dir,
-            patient_config=patient_config,
-            duration_minutes=duration,
-            time_step=time_step,
-            seed=seed,
-            prepare_ai=prepare_ai,
-        )
-    except Exception as exc:
-        console.print(f"[bold red]Demo cockpit failed:[/bold red] {exc}")
-        raise typer.Exit(code=1)
-
-    table = Table(title="IINTS Demo Cockpit")
-    table.add_column("Artifact", style="cyan")
-    table.add_column("Path", overflow="fold")
-    for key in [
-        "html_path",
-        "summary_json",
-        "poster_png",
-        "demo_summary_json",
-        "jury_talk_track",
-        "live_demo_script",
-        "run_commands",
-        "mdmp_cert",
-    ]:
-        if key in outputs:
-            table.add_row(key, outputs[key])
-    console.print(table)
-    if "html_path" in outputs:
-        console.print(f"[green]Open this in your browser:[/green] {outputs['html_path']}")
-    console.print(
-        "[green]Pitch flow:[/green] show `07_live_stage_demo.py`, run one command, then open the cockpit HTML fullscreen."
     )
 
 

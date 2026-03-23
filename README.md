@@ -188,22 +188,29 @@ You can also run it through the CLI:
 iints demo-booth --output-dir results/booth_demo
 ```
 
-If you want a more visual fullscreen demo experience, generate the HTML cockpit:
+For a cleaner live explanation, show this source file first:
 
 ```bash
-./scripts/run_demo_cockpit.sh
+examples/demos/07_live_stage_demo.py
 ```
 
-Or via the installed CLI:
+That file is deliberately small and readable, so you can point to:
+- `PATIENT_CONFIG`
+- `OUTPUT_DIR`
+- `DURATION_MINUTES`
+- `TIME_STEP_MINUTES`
+- `SEED`
+
+Then run:
 
 ```bash
-iints demo-cockpit --output-dir results/demo_cockpit
+./scripts/run_live_stage_demo.sh
 ```
 
-That creates `results/demo_cockpit/demo_cockpit.html`, which is designed for live presentation on a booth screen:
-- the code you show first
-- the command you run live
-- the three scenario results in one polished visual cockpit
+And open:
+- `results/booth_demo_live/booth_demo_poster.png`
+- `results/booth_demo_live/JURY_TALK_TRACK.md`
+- `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
 
 ## Updating The SDK
 

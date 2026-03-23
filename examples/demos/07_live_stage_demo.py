@@ -12,8 +12,20 @@ if SDK_SRC.exists():
 
 from iints.analysis.booth_demo import build_booth_demo
 
-# These are the three knobs to point at on a fair stand.
-# Swap the patient profile, rerun, and the poster + reports update automatically.
+# FAIR DEMO SCRIPT
+# ----------------
+# This is the file to show first on a booth stand.
+# Point at the values below and explain:
+# - PATIENT_CONFIG: swap the patient, rerun, and the whole bundle updates
+# - OUTPUT_DIR: every artifact lands in one clean folder
+# - DURATION_MINUTES / TIME_STEP_MINUTES: simulation horizon and resolution
+# - SEED: same seed = same result, which keeps the demo reproducible
+#
+# The script then creates three stories:
+# 1. Normal Run
+# 2. Meal Stress Test
+# 3. Supervisor Override
+# After the run, open the poster + per-scenario folders.
 PATIENT_CONFIG = "default_patient"
 OUTPUT_DIR = "results/booth_demo_live"
 DURATION_MINUTES = 360
@@ -54,11 +66,23 @@ def main() -> None:
 
     print("IINTS Live Stage Demo complete.")
     print(f"Patient config: {args.patient_config}")
-    print("Key outputs:")
-    print(f"- Poster: {outputs['poster_png']}")
-    print(f"- Jury guide: {outputs['jury_talk_track']}")
-    print(f"- Live demo script: {outputs['live_demo_script']}")
-    print(f"- Commands: {outputs['run_commands']}")
+    print("")
+    print("What to show next:")
+    print(f"1. Poster: {outputs['poster_png']}")
+    print(f"2. Jury guide: {outputs['jury_talk_track']}")
+    print(f"3. Live demo script: {outputs['live_demo_script']}")
+    print(f"4. Commands: {outputs['run_commands']}")
+    print("")
+    print("Three scenario folders:")
+    print(f"- Normal Run: {outputs['01_normal_run_dir']}")
+    print(f"- Meal Stress Test: {outputs['02_meal_stress_test_dir']}")
+    print(f"- Supervisor Override: {outputs['03_supervisor_override_dir']}")
+    print("")
+    print("Suggested booth flow:")
+    print("- Show the constants at the top of this file.")
+    print("- Run this script once.")
+    print("- Open the poster and explain the three panels from left to right.")
+    print("- If people want proof, open a scenario folder and show the CSV, PDF, and manifest.")
     print(json.dumps(outputs, indent=2, sort_keys=True))
 
 

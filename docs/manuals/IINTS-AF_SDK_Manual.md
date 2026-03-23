@@ -1626,29 +1626,26 @@ iints demo-booth --output-dir results/booth_demo
 - `results/booth_demo/run_commands.md`
 - `results/booth_demo/demo_summary.json`
 
-**Visual cockpit option**
+**Best live flow**
 
-If you want a stronger on-screen presentation for a booth or jury table, generate the HTML cockpit:
+For a booth or jury table, the cleanest explanation is:
+
+1. Open `examples/demos/07_live_stage_demo.py`.
+2. Point to `PATIENT_CONFIG`, `OUTPUT_DIR`, `DURATION_MINUTES`, `TIME_STEP_MINUTES`, and `SEED`.
+3. Explain that swapping the patient profile reruns the same pipeline for another patient.
+4. Run:
 
 ```bash
-./scripts/run_demo_cockpit.sh
+./scripts/run_live_stage_demo.sh
 ```
 
-Or:
+5. Open:
 
-```bash
-iints demo-cockpit --output-dir results/demo_cockpit
-```
+- `results/booth_demo_live/booth_demo_poster.png`
+- `results/booth_demo_live/JURY_TALK_TRACK.md`
+- `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
 
-This writes:
-
-- `results/demo_cockpit/demo_cockpit.html`
-
-The cockpit is designed to show:
-
-- the small demo script first
-- the live run command second
-- the three scenario results in one polished visual screen
+6. If someone wants more proof, open a scenario folder and show `results.csv`, `clinical_report.pdf`, and `run_manifest.json`.
 
 **Why this is useful**
 - You get real run bundles, not hand-built presentation images.

@@ -73,30 +73,38 @@ Each scenario also gets its own full run bundle with:
 - `clinical_report.pdf`
 - `run_manifest.json`
 
-## Visual Demo Cockpit
+## Best Live Flow
 
-If you want something more visually impressive than a terminal plus poster, generate the HTML cockpit:
-
-```bash
-./scripts/run_demo_cockpit.sh
-```
-
-Or via the installed CLI:
+Use the smallest readable source file as your starting point:
 
 ```bash
-iints demo-cockpit --output-dir results/demo_cockpit
+examples/demos/07_live_stage_demo.py
 ```
 
-Main output:
+What to point at first:
 
-- `results/demo_cockpit/demo_cockpit.html`
+- `PATIENT_CONFIG` - show that a patient can be swapped
+- `OUTPUT_DIR` - show that all artifacts land in one bundle
+- `DURATION_MINUTES` and `TIME_STEP_MINUTES` - show simulation control
+- `SEED` - show reproducibility
 
-Why this is useful:
+Then run:
 
-- it shows the exact demo script first
-- it shows the live command block second
-- it shows the three scenario results in one polished screen
-- it gives you a stronger booth / jury narrative than jumping between folders
+```bash
+./scripts/run_live_stage_demo.sh
+```
+
+Then open:
+
+- `results/booth_demo_live/booth_demo_poster.png`
+- `results/booth_demo_live/JURY_TALK_TRACK.md`
+- `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
+
+If someone wants proof that the poster is real, open one of the scenario folders and show:
+
+- `results.csv`
+- `clinical_report.pdf`
+- `run_manifest.json`
 
 ## Optional Local AI Step
 

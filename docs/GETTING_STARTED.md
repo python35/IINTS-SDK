@@ -146,13 +146,12 @@ You can still use the full booth bundle command:
 
 This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
 
-If you want a more visual one-screen presentation after that, generate the HTML cockpit:
+For a fair or jury table, the cleanest live flow is:
 
-```bash
-./scripts/run_demo_cockpit.sh
-```
-
-That writes `results/demo_cockpit/demo_cockpit.html`.
+1. open `examples/demos/07_live_stage_demo.py`
+2. point to the patient profile and runtime constants
+3. run `./scripts/run_live_stage_demo.sh`
+4. open the generated poster and scenario folders under `results/booth_demo_live/`
 
 - Updating an existing install to the latest release:
 
