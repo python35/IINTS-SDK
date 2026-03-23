@@ -73,6 +73,31 @@ Each scenario also gets its own full run bundle with:
 - `clinical_report.pdf`
 - `run_manifest.json`
 
+## Visual Demo Cockpit
+
+If you want something more visually impressive than a terminal plus poster, generate the HTML cockpit:
+
+```bash
+./scripts/run_demo_cockpit.sh
+```
+
+Or via the installed CLI:
+
+```bash
+iints demo-cockpit --output-dir results/demo_cockpit
+```
+
+Main output:
+
+- `results/demo_cockpit/demo_cockpit.html`
+
+Why this is useful:
+
+- it shows the exact demo script first
+- it shows the live command block second
+- it shows the three scenario results in one polished screen
+- it gives you a stronger booth / jury narrative than jumping between folders
+
 ## Optional Local AI Step
 
 If Ollama and a local Ministral model are ready, the booth demo also prepares the Supervisor Override run for AI explanation.

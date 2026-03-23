@@ -23,6 +23,8 @@ These scripts are reference-quality examples for showing the SDK to developers, 
    Presentation-focused proof of the three-layer “Open Logic” architecture.
 6. `06_booth_demo.py`  
    Fair-ready script that runs three scenarios, generates a poster, and writes a jury talk track.
+7. `07_live_stage_demo.py`  
+   The smallest live-showcase script for a booth stand: point to the patient profile, run one command, and then open the visual demo cockpit.
 
 ## Prerequisites
 
@@ -39,6 +41,7 @@ PYTHONPATH=src python3 examples/demos/03_validation_and_contracts.py
 PYTHONPATH=src python3 examples/demos/04_scenario_bank_scorecard.py --max-presets 3
 PYTHONPATH=src python3 examples/demos/05_open_logic_architecture.py
 PYTHONPATH=src python3 examples/demos/06_booth_demo.py
+PYTHONPATH=src python3 examples/demos/07_live_stage_demo.py
 ```
 
 All scripts write artifacts in `results/` and print a compact machine-readable summary to stdout.

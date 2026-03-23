@@ -1626,6 +1626,30 @@ iints demo-booth --output-dir results/booth_demo
 - `results/booth_demo/run_commands.md`
 - `results/booth_demo/demo_summary.json`
 
+**Visual cockpit option**
+
+If you want a stronger on-screen presentation for a booth or jury table, generate the HTML cockpit:
+
+```bash
+./scripts/run_demo_cockpit.sh
+```
+
+Or:
+
+```bash
+iints demo-cockpit --output-dir results/demo_cockpit
+```
+
+This writes:
+
+- `results/demo_cockpit/demo_cockpit.html`
+
+The cockpit is designed to show:
+
+- the small demo script first
+- the live run command second
+- the three scenario results in one polished visual screen
+
 **Why this is useful**
 - You get real run bundles, not hand-built presentation images.
 - You can explain normal control, stress handling, and safety intervention in one pass.

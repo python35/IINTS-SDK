@@ -146,6 +146,14 @@ You can still use the full booth bundle command:
 
 This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
 
+If you want a more visual one-screen presentation after that, generate the HTML cockpit:
+
+```bash
+./scripts/run_demo_cockpit.sh
+```
+
+That writes `results/demo_cockpit/demo_cockpit.html`.
+
 - Updating an existing install to the latest release:
 
 ```bash

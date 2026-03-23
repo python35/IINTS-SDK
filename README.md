@@ -188,6 +188,23 @@ You can also run it through the CLI:
 iints demo-booth --output-dir results/booth_demo
 ```
 
+If you want a more visual fullscreen demo experience, generate the HTML cockpit:
+
+```bash
+./scripts/run_demo_cockpit.sh
+```
+
+Or via the installed CLI:
+
+```bash
+iints demo-cockpit --output-dir results/demo_cockpit
+```
+
+That creates `results/demo_cockpit/demo_cockpit.html`, which is designed for live presentation on a booth screen:
+- the code you show first
+- the command you run live
+- the three scenario results in one polished visual cockpit
+
 ## Updating The SDK
 
 If another machine is missing newer commands like `iints ai ...` or `iints demo-booth`, upgrade inside the active virtual environment to the latest release:

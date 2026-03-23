@@ -49,6 +49,8 @@ coverage.xml
 *.log
 local/
 .DS_Store
+.mplt_demo/
+.cache_demo/
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/
 tools/local/*

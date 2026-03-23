@@ -73,6 +73,7 @@ from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArt
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.booth_demo import build_booth_demo
 from .analysis.carelink_workbench import build_carelink_workbench
+from .analysis.demo_cockpit import build_demo_cockpit
 from .analysis.poster import generate_results_poster
 from .analysis.reporting import ClinicalReportGenerator
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
@@ -188,6 +189,7 @@ __all__ = [
     "generate_benchmark_metrics",
     "build_booth_demo",
     "build_carelink_workbench",
+    "build_demo_cockpit",
     "ClinicalReportGenerator",
     "EnergyEstimate",
     "estimate_energy_per_decision",
