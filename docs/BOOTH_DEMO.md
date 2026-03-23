@@ -26,7 +26,15 @@ That makes it easy to explain the SDK in public:
 
 ## Fastest Way To Run It
 
-From the repository root:
+From the repository root, for the cleanest live on-stage flow:
+
+```bash
+./scripts/run_live_stage_demo.sh
+```
+
+That script is backed by `examples/demos/07_live_stage_demo.py`, which is the best file to show first because the top of the file clearly exposes the patient profile, output directory, duration, and deterministic seed.
+
+You can also run the full booth bundle script directly:
 
 ```bash
 ./scripts/run_booth_demo.sh
@@ -85,11 +93,14 @@ Suggested one-line pitch:
 
 Suggested walkthrough:
 
-1. Show the left panel first: normal control.
-2. Move to the middle panel: stress handling under meals and exercise.
-3. Finish on the right panel: the supervisor blocks unsafe insulin.
-4. Point out that each panel comes from a full reproducible run bundle, not a hand-drawn mockup.
-5. If time allows, show the local AI explanation on the safety case.
+1. Open `examples/demos/07_live_stage_demo.py` and point at `PATIENT_CONFIG`, `OUTPUT_DIR`, `DURATION_MINUTES`, and `SEED`.
+2. Say that a different patient can be tested by swapping the patient profile name or pointing to another YAML config.
+3. Run `./scripts/run_live_stage_demo.sh`.
+4. Open the left panel first: normal control.
+5. Move to the middle panel: stress handling under meals and exercise.
+6. Finish on the right panel: the supervisor blocks unsafe insulin.
+7. Point out that each panel comes from a full reproducible run bundle, not a hand-drawn mockup.
+8. If time allows, show the local AI explanation on the safety case.
 
 ## Why This Is Good For A Fair
 

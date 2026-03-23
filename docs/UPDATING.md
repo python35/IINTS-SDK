@@ -26,12 +26,21 @@ iints --help
 If you work from a local checkout, update the repo and reinstall editable mode:
 
 ```bash
+cd /path/to/IINTS-SDK
 git pull
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U -e ".[mdmp]"
 hash -r
 ```
+
+If you see:
+
+```text
+ERROR: file:///home/your-user does not appear to be a Python project
+```
+
+then you ran `pip install -e ".[mdmp]"` from the wrong folder. Move into the SDK repository root first, where `pyproject.toml` lives.
 
 ## If `iints ai` is missing after upgrading
 

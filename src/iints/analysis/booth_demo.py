@@ -231,9 +231,13 @@ def _build_commands_markdown(
     supervisor_dir = run_outputs["03_supervisor_override"]["output_dir"]
     return (
         "# Booth Demo Commands\n\n"
-        "## Run from source tree\n\n"
+        "## Showable live demo script\n\n"
         "```bash\n"
         f"PYTHONPATH=src python3 {example_script} --output-dir {output_dir}\n"
+        "```\n\n"
+        "## Run from source tree\n\n"
+        "```bash\n"
+        f"PYTHONPATH=src python3 examples/demos/06_booth_demo.py --output-dir {output_dir}\n"
         "```\n\n"
         "## Run via installed CLI\n\n"
         "```bash\n"
@@ -258,12 +262,15 @@ def _build_live_demo_script_text(
         "IINTS-AF BOOTH LIVE DEMO SCRIPT\n"
         "===============================\n\n"
         "1. WHAT CODE TO SHOW FIRST\n"
-        "- Show examples/demos/06_booth_demo.py first.\n"
-        "  Reason: it is the shortest, clearest orchestration file and shows the whole story in one screen.\n"
-        "- If someone asks how it really works, open src/iints/analysis/booth_demo.py.\n"
-        "  Reason: that file defines the three scenarios and writes the poster, talk track, and run bundle outputs.\n\n"
+        "- Show examples/demos/07_live_stage_demo.py first.\n"
+        "  Reason: the top of that file exposes the patient profile, output folder, duration, and seed on one screen.\n"
+        "- Point out that you can swap PATIENT_CONFIG to another packaged profile such as patient_559_config or clinic_safe_hypo_prone.\n"
+        "- If someone asks how the full bundle is generated, open examples/demos/06_booth_demo.py and then src/iints/analysis/booth_demo.py.\n"
+        "  Reason: those files define the three scenarios and write the poster, talk track, and run bundle outputs.\n\n"
         "2. LIVE COMMAND TO RUN\n"
-        "- From the repository root, run:\n"
+        "- From the repository root, run the live stage script:\n"
+        "  ./scripts/run_live_stage_demo.sh\n"
+        "- Or run the booth bundle directly:\n"
         "  ./scripts/run_booth_demo.sh\n"
         "- Or use the installed CLI:\n"
         "  iints demo-booth --output-dir results/booth_demo\n\n"
@@ -304,6 +311,7 @@ def _build_live_demo_script_text(
 def build_booth_demo(
     output_dir: str | Path = "./results/booth_demo",
     *,
+    patient_config: str | Path | dict[str, Any] = "default_patient",
     duration_minutes: int = 360,
     time_step: int = 5,
     seed: int = 42,
@@ -326,7 +334,7 @@ def build_booth_demo(
         outputs = run_full(
             algorithm=spec.algorithm_factory(),
             scenario=spec.scenario,
-            patient_config="default_patient",
+            patient_config=patient_config,
             duration_minutes=duration_minutes,
             time_step=time_step,
             seed=seed,
@@ -375,6 +383,7 @@ def build_booth_demo(
 
     summary_payload = {
         "output_dir": str(resolved_output),
+        "patient_config": str(patient_config),
         "duration_minutes": duration_minutes,
         "time_step_minutes": time_step,
         "seed": seed,
@@ -395,7 +404,7 @@ def build_booth_demo(
     }
     _write_json(resolved_output / "demo_summary.json", summary_payload)
 
-    example_script = Path("examples/demos/06_booth_demo.py")
+    example_script = Path("examples/demos/07_live_stage_demo.py")
     commands_markdown = _build_commands_markdown(
         output_dir=resolved_output,
         example_script=example_script,

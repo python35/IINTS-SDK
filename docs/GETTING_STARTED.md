@@ -133,6 +133,14 @@ iints poster \
 - One-command booth / jury demo:
 
 ```bash
+./scripts/run_live_stage_demo.sh
+```
+
+This is the easiest script to show on a fair stand because `examples/demos/07_live_stage_demo.py` exposes the patient profile and runtime knobs right at the top of the file.
+
+You can still use the full booth bundle command:
+
+```bash
 ./scripts/run_booth_demo.sh
 ```
 

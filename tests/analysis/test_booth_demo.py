@@ -35,6 +35,7 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
         (output_dir / "run_metadata.json").write_text(json.dumps({"run_id": output_dir.name}), encoding="utf-8")
         (output_dir / "run_manifest.json").write_text(json.dumps({"results": "sha256:demo"}), encoding="utf-8")
         (output_dir / "clinical_report.pdf").write_text("pdf", encoding="utf-8")
+        assert kwargs["patient_config"] == "patient_559_config"
         return {
             "results_csv": str(output_dir / "results.csv"),
             "report_pdf": str(output_dir / "clinical_report.pdf"),
@@ -60,7 +61,7 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr("iints.analysis.booth_demo.generate_results_poster", _fake_poster)
     monkeypatch.setattr("iints.analysis.booth_demo.prepare_ai_ready_artifacts", _fake_prepare)
 
-    outputs = build_booth_demo(tmp_path / "booth_demo")
+    outputs = build_booth_demo(tmp_path / "booth_demo", patient_config="patient_559_config")
 
     assert Path(outputs["poster_png"]).is_file()
     assert Path(outputs["poster_summary_json"]).is_file()
@@ -75,4 +76,5 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     assert "iints ai report" in talk_track
     live_script = Path(outputs["live_demo_script"]).read_text(encoding="utf-8")
     assert "WHAT CODE TO SHOW FIRST" in live_script
-    assert "./scripts/run_booth_demo.sh" in live_script
+    assert "./scripts/run_live_stage_demo.sh" in live_script
+    assert "07_live_stage_demo.py" in live_script

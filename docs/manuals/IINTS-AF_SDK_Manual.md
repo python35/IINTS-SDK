@@ -1620,6 +1620,7 @@ iints demo-booth --output-dir results/booth_demo
 - optional AI-ready artifacts for the safety scenario
 
 **Main outputs**
+- `examples/demos/07_live_stage_demo.py`
 - `results/booth_demo/booth_demo_poster.png`
 - `results/booth_demo/JURY_TALK_TRACK.md`
 - `results/booth_demo/run_commands.md`
