@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## v1.3.2
+
+Release date: 2026-03-24
+
+### Added
+
+- new `iints demo-export` command for machines that have the SDK installed but do not have the repository checkout
+- bundled exportable live demo script template under `src/iints/templates/demos/live_stage_demo.py`
+- new install/path guide: `docs/INSTALLATION.md`
+
+### Improved
+
+- the live booth script now visibly demonstrates `run_full(...)`, `generate_results_poster(...)`, and `prepare_ai_ready_artifacts(...)`
+- booth wrappers now resolve the repository root automatically, making them safer to launch from another working directory
+- installation, updating, getting started, and booth demo docs now explain much more clearly which commands run from which folder
+
+### Why it matters
+
+This patch closes the last booth-demo gap on secondary machines: users can now install the SDK, export the demo code, show the code, run it, and explain the results without needing a full repository clone.
+
 ## v1.3.1
 
 Release date: 2026-03-23

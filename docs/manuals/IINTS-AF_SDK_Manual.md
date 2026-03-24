@@ -1,5 +1,5 @@
 # Full Technical Manual
-Version 1.3.1 | Python SDK
+Version 1.3.2 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
