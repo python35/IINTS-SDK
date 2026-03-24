@@ -26,7 +26,7 @@ iints --help
 If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[mdmp]==1.3.2"
+python -m pip install -U "iints-sdk-python35[mdmp]==1.4.0"
 ```
 
 ## If you installed from source

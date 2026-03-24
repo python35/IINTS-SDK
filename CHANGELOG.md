@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## v1.4.0
+
+Release date: 2026-03-24
+
+### Added
+
+- bundled the MDMP protocol implementation directly into the SDK under `src/mdmp_core`, `src/mdmp_ai`, `src/mdmp_flavors`, and `src/mdmp_integrations`
+- bundled conformance vectors and the MDMP public key into the SDK distribution so offline verification and conformance checks survive without a separate MDMP checkout
+- added Apache 2.0 distribution metadata plus `NOTICE` and preserved legacy license notices for the combined SDK distribution
+- added a bundled MDMP integration test to verify AI-ready artifact preparation and MDMP guard validation from the SDK alone
+
+### Improved
+
+- AI MDMP preparation and guard flows now describe the bundled MDMP runtime instead of pointing users at an external package install
+- MDMP CI and sync checks now validate the bundled implementation directly, removing the old dual-repo dependency for normal SDK development
+- T1D defaults, clinical boundary handling, data plausibility checks, and model-loading paths were hardened as part of the same release train
+- install, AI, evidence, and manual docs now explain Ollama setup, medical evidence sources, and the new bundled-MDMP architecture more clearly
+
+### Why it matters
+
+This release makes the SDK operationally self-contained: the research, AI, and MDMP trust flows now ship together in one package, which means the separate MDMP repository is no longer required for normal SDK installs or demos.
+
 ## v1.3.2
 
 Release date: 2026-03-24
