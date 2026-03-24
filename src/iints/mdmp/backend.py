@@ -114,9 +114,8 @@ def get_backend() -> str:
     if requested in {BACKEND_MDMP, "mdmp", "external"}:
         if not is_mdmp_available():
             raise ImportError(
-                "mdmp_core not found.\n"
-                "Install with: pip install iints-sdk-python35[mdmp]\n"
-                "or: pip install 'mdmp-protocol>=0.3.0'"
+                "Bundled MDMP support is not available in this environment.\n"
+                "Install with: pip install iints-sdk-python35[mdmp]"
             )
         return BACKEND_MDMP
     if requested == "auto" and is_mdmp_available():

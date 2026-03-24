@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Dict, Any, Union, Optional
 import yaml
 
+from iints.core.safety.config import SENSOR_GLUCOSE_MAX_MGDL, SENSOR_GLUCOSE_MIN_MGDL
+
 class DataIngestor:
     """
     Standardized Data Bridge for ingesting various diabetes datasets into a
@@ -64,8 +66,11 @@ class DataIngestor:
         
         # Basic quality checks (from DATA_SCHEMA.md)
         if 'glucose' in df.columns:
-            if not ((df['glucose'] >= 20) & (df['glucose'] <= 600)).all():
-                raise ValueError("Glucose values outside acceptable range (20-600 mg/dL)")
+            if not ((df['glucose'] >= SENSOR_GLUCOSE_MIN_MGDL) & (df['glucose'] <= SENSOR_GLUCOSE_MAX_MGDL)).all():
+                raise ValueError(
+                    "Glucose values outside acceptable CGM/sensor range "
+                    f"({int(SENSOR_GLUCOSE_MIN_MGDL)}-{int(SENSOR_GLUCOSE_MAX_MGDL)} mg/dL)"
+                )
         if 'insulin' in df.columns and not df['insulin'].isna().all():
             if not ((df['insulin'] >= 0) & (df['insulin'] <= 50)).all():
                 raise ValueError("Insulin values outside acceptable range (0-50 units)")

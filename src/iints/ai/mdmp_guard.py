@@ -14,9 +14,8 @@ def _load_mdmp_verifier() -> type[Any]:
         module = importlib.import_module("mdmp_core")
     except Exception as exc:
         raise ImportError(
-            "MDMP verification requires the optional standalone package.\n"
-            "Install with: pip install iints-sdk-python35[mdmp]\n"
-            "or: pip install 'mdmp-protocol>=0.3.0'"
+            "MDMP verification requires the bundled MDMP crypto support.\n"
+            "Install with: pip install iints-sdk-python35[mdmp]"
         ) from exc
     verifier_cls = getattr(module, "MDMPVerifier", None)
     if verifier_cls is None:

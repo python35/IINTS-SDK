@@ -15,6 +15,18 @@ except Exception:  # pragma: no cover
     _TORCH_AVAILABLE = False
 
 
+def _safe_torch_load_weights(path: str):
+    if torch is None:  # pragma: no cover
+        raise ImportError("Torch required for model loading.")
+    try:
+        return torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "This PyTorch build does not support secure weights-only loading. "
+            "Upgrade torch to a version that supports `weights_only=True`."
+        ) from exc
+
+
 @dataclass
 class ClinicalConstraints:
     """Physiological constraints based on medical literature."""
@@ -98,7 +110,7 @@ if _TORCH_AVAILABLE:
             model = LSTMModel(input_size=7, hidden_size=50, output_size=1)
 
             if os.path.exists(self.model_path):
-                model.load_state_dict(torch.load(self.model_path))
+                model.load_state_dict(_safe_torch_load_weights(self.model_path))
 
             improved_model = self._clinical_fine_tuning(model, clinical_X, clinical_y)
             safety_score = self._validate_clinical_safety(improved_model, clinical_X, clinical_y)

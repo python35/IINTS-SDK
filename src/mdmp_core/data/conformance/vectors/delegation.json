@@ -1,0 +1,56 @@
+{
+  "suite": "mdmp_delegation_v1",
+  "notes": "clinical_grade and ai_ready are non-delegable",
+  "vectors": [
+    {
+      "id": "delegation_001",
+      "description": "valid delegate trust-chain",
+      "root_private_seed_hex": "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100",
+      "root_public_key_raw_hex": "712651f450ba05b63898b99ef5f7ba45632e8e2527f7f715cd671ec4024cc51e",
+      "delegate_private_seed_hex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "delegate_public_key_raw_hex": "29acbae141bccaf0b22e1a94d34d0bc7361e526d0bfe12c89794bc9322966dd7",
+      "delegate_certificate_unsigned": {
+        "mdmp_object": "delegate_certificate",
+        "version": "1",
+        "delegate_id": "org-001",
+        "delegate_name": "Org One",
+        "delegate_pubkey": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0KTUNvd0JRWURLMlZ3QXlFQUtheTY0VUc4eXZDeUxocVUwMDBMeHpZZVVtMEwvaExJbDVTOGt5S1diZGM9Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLQo=",
+        "allowed_grades": ["draft", "research_grade"],
+        "issued_at": "2026-01-01T00:00:00Z",
+        "expires": "2030-01-01T00:00:00Z",
+        "constraints": {
+          "max_expires_days": 365,
+          "require_consent_field": true,
+          "allowed_flavors": ["health"],
+          "allowed_grades": ["draft", "research_grade"]
+        }
+      },
+      "delegate_certificate_signature_base64": "rJ3XAdMog/Iv0cWzk7dJFgAxK8DWEJEB/z3q+cjT95aB8S3hVH66E83wpMqewNq8xXuha/mOaazYXNkBiLeZAQ==",
+      "delegate_card_unsigned": {
+        "grade": "research_grade",
+        "flavor": "health",
+        "consent": {
+          "ai_training_allowed": true
+        },
+        "fingerprint": "sha256:b4b52538d3da9d9fe88535e8368d5c95f6e506f00efd8f8d6061fecf62b7df1e",
+        "issued_at": "2030-01-01T00:10:00Z",
+        "expires": "2030-06-01T00:10:00Z",
+        "issued_by_delegate": "org-001",
+        "delegate_cert_id": "org-001"
+      },
+      "delegate_card_signature_base64": "Xib12mezymd8Zd5lUspsTm+dCreh/5skDgCtHdrisHckJGg36fuIAOijojNXH6Boc/HQeENzwVtgQoGs6KAVBA==",
+      "expected_valid": true
+    },
+    {
+      "id": "delegation_002",
+      "description": "tampered delegate grade not allowed",
+      "base_vector": "delegation_001",
+      "tampered_fields": {
+        "grade": "clinical_grade"
+      },
+      "expected_valid": false,
+      "expected_error_symbol": "MDMP_GRADE_NOT_PERMITTED",
+      "expected_error_string": "delegate_grade_not_allowed"
+    }
+  ]
+}

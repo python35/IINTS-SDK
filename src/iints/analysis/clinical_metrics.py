@@ -144,6 +144,12 @@ class ClinicalMetricsCalculator:
         """
         self.target_range = target_range
         self.tight_range = tight_range
+
+    @staticmethod
+    def _percentage(mask: pd.Series) -> float:
+        if len(mask) == 0:
+            return 0.0
+        return float(mask.sum()) / float(len(mask)) * 100.0
         
     def calculate_tir(self, 
                       glucose: pd.Series, 
@@ -169,13 +175,13 @@ class ClinicalMetricsCalculator:
     def calculate_all_tir_metrics(self, glucose: pd.Series) -> Dict[str, float]:
         """Calculate all TIR-related metrics"""
         return {
-            'tir_70_180': self.calculate_tir(glucose, 70, 180),
-            'tir_70_140': self.calculate_tir(glucose, 70, 140),
-            'tir_70_110': self.calculate_tir(glucose, 70, 110),
-            'tir_below_70': self.calculate_tir(glucose, 0, 70),
-            'tir_below_54': self.calculate_tir(glucose, 0, 54),
-            'tir_above_180': self.calculate_tir(glucose, 180, 600),
-            'tir_above_250': self.calculate_tir(glucose, 250, 600)
+            'tir_70_180': self._percentage((glucose >= 70) & (glucose <= 180)),
+            'tir_70_140': self._percentage((glucose >= 70) & (glucose <= 140)),
+            'tir_70_110': self._percentage((glucose >= 70) & (glucose <= 110)),
+            'tir_below_70': self._percentage(glucose < 70),
+            'tir_below_54': self._percentage(glucose < 54),
+            'tir_above_180': self._percentage(glucose > 180),
+            'tir_above_250': self._percentage(glucose > 250)
         }
     
     def calculate_gmi(self, glucose: pd.Series) -> float:

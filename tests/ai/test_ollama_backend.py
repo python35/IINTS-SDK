@@ -143,3 +143,13 @@ def test_ollama_backend_complete_gives_clear_disconnect_hint(monkeypatch) -> Non
 
     with pytest.raises(RuntimeError, match="closed the generation connection"):
         backend.complete(system_prompt="system", user_prompt="prompt")
+
+
+def test_ollama_backend_rejects_non_http_schemes() -> None:
+    with pytest.raises(ValueError, match="must use http or https"):
+        OllamaBackend(base_url="file:///tmp/ollama.sock")
+
+
+def test_ollama_backend_rejects_remote_hosts_by_default() -> None:
+    with pytest.raises(ValueError, match="Remote Ollama endpoints are disabled"):
+        OllamaBackend(base_url="http://192.168.1.10:11434")

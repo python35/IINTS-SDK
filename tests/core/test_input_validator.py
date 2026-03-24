@@ -15,3 +15,13 @@ def test_input_validator_rejects_unrealistic_glucose_jump():
 
     with pytest.raises(ValueError, match="RATE_OF_CHANGE_ERROR"):
         validator.validate_glucose(200.0, current_time=5.0)
+
+
+def test_input_validator_rejects_out_of_sensor_range_values():
+    validator = InputValidator()
+
+    with pytest.raises(ValueError, match="BIOLOGICAL_PLAUSIBILITY_ERROR"):
+        validator.validate_glucose(39.0, current_time=0.0)
+
+    with pytest.raises(ValueError, match="BIOLOGICAL_PLAUSIBILITY_ERROR"):
+        validator.validate_glucose(501.0, current_time=5.0)

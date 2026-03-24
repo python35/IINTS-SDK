@@ -185,6 +185,8 @@ python -c "import iints; print(iints.__version__)"
 
 - Full update guide: [Updating The SDK](UPDATING.md)
 - Full install/path guide: [Installation And Paths](INSTALLATION.md)
+- Full Ollama + local AI setup guide: [AI Assistant Guide](AI_ASSISTANT.md)
+- Full source legend: [Scientific Evidence & Source Legend](EVIDENCE_BASE.md)
 - Need a fixed environment for a demo or paper? Pin a specific version only when reproducibility matters.
 
 - Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)

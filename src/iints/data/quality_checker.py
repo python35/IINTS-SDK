@@ -10,6 +10,12 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 
+from iints.core.safety.config import (
+    SENSOR_GLUCOSE_MAX_MGDL,
+    SENSOR_GLUCOSE_MIN_MGDL,
+    SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
+)
+
 
 @dataclass
 class QualityReport:
@@ -100,14 +106,16 @@ class DataQualityChecker:
     
     # Physiological limits for glucose values
     GLUCOSE_LIMITS = {
-        'minimum': 20,    # mg/dL - physiologically possible minimum
-        'maximum': 600,   # mg/dL - physiologically possible maximum
+        'minimum': SENSOR_GLUCOSE_MIN_MGDL,  # mg/dL - broad CGM/sensor-valid minimum
+        'maximum': SENSOR_GLUCOSE_MAX_MGDL,  # mg/dL - broad CGM/sensor-valid maximum
         'critical_low': 54,   # mg/dL - clinically significant low
         'critical_high': 350  # mg/dL - clinically significant high
     }
-    
+
     PHYSIOLOGICAL_RATES = {
-        'max_glucose_change_per_min': 19.9 # mg/dL/min - Detecting changes of 20 mg/dL/min or more
+        # Broad fail-soft CGM plausibility cap; common CGM trend-arrow systems
+        # already treat >2 mg/dL/min as "rapid", so this keeps a conservative margin.
+        'max_glucose_change_per_min': SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL
     }
     
     # Expected sampling intervals (in minutes)

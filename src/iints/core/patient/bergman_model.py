@@ -46,7 +46,7 @@ class BergmanParameters:
     n: float = 0.23         # 1/min  — fractional insulin degradation
     Ib: float = 7.0         # mU/L   — basal plasma insulin
     Vi: float = 0.05        # L/kg   — insulin distribution volume
-    gamma: float = 0.004    # (mU/L)/(mg/dL)/min — endogenous secretion gain
+    gamma: float = 0.0      # (mU/L)/(mg/dL)/min — endogenous secretion gain (0 for T1D default)
     h: float = 80.0         # mg/dL  — secretion glucose threshold
 
     # --- Gut absorption ---
@@ -330,7 +330,8 @@ class BergmanPatientModel:
         dXdt = -p.p2 * X + p.p3 * max(I - p.Ib, 0.0)
 
         # --- dI/dt ---
-        # Endogenous pancreatic secretion (blunted in T1D, but kept for generality)
+        # T1D defaults keep endogenous secretion disabled (gamma=0). Override
+        # gamma explicitly if you intentionally want residual beta-cell function.
         secretion = p.gamma * max(G - p.h, 0.0)
         dIdt = -p.n * (I - p.Ib) + secretion + u_insulin_mu_per_min / Vi_abs
 

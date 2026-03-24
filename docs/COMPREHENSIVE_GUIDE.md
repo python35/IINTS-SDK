@@ -181,6 +181,7 @@ The central class for running simulations. It orchestrates the patient model, al
 *   `add_stress_event()`: Adds predefined stress events (e.g., missed meal, exercise).
 *   `enable_profiling=True`: Records algorithm, supervisor, and step latency.
 *   `critical_glucose_threshold` / `critical_glucose_duration_minutes`: Automatically stops the simulation if glucose is critically low for too long (default: <40 mg/dL for 30 minutes).
+*   Input plausibility checks now use broad CGM/sensor bounds by default (`40-500 mg/dL`) instead of treating the full simulator envelope as sensor-valid input.
 
 ### `iints.data.ingestor.DataIngestor`
 

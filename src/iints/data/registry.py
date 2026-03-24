@@ -5,8 +5,10 @@ import urllib.request
 import zipfile
 import hashlib
 import shutil
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Dict, List, Optional, IO, cast
+from urllib.parse import urlparse
 
 try:  # Python 3.9+
     from importlib.resources import files
@@ -54,10 +56,30 @@ def list_dataset_ids() -> List[str]:
     return ids
 
 
+def _is_loopback_host(hostname: str) -> bool:
+    if hostname == "localhost":
+        return True
+    try:
+        return ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
+def _validate_download_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme == "https":
+        return url
+    if parsed.scheme == "http" and parsed.hostname and _is_loopback_host(parsed.hostname):
+        return url
+    raise DatasetFetchError(
+        "Dataset download URL must use https, or http only for localhost/loopback development mirrors."
+    )
+
+
 def _download_file(url: str, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        urllib.request.urlretrieve(url, output_path)
+        urllib.request.urlretrieve(_validate_download_url(url), output_path)  # nosec B310 - URL is scheme validated before download
     except Exception as exc:
         raise DatasetFetchError(f"Failed to download {url}: {exc}") from exc
     return output_path

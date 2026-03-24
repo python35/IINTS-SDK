@@ -2,16 +2,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+SENSOR_GLUCOSE_MIN_MGDL = 40.0
+SENSOR_GLUCOSE_MAX_MGDL = 500.0
+SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL = 20.0
+SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL = 4.0
+SIMULATION_GLUCOSE_FLOOR_MGDL = 20.0
+SIMULATION_GLUCOSE_CEILING_MGDL = 600.0
+
 
 @dataclass
 class SafetyConfig:
     """
     Central safety configuration for simulator, input validation, and supervisor.
     """
-    # Input validation limits
-    min_glucose: float = 20.0
-    max_glucose: float = 600.0
-    max_glucose_delta_per_5_min: float = 35.0
+    # Broad CGM/sensor plausibility limits.
+    # These are intentionally device-aware fail-soft bounds, not a claim about
+    # the full physiologic envelope of blood glucose inside the simulator.
+    min_glucose: float = SENSOR_GLUCOSE_MIN_MGDL
+    max_glucose: float = SENSOR_GLUCOSE_MAX_MGDL
+    max_glucose_delta_per_5_min: float = SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL
 
     # Supervisor thresholds
     hypoglycemia_threshold: float = 70.0

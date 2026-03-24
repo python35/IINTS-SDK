@@ -1,0 +1,24 @@
+{
+  "suite": "mdmp_fingerprint_v1",
+  "algorithm": "sha256(raw_file_bytes)",
+  "vectors": [
+    {
+      "id": "fingerprint_001",
+      "description": "single-row CSV",
+      "input_bytes_hex": "676c75636f73652c74696d657374616d700a3131322c323032362d30312d30315430303a30303a30305a0a",
+      "expected_fingerprint": "sha256:b4b52538d3da9d9fe88535e8368d5c95f6e506f00efd8f8d6061fecf62b7df1e"
+    },
+    {
+      "id": "fingerprint_002",
+      "description": "two-row CSV",
+      "input_bytes_hex": "74696d657374616d702c676c75636f73650a323032362d30312d30315430303a30303a30305a2c3131320a323032362d30312d30315430303a30353a30305a2c3131350a",
+      "expected_fingerprint": "sha256:9e780a05fcf23a784ec2dfb31be524d3acd8bbc2ed977cbfda6f3165b6bfcbbe"
+    },
+    {
+      "id": "fingerprint_003",
+      "description": "empty file",
+      "input_bytes_hex": "",
+      "expected_fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

@@ -4,6 +4,12 @@ from typing import Dict, List, Tuple, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
+from iints.core.safety.config import (
+    SENSOR_GLUCOSE_MAX_MGDL,
+    SENSOR_GLUCOSE_MIN_MGDL,
+    SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
+)
+
 class ReliabilityLevel(Enum):
     HIGH = "high"
     MEDIUM = "medium" 
@@ -22,9 +28,9 @@ class DataIntegrityValidator:
     """Validates data integrity for reverse engineering analysis."""
     
     def __init__(self):
-        # Physiological limits
-        self.max_glucose_rate = 10  # mg/dL per minute
-        self.glucose_range = (20, 600)  # Physiologically possible range
+        # Broad CGM/sensor fail-soft limits
+        self.max_glucose_rate = SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL
+        self.glucose_range = (SENSOR_GLUCOSE_MIN_MGDL, SENSOR_GLUCOSE_MAX_MGDL)
         self.max_insulin_per_step = 5.0  # Units per 5-min step
         
     def validate_glucose_data(self, glucose_values: List[float], timestamps: List[float]) -> ValidationResult:

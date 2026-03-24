@@ -245,7 +245,7 @@ def _load_mdmp_signer_tools() -> tuple[type[Any], Any]:
         module = importlib.import_module("mdmp_core")
     except Exception as exc:
         raise ImportError(
-            "Local AI certification requires the optional standalone MDMP package.\n"
+            "Local AI certification requires the bundled MDMP crypto support.\n"
             "Install with: pip install 'iints-sdk-python35[mdmp]'"
         ) from exc
 

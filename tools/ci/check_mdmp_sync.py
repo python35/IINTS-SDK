@@ -22,7 +22,7 @@ def main() -> None:
         from mdmp_core.runner import MDMP_GRADE_ORDER as EXTERNAL_GRADE_ORDER
     except Exception as exc:  # pragma: no cover - depends on CI environment
         raise RuntimeError(
-            "Standalone mdmp_core is not importable. Install mdmp-protocol before running this check."
+            "Bundled mdmp_core is not importable. Install the SDK with the mdmp extra before running this check."
         ) from exc
 
     from iints.mdmp.backend import (
@@ -94,7 +94,7 @@ def main() -> None:
     _assert("<html" in html.lower(), "Dashboard renderer did not return HTML")
     _assert("MDMP Sync Check" in html, "Dashboard title missing in rendered HTML")
 
-    print("MDMP sync check passed: SDK backend is aligned with standalone mdmp_core.")
+    print("MDMP sync check passed: SDK backend is aligned with bundled mdmp_core.")
 
 
 if __name__ == "__main__":

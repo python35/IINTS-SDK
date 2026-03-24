@@ -62,6 +62,96 @@ python -m pip install -U pip
 python -m pip install -e ".[mdmp]"
 ```
 
+## Clean Ollama Setup (Small Version)
+
+This is the shortest reliable setup if you want the local AI layer working end to end.
+
+### 1. Install the SDK
+
+Released SDK:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[mdmp]"
+```
+
+Source checkout:
+
+```bash
+cd /path/to/IINTS-SDK
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U -e ".[mdmp]"
+```
+
+### 2. Install Ollama
+
+On macOS/Linux, the quick official path is:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama -v
+```
+
+If you are on Windows, install Ollama first via the official installer and then reopen your terminal.
+
+### 3. Start Ollama
+
+```bash
+ollama serve
+```
+
+If Ollama is already running as a service, you do not need to start it manually again.
+
+### 4. Pull a local model
+
+Balanced default:
+
+```bash
+ollama pull ministral-3:8b
+```
+
+Smaller fallback:
+
+```bash
+ollama pull ministral-3:3b
+```
+
+### 5. Link Ollama to the SDK
+
+By default, the SDK looks for Ollama here:
+
+```text
+http://127.0.0.1:11434
+```
+
+So on a normal single-machine setup, there is nothing extra to configure.
+
+If you want to set it explicitly:
+
+```bash
+export OLLAMA_HOST=http://127.0.0.1:11434
+```
+
+If you want to override it for one command only:
+
+```bash
+iints ai local-check \
+  --model ministral-3:8b \
+  --ollama-host http://127.0.0.1:11434
+```
+
+Important notes:
+
+- `OLLAMA_HOST` is the normal way to point the SDK at a non-default local Ollama endpoint.
+- Remote Ollama endpoints are blocked by default. Only enable them deliberately.
+- If you truly want to connect to a non-loopback Ollama host, you must also set `IINTS_ALLOW_REMOTE_OLLAMA=1`.
+
+### 6. Verify the full chain
+
 Install and check the local model:
 
 ```bash

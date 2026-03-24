@@ -293,7 +293,15 @@ def load_predictor(model_path: Path) -> Tuple["LSTMPredictor", dict]:
         raise ImportError(
             "Torch is required for predictor loading. Install with `pip install iints-sdk-python35[research]`."
         ) from _IMPORT_ERROR
-    payload = torch.load(model_path, map_location="cpu", weights_only=False)
+    try:
+        payload = torch.load(model_path, map_location="cpu", weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "This PyTorch build does not support secure checkpoint loading. "
+            "Upgrade torch to a version with `weights_only=True` support."
+        ) from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("Predictor checkpoint must decode to a dictionary payload.")
     config = payload["config"]
     model = LSTMPredictor(
         input_size=config["input_size"],

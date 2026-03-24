@@ -1,0 +1,17 @@
+IINTS-AF SDK
+Copyright (c) 2026 IINTS-AF Contributors
+
+This distribution now bundles MDMP components directly inside the SDK source tree,
+including `mdmp_core`, `mdmp_ai`, `mdmp_flavors`, and `mdmp_integrations`.
+
+Bundled MDMP code originates from the MDMP project and is included here under
+the Apache License, Version 2.0.
+
+The original IINTS-AF SDK was previously distributed under the MIT License.
+The preserved MIT notice for legacy IINTS-origin portions is included in:
+
+`LICENSE-MIT-IINTS-LEGACY`
+
+Research-use notice:
+This software is intended for academic and pre-clinical research purposes only.
+It is not a medical device and does not provide clinical dosing advice.

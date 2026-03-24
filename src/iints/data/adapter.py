@@ -10,6 +10,8 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 
+from iints.core.safety.config import SENSOR_GLUCOSE_MAX_MGDL, SENSOR_GLUCOSE_MIN_MGDL
+
 class DataAdapter:
     """Universal data adapter for IINTS-AF framework"""
     
@@ -51,8 +53,11 @@ class DataAdapter:
             raise ValueError(f"Missing required columns: {missing_cols}")
         
         # Validate glucose range
-        if df['glucose'].min() < 20 or df['glucose'].max() > 600:
-            raise ValueError("Glucose values outside physiological range (20-600 mg/dL)")
+        if df['glucose'].min() < SENSOR_GLUCOSE_MIN_MGDL or df['glucose'].max() > SENSOR_GLUCOSE_MAX_MGDL:
+            raise ValueError(
+                "Glucose values outside broad CGM/sensor-valid range "
+                f"({int(SENSOR_GLUCOSE_MIN_MGDL)}-{int(SENSOR_GLUCOSE_MAX_MGDL)} mg/dL)"
+            )
     
     def load_ohio_dataset(self, patient_id: str) -> pd.DataFrame:
         """Load Ohio T1DM dataset with clinical benchmarks"""

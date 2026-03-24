@@ -1,0 +1,83 @@
+{
+  "suite": "mdmp_grading_v1",
+  "grade_order": ["raw", "draft", "research_grade", "clinical_grade", "ai_ready"],
+  "vectors": [
+    {
+      "id": "grading_001",
+      "input": {
+        "score": 99.0,
+        "is_compliant": false,
+        "consent_policy_ok": true,
+        "consent_window_ok": true
+      },
+      "expected_grade": "raw",
+      "expected_reason": "non_compliant_schema_or_bounds"
+    },
+    {
+      "id": "grading_002",
+      "input": {
+        "score": 99.0,
+        "is_compliant": true,
+        "consent_policy_ok": false,
+        "consent_window_ok": true
+      },
+      "expected_grade": "research_grade",
+      "expected_reason": "consent_policy_not_verified"
+    },
+    {
+      "id": "grading_003",
+      "input": {
+        "score": 99.0,
+        "is_compliant": true,
+        "consent_policy_ok": true,
+        "consent_window_ok": false
+      },
+      "expected_grade": "research_grade",
+      "expected_reason": "consent_window_not_valid"
+    },
+    {
+      "id": "grading_004",
+      "input": {
+        "score": 70.0,
+        "is_compliant": true,
+        "consent_policy_ok": true,
+        "consent_window_ok": true
+      },
+      "expected_grade": "draft",
+      "expected_reason": "low_validation_score"
+    },
+    {
+      "id": "grading_005",
+      "input": {
+        "score": 82.5,
+        "is_compliant": true,
+        "consent_policy_ok": true,
+        "consent_window_ok": true
+      },
+      "expected_grade": "research_grade",
+      "expected_reason": "medium_validation_score"
+    },
+    {
+      "id": "grading_006",
+      "input": {
+        "score": 93.0,
+        "is_compliant": true,
+        "consent_policy_ok": true,
+        "consent_window_ok": true
+      },
+      "expected_grade": "clinical_grade",
+      "expected_reason": "high_score_but_not_ai_ready_threshold"
+    },
+    {
+      "id": "grading_007",
+      "input": {
+        "score": 97.1,
+        "is_compliant": true,
+        "consent_policy_ok": true,
+        "consent_window_ok": true
+      },
+      "expected_grade": "ai_ready",
+      "expected_reason": "all_checks_passed_with_valid_consent"
+    }
+  ]
+}

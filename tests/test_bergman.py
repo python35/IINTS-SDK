@@ -11,6 +11,12 @@ class TestBergmanPatientModel:
         assert model.current_glucose == 120.0
         assert model.insulin_on_board == 0.0
         assert model.carbs_on_board == 0.0
+        assert model.params.gamma == 0.0
+
+    def test_default_t1d_mode_disables_endogenous_secretion(self):
+        model = BergmanPatientModel(initial_glucose=220.0)
+        d_state = model._ode(0.0, model._state.copy(), 0.0, 0.0)
+        assert d_state[2] == pytest.approx(0.0), "Default T1D Bergman mode should not add endogenous insulin secretion"
 
     def test_reset(self):
         model = BergmanPatientModel(initial_glucose=130.0)

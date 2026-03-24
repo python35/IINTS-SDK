@@ -61,6 +61,86 @@ ERROR: ... does not appear to be a Python project
 
 you are almost certainly not inside the repository root.
 
+## Optional: Add Local Ollama AI
+
+If you want the local research AI features, there is one extra component:
+
+- the SDK itself
+- a local Ollama server
+- a local open Mistral-family model such as `ministral-3:8b` or `ministral-3:3b`
+
+The SDK talks to Ollama over HTTP.
+By default it expects:
+
+```text
+http://127.0.0.1:11434
+```
+
+### Small Setup Sequence
+
+1. Install Ollama
+
+On macOS/Linux, the quickest path is:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama -v
+```
+
+On Windows, install Ollama from the official download page first, then open a new terminal.
+
+2. Start Ollama
+
+```bash
+ollama serve
+```
+
+If Ollama is already running as a background service on your machine, you do not need to start it again.
+
+3. Pull a local model
+
+Balanced default:
+
+```bash
+ollama pull ministral-3:8b
+```
+
+Lighter fallback for smaller machines:
+
+```bash
+ollama pull ministral-3:3b
+```
+
+4. Link Ollama to IINTS and verify
+
+If you use the default local endpoint, the SDK finds Ollama automatically.
+If you want to make the link explicit, set:
+
+```bash
+export OLLAMA_HOST=http://127.0.0.1:11434
+```
+
+Then verify the connection:
+
+```bash
+iints ai local-check --model ministral-3:8b
+```
+
+You can also override the endpoint per command:
+
+```bash
+iints ai local-check \
+  --model ministral-3:8b \
+  --ollama-host http://127.0.0.1:11434
+```
+
+Important:
+
+- `OLLAMA_HOST` is the normal way to point the SDK at a non-default local Ollama endpoint.
+- Remote Ollama endpoints are blocked by default for safety. Only enable them intentionally.
+- If `ministral-3:8b` is unstable on your hardware, try `ministral-3:3b` first.
+- Full AI usage guide: `docs/AI_ASSISTANT.md`
+
 ## Folder Map
 
 There are three important places to keep straight:

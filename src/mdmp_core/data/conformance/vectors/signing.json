@@ -1,0 +1,37 @@
+{
+  "suite": "mdmp_signing_v1",
+  "canonicalization": {
+    "sort_keys": true,
+    "separators": [",", ":"],
+    "encoding": "utf-8"
+  },
+  "vectors": [
+    {
+      "id": "signing_001",
+      "description": "root signing happy path",
+      "private_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "public_key_raw_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+      "unsigned_card": {
+        "fingerprint": "sha256:b4b52538d3da9d9fe88535e8368d5c95f6e506f00efd8f8d6061fecf62b7df1e",
+        "grade": "draft"
+      },
+      "expected_digest_hex": "9b6d7e6561c111a900f30afc0b85d5b5b98464734722e6fbcb0aed74e7972621",
+      "expected_signature_base64": "DWRkSQNX/5EqYriHo/eW8c+TyLcZFqogeoEI9X+NJzFxTctYfzABRqFfBoBOxf3mwLW1TxmkZKMkutCgxvwFBw==",
+      "expected_valid": true
+    },
+    {
+      "id": "signing_002",
+      "description": "tampered payload must fail with original signature",
+      "private_seed_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "public_key_raw_hex": "03a107bff3ce10be1d70dd18e74bc09967e4d6309ba50d5f1ddc8664125531b8",
+      "unsigned_card": {
+        "fingerprint": "sha256:b4b52538d3da9d9fe88535e8368d5c95f6e506f00efd8f8d6061fecf62b7df1e",
+        "grade": "clinical_grade"
+      },
+      "signature_base64_from_vector": "DWRkSQNX/5EqYriHo/eW8c+TyLcZFqogeoEI9X+NJzFxTctYfzABRqFfBoBOxf3mwLW1TxmkZKMkutCgxvwFBw==",
+      "expected_valid": false,
+      "expected_error_symbol": "MDMP_SIGNATURE_INVALID",
+      "expected_error_string": "signature_verification_failed_or_card_invalid"
+    }
+  ]
+}

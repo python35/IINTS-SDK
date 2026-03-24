@@ -1,66 +1,62 @@
-# Dual Repo Workflow (IINTS-SDK + MDMP)
+# Bundled MDMP Workflow
 
-This project now runs with two repositories:
+The SDK no longer depends on a separate public MDMP repository checkout.
 
-- SDK: `python35/IINTS-SDK`
-- MDMP: `python35/MDMP`
+## What changed
 
-## Goal
-Keep simulation/runtime concerns in SDK and protocol/provenance concerns in MDMP, while shipping both in lockstep.
+MDMP now ships inside the SDK source tree as bundled Python packages:
+
+- `src/mdmp_core/`
+- `src/mdmp_ai/`
+- `src/mdmp_flavors/`
+- `src/mdmp_integrations/`
+
+That means:
+
+- the SDK can keep its `iints mdmp ...` namespace
+- local AI MDMP certification can keep using `mdmp_core`
+- the standalone `mdmp` CLI can still be exposed from the SDK package
+- the old dual-repo maintenance flow is no longer required
 
 ## CI sync gate
 
-SDK now contains a dedicated workflow:
+The compatibility gate remains, but it now checks:
+
+- SDK wrapper behavior
+- bundled `mdmp_core` behavior
+
+Workflow:
 
 - `.github/workflows/mdmp-sync.yml`
 
-It installs the standalone MDMP package from `python35/MDMP` and runs:
+Check script:
 
 - `tools/ci/check_mdmp_sync.py`
 
-The gate fails if SDK MDMP backend behavior diverges from standalone `mdmp_core`
-(grade order, validation result surface, fingerprints, or dashboard generation contract).
+## Practical install modes
 
-The gate runs daily and supports both source modes:
-
-- Repo mode: checkout `python35/MDMP` with `MDMP_REPO_TOKEN` when configured.
-- Package mode: fallback to `mdmp-protocol` from PyPI when repo checkout is unavailable.
-
-Dependency refresh for MDMP package updates is handled by Dependabot (`.github/dependabot.yml`).
-
-## Local layout
-
-```text
-IINTS-SDK-main/
-  local/mdmp-private/   # standalone MDMP repo clone/worktree
-```
-
-## Daily workflow
-
-1. Check both repos:
+### SDK only
 
 ```bash
-tools/dev/dual_repo_status.sh
+python -m pip install -U "iints-sdk-python35"
 ```
 
-2. Implement SDK changes and/or MDMP changes.
-3. Run tests in both repos.
-4. Commit/push both:
+### SDK with bundled MDMP crypto/signing support
 
 ```bash
-tools/dev/dual_repo_commit_push.sh \
-  --sdk-msg "SDK: <change summary>" \
-  --mdmp-msg "MDMP: <change summary>"
+python -m pip install -U "iints-sdk-python35[mdmp]"
 ```
+
+The `mdmp` extra now enables the cryptographic pieces needed for signing and verification.
 
 ## MDMP backend in SDK
 
-SDK MDMP commands can use either backend:
+SDK MDMP commands can still use either backend name:
 
-- `iints` (default): built-in SDK MDMP runtime
-- `mdmp_core` (optional): standalone MDMP package
+- `iints` (built-in contract/runtime path)
+- `mdmp_core` (bundled MDMP package path)
 
-Set backend explicitly:
+Set backend explicitly if you want the bundled `mdmp_core` route:
 
 ```bash
 export IINTS_MDMP_BACKEND=mdmp_core
@@ -72,14 +68,4 @@ Then run:
 iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
 ```
 
-The command summary prints the active backend so provenance is explicit.
-
-For stale lineage handling with standalone MDMP:
-
-```bash
-mdmp fingerprint-record data/my_cgm.csv --output-json results/fingerprint.json --expires-days 365
-mdmp fingerprint-check results/fingerprint.json data/my_cgm.csv
-mdmp lineage-card-refresh results/mdmp_model_card.yaml
-mdmp registry init --registry registry/mdmp_registry.json
-mdmp registry push --registry registry/mdmp_registry.json --report results/mdmp_report.json
-```
+The command summary prints the active backend so provenance stays explicit.

@@ -203,6 +203,43 @@ python -m pip install -U -e ".[mdmp]"
 pip install iints-sdk-python35[research]
 ```
 
+#### Optional: Add Ollama For Local AI
+
+If you want the local research AI features, the SDK needs a local Ollama server plus a local model.
+
+Default endpoint:
+
+```text
+http://127.0.0.1:11434
+```
+
+Quick setup:
+
+```bash
+# Install Ollama (macOS/Linux quick path)
+curl -fsSL https://ollama.com/install.sh | sh
+ollama -v
+
+# Start Ollama if it is not already running as a service
+ollama serve
+
+# Pull a model
+ollama pull ministral-3:8b
+
+# Link it explicitly to the SDK if desired
+export OLLAMA_HOST=http://127.0.0.1:11434
+
+# Verify the full path
+iints ai local-check --model ministral-3:8b
+```
+
+Practical notes:
+- the SDK auto-uses `http://127.0.0.1:11434` when `OLLAMA_HOST` is not set
+- use `ministral-3:3b` on smaller machines
+- use `--ollama-host ...` if you want to override the endpoint per command
+- remote Ollama hosts are blocked by default unless intentionally enabled
+- full AI guide: `docs/AI_ASSISTANT.md`
+
 **Folder rule**
 
 - Installed `iints ...` commands can run from any folder.
@@ -723,9 +760,9 @@ The IndependentSupervisor applies these checks **in order**:
 The InputValidator checks:
 
 ```python
-# Glucose range validation
-if glucose < 20 or glucose > 600:
-    raise InvalidGlucoseError(f"Glucose {glucose} outside valid range")
+# Broad CGM/sensor plausibility validation
+if glucose < 40 or glucose > 500:
+    raise InvalidGlucoseError(f"Glucose {glucose} outside broad sensor-valid range")
 
 # Insulin request validation
 if insulin < 0 or insulin > config.max_bolus:
@@ -1469,6 +1506,13 @@ ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
 ```
 
+If you want to make the Ollama link explicit:
+
+```bash
+export OLLAMA_HOST=http://127.0.0.1:11434
+iints ai local-check --model ministral-3:8b
+```
+
 `local-check` now includes a small generation smoke-test by default, so it verifies real model inference readiness and not just basic Ollama reachability.
 
 **Recommended run workflow**
@@ -1569,6 +1613,18 @@ Suggested rule:
 - move up to `ministral-3:14b` only if you have headroom and want better answer quality
 - Oversized JSON payloads are clipped automatically before prompt construction so local inference stays practical on smaller systems.
 - Use `--timeout-seconds 120` or higher for slower edge hardware.
+
+**Full source legend**
+
+If you want the full human-readable legend of the medical, dataset, runtime, and emulation references used across the SDK guides and defaults, see:
+
+- `docs/EVIDENCE_BASE.md`
+
+If you want the packaged machine-readable subset from the installed SDK:
+
+```bash
+iints sources --output-json results/source_manifest.json
+```
 
 ## 11. Poster-Ready Results for Jury Demos
 
@@ -2009,4 +2065,4 @@ SafetyConfig(
 This document is provided for research and educational purposes only.
 The IINTS-AF SDK is not a medical device and should not be used for clinical decision-making.
 
-(C) 2026 IINTS-AF Project. Licensed under MIT License.
+(C) 2026 IINTS-AF Project. Distributed under Apache License 2.0.

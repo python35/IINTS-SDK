@@ -63,14 +63,14 @@ class PatientFactory:
         """Get a diverse set of patients for population studies."""
         if not SIMGLUCOSE_AVAILABLE:
             # Create diverse custom patients with different parameters
-            return [
-                CustomPatientModel(initial_glucose=120, insulin_sensitivity=40),  # High sensitivity
-                CustomPatientModel(initial_glucose=120, insulin_sensitivity=60),  # Low sensitivity
-                CustomPatientModel(initial_glucose=120, carb_factor=8),          # Fast carb absorption
-                CustomPatientModel(initial_glucose=120, carb_factor=12),         # Slow carb absorption
-                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.0015), # Slow metabolism
-                CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.0035), # Fast metabolism
-            ]
+                return [
+                    CustomPatientModel(initial_glucose=120, insulin_sensitivity=40),  # High sensitivity
+                    CustomPatientModel(initial_glucose=120, insulin_sensitivity=60),  # Low sensitivity
+                    CustomPatientModel(initial_glucose=120, carb_factor=8),          # Fast carb absorption
+                    CustomPatientModel(initial_glucose=120, carb_factor=12),         # Slow carb absorption
+                    CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.03), # Slower homeostatic drift
+                    CustomPatientModel(initial_glucose=120, glucose_decay_rate=0.07), # Faster homeostatic drift
+                ]
         else:
             # Use FDA-approved virtual patients
             selected_patients = [

@@ -767,7 +767,7 @@ tools/docs/build_manuals.sh
 
 ## Safety Architecture
 * **IndependentSupervisor**: deterministic safety layer that caps insulin, blocks dangerous doses, and logs interventions.
-* **InputValidator**: filters CGM noise and blocks physiologically impossible glucose values.
+* **InputValidator**: applies broad CGM/sensor plausibility bounds (default `40-500 mg/dL`) and rate-of-change checks before an algorithm sees a glucose value.
 * **Deterministic Audit**: every decision is logged for accountability and explainability.
 
 ## Roadmap

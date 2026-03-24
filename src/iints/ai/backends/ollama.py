@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+from ipaddress import ip_address
 from http.client import IncompleteRead, RemoteDisconnected
 from time import sleep
 from urllib import error, request
+from urllib.parse import urlparse
 
 
 DEFAULT_OLLAMA_HOST = "http://127.0.0.1:11434"
@@ -35,9 +37,37 @@ class OllamaBackend:
         timeout_seconds: float = 120.0,
     ) -> None:
         self.model_name = model_name
-        self.base_url = (base_url or os.getenv("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST).rstrip("/")
+        raw_base_url = base_url or os.getenv("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST
+        self.base_url = self._validate_base_url(raw_base_url)
         self.timeout_seconds = timeout_seconds
         self.resolved_model_name: str | None = None
+
+    @staticmethod
+    def _is_loopback_host(hostname: str) -> bool:
+        if hostname == "localhost":
+            return True
+        try:
+            return ip_address(hostname).is_loopback
+        except ValueError:
+            return False
+
+    @classmethod
+    def _validate_base_url(cls, raw_base_url: str) -> str:
+        parsed = urlparse(raw_base_url)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError(
+                "OLLAMA_HOST/base_url must use http or https. Other URL schemes are blocked."
+            )
+        if not parsed.hostname:
+            raise ValueError("OLLAMA_HOST/base_url must include a hostname.")
+        if parsed.path not in {"", "/"}:
+            raise ValueError("OLLAMA_HOST/base_url must not include a path component.")
+        if not cls._is_loopback_host(parsed.hostname) and os.getenv("IINTS_ALLOW_REMOTE_OLLAMA") != "1":
+            raise ValueError(
+                "Remote Ollama endpoints are disabled by default. "
+                "Use localhost/127.0.0.1 or set IINTS_ALLOW_REMOTE_OLLAMA=1 explicitly."
+            )
+        return raw_base_url.rstrip("/")
 
     def _pull_hint(self) -> str:
         return f"ollama pull {self.model_name}"
@@ -102,7 +132,7 @@ class OllamaBackend:
             headers["Content-Type"] = "application/json"
         req = request.Request(url, data=body, headers=headers, method=method)
         try:
-            with request.urlopen(req, timeout=self.timeout_seconds) as response:
+            with request.urlopen(req, timeout=self.timeout_seconds) as response:  # nosec B310 - base_url is scheme/host validated
                 text = response.read().decode("utf-8")
         except error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace").strip()

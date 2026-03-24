@@ -50,6 +50,7 @@ coverage.xml
 local/
 .DS_Store
 .mplt_demo/
+.mplt_test/
 .cache_demo/
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/

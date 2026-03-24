@@ -1,13 +1,47 @@
-# Scientific Evidence & Sources
+# Scientific Evidence & Source Legend
 
-This file documents the scientific sources used to shape IINTS-AF defaults, validation targets, and report framing.
+This file documents the scientific and technical sources used to shape IINTS-AF defaults, validation targets, report framing, local AI setup guidance, and best-effort device emulation notes.
 
 Scope:
 - Pre-clinical simulation and retrospective forecasting only.
 - Not a treatment recommendation engine.
 - Not a medical device.
 
-Use `iints sources` to print the same source manifest from the packaged SDK.
+Use `iints sources` to print the packaged source manifest from the installed SDK.
+
+## How To Read This Legend
+
+There are two source buckets in this project:
+
+1. **Packaged evidence sources**
+   These are the core medical and dataset references shipped with the SDK and exposed through `iints sources`.
+
+2. **Documentation-only implementation sources**
+   These are the additional references used in the guides for:
+   - Ollama setup
+   - local open Mistral model selection
+   - best-effort device emulation context
+
+That split is intentional:
+- the packaged manifest stays focused on repeatable research evidence
+- this page stays readable as the full legend for humans
+
+## Category Legend
+
+| Category | Meaning |
+|---|---|
+| `guideline` | formal standards or standards-of-care style guidance |
+| `consensus` | expert consensus used for interpretation targets |
+| `trial` | clinical or comparative outcome study |
+| `pharmacology` | insulin PK/PD reference |
+| `sensor` | CGM behavior, lag, or sensor interpretation source |
+| `model` | mathematical or simulator foundation source |
+| `dataset` | public dataset provenance source |
+| `runtime` | technical runtime or installation reference for local AI |
+| `model_card` | model-family reference for local Mistral choices |
+| `regulatory` | manufacturer or regulator-facing system reference |
+| `technical_manual` | user guide or product documentation |
+| `clinical_trial` | named trial registry or trial program page |
 
 ## How Sources Map to SDK Components
 
@@ -23,8 +57,10 @@ Use `iints sources` to print the same source manifest from the packaged SDK.
 | Simulator realism/validation framing | Align in-silico model evaluation with accepted simulator literature | `visentin_2018_uvapadova` |
 | Exercise stress scenarios | Use consensus guidance for exercise-related glucose behavior | `riddell_2017_exercise_consensus` |
 | Forecast training data provenance | Use publicly documented dataset references | `marling_2020_ohiot1dm` |
+| Local AI setup and model selection docs | Keep Ollama and open Mistral setup instructions grounded in official docs | `ollama_linux_install`, `mistral_2025_ministral_3_announcement`, `mistral_2025_ministral_3_3b`, `mistral_2025_ministral_3_8b`, `mistral_2025_ministral_3_14b` |
+| Device emulation notes | Provide best-effort references behind 780G / Control-IQ / Omnipod 5 approximations | `bergenstal_2020_780g`, `fda_k193510_780g`, `medtronic_780g_user_guide`, `brown_2019_control_iq_dtt`, `fda_k191289_control_iq`, `idcl_nct03563313`, `control_iq_user_guide`, `assert_omnipod_5`, `onset_omnipod_5`, `fda_k203467_omnipod5`, `omnipod5_user_guide` |
 
-## Source List
+## Packaged Medical And Dataset Sources
 
 1. `ada_2026_glycemic_goals`  
    ADA Professional Practice Committee. *Glycemic Goals and Hypoglycemia: Standards of Care in Diabetes—2026*.  
@@ -78,9 +114,93 @@ Use `iints sources` to print the same source manifest from the packaged SDK.
     Marling C, Bunescu R. *The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020*. CEUR Workshop Proceedings.  
     Paper: [ceur-ws.org/Vol-2675/paper2.pdf](http://ceur-ws.org/Vol-2675/paper2.pdf)
 
+## Documentation-Only Local AI Setup Sources
+
+These are the official references used in the guides for installing Ollama, understanding the local Ministral 3 family, and explaining why the SDK recommends different model sizes for different hardware.
+
+1. `ollama_linux_install`  
+   Ollama. *Linux Installation Documentation*.  
+   URL: [docs.ollama.com/linux](https://docs.ollama.com/linux)
+
+2. `mistral_2025_ministral_3_announcement`  
+   Mistral AI. *Introducing Mistral 3*.  
+   URL: [mistral.ai/news/mistral-3](https://mistral.ai/news/mistral-3)
+
+3. `mistral_2025_ministral_3_3b`  
+   Mistral AI Docs. *Ministral 3 3B*.  
+   URL: [docs.mistral.ai/models/ministral-3-3b-25-12](https://docs.mistral.ai/models/ministral-3-3b-25-12)
+
+4. `mistral_2025_ministral_3_8b`  
+   Mistral AI Docs. *Ministral 3 8B*.  
+   URL: [docs.mistral.ai/models/ministral-3-8b-25-12](https://docs.mistral.ai/models/ministral-3-8b-25-12)
+
+5. `mistral_2025_ministral_3_14b`  
+   Mistral AI Docs. *Ministral 3 14B*.  
+   URL: [docs.mistral.ai/models/ministral-3-14b-25-12](https://docs.mistral.ai/models/ministral-3-14b-25-12)
+
+## Documentation-Only Device Emulation References
+
+These references are used for the best-effort emulator notes and are not claims of exact proprietary algorithm reproduction.
+
+### Medtronic MiniMed 780G
+
+1. `bergenstal_2020_780g`  
+   Bergenstal RM, et al. *Safety of a Hybrid Closed-Loop Insulin Delivery System in Patients With Type 1 Diabetes*.  
+   DOI: [10.1056/NEJMoa2003479](https://doi.org/10.1056/NEJMoa2003479)
+
+2. `fda_k193510_780g`  
+   U.S. FDA. *510(k) K193510 - MiniMed 780G System*.  
+   URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
+
+3. `medtronic_780g_user_guide`  
+   Medtronic Diabetes. *MiniMed 780G User Guide / Product Documentation*.  
+   URL: [medtronicdiabetes.com](https://www.medtronicdiabetes.com/)
+
+### Tandem Control-IQ
+
+4. `brown_2019_control_iq_dtt`  
+   Brown SA, et al. *Performance of the Tandem t:slim X2 insulin pump with Control-IQ technology in the International Diabetes Closed-Loop trial*.  
+   DOI: [10.1089/dia.2019.0226](https://doi.org/10.1089/dia.2019.0226)
+
+5. `fda_k191289_control_iq`  
+   U.S. FDA. *510(k) K191289 - Control-IQ System*.  
+   URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
+
+6. `idcl_nct03563313`  
+   ClinicalTrials.gov. *International Diabetes Closed Loop Trial*.  
+   URL: [clinicaltrials.gov/ct2/show/NCT03563313](https://clinicaltrials.gov/ct2/show/NCT03563313)
+
+7. `control_iq_user_guide`  
+   Tandem Diabetes Care. *Control-IQ User Guide / Product Documentation*.  
+   URL: [tandemdiabetes.com](https://www.tandemdiabetes.com/)
+
+### Omnipod 5
+
+8. `assert_omnipod_5`  
+   Insulet / Omnipod. *ASSERT Trial - Omnipod 5*.  
+   URL: [omnipod.com/assert-trial](https://www.omnipod.com/assert-trial)
+
+9. `onset_omnipod_5`  
+   Insulet / Omnipod. *ONSET Trial - Omnipod 5 in Type 2 Diabetes*.  
+   URL: [omnipod.com/onset-trial](https://www.omnipod.com/onset-trial)
+
+10. `fda_k203467_omnipod5`  
+    U.S. FDA. *510(k) K203467 - Omnipod 5 System*.  
+    URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
+
+11. `omnipod5_user_guide`  
+    Insulet / Omnipod. *Omnipod 5 User Guide / Product Documentation*.  
+    URL: [omnipod.com](https://www.omnipod.com/)
+
 ## Reproducibility Note
 
 For report reproducibility, pair this file with:
 - run metadata (`run_metadata.json`)
 - manifest hashes (`run_manifest.json`)
 - dataset lineage fields in research outputs (`source_file_sha256`, split metadata).
+
+If you want the machine-readable packaged subset, export it with:
+
+```bash
+iints sources --output-json results/source_manifest.json
+```

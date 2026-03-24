@@ -33,42 +33,10 @@ jobs:
       with:
         python-version: "3.11"
 
-    - name: Install SDK
+    - name: Install SDK with bundled MDMP support
       run: |
         python -m pip install --upgrade pip
-        pip install -e .
-
-    - name: Resolve MDMP source
-      id: mdmp_source
-      env:
-        MDMP_REPO_TOKEN: ${{ secrets.MDMP_REPO_TOKEN }}
-      run: |
-        if [ -n "${MDMP_REPO_TOKEN}" ]; then
-          echo "mode=repo" >> $GITHUB_OUTPUT
-          echo "MDMP source mode: repository checkout"
-        else
-          echo "mode=pypi" >> $GITHUB_OUTPUT
-          echo "MDMP source mode: PyPI package fallback"
-        fi
-
-    - name: Checkout standalone MDMP repo
-      if: steps.mdmp_source.outputs.mode == 'repo'
-      uses: actions/checkout@v4
-      with:
-        repository: python35/MDMP
-        ref: main
-        path: external/mdmp
-        token: ${{ secrets.MDMP_REPO_TOKEN }}
-
-    - name: Install standalone MDMP package (repo)
-      if: steps.mdmp_source.outputs.mode == 'repo'
-      run: |
-        pip install -e external/mdmp
-
-    - name: Install standalone MDMP package (PyPI fallback)
-      if: steps.mdmp_source.outputs.mode == 'pypi'
-      run: |
-        pip install "mdmp-protocol>=0.3.0"
+        pip install -e ".[mdmp]"
 
     - name: Run MDMP sync check
       env:

@@ -32,6 +32,8 @@ iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 
 If you want the clearest install/path rules first, read:
 - `docs/INSTALLATION.md`
+- `docs/AI_ASSISTANT.md` for the small Ollama setup and SDK linking flow
+- `docs/EVIDENCE_BASE.md` for the full medical + technical source legend
 
 Short rule:
 - installed `iints ...` commands can run from any folder
@@ -108,6 +110,12 @@ Run the open local Mistral model locally with Ollama:
 ollama pull ministral-3:8b
 iints ai models
 ```
+
+If you want the short "install Ollama + link it to the SDK" guide, read:
+- `docs/AI_ASSISTANT.md`
+
+If you want the full legend of medical, dataset, runtime, and emulator references used across the project docs:
+- `docs/EVIDENCE_BASE.md`
 
 Recommended first-time setup:
 
@@ -294,13 +302,13 @@ iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdm
 iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html
 ```
 
-Use standalone MDMP backend (optional):
+Use bundled `mdmp_core` backend (optional):
 
 ```bash
 export IINTS_MDMP_BACKEND=mdmp_core
 ```
 
-Staleness / lineage checks (standalone MDMP CLI):
+Staleness / lineage checks via the bundled `mdmp` CLI:
 
 ```bash
 mdmp fingerprint-record data/my_cgm.csv --output-json results/fingerprint.json --expires-days 365
@@ -310,21 +318,17 @@ mdmp registry init --registry registry/mdmp_registry.json
 mdmp registry push --registry registry/mdmp_registry.json --report results/mdmp_report.json
 ```
 
-## Dual Repo Workflow
-- SDK repo: `python35/IINTS-SDK`
-- MDMP repo: `python35/MDMP`
+## Bundled MDMP
 
-Local helper scripts:
-- `tools/dev/dual_repo_status.sh`
-- `tools/dev/dual_repo_commit_push.sh`
+MDMP now ships inside the SDK, so the SDK no longer depends on a separate public MDMP repository checkout.
 
-Full process: `docs/DUAL_REPO_WORKFLOW.md`
+That means:
+- `iints mdmp ...` stays available
+- the bundled `mdmp` CLI can still be used
+- local AI signing and verification can still use `mdmp_core`
 
-MDMP sync CI gate:
-- `.github/workflows/mdmp-sync.yml`
-- Uses private-repo checkout when `MDMP_REPO_TOKEN` is configured.
-- Falls back to `mdmp-protocol` from PyPI when checkout is unavailable.
-- Auto dependency updates for MDMP are handled via Dependabot (`.github/dependabot.yml`).
+Reference:
+- `docs/DUAL_REPO_WORKFLOW.md`
 
 ## Tools Layout
 

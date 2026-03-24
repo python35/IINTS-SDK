@@ -14,7 +14,7 @@ class CustomPatientModel:
     This model is intended for educational and stress-testing purposes, not for clinical accuracy.
     """
     def __init__(self, basal_insulin_rate: float = 0.8, insulin_sensitivity: float = 50.0,
-                 carb_factor: float = 10.0, glucose_decay_rate: float = 0.002,
+                 carb_factor: float = 10.0, glucose_decay_rate: float = 0.05,
                  initial_glucose: float = 120.0, glucose_absorption_rate: float = 0.03,
                  basal_glucose_target: Optional[float] = None,
                  insulin_action_duration: float = 300.0, # minutes, e.g., 5 hours

@@ -1,6 +1,11 @@
 from typing import Any, Dict, Optional
 
-from iints.core.safety.config import SafetyConfig
+from iints.core.safety.config import (
+    SENSOR_GLUCOSE_MAX_MGDL,
+    SENSOR_GLUCOSE_MIN_MGDL,
+    SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL,
+    SafetyConfig,
+)
 
 class InputValidator:
     """
@@ -9,16 +14,16 @@ class InputValidator:
     This component makes the system robust against common sensor errors.
     """
     def __init__(self,
-                 min_glucose: float = 20.0,
-                 max_glucose: float = 600.0,
-                 max_glucose_delta_per_5_min: float = 35.0,
+                 min_glucose: float = SENSOR_GLUCOSE_MIN_MGDL,
+                 max_glucose: float = SENSOR_GLUCOSE_MAX_MGDL,
+                 max_glucose_delta_per_5_min: float = SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL,
                  safety_config: Optional[SafetyConfig] = None):
         """
         Initializes the validator with plausible biological limits.
 
         Args:
-            min_glucose (float): The absolute minimum plausible glucose value (mg/dL).
-            max_glucose (float): The absolute maximum plausible glucose value (mg/dL).
+            min_glucose (float): Broad fail-soft lower bound for incoming CGM/sensor values (mg/dL).
+            max_glucose (float): Broad fail-soft upper bound for incoming CGM/sensor values (mg/dL).
             max_glucose_delta_per_5_min (float): The maximum plausible change in glucose
                                                  over a 5-minute period (mg/dL).
         """
@@ -62,7 +67,7 @@ class InputValidator:
         Raises:
             ValueError: If the value is outside biological plausibility limits.
         """
-        # 1. Absolute biological plausibility check
+        # 1. Broad CGM/sensor plausibility check
         if not (self.min_glucose <= glucose_value <= self.max_glucose):
             raise ValueError(
                 f"BIOLOGICAL_PLAUSIBILITY_ERROR: Glucose {glucose_value} mg/dL is outside the "

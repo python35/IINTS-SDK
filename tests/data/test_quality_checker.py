@@ -9,10 +9,10 @@ def test_physiological_rapid_change_detection():
     """
     checker = DataQualityChecker(expected_interval=1) # Set interval to 1 minute for this test
 
-    # Create a DataFrame with a rapid glucose increase (20 mg/dL in 1 minute)
+    # Create a DataFrame with a rapid glucose increase (5 mg/dL in 1 minute)
     data = {
         'timestamp': [0, 1, 2, 3],
-        'glucose': [100, 120, 121, 122] # 20 mg/dL in 1 minute from 0 to 1
+        'glucose': [100, 105, 106, 107] # 5 mg/dL in 1 minute from 0 to 1
     }
     df = pd.DataFrame(data)
 
@@ -22,14 +22,14 @@ def test_physiological_rapid_change_detection():
     # Assert that a rapid_change anomaly is detected
     assert any(
         a.anomaly_type == 'rapid_change' and
-        "Impossible glucose rise of 20.0 mg/dL/min" in a.description
+        "Impossible glucose rise of 5.0 mg/dL/min" in a.description
         for a in anomalies
     ), "Physiologically impossible rapid glucose rise was not detected."
 
-    # Test a rapid glucose decrease (20 mg/dL in 1 minute)
+    # Test a rapid glucose decrease (5 mg/dL in 1 minute)
     data_decrease = {
         'timestamp': [0, 1, 2, 3],
-        'glucose': [120, 100, 99, 98] # 20 mg/dL in 1 minute from 0 to 1
+        'glucose': [120, 115, 114, 113] # 5 mg/dL in 1 minute from 0 to 1
     }
     df_decrease = pd.DataFrame(data_decrease)
 
@@ -37,14 +37,14 @@ def test_physiological_rapid_change_detection():
 
     assert any(
         a.anomaly_type == 'rapid_change' and
-        "Impossible glucose drop of -20.0 mg/dL/min" in a.description
+        "Impossible glucose drop of -5.0 mg/dL/min" in a.description
         for a in anomalies_dec
     ), "Physiologically impossible rapid glucose drop was not detected."
 
     # Test with a change below the threshold (should not trigger anomaly)
     data_safe = {
         'timestamp': [0, 1, 2, 3],
-        'glucose': [100, 110, 111, 112] # 10 mg/dL in 1 minute
+        'glucose': [100, 103, 104, 105] # 3 mg/dL in 1 minute
     }
     df_safe = pd.DataFrame(data_safe)
 
@@ -62,12 +62,12 @@ def test_overall_report_with_rapid_change_anomaly():
 
     data = {
         'timestamp': [0, 1, 2, 3],
-        'glucose': [100, 120, 121, 122] # Rapid change here
+        'glucose': [100, 105, 106, 107] # Rapid change here
     }
     df = pd.DataFrame(data)
 
     report = checker.check(df)
 
     assert report.overall_score < 1.0, "Overall score should be affected by rapid change anomaly."
-    assert any("CRITICAL ANOMALY: Impossible glucose rise of 20.0 mg/dL/min" in w for w in report.warnings), \
+    assert any("CRITICAL ANOMALY: Impossible glucose rise of 5.0 mg/dL/min" in w for w in report.warnings), \
         "Warning for rapid change not found in report."
