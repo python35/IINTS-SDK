@@ -1657,7 +1657,15 @@ For a booth or jury table, the cleanest explanation is:
 - `results/booth_demo_live/JURY_TALK_TRACK.md`
 - `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
 
-7. If someone wants more proof, open a scenario folder and show `results.csv`, `clinical_report.pdf`, and `run_manifest.json`.
+7. If the machine only has the installed SDK and not the repository checkout, export the same code first:
+
+```bash
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
+```
+
+8. If someone wants more proof, open a scenario folder and show `results.csv`, `clinical_report.pdf`, and `run_manifest.json`.
 
 **Why this is useful**
 - You get real run bundles, not hand-built presentation images.

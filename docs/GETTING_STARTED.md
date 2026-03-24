@@ -166,6 +166,14 @@ For a fair or jury table, the cleanest live flow is:
 
 That wrapper script resolves the repository root automatically, so it is more forgiving than running raw relative Python commands by hand.
 
+If the machine only has the installed SDK and not the repository checkout, export the same demo code first:
+
+```bash
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
+```
+
 - Updating an existing install to the latest release:
 
 ```bash

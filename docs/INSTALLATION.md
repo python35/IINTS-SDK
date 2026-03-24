@@ -146,6 +146,19 @@ python -m pip install -U -e ".[mdmp]"
 
 ## Booth Demo Paths
 
+If you only installed the SDK and do not have the repository checkout, export the same showable booth code with:
+
+```bash
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
+```
+
+That writes:
+
+- `07_live_stage_demo.py`
+- `RUN_ME_FIRST.txt`
+
 If you use:
 
 ```bash

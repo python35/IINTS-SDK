@@ -45,3 +45,9 @@ PYTHONPATH=src python3 examples/demos/07_live_stage_demo.py
 ```
 
 All scripts write artifacts in `results/` and print a compact machine-readable summary to stdout.
+
+If you installed the SDK on another machine and do not have this repository checkout there, export the live booth script with:
+
+```bash
+iints demo-export --output-dir iints_demo
+```

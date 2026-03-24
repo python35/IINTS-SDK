@@ -236,6 +236,14 @@ What makes this script good for a booth:
 - it visibly calls `prepare_ai_ready_artifacts(...)`
 - you can point to one patient setting and explain how the same pipeline reruns for another patient
 
+If you installed the SDK on another machine and do not have the repository checkout there, export the same demo code with:
+
+```bash
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
+```
+
 ## Updating The SDK
 
 If another machine is missing newer commands like `iints ai ...` or `iints demo-booth`, upgrade inside the active virtual environment to the latest release:

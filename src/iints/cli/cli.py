@@ -53,6 +53,7 @@ from iints.data.registry import (
 )
 from iints.data.contracts import load_contract_yaml
 from iints.data.synthetic_mirror import generate_synthetic_mirror
+from iints.demo_assets import export_live_stage_demo
 from iints.mdmp.backend import (
     MDMP_GRADE_ORDER,
     active_mdmp_backend,
@@ -2737,6 +2738,39 @@ def demo_booth(
         console.print(f"[green]Live booth script:[/green] {outputs['live_demo_script']}")
     console.print(
         "[green]Next:[/green] open the poster and use the jury talk track to walk people through the story."
+    )
+
+
+@app.command("demo-export")
+def demo_export(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory where the bundled live stage demo files should be written."),
+    ] = Path("./iints_demo"),
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite/--no-overwrite", help="Allow overwriting exported demo files."),
+    ] = False,
+) -> None:
+    """Export the showable live demo code from the installed SDK."""
+    console = Console()
+    try:
+        outputs = export_live_stage_demo(output_dir=output_dir, overwrite=overwrite)
+    except FileExistsError as exc:
+        console.print(f"[bold red]Demo export stopped:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Demo export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Demo Export")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("script", outputs["script_path"])
+    table.add_row("notes", outputs["notes_path"])
+    console.print(table)
+    console.print(
+        "[green]Next:[/green] open `07_live_stage_demo.py`, explain the visible SDK calls, then run `python 07_live_stage_demo.py`."
     )
 
 

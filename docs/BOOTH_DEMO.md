@@ -108,6 +108,14 @@ Then open:
 - `results/booth_demo_live/JURY_TALK_TRACK.md`
 - `results/booth_demo_live/BEURS_LIVE_DEMO_SCRIPT.txt`
 
+If you are on a machine that only has the installed SDK and not the repository checkout, first export the same showable demo code with:
+
+```bash
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
+```
+
 If someone wants proof that the poster is real, open one of the scenario folders and show:
 
 - `results.csv`
