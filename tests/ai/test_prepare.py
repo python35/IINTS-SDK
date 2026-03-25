@@ -89,10 +89,10 @@ def test_prepare_ai_ready_artifacts_creates_payloads_and_local_cert(tmp_path, mo
     outputs = prepare_ai_ready_artifacts(tmp_path)
 
     assert "report_payload" in outputs
+    assert "review_payload" in outputs
     assert "anomalies_payload" in outputs
     assert "trends_payload" in outputs
     assert "step_riskiest" in outputs
     assert "mdmp_cert" in outputs
     cert_payload = json.loads((tmp_path / "ai" / "report.signed.mdmp").read_text(encoding="utf-8"))
     assert cert_payload["signature"] == "demo"
-

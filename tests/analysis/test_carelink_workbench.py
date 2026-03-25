@@ -152,6 +152,7 @@ def test_build_carelink_workbench_generates_dashboard_and_ai_payloads(tmp_path: 
     assert Path(outputs["poster_png"]).is_file()
     assert Path(outputs["dashboard_html"]).is_file()
     assert Path(outputs["report_payload"]).is_file()
+    assert Path(outputs["review_payload"]).is_file()
     assert Path(outputs["trends_payload"]).is_file()
     assert Path(outputs["anomalies_payload"]).is_file()
     assert Path(outputs["step_riskiest"]).is_file()

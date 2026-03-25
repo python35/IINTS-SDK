@@ -34,6 +34,7 @@ nav:
       - Updating The SDK: UPDATING.md
       - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Documentation Map: DOCUMENTATION_INDEX.md
+      - Public Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
       - AI Assistant Guide: AI_ASSISTANT.md
       - Booth Demo Guide: BOOTH_DEMO.md
   - Data Quality (MDMP):

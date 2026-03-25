@@ -254,6 +254,7 @@ def _build_jury_talk_track(summary: dict[str, Any]) -> str:
             "```bash",
             "iints ai local-check --model ministral-3:3b",
             f"iints ai report {summary['scenarios'][2]['output_dir']} --model ministral-3:3b",
+            f"iints ai review {summary['scenarios'][2]['output_dir']} --model ministral-3:3b",
             f"iints ai explain {summary['scenarios'][2]['output_dir']} --model ministral-3:3b",
             "```",
             "",
@@ -304,6 +305,7 @@ def _build_run_commands(summary: dict[str, Any]) -> str:
         "```bash\n"
         "iints ai local-check --model ministral-3:3b\n"
         f"iints ai report {supervisor_dir} --model ministral-3:3b\n"
+        f"iints ai review {supervisor_dir} --model ministral-3:3b\n"
         f"iints ai explain {supervisor_dir} --model ministral-3:3b\n"
         "```\n"
     )

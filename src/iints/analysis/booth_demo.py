@@ -196,6 +196,7 @@ def _build_jury_brief(
             "```bash",
             "iints ai local-check --model ministral-3:3b",
             f"iints ai report {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b",
+            f"iints ai review {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b",
             f"iints ai explain {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b",
             "```",
             "",
@@ -247,6 +248,7 @@ def _build_commands_markdown(
         "```bash\n"
         "iints ai local-check --model ministral-3:3b\n"
         f"iints ai report {supervisor_dir} --model ministral-3:3b\n"
+        f"iints ai review {supervisor_dir} --model ministral-3:3b\n"
         f"iints ai explain {supervisor_dir} --model ministral-3:3b\n"
         "```\n"
     )
@@ -296,6 +298,7 @@ def _build_live_demo_script_text(
         "- If Ollama is ready, run:\n"
         "  iints ai local-check --model ministral-3:3b\n"
         f"  iints ai report {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b\n"
+        f"  iints ai review {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b\n"
         f"  iints ai explain {run_outputs['03_supervisor_override']['output_dir']} --model ministral-3:3b\n"
         "- Say: the local model explains the result, but only after the SDK has prepared the run artifacts.\n\n"
         "7. IF THE JURY ASKS WHY THIS MATTERS\n"

@@ -131,6 +131,7 @@ Recommended live check:
 ```bash
 iints ai local-check --model ministral-3:3b
 iints ai report results/booth_demo/03_supervisor_override --model ministral-3:3b
+iints ai review results/booth_demo/03_supervisor_override --model ministral-3:3b
 iints ai explain results/booth_demo/03_supervisor_override --model ministral-3:3b
 ```
 

@@ -134,6 +134,7 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 iints ai prepare results/<run_id>
 iints ai report results/<run_id>
+iints ai review results/<run_id>
 ```
 
 For imported CareLink data, the matching flow is:
@@ -144,6 +145,7 @@ iints carelink-workbench \
   --output-dir results/personal_carelink
 
 iints ai report results/personal_carelink --model ministral-3:3b
+iints ai review results/personal_carelink --model ministral-3:3b
 iints ai trends results/personal_carelink --model ministral-3:3b
 iints ai explain results/personal_carelink --model ministral-3:3b
 ```
@@ -164,7 +166,7 @@ Notes:
 - `iints ai prepare <run_dir>` now creates AI-ready JSON payloads and, when MDMP is installed, a local development certificate plus keypair in `<run_dir>/ai/`.
 - `iints carelink-workbench` now does the same kind of AI preparation for imported personal CareLink data and also generates a dashboard PNG/HTML pair.
 - If Ollama closes the connection during generation, the SDK now surfaces an explicit recovery hint and points users toward `ministral-3:3b` for lower-memory systems.
-- After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report` directly at the run directory.
+- After `iints ai prepare`, you can point `iints ai explain|trends|anomalies|report|review` directly at the run directory.
 - After `iints carelink-workbench`, you can point those same AI commands directly at the generated CareLink workspace directory.
 - Output is research-only and not medical advice.
 

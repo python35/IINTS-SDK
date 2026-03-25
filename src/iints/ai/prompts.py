@@ -4,7 +4,13 @@ import json
 from typing import Any, Literal
 
 
-TaskName = Literal["explain_decision", "analyze_trends", "detect_anomalies", "generate_report"]
+TaskName = Literal[
+    "explain_decision",
+    "analyze_trends",
+    "detect_anomalies",
+    "generate_report",
+    "review_realism",
+]
 MAX_PROMPT_PAYLOAD_CHARS = 12000
 
 SYSTEM_PROMPT = (
@@ -50,6 +56,18 @@ TASK_TEMPLATES: dict[TaskName, str] = {
         "3. Safety, supervision, or device behavior\n"
         "4. Notable events, patterns, or anomalies\n"
         "5. Research-only conclusion\n\n"
+        "Input JSON:\n{data}"
+    ),
+    "review_realism": (
+        "Review this simulation or imported-data payload and judge whether the results look physiologically plausible for research use.\n"
+        "Be conservative and do not overclaim. If the payload is incomplete, say so clearly.\n"
+        "Respond in markdown with these sections:\n"
+        "1. Overall realism verdict (Likely realistic / Needs review / Likely unrealistic)\n"
+        "2. Strong realism signals\n"
+        "3. Questionable or unrealistic patterns\n"
+        "4. Concrete feedback points the SDK developer can improve\n"
+        "5. Suggested follow-up validation checks\n\n"
+        "Focus on glycemic ranges, excursion patterns, insulin behavior, safety overrides, and whether the data looks internally coherent.\n\n"
         "Input JSON:\n{data}"
     ),
 }

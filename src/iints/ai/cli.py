@@ -43,6 +43,7 @@ def _default_prepared_payload(task: str, ai_dir: Path) -> Path:
         "trends": ["trends_payload.json"],
         "anomalies": ["anomalies_payload.json"],
         "report": ["report_payload.json"],
+        "review": ["review_payload.json", "report_payload.json"],
     }.get(task, [])
     for filename in candidates:
         candidate = ai_dir / filename
@@ -93,6 +94,14 @@ def _write_output(path: Path | None, response: AIResponse) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(response.text + "\n", encoding="utf-8")
+
+
+def _default_output_for_review(input_path: Path, output: Path | None) -> Path | None:
+    if output is not None:
+        return output
+    if input_path.is_dir():
+        return input_path / "ai" / "realism_review.md"
+    return None
 
 
 def _render_response(console: Console, title: str, response: AIResponse, output: Path | None) -> None:
@@ -435,6 +444,48 @@ def report(
         response = assistant.generate_report(payload)
         _write_output(output, response)
         _render_response(console, "IINTS AI Report", response, output)
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command("review")
+def review(
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with run-level simulation outputs.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
+    mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
+    model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
+    minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
+    public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
+    trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
+    ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
+    output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the realism review.")] = None,
+) -> None:
+    console = Console()
+    try:
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="review",
+            input_path=input_json,
+            mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
+            mode=mode,
+            model=model,
+            minimum_grade=minimum_grade,
+            public_key=resolved_public_key,
+            trust_store=trust_store,
+            ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
+        )
+        resolved_output = _default_output_for_review(input_json, output)
+        response = assistant.review_realism(payload)
+        _write_output(resolved_output, response)
+        _render_response(console, "IINTS AI Realism Review", response, resolved_output)
     except Exception as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)

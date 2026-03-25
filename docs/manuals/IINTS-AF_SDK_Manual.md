@@ -1523,6 +1523,7 @@ cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 iints ai prepare results/<run_id>
 iints ai report results/<run_id>
+iints ai review results/<run_id>
 ```
 
 `iints ai prepare` creates AI-ready JSON payloads in `results/<run_id>/ai/` and, when the MDMP extra is installed, also generates a local development MDMP certificate plus companion keypair so the assistant can run without hand-building `step.json` and `report.signed.mdmp`.
@@ -1550,6 +1551,7 @@ This creates:
 - `carelink_poster.png`
 - `carelink_dashboard.html`
 - `ai/report_payload.json`
+- `ai/review_payload.json`
 - `ai/trends_payload.json`
 - `ai/anomalies_payload.json`
 - `ai/step_riskiest.json`
@@ -1566,12 +1568,14 @@ iints ai trends results/<run_id>
 iints ai anomalies results/<run_id>
 iints ai report results/<run_id> \
   --output results/<run_id>/ai/ai_report.md
+iints ai review results/<run_id>
 ```
 
 Prepared personal CareLink workspace mode:
 
 ```bash
 iints ai report results/personal_carelink --model ministral-3:3b
+iints ai review results/personal_carelink --model ministral-3:3b
 iints ai trends results/personal_carelink --model ministral-3:3b
 iints ai explain results/personal_carelink --model ministral-3:3b
 ```
@@ -1591,6 +1595,10 @@ iints ai anomalies results/simulation_run.json \
 iints ai report results/simulation_run.json \
   --mdmp-cert results/report.signed.mdmp \
   --output results/ai_report.md
+
+iints ai review results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/realism_review.md
 ```
 
 **Operational notes**

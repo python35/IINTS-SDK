@@ -97,6 +97,13 @@ def _sample_trace(df: pd.DataFrame, *, max_rows: int = 48) -> list[dict[str, Any
     return [_normalize_series_record(record) for record in sampled.to_dict(orient="records")]
 
 
+def _max_glucose_delta_per_step(df: pd.DataFrame, glucose_column: str) -> float:
+    clean = pd.to_numeric(df[glucose_column], errors="coerce").dropna()
+    if clean.empty or len(clean) < 2:
+        return 0.0
+    return float(clean.diff().abs().dropna().max())
+
+
 def _position_for_label(df: pd.DataFrame, label: Any) -> int:
     location = df.index.get_loc(label)
     if isinstance(location, int):
@@ -166,9 +173,12 @@ def _build_summary(df: pd.DataFrame, run_metadata: dict[str, Any], audit_summary
         "mean_glucose_mgdl": _normalize_value(float(glucose.mean())),
         "min_glucose_mgdl": _normalize_value(float(glucose.min())),
         "max_glucose_mgdl": _normalize_value(float(glucose.max())),
+        "max_glucose_delta_per_step_mgdl": _normalize_value(_max_glucose_delta_per_step(df, glucose_column)),
         "time_in_range_70_180_pct": _normalize_value(_time_in_band_pct(glucose, 70.0, 180.0)),
         "time_below_70_pct": _normalize_value(float((glucose < 70.0).mean() * 100.0)),
+        "time_below_54_pct": _normalize_value(float((glucose < 54.0).mean() * 100.0)),
         "time_above_180_pct": _normalize_value(float((glucose > 180.0).mean() * 100.0)),
+        "time_above_250_pct": _normalize_value(float((glucose > 250.0).mean() * 100.0)),
         "delivered_insulin_total_units": _normalize_value(_safe_sum(df, "delivered_insulin_units")),
         "recommended_insulin_total_units": _normalize_value(_safe_sum(df, "algo_recommended_insulin_units")),
         "safety_trigger_count": _bool_sum(df, "safety_triggered"),
@@ -227,6 +237,23 @@ def _build_payloads(
             **common,
             "trace_sample": trace_sample,
             "baseline_comparison": baseline_comparison,
+        },
+        "review_payload.json": {
+            **common,
+            "audit_summary": audit_summary,
+            "baseline_comparison": baseline_comparison,
+            "trace_sample": trace_sample,
+            "review_focus": {
+                "goal": "Judge whether the simulation or imported dataset looks physiologically plausible and internally coherent.",
+                "checks": [
+                    "glucose range plausibility",
+                    "excursion size and recovery behavior",
+                    "time in range and severe hypo/hyper exposure",
+                    "insulin delivery realism relative to observed glucose behavior",
+                    "safety trigger and override consistency",
+                ],
+            },
+            "run_manifest": run_manifest,
         },
         "step_riskiest.json": {
             **common,

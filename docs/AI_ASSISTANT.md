@@ -206,6 +206,7 @@ iints ai explain results/<run_id>
 iints ai trends results/<run_id>
 iints ai anomalies results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+iints ai review results/<run_id>
 ```
 
 For imported CareLink data, generate a personal workspace first:
@@ -224,6 +225,7 @@ That creates:
 - `carelink_timeline.csv`
 - `carelink_metrics.json`
 - `ai/report_payload.json`
+- `ai/review_payload.json`
 - `ai/trends_payload.json`
 - `ai/anomalies_payload.json`
 - `ai/step_riskiest.json`
@@ -233,6 +235,7 @@ After that, the same AI commands work directly on the CareLink workspace directo
 
 ```bash
 iints ai report results/personal_carelink --model ministral-3:3b
+iints ai review results/personal_carelink --model ministral-3:3b
 iints ai trends results/personal_carelink --model ministral-3:3b
 iints ai explain results/personal_carelink --model ministral-3:3b
 ```
@@ -246,6 +249,7 @@ iints ai explain results/<run_id>
 iints ai trends results/<run_id>
 iints ai anomalies results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+iints ai review results/<run_id>
 ```
 
 Prepared CareLink workspace mode:
@@ -256,6 +260,7 @@ iints carelink-workbench \
   --output-dir results/personal_carelink
 
 iints ai report results/personal_carelink --model ministral-3:3b
+iints ai review results/personal_carelink --model ministral-3:3b
 iints ai trends results/personal_carelink --model ministral-3:3b
 iints ai explain results/personal_carelink --model ministral-3:3b
 ```
@@ -275,7 +280,13 @@ iints ai anomalies results/simulation_run.json \
 iints ai report results/simulation_run.json \
   --mdmp-cert results/report.signed.mdmp \
   --output results/ai_report.md
+
+iints ai review results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/realism_review.md
 ```
+
+`iints ai review` writes a realism-focused critique. When you point it at a prepared run directory and do not pass `--output`, it automatically saves to `results/<run_id>/ai/realism_review.md`.
 
 Useful options:
 

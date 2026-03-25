@@ -202,6 +202,23 @@ def _prepare_ai_payloads(
             "profile_24h": profile_records,
             "trace_sample": trace_sample,
         },
+        "review_payload.json": {
+            **common,
+            "daily_summary": daily_records,
+            "profile_24h": profile_records,
+            "trace_sample": trace_sample,
+            "top_alerts": alert_counts,
+            "top_sensor_exceptions": sensor_exception_counts,
+            "review_focus": {
+                "goal": "Judge whether the imported glucose history looks internally coherent and physiologically plausible.",
+                "checks": [
+                    "time in range versus extreme exposure",
+                    "daily variability and day-to-day stability",
+                    "consistency between glucose, carbs, and insulin logs",
+                    "frequency of alerts and sensor exceptions",
+                ],
+            },
+        },
         "anomalies_payload.json": {
             **common,
             "lowest_readings": [

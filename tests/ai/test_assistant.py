@@ -135,3 +135,18 @@ def test_guard_wrap_appends_disclaimer() -> None:
     guard = MDMPGuard("cert.json")
     wrapped = guard.wrap("Generated report body.")
     assert wrapped.endswith("WARNING: For research use only. Not medical advice.")
+
+
+def test_assistant_review_realism_uses_same_guarded_flow() -> None:
+    guard = _FakeGuard()
+    assistant = IINTSAssistant(
+        "cert.json",
+        backend=_FakeBackend(),
+        guard=guard,  # type: ignore[arg-type]
+    )
+
+    response = assistant.review_realism({"summary": {"mean_glucose_mgdl": 145}})
+
+    assert response.task == "review_realism"
+    assert "research use only" in response.text.lower()
+    assert guard.calls == 1

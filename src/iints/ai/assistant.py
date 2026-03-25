@@ -122,3 +122,6 @@ class IINTSAssistant:
 
     def generate_report(self, run: dict[str, Any]) -> AIResponse:
         return self._run_task("generate_report", run)
+
+    def review_realism(self, run: dict[str, Any]) -> AIResponse:
+        return self._run_task("review_realism", run)
