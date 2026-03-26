@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## v1.5.0
+
+Release date: 2026-03-26
+
+### Added
+
+- new `iints ai review` command for realism-oriented run critique using the local Ministral model
+- automatic `review_payload.json` generation in AI-prepared run bundles and CareLink workspaces
+- automatic `realism_review.md` output when reviewing a prepared run directory
+- new public release checklist in `docs/PUBLIC_RELEASE_CHECKLIST.md`
+
+### Improved
+
+- booth demo scripts and public-facing guides now show how to use AI both for explanation and for realism review
+- the AI docs, manual, README, and CareLink guidance now document the full explain/report/review flow
+- prerelease validation confirmed lint, type checks, tests, docs, manuals, package build, and security scans are in a releasable state
+
+### Why it matters
+
+This release makes the public story stronger: the SDK can now not only simulate and explain results, but also critique whether they look realistic and give concrete feedback points before a paper, demo, or external release.
+
 ## v1.4.0
 
 Release date: 2026-03-24
