@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.5.0"
+    __version__ = "1.5.1"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
@@ -70,11 +70,13 @@ from .data.nightscout import NightscoutConfig, import_nightscout
 from .data.tidepool import TidepoolClient, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
+from .data.study_corruption import AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
 from .analysis.booth_demo import build_booth_demo
 from .analysis.carelink_workbench import build_carelink_workbench
 from .analysis.poster import generate_results_poster
 from .analysis.reporting import ClinicalReportGenerator
+from .analysis.study_protocol import build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
 from .ai import AIResponse, IINTSAssistant, MDMPGuard
 from .highlevel import run_simulation, run_full, run_population
@@ -184,10 +186,16 @@ __all__ = [
     "MDMPGateError",
     "generate_synthetic_mirror",
     "SyntheticMirrorArtifact",
+    "AVAILABLE_STUDY_CORRUPTIONS",
+    "apply_study_corruptions",
+    "write_corrupted_study_csv",
     # Analysis Metrics
     "generate_benchmark_metrics",
     "build_booth_demo",
     "build_carelink_workbench",
+    "build_study_protocol_payload",
+    "render_study_protocol_markdown",
+    "write_study_protocol_bundle",
     "ClinicalReportGenerator",
     "EnergyEstimate",
     "estimate_energy_per_decision",

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.0"
+version = "1.5.1"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -67,7 +67,6 @@ mdmp = [
 [project.scripts]
 iints = "iints.cli.cli:app"
 iints-sdk-doctor = "iints_sdk_python35_doctor:main"
-mdmp = "mdmp_core.cli:app"
 
 [project.entry-points."iints.algorithms"]
 "PID Controller" = "iints.core.algorithms.pid_controller:PIDController"

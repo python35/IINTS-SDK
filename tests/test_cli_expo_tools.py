@@ -1,0 +1,246 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pandas as pd
+
+from typer.testing import CliRunner
+
+from iints.cli.cli import app
+
+
+runner = CliRunner()
+
+
+def test_scenarios_export_study_pack_writes_manifest(tmp_path) -> None:
+    output_dir = tmp_path / "study_pack"
+
+    result = runner.invoke(
+        app,
+        ["scenarios", "export-study-pack", "--output-dir", str(output_dir), "--seeds", "1,2,3"],
+    )
+
+    assert result.exit_code == 0
+    manifest = output_dir / "study_pack_manifest.json"
+    assert manifest.is_file()
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    assert payload["seeds"] == [1, 2, 3]
+    assert (output_dir / "baseline_day.json").is_file()
+
+
+def test_scenarios_export_study_pack_supports_eucys_preset(tmp_path) -> None:
+    output_dir = tmp_path / "eucys_pack"
+
+    result = runner.invoke(
+        app,
+        ["scenarios", "export-study-pack", "--output-dir", str(output_dir), "--preset", "eucys", "--seeds", "1,2"],
+    )
+
+    assert result.exit_code == 0
+    manifest = json.loads((output_dir / "study_pack_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["preset"] == "eucys"
+    assert (output_dir / "eucys_study_matrix.csv").is_file()
+
+
+def test_demo_expo_writes_bundle_summary(monkeypatch, tmp_path) -> None:
+    output_dir = tmp_path / "expo_demo"
+
+    def _fake_booth_demo(output_dir, **kwargs):
+        target = output_dir
+        target.mkdir(parents=True, exist_ok=True)
+        return {"poster_png": str(target / "booth_demo_poster.png")}
+
+    class _FakeSummary:
+        def to_dict(self):
+            return {
+                "study_dir": str(output_dir),
+                "run_count": 2,
+                "aggregate": {
+                    "mean_tir_70_180": 82.0,
+                    "mean_supervisor_interventions": 3.0,
+                    "mean_glucose": 145.0,
+                    "mean_cv": 28.0,
+                    "run_count": 2,
+                },
+                "certification_comparison": {
+                    "certified_runs": 1,
+                    "uncertified_runs": 1,
+                    "mean_tir_70_180_certified": 85.0,
+                    "mean_tir_70_180_uncertified": 79.0,
+                    "mean_supervisor_interventions_certified": 2.0,
+                    "mean_supervisor_interventions_uncertified": 4.0,
+                    "tir_delta_certified_minus_uncertified": 6.0,
+                },
+                "baseline_summary": {
+                    "mean_tir_70_180_by_algorithm": {"AlgoA": 82.0},
+                    "mean_bolus_interventions_by_algorithm": {"AlgoA": 3.0},
+                    "run_quality_badge_counts": {"strong_tir": 2},
+                },
+                "evidence_rows": [
+                    {
+                        "scenario_name": "Run 1",
+                        "algorithm": "AlgoA",
+                        "seed": 1,
+                        "tir_70_180": 82.0,
+                        "tir_below_70": 1.0,
+                        "tir_above_180": 17.0,
+                        "mean_glucose": 145.0,
+                        "cv": 28.0,
+                        "gmi": 6.8,
+                        "supervisor_interventions": 3.0,
+                        "certification_grade": "research_grade",
+                        "quality_badges": "strong_tir,stable_variability",
+                    }
+                ],
+                "runs": [
+                    {
+                        "scenario_name": "Run 1",
+                        "run_id": "run-1",
+                        "algorithm": "AlgoA",
+                        "certification_grade": "research_grade",
+                        "quality_badges": ["strong_tir"],
+                        "metrics": {
+                            "tir_70_180": 82.0,
+                            "supervisor_interventions": 3.0,
+                        },
+                    }
+                ],
+            }
+
+    def _fake_analyze_study_directory(path):
+        return _FakeSummary()
+
+    def _fake_generate_study_poster(summary, **kwargs):
+        output = output_dir / "study_poster.png"
+        output.write_text("png", encoding="utf-8")
+        summary_json = output_dir / "study_poster.json"
+        summary_json.write_text("{}", encoding="utf-8")
+        return {"poster_png": str(output), "poster_summary_json": str(summary_json)}
+
+    def _fake_protocol_bundle(output_dir, **kwargs):
+        target = output_dir
+        target.mkdir(parents=True, exist_ok=True)
+        markdown = target / "STUDY_PROTOCOL.md"
+        markdown.write_text("# protocol", encoding="utf-8")
+        design = target / "study_design.json"
+        design.write_text("{}", encoding="utf-8")
+        matrix = target / "study_matrix.csv"
+        matrix.write_text("scenario,algorithm,seed\n", encoding="utf-8")
+        return {
+            "protocol_markdown": str(markdown),
+            "study_design_json": str(design),
+            "study_matrix_csv": str(matrix),
+        }
+
+    monkeypatch.setattr("iints.cli.cli.build_booth_demo", _fake_booth_demo)
+    monkeypatch.setattr("iints.cli.cli.analyze_study_directory", _fake_analyze_study_directory)
+    monkeypatch.setattr("iints.cli.cli.generate_study_poster", _fake_generate_study_poster)
+    monkeypatch.setattr("iints.cli.cli.write_study_protocol_bundle", _fake_protocol_bundle)
+
+    result = runner.invoke(app, ["demo-expo", "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert (output_dir / "study_summary.json").is_file()
+    assert (output_dir / "study_summary.md").is_file()
+    assert (output_dir / "evidence_table.csv").is_file()
+    assert (output_dir / "evidence_table.md").is_file()
+    assert (output_dir / "study_poster.png").is_file()
+    assert (output_dir / "protocol" / "STUDY_PROTOCOL.md").is_file()
+
+
+def test_run_eucys_study_builds_scientific_bundle(monkeypatch, tmp_path) -> None:
+    output_dir = tmp_path / "eucys"
+    algo_path = tmp_path / "algo.py"
+    algo_path.write_text("class Dummy: pass\n", encoding="utf-8")
+
+    def _fake_load_algorithm_instance_silent(_path):
+        return object()
+
+    def _fake_run_full(*, algorithm, scenario, patient_config, duration_minutes, time_step, seed, output_dir, safety_config=None, **kwargs):
+        target = Path(output_dir)
+        (target / "audit").mkdir(parents=True, exist_ok=True)
+        (target / "baseline").mkdir(parents=True, exist_ok=True)
+        df = pd.DataFrame(
+            {
+                "time_minutes": [0, 5, 10],
+                "glucose_actual_mgdl": [110.0 + seed, 120.0 + seed, 130.0 + seed],
+                "safety_triggered": [False, False, False],
+            }
+        )
+        df.to_csv(target / "results.csv", index=False)
+        (target / "run_metadata.json").write_text(
+            json.dumps(
+                {
+                    "run_id": target.name,
+                    "seed": seed,
+                    "config": {
+                        "algorithm": {
+                            "class": "algorithms.DemoAlgorithm",
+                            "metadata": {"name": "DemoAlgorithm"},
+                        },
+                        "duration_minutes": duration_minutes,
+                        "scenario": scenario,
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (target / "config.json").write_text(
+            json.dumps(
+                {
+                    "algorithm": {
+                        "class": "algorithms.DemoAlgorithm",
+                        "metadata": {"name": "DemoAlgorithm"},
+                    },
+                    "duration_minutes": duration_minutes,
+                    "scenario": scenario,
+                }
+            ),
+            encoding="utf-8",
+        )
+        (target / "audit" / "audit_summary.json").write_text(
+            json.dumps({"bolus_interventions_count": 1, "terminated_early": False}),
+            encoding="utf-8",
+        )
+        (target / "baseline" / "baseline_comparison.json").write_text(
+            json.dumps(
+                {
+                    "reference": "Standard PID",
+                    "rows": [
+                        {"algorithm": "DemoAlgorithm", "tir_70_180": 82.0, "bolus_interventions": 1},
+                        {"algorithm": "Standard PID", "tir_70_180": 80.0, "bolus_interventions": 2},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return {"output_dir": str(target)}
+
+    def _fake_prepare(_output_dir, _console):
+        return None
+
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_instance_silent", _fake_load_algorithm_instance_silent)
+    monkeypatch.setattr("iints.cli.cli._maybe_prepare_ai_artifacts", _fake_prepare)
+    monkeypatch.setattr("iints.cli.cli.iints.run_full", _fake_run_full)
+
+    result = runner.invoke(
+        app,
+        [
+            "run-eucys-study",
+            "--algo",
+            str(algo_path),
+            "--output-dir",
+            str(output_dir),
+            "--seeds",
+            "1,2",
+            "--no-prepare-ai",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "protocol" / "STUDY_PROTOCOL.md").is_file()
+    assert (output_dir / "scenarios" / "eucys_study_matrix.csv").is_file()
+    assert (output_dir / "study_clean" / "study_summary.json").is_file()
+    assert (output_dir / "study_corrupted" / "study_summary.json").is_file()
+    assert (output_dir / "comparisons" / "clean_vs_corrupted.json").is_file()

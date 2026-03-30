@@ -150,10 +150,10 @@ iints study-ready \
 
 **Commands**
 ```bash
-iints mdmp template --output-path mdmp_contract.yaml
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv \
-  --output-json results/mdmp_report.json
-iints mdmp visualizer results/mdmp_report.json \
+iints data certify-template --output-path data_contract.yaml
+iints data certify data_contract.yaml data/my_cgm.csv \
+  --output-json results/certification.json
+iints data certify-visualizer results/certification.json \
   --output-html results/mdmp_dashboard.html
 ```
 
@@ -439,36 +439,73 @@ iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
 ### Data Contract Runner (Model-Ready Gate)
 ```bash
 iints data contract-template --output-path data_contract.yaml
-iints data contract-run data_contract.yaml data/my_cgm.csv \
-  --output-json results/contract_data_report.json
-iints data contract-run data_contract.yaml data/my_cgm.csv \
+iints data certify data_contract.yaml data/my_cgm.csv \
+  --output-json results/certification.json
+iints data certify data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade --fail-on-noncompliant
 iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
   --output-csv data/synthetic_mirror.csv \
   --output-json results/synthetic_mirror_report.json
-iints data mdmp-visualizer results/contract_data_report.json \
+iints data certify-visualizer results/certification.json \
   --output-html results/mdmp_dashboard.html
-iints mdmp template --output-path mdmp_contract.yaml
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv \
-  --output-json results/mdmp_report.json
-iints mdmp synthetic-mirror data/my_cgm.csv mdmp_contract.yaml \
-  --output-csv data/synthetic_mirror.csv \
-  --output-json results/synthetic_mirror_report.json
-iints mdmp visualizer results/mdmp_report.json \
-  --output-html results/mdmp_dashboard.html
+iints data corrupt-for-study data/my_cgm.csv \
+  --output-csv results/data_corrupted.csv \
+  --mode timestamp_shift --mode missing_block --mode glucose_spikes
 ```
-`contract-run` reports:
+`iints data certify` reports:
 - `compliance_score`
 - `contract_fingerprint_sha256`
 - `dataset_fingerprint_sha256`
 - `mdmp_grade` (`draft`, `research_grade`, `clinical_grade`)
 - `certified_for_medical_research`
 
-`mdmp-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
+`iints data certify-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
+
+`iints data corrupt-for-study` creates a controlled corrupted dataset plus a manifest JSON, so you can test certified-vs-uncertified claims with a documented ablation instead of ad-hoc edits.
+
+### Scientific Study Workflow
+```bash
+iints study-protocol --preset eucys --output-dir results/study_protocol
+iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack
+
+iints analyze results/study \
+  --output-json results/study_summary.json \
+  --output-markdown results/study_summary.md \
+  --output-csv results/evidence_table.csv \
+  --output-evidence-markdown results/evidence_table.md \
+  --carelink-metrics results/personal_carelink/carelink_metrics.json
+
+iints compare-study results/study_clean results/study_corrupted \
+  --output-json results/study_comparison.json \
+  --output-markdown results/study_comparison.md
+
+iints poster-study results/study_summary.json \
+  --output-path results/study_poster.png
+
+iints run-eucys-study \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/eucys_study
+```
+
+This workflow is designed for:
+- explicit hypotheses
+- shared seeds across conditions
+- controlled corruption operators
+- descriptive statistics and effect estimates
+- failure analysis
+- optional real-world plausibility comparison using imported CareLink metrics
 
 `synthetic-mirror` generates a synthetic dataset from a validated source CSV, preserving schema and broad numeric behavior, then validates the synthetic output against the same contract.
 
-`iints mdmp ...` is the preferred protocol namespace for MDMP. `iints data ...` MDMP commands remain available for compatibility.
+`iints data ...` is now the preferred public namespace for certification workflows. The old `iints mdmp ...` aliases remain hidden for backwards compatibility.
+
+### Study Aggregation
+```bash
+iints analyze results/study \
+  --output-json results/study_summary.json \
+  --output-markdown results/study_summary.md
+```
+This aggregates multi-run evidence such as mean TIR, supervisor interventions, baseline deltas, and certified-vs-uncertified splits.
 
 ### MDMP Auto-Guardian Decorator
 ```python

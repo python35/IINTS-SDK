@@ -71,6 +71,20 @@ Key files:
 - `results/booth_demo/run_commands.md`
 - `results/booth_demo/demo_summary.json`
 
+For the larger public story, you can also build:
+
+```bash
+iints demo-expo --output-dir results/expo_demo
+```
+
+That adds:
+
+- `results/expo_demo/study_summary.json`
+- `results/expo_demo/study_summary.md`
+- `results/expo_demo/evidence_table.csv`
+- `results/expo_demo/evidence_table.md`
+- `results/expo_demo/study_poster.png`
+
 Each scenario also gets its own full run bundle with:
 
 - `results.csv`

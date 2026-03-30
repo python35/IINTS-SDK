@@ -13,9 +13,9 @@ MDMP now ships inside the SDK source tree as bundled Python packages:
 
 That means:
 
-- the SDK can keep its `iints mdmp ...` namespace
+- the SDK exposes certification through the main `iints data ...` namespace
 - local AI MDMP certification can keep using `mdmp_core`
-- the standalone `mdmp` CLI can still be exposed from the SDK package
+- the standalone `mdmp` CLI no longer needs to be exposed from the SDK package
 - the old dual-repo maintenance flow is no longer required
 
 ## CI sync gate
@@ -65,7 +65,7 @@ export IINTS_MDMP_BACKEND=mdmp_core
 Then run:
 
 ```bash
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
+iints data certify data_contract.yaml data/my_cgm.csv --output-json results/certification.json
 ```
 
 The command summary prints the active backend so provenance stays explicit.

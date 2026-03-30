@@ -1,22 +1,22 @@
-# MDMP Quickstart
+# Data Certification Quickstart
 
-MDMP is the IINTS protocol for validating data quality before modeling or evaluation.
+Data certification is the IINTS trust layer for validating data quality before modeling or evaluation.
 
 !!! important "Use a Virtual Environment"
     Run all commands from an active `.venv`:
     `python3 -m venv .venv && source .venv/bin/activate`
 
-## What MDMP Produces
+## What Certification Produces
 
 - Contract validation results (pass/fail per rule)
 - Compliance score
 - Deterministic dataset + contract fingerprints
-- MDMP grade: `draft`, `research_grade`, or `clinical_grade`
+- Trust grade: `draft`, `research_grade`, or `clinical_grade`
 
 ## 1) Generate a Contract Template
 
 ```bash
-iints mdmp template --output-path mdmp_contract.yaml
+iints data certify-template --output-path data_contract.yaml
 ```
 
 Edit the contract to match your dataset schema and bounds.
@@ -24,22 +24,22 @@ Edit the contract to match your dataset schema and bounds.
 ## 2) Validate a Dataset
 
 ```bash
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
+iints data certify data_contract.yaml data/my_cgm.csv --output-json results/certification.json
 ```
 
 Strict mode for pipelines:
 
 ```bash
-iints data contract-run mdmp_contract.yaml data/my_cgm.csv \
+iints data certify data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade \
   --fail-on-noncompliant \
-  --output-json results/contract_data_report.json
+  --output-json results/certification.json
 ```
 
 ## 3) Generate an Audit Dashboard
 
 ```bash
-iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html
+iints data certify-visualizer results/certification.json --output-html results/mdmp_dashboard.html
 ```
 
 This creates a single-file HTML report that can be shared offline.
@@ -47,7 +47,7 @@ This creates a single-file HTML report that can be shared offline.
 ## 4) Create Synthetic Mirror Data
 
 ```bash
-iints mdmp synthetic-mirror data/my_cgm.csv mdmp_contract.yaml \
+iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
   --output-csv data/synthetic_mirror.csv \
   --output-json results/synthetic_mirror_report.json
 ```

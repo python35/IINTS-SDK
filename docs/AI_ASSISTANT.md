@@ -288,6 +288,15 @@ iints ai review results/simulation_run.json \
 
 `iints ai review` writes a realism-focused critique. When you point it at a prepared run directory and do not pass `--output`, it automatically saves to `results/<run_id>/ai/realism_review.md`.
 
+The review now asks the local model to always structure feedback as:
+
+- overall realism verdict
+- what looks realistic
+- what looks suspicious
+- priority fixes
+- what to improve next
+- follow-up validation checks
+
 Useful options:
 
 - `--mode local` to require Ollama explicitly

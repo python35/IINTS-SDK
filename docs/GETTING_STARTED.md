@@ -1,6 +1,10 @@
 # Getting Started
 
-This page gives the fastest reliable path from install to a validated run.
+This page gives the fastest reliable path through the new IINTS story:
+
+1. `iints run` or `iints presets run` to simulate
+2. `iints data certify` to certify the data
+3. `iints ai report` to explain what happened
 
 If you mainly need help with folder choice and install mode, read [Installation And Paths](INSTALLATION.md) first.
 
@@ -45,6 +49,9 @@ cd iints_quickstart
 Generated structure includes:
 - `algorithms/`
 - `scenarios/`
+- `contracts/`
+- `data/demo/`
+- `audit/`
 - `results/`
 
 Important:
@@ -58,7 +65,38 @@ Important:
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-## 6) Check Outputs
+## 6) Certify the Run Data
+
+Use the generated results CSV plus the project contract:
+
+```bash
+iints data certify \
+  contracts/clinical_mdmp_contract.yaml \
+  results/<run_id>/results.csv \
+  --output-json results/<run_id>/certification.json
+```
+
+Optional dashboard:
+
+```bash
+iints data certify-visualizer \
+  results/<run_id>/certification.json \
+  --output-html results/<run_id>/certification_dashboard.html
+```
+
+## 7) Ask the Local AI to Explain the Run
+
+```bash
+iints ai report results/<run_id>
+```
+
+That gives the public demo flow in three commands:
+
+1. `iints presets run`
+2. `iints data certify`
+3. `iints ai report`
+
+## 8) Check Outputs
 
 A typical run writes:
 - `results.csv`: time-series simulation output.
@@ -66,8 +104,9 @@ A typical run writes:
 - `audit/`: decision and safety trail.
 - `run_manifest.json`: file hashes for reproducibility.
 - `run_metadata.json`: run config and environment details.
+- `certification.json`: trust-grade and dataset checks after `iints data certify`
 
-## 7) Build a Study-Ready Bundle
+## 9) Build a Study-Ready Bundle
 
 ```bash
 iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
@@ -78,7 +117,7 @@ Adds:
 - `sources_manifest.json`
 - `SUMMARY.md`
 
-## 8) Next Steps
+## 10) Next Steps
 
 - Import a Medtronic CareLink / MiniMed CSV export:
 
@@ -157,6 +196,21 @@ You can still use the full booth bundle command:
 
 This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
 
+- Aggregate a study or build a result poster:
+
+```bash
+iints analyze results/study --output-json results/study_summary.json --output-markdown results/study_summary.md
+iints poster-study results/study_summary.json --output-path results/study_poster.png
+iints study-protocol --preset eucys --output-dir results/study_protocol
+iints run-eucys-study --algo algorithms/example_algorithm.py --output-dir results/eucys_study
+```
+
+- Export the official scenario pack for repeatable studies:
+
+```bash
+iints scenarios export-study-pack --output-dir scenarios/study_pack
+```
+
 For a fair or jury table, the cleanest live flow is:
 
 1. open `examples/demos/07_live_stage_demo.py`
@@ -185,6 +239,8 @@ python -c "import iints; print(iints.__version__)"
 
 - Full update guide: [Updating The SDK](UPDATING.md)
 - Full install/path guide: [Installation And Paths](INSTALLATION.md)
+- Multi-run evidence summary: [Study Analysis](STUDY_ANALYSIS.md)
+- Hypotheses, corruption operators, and protocol bundles: [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - Full Ollama + local AI setup guide: [AI Assistant Guide](AI_ASSISTANT.md)
 - Full source legend: [Scientific Evidence & Source Legend](EVIDENCE_BASE.md)
 - Need a fixed environment for a demo or paper? Pin a specific version only when reproducibility matters.

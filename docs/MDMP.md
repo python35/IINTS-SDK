@@ -1,4 +1,4 @@
-# MDMP Specification (Draft)
+# Data Certification Specification (Draft)
 
 The IINTS MDMP is a data-governance layer for AI research pipelines.  
 It standardizes how datasets are validated, fingerprinted, and scored before model training or evaluation.
@@ -8,9 +8,9 @@ For the complete operational guide (commands, rules, scoring, gates, and pitfall
 MDMP is designed for traceability and reproducibility in research settings.  
 It does **not** certify a model for clinical use on its own.
 
-MDMP has a dedicated SDK namespace:
-- Python: `iints.mdmp`
-- CLI: `iints mdmp ...`
+Public SDK surface:
+- Python: `iints.data`
+- CLI: `iints data ...`
 
 ## Who This Page Is For
 
@@ -48,8 +48,8 @@ MDMP currently covers:
 - reproducible compliance scoring
 
 Implemented in:
-- `iints data contract-template`
-- `iints data contract-run`
+- `iints data certify-template`
+- `iints data certify`
 
 ## Core Pillars
 
@@ -80,7 +80,7 @@ Grade gating can be enforced in CI:
 **Commands**
 
 ```bash
-iints data contract-run data_contract.yaml data/my_cgm.csv \
+iints data certify data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade \
   --fail-on-noncompliant
 ```
@@ -88,7 +88,7 @@ iints data contract-run data_contract.yaml data/my_cgm.csv \
 Certification dashboard generation:
 
 ```bash
-iints data mdmp-visualizer results/contract_data_report.json \
+iints data certify-visualizer results/certification.json \
   --output-html results/mdmp_dashboard.html
 ```
 
@@ -113,13 +113,13 @@ def process_dataframe(df):
 ## Recommended Workflow
 
 **Output / Artifacts**
-- `contract_data_report.json` / `mdmp_report.json`
+- `certification.json`
 - MDMP grade + compliance score
 - contract and dataset fingerprints
 - optional HTML dashboard for audit sharing
 
 1. Write `data_contract.yaml` for your dataset.
-2. Run `iints data contract-run` and store JSON output.
+2. Run `iints data certify` and store JSON output.
 3. Archive fingerprints with model artifacts.
 4. Train/evaluate only on datasets meeting your minimum grade policy.
 

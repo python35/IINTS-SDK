@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## v1.5.1
+
+Release date: 2026-03-30
+
+### Added
+
+- new hypothesis-driven scientific workflow layer:
+  - `iints study-protocol`
+  - `docs/SCIENTIFIC_WORKFLOW.md`
+  - protocol bundles with `STUDY_PROTOCOL.md`, `study_design.json`, and `study_matrix.csv`
+- new controlled corruption workflow for ablation studies:
+  - `iints data corrupt-for-study`
+  - corruption manifests for timestamp shifts, missing blocks, duplicated rows, glucose spikes, dropped meal annotations, and unit-scale errors
+- new EUCYS-specific study preset support:
+  - `iints scenarios export-study-pack --preset eucys`
+  - `iints study-protocol --preset eucys`
+  - `iints run-eucys-study`
+
+### Improved
+
+- `iints analyze` now reports richer scientific outputs:
+  - descriptive statistics with standard deviation and 95% confidence intervals
+  - failure analysis for severe hypo, early termination, and worst-run surfacing
+  - optional external plausibility comparison against imported CareLink metrics
+- `iints compare-study` now includes effect estimates and confidence intervals for key metrics
+- study posters now include failure-analysis and external-validation cues
+- docs and manuals now explain the fair-ready scientific workflow more clearly
+
+### Why it matters
+
+This patch shifts the SDK from “good demo tooling” toward a real experimental platform: it is now much easier to define a hypothesis, run a fixed matrix, compare clean vs corrupted evidence, and defend the results in a scientific setting.
+
 ## v1.5.0
 
 Release date: 2026-03-26

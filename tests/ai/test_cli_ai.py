@@ -254,6 +254,50 @@ def test_ai_report_command_auto_resolves_prepared_run_directory(tmp_path, monkey
     assert "Prepared report body" in result.stdout
 
 
+def test_ai_report_command_auto_prepares_run_directory_when_needed(tmp_path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+
+    def _fake_prepare(target, create_dev_mdmp_cert=True, **kwargs):
+        assert target == run_dir
+        ai_dir = run_dir / "ai"
+        key_dir = ai_dir / "keys"
+        key_dir.mkdir(parents=True, exist_ok=True)
+        (ai_dir / "report_payload.json").write_text(json.dumps({"summary": {"steps": 12}}), encoding="utf-8")
+        (ai_dir / "report.signed.mdmp").write_text(json.dumps({"signature": "demo"}), encoding="utf-8")
+        (key_dir / "mdmp_pub_v1.pem").write_text("public", encoding="utf-8")
+        return {"report_payload": str(ai_dir / "report_payload.json"), "mdmp_cert": str(ai_dir / "report.signed.mdmp")}
+
+    class _FakeAssistant:
+        def __init__(self, mdmp_cert, **kwargs) -> None:
+            assert str(mdmp_cert).endswith("report.signed.mdmp")
+
+        def generate_report(self, payload):
+            assert payload["summary"]["steps"] == 12
+            return AIResponse(
+                task="generate_report",
+                text="Auto prepared report body.",
+                backend="fake",
+                model="ministral-3:3b",
+                certification=GuardResult(
+                    cert_path=str(run_dir / "ai" / "report.signed.mdmp"),
+                    grade="research_grade",
+                    issued_by="IINTS-Local-AI",
+                    verification_mode="explicit_key",
+                    key_id="iints_local_ai_v1",
+                    raw_result={"valid": True},
+                ),
+            )
+
+    monkeypatch.setattr("iints.ai.cli.prepare_ai_ready_artifacts", _fake_prepare)
+    monkeypatch.setattr("iints.ai.cli.IINTSAssistant", _FakeAssistant)
+
+    result = runner.invoke(app, ["ai", "report", str(run_dir)])
+
+    assert result.exit_code == 0
+    assert "Auto prepared report body" in result.stdout
+
+
 def test_ai_review_command_auto_writes_feedback_file_for_run_dir(tmp_path, monkeypatch) -> None:
     run_dir = tmp_path / "run"
     ai_dir = run_dir / "ai"

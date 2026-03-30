@@ -70,6 +70,15 @@ def _resolve_cli_inputs(
 
     if input_path.is_dir():
         ai_dir = input_path / "ai"
+        if (
+            not ai_dir.exists()
+            or not any((ai_dir / candidate).is_file() for candidate in ("report_payload.json", "trends_payload.json", "anomalies_payload.json", "step_riskiest.json", "review_payload.json"))
+            or (resolved_cert is None and not (ai_dir / "report.signed.mdmp").is_file())
+        ):
+            prepare_ai_ready_artifacts(
+                input_path,
+                create_dev_mdmp_cert=resolved_cert is None,
+            )
         resolved_input = _default_prepared_payload(task, ai_dir)
         if resolved_cert is None:
             candidate_cert = ai_dir / "report.signed.mdmp"

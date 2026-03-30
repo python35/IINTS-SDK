@@ -1,6 +1,6 @@
-# MDMP Full Guide
+# Data Certification Full Guide
 
-This page is the complete implementation guide for MDMP in IINTS-AF.
+This page is the complete implementation guide for the IINTS data-certification layer.
 
 ## Environment Requirement
 
@@ -18,29 +18,30 @@ python -m pip install -U pip
 - Engineers implementing quality gates in scripts, CI, and services.
 - Reviewers who need traceable evidence for dataset integrity.
 
-## What MDMP Is (And Is Not)
+## What Data Certification Is (And Is Not)
 
-MDMP is the data-quality protocol layer in IINTS-AF.
+Data certification is the data-quality protocol layer in IINTS-AF.
 
-MDMP does:
+It does:
 - Validate schema, types, value ranges, and explicit data rules.
 - Generate deterministic fingerprints for contract and dataset.
 - Assign a quality grade (`draft`, `research_grade`, `clinical_grade`).
 - Produce machine-readable reports and optional HTML dashboards.
 
-MDMP does not:
+It does not:
 - Grant clinical approval.
 - Convert this SDK into a medical device.
 - Replace model evaluation or clinical study design.
 
 ## Protocol Surface
 
-Preferred namespace:
+Preferred public namespace:
+- CLI: `iints data ...`
+- Python: `iints.data`
+
+Legacy compatibility namespace (hidden from public help):
 - CLI: `iints mdmp ...`
 - Python: `iints.mdmp`
-
-Compatibility namespace (still supported):
-- CLI: `iints data contract-*`, `iints data mdmp-visualizer`, `iints data synthetic-mirror`
 
 ## MDMP Contract Model
 
@@ -146,49 +147,51 @@ Practical meaning:
 ### 1) Create a contract template
 
 ```bash
-iints mdmp template --output-path mdmp_contract.yaml
+iints data certify-template --output-path data_contract.yaml
 ```
 
 ### 2) Validate dataset
 
 ```bash
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv --output-json results/mdmp_report.json
+iints data certify data_contract.yaml data/my_cgm.csv --output-json results/certification.json
 ```
 
 Strict gate example:
 
 ```bash
-iints mdmp validate mdmp_contract.yaml data/my_cgm.csv \
+iints data certify data_contract.yaml data/my_cgm.csv \
   --min-mdmp-grade research_grade \
   --fail-on-noncompliant \
-  --output-json results/mdmp_report.json
+  --output-json results/certification.json
 ```
 
 ### 3) Build HTML dashboard
 
 ```bash
-iints mdmp visualizer results/mdmp_report.json --output-html results/mdmp_dashboard.html
+iints data certify-visualizer results/certification.json --output-html results/mdmp_dashboard.html
 ```
 
 ### 4) Generate synthetic mirror data
 
 ```bash
-iints mdmp synthetic-mirror data/my_cgm.csv mdmp_contract.yaml \
+iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
   --output-csv data/synthetic_mirror.csv \
   --output-json results/synthetic_mirror_report.json
 ```
 
-## `iints mdmp` vs `iints data contract-run`
+## `iints data certify` vs legacy commands
 
-Both call the same core validator with slightly different defaults.
+The public command is now `iints data certify`.
 
-- `iints mdmp validate`
-  - `apply_builtin_transforms` default: `False`
-  - more explicit/strict MDMP behavior
+- `iints data certify`
+  - public, unified certification flow
+  - recommended for docs, demos, and new automation
 
 - `iints data contract-run`
-  - `apply_builtin_transforms` default: `True`
-  - convenience mode for broader data workflows
+  - low-level compatibility alias
+
+- `iints mdmp validate`
+  - hidden legacy alias kept so older scripts do not break immediately
 
 ## Built-in Unit Transforms
 
@@ -201,7 +204,7 @@ When built-in transforms are enabled, current supported conversion is:
 
 ```python
 from pathlib import Path
-from iints.mdmp import load_contract_yaml, compile_contract
+from iints.data import load_contract_yaml, compile_contract
 
 contract = load_contract_yaml(Path("mdmp_contract.yaml"))
 compiled = compile_contract(contract.to_dict())
@@ -212,7 +215,7 @@ print(compiled["fingerprint_sha256"])
 
 ```python
 import pandas as pd
-from iints.mdmp import ContractRunner, load_contract_yaml
+from iints.data import ContractRunner, load_contract_yaml
 
 df = pd.read_csv("data/my_cgm.csv")
 contract = load_contract_yaml(Path("mdmp_contract.yaml"))
@@ -224,7 +227,7 @@ print(result.mdmp_grade, result.compliance_score)
 
 ```python
 import pandas as pd
-from iints.mdmp import mdmp_gate
+from iints.data import mdmp_gate
 
 @mdmp_gate("mdmp_contract.yaml", min_grade="research_grade", fail_mode="raise")
 def process(df: pd.DataFrame) -> int:

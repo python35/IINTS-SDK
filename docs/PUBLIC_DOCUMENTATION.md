@@ -72,10 +72,10 @@ For non-technical readers, start with:
 - Cite datasets using `iints data cite <dataset_id>`.
 - Export literature sources using `iints sources --output-json results/source_manifest.json`.
 - Use `iints study-ready` when you want a ready-to-review bundle in one command.
-- Use `iints data mdmp-visualizer` to turn `contract_data_report.json` into a shareable single-file audit dashboard.
+- Use `iints data certify-visualizer` to turn `certification.json` into a shareable single-file audit dashboard.
 - Use `iints init --template clinical-trial` for a ready-made MDMP scaffold (contract + demo data + audit folders).
 - Use `iints data synthetic-mirror` to build privacy-safe synthetic datasets from validated source data.
-- Prefer `iints mdmp ...` commands and `iints.mdmp` imports for protocol-specific workflows.
+- Prefer `iints data certify ...` commands and `iints.data` imports for public-facing certification workflows.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
 ---

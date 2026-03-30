@@ -21,6 +21,18 @@ from .importer import (
     summarize_carelink_csv,
 )
 from .quality_checker import DataQualityChecker, QualityReport, DataGap, DataAnomaly
+from .certify import (
+    certify_csv,
+    certify_dataset,
+    render_certification_dashboard,
+    write_certification_dashboard,
+    write_certification_report,
+)
+from .study_corruption import (
+    AVAILABLE_STUDY_CORRUPTIONS,
+    apply_study_corruptions,
+    write_corrupted_study_csv,
+)
 from .universal_parser import UniversalParser, StandardDataPack, ParseResult
 from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
 from .nightscout import NightscoutConfig, import_nightscout
@@ -71,6 +83,14 @@ __all__ = [
     'QualityReport',
     'DataGap',
     'DataAnomaly',
+    'certify_csv',
+    'certify_dataset',
+    'render_certification_dashboard',
+    'write_certification_dashboard',
+    'write_certification_report',
+    'AVAILABLE_STUDY_CORRUPTIONS',
+    'apply_study_corruptions',
+    'write_corrupted_study_csv',
     'UniversalParser',
     'StandardDataPack',
     'ParseResult',
