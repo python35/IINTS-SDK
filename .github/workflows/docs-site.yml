@@ -59,4 +59,4 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         if: ${{ steps.setup_pages.outcome == 'success' }}
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
