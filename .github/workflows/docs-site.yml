@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Setup Pages
         id: setup_pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
         continue-on-error: true
       - name: Pages setup guidance
         if: ${{ steps.setup_pages.outcome != 'success' }}
