@@ -8,6 +8,7 @@ This page is the simplest answer to two common questions:
 ## The Short Rule
 
 - `iints ...` commands can run from any working folder once the SDK is installed.
+- `iints patient ...` commands can also run from any working folder once the SDK is installed.
 - `pip install -e ".[...]"` must be run from the SDK repository root, where `pyproject.toml` lives.
 - `./scripts/run_live_stage_demo.sh` and `./scripts/run_booth_demo.sh` belong to the SDK repository and resolve the repo root automatically.
 - After `iints quickstart`, switch into the generated project folder before running project commands.
@@ -22,7 +23,7 @@ You can run these commands from any folder:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 ```
 
 Then verify:
@@ -30,6 +31,34 @@ Then verify:
 ```bash
 iints doctor --smoke-run
 python -c "import iints; print(iints.__version__)"
+```
+
+## Option 1b: Install The Edge Runtime Profile
+
+For Raspberry Pi or UNO Q style deployments, use the lighter edge profile:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+```
+
+Use this when you mainly need:
+
+- `iints patient ...`
+- `iints edge ...`
+- local FastAPI dashboard
+- SQLite runtime state
+- CLI control
+- optional local AI review
+
+Typical SBC bootstrap:
+
+```bash
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
 ```
 
 ## Option 2: Install From Source
@@ -50,7 +79,13 @@ cd /path/to/IINTS-SDK
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[mdmp]"
+python -m pip install -U -e ".[full,mdmp]"
+```
+
+If you want the lighter edge runtime from source instead:
+
+```bash
+python -m pip install -U -e ".[edge,mdmp]"
 ```
 
 If you see:
@@ -141,6 +176,58 @@ Important:
 - If `ministral-3:8b` is unstable on your hardware, try `ministral-3:3b` first.
 - Full AI usage guide: `docs/AI_ASSISTANT.md`
 
+## Optional: Turn A Raspberry Pi Into A Live Digital Patient
+
+If you want a persistent expo or classroom rig, the SDK now includes:
+
+- `iints patient start`
+- `iints patient status`
+- `iints patient inject-meal`
+- `iints patient expo-reset`
+- `iints patient review`
+
+Recommended setup:
+
+- Raspberry Pi 5
+- Raspberry Pi OS Desktop (Bookworm or newer)
+- Raspberry Pi Connect enabled
+
+Fastest flow:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+
+iints quickstart --project-name iints_pi_demo
+cd iints_pi_demo
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8765/dashboard
+```
+
+Use Raspberry Pi Connect screen sharing from your laptop to present the live dashboard.
+
+If this Pi will be left running unattended, export a ready-made systemd unit after the first start:
+
+```bash
+iints patient export-service --workspace patient_runtime
+```
+
+Full guide:
+
+- `docs/DIGITAL_PATIENT_PI.md`
+
 ## Folder Map
 
 There are three important places to keep straight:
@@ -155,7 +242,7 @@ Example:
 
 Use this for:
 
-- `python -m pip install -e ".[mdmp]"`
+- `python -m pip install -e ".[full,mdmp]"`
 - `./scripts/run_live_stage_demo.sh`
 - `./scripts/run_booth_demo.sh`
 - opening `examples/demos/07_live_stage_demo.py`
@@ -205,7 +292,7 @@ That run bundle contains files such as:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
@@ -219,7 +306,7 @@ cd /path/to/IINTS-SDK
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[mdmp]"
+python -m pip install -U -e ".[full,mdmp]"
 
 ./scripts/run_live_stage_demo.sh
 ```
@@ -276,17 +363,17 @@ If needed:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 ```
 
-### `pip install -e ".[mdmp]"` fails
+### `pip install -e ".[full,mdmp]"` or `pip install -e ".[edge,mdmp]"` fails
 
 Move into the SDK repository root first:
 
 ```bash
 cd /path/to/IINTS-SDK
-python -m pip install -e ".[mdmp]"
+python -m pip install -e ".[full,mdmp]"
 ```
 
 ### Wrong Python version

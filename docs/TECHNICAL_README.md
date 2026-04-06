@@ -205,7 +205,7 @@ iints carelink-workbench \
 
 **Commands**
 ```bash
-python -m pip install -e ".[mdmp]"
+python -m pip install -e ".[full,mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
@@ -219,7 +219,7 @@ iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
 For imported personal CareLink data:
 
 ```bash
-python -m pip install -e ".[mdmp]"
+python -m pip install -e ".[full,mdmp]"
 ollama pull ministral-3:3b
 iints ai local-check --model ministral-3:3b
 iints carelink-workbench \
@@ -258,7 +258,54 @@ iints ai report results/simulation_run.json \
 - Use `ministral-3:3b` for smaller laptops or CPU-only systems.
 - Use `ministral-3:8b` as the default balanced choice.
 
-### Core Workflow Chapter F: Poster-Ready Results Graphic
+### Core Workflow Chapter G: Edge Runtime On SBC
+
+**Purpose**
+- Scaffold, run, inspect, update, and export a persistent digital patient runtime on Raspberry Pi or other Linux-capable SBC hardware.
+
+**When to use**
+- When you want an always-on booth rig, classroom Pi, UNO Q hybrid runtime, or long-running edge patient setup.
+
+**Commands**
+```bash
+python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
+iints edge status --workspace patient_runtime
+iints patient kiosk --workspace patient_runtime
+iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
+```
+
+For physical feedback on UNO Q:
+
+```bash
+iints edge hardware-bridge --board uno_q --output-dir uno_q_bridge
+```
+
+**Output**
+- generated edge scaffold with:
+  - `algorithms/example_algorithm.py`
+  - `run_edge_patient.sh`
+  - `launch_kiosk.sh`
+  - `update_edge_runtime.sh`
+  - `EDGE_SETUP.md`
+- persistent runtime workspace with:
+  - `patient_state.db`
+  - `patient_runtime_config.json`
+  - `patient.log`
+  - `live_bundle/`
+- optional export artifacts:
+  - `edge_runtime_bundle.zip`
+  - UNO Q bridge sketch + protocol notes
+
+**What this workflow gives you**
+- a lighter install profile for edge hardware
+- a kiosk-ready dashboard for Raspberry Pi Connect screen sharing
+- exported `systemd` service files for auto-restart on the device
+- a clean handoff path back to a workstation for full analysis
+
+### Core Workflow Chapter H: Poster-Ready Results Graphic
 
 **Purpose**
 - Turn one to three completed IINTS run bundles into a single poster-style PNG for jury demos, expos, or slide decks.
@@ -290,7 +337,7 @@ iints poster \
 - Per-panel summary block with TIR, time below range, meals, and intervention count
 - Use `ministral-3:14b` only on stronger workstations with plenty of memory.
 
-### Core Workflow Chapter G: Booth / Jury Demo Bundle
+### Core Workflow Chapter I: Booth / Jury Demo Bundle
 
 **Purpose**
 - Give you one public-facing command that creates a fair-ready demo with code, poster, and speaker notes.

@@ -2,6 +2,43 @@
 
 ## Unreleased
 
+## v1.5.2
+
+Release date: 2026-04-06
+
+### Added
+
+- introduced the SBC-first edge workflow:
+  - `iints edge setup`
+  - `iints edge status`
+  - `iints edge bundle`
+  - `iints edge update`
+  - `iints edge hardware-bridge`
+- added a kiosk-oriented live patient presentation layer:
+  - `iints patient kiosk`
+  - richer dashboard cards for certification, realism review, and active scenario
+  - one-click scenario shortcuts for booth and classroom demos
+- added generated edge deployment scaffolding:
+  - `run_edge_patient.sh`
+  - `launch_kiosk.sh`
+  - `update_edge_runtime.sh`
+  - exported `systemd` unit files and install notes
+- added UNO Q bridge export scaffolding for physical LEDs / buzzer feedback
+- added public SBC support documentation with a support matrix and architecture diagram
+
+### Improved
+
+- split installs cleanly into workstation and SBC profiles:
+  - `iints-sdk-python35[full,mdmp]`
+  - `iints-sdk-python35[edge,mdmp]`
+- made analysis/report imports safer so the edge profile can run without the full reporting stack installed
+- expanded the live patient workspace summary to show certification, realism review, workspace size, kiosk URL, and bundle status
+- improved Raspberry Pi and UNO Q docs so setup, update, and service installation are clearer and more reproducible
+
+### Why it matters
+
+This is the SBC release: the SDK now has a clean story for Raspberry Pi and other Linux-capable edge boards. You can scaffold an edge runtime, auto-start it as a service, present it in kiosk mode, export the runtime back to a laptop, and keep the public docs aligned with that deployment path.
+
 ## v1.5.1
 
 Release date: 2026-03-30

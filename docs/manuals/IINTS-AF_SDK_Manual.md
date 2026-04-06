@@ -1,5 +1,5 @@
 # Full Technical Manual
-Version 1.5.1 | Python SDK
+Version 1.5.2 | Python SDK
 
 **PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
 
@@ -178,11 +178,28 @@ source .venv/bin/activate  # macOS/Linux
 
 # Install SDK + MDMP support
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 # Verify installation
 iints doctor --smoke-run
 iints --help
+```
+
+#### Option 1b: Edge Install For Raspberry Pi / UNO Q
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+```
+
+Common edge bootstrap:
+
+```bash
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
 ```
 
 #### Option 2: Development Install
@@ -194,7 +211,7 @@ cd IINTS-SDK
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[mdmp]"
+python -m pip install -U -e ".[full,mdmp]"
 ```
 
 #### Option 3: With Research Extras (AI Predictor)
@@ -243,7 +260,7 @@ Practical notes:
 **Folder rule**
 
 - Installed `iints ...` commands can run from any folder.
-- `python -m pip install -e ".[mdmp]"` only works from the SDK repository root.
+- `python -m pip install -e ".[full,mdmp]"` only works from the SDK repository root.
 - After `iints quickstart`, switch into the generated project folder before running `iints presets run ...`.
 
 For the detailed path guide, see `docs/INSTALLATION.md`.
@@ -1500,7 +1517,7 @@ python -m pip install -e ".[mdmp]"
 Pull and validate the local model:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
@@ -1778,7 +1795,7 @@ python3 --version  # Must be 3.10+
 ```bash
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 python -c "import iints; print(iints.__version__)"
 iints-sdk-doctor
@@ -1788,7 +1805,7 @@ If `iints-sdk-doctor` reports a conflict:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 ```
 

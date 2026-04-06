@@ -46,7 +46,7 @@ Final dosing is always safety-constrained.
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py

@@ -21,7 +21,7 @@ All commands below assume this `.venv` is active.
 ## 2) Install
 
 ```bash
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 ```
 
 Optional extras:
@@ -29,6 +29,7 @@ Optional extras:
 ```bash
 pip install "iints-sdk-python35[research]"
 pip install "iints-sdk-python35[nightscout]"
+pip install "iints-sdk-python35[edge,mdmp]"
 ```
 
 ## 3) Verify Environment
@@ -211,6 +212,53 @@ iints run-eucys-study --algo algorithms/example_algorithm.py --output-dir result
 iints scenarios export-study-pack --output-dir scenarios/study_pack
 ```
 
+- Run a persistent digital patient on a Raspberry Pi:
+
+```bash
+iints quickstart --project-name iints_pi_demo
+cd iints_pi_demo
+iints patient scenarios
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x
+iints patient status --workspace patient_runtime
+```
+
+That flow gives you:
+
+- a persistent SQLite-backed runtime
+- a live dashboard on `http://127.0.0.1:8765/dashboard`
+- a run-like bundle under `patient_runtime/live_bundle/`
+
+This is the cleanest setup for Raspberry Pi Connect demos and classroom use.
+Full guide: [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
+
+- Build an edge-ready SBC project in one shot:
+
+```bash
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
+```
+
+- Show the fullscreen kiosk view and export the runtime back to a laptop:
+
+```bash
+iints patient kiosk --workspace patient_runtime
+iints edge status --workspace patient_runtime
+iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
+```
+
+That edge flow gives you:
+
+- a generated edge project scaffold
+- a service file and update script for the board
+- a kiosk dashboard URL for Raspberry Pi Connect screen sharing
+- a ZIP bundle for workstation-side analysis and reporting
+
 For a fair or jury table, the cleanest live flow is:
 
 1. open `examples/demos/07_live_stage_demo.py`
@@ -232,7 +280,7 @@ python 07_live_stage_demo.py
 
 ```bash
 source .venv/bin/activate
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 python -c "import iints; print(iints.__version__)"
 ```

@@ -17,7 +17,16 @@ Docs: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
+```
+
+For Raspberry Pi or UNO Q edge rigs, use `iints-sdk-python35[edge,mdmp]` and follow `docs/EDGE_HARDWARE.md`.
+
+Edge workflow:
+```bash
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+iints edge status --workspace iints_edge_demo/patient_runtime
+iints edge bundle --workspace iints_edge_demo/patient_runtime --output results/edge_runtime_bundle.zip
 ```
 
 Sanity check:
@@ -37,6 +46,8 @@ iints ai report results/<run_id>
 ## Read Next
 - Start here: `docs/GETTING_STARTED.md`
 - Installation and paths: `docs/INSTALLATION.md`
+- Edge hardware profiles: `docs/EDGE_HARDWARE.md`
+- Raspberry Pi digital patient: `docs/DIGITAL_PATIENT_PI.md`
 - Study analysis: `docs/STUDY_ANALYSIS.md`
 - AI assistant: `docs/AI_ASSISTANT.md`
 - Data certification: `docs/MDMP_QUICKSTART.md`

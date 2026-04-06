@@ -51,7 +51,7 @@ def _write_run_bundle(tmp_path) -> None:
         json.dumps(
             {
                 "run_id": "bundled-mdmp-demo",
-                "sdk_version": "1.5.1",
+                "sdk_version": "1.5.2",
                 "output_dir": str(tmp_path),
                 "config": {
                     "duration_minutes": 10,

@@ -22,15 +22,29 @@ markdown_extensions:
   - admonition
   - codehilite
   - footnotes
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - tables
   - toc:
       permalink: true
+
+extra_javascript:
+  - https://unpkg.com/mermaid@11/dist/mermaid.min.js
+  - javascripts/mermaid.js
+
+extra_css:
+  - stylesheets/extra.css
 
 nav:
   - Home: index.md
   - Start Here:
       - Quick Start: GETTING_STARTED.md
       - Installation And Paths: INSTALLATION.md
+      - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
+      - Digital Patient On Raspberry Pi: DIGITAL_PATIENT_PI.md
       - Study Analysis: STUDY_ANALYSIS.md
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
       - Updating The SDK: UPDATING.md
@@ -55,9 +69,10 @@ nav:
       - Public Documentation Overview: PUBLIC_DOCUMENTATION.md
       - Scientific Evidence & Sources: EVIDENCE_BASE.md
   - Release Notes:
-      - Latest (v1.5.1): releases/v1.5.1.md
+      - Latest (v1.5.2): releases/v1.5.2.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.1: releases/v1.5.1.md
           - v1.5.0: releases/v1.5.0.md
           - v1.4.0: releases/v1.4.0.md
           - v1.3.2: releases/v1.3.2.md

@@ -59,7 +59,7 @@ Always work from an active virtual environment:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -e ".[mdmp]"
+python -m pip install -e ".[full,mdmp]"
 ```
 
 ## Clean Ollama Setup (Small Version)
@@ -74,7 +74,7 @@ Released SDK:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 ```
 
 Source checkout:
@@ -84,7 +84,7 @@ cd /path/to/IINTS-SDK
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[mdmp]"
+python -m pip install -U -e ".[full,mdmp]"
 ```
 
 ### 2. Install Ollama
@@ -239,6 +239,24 @@ iints ai review results/personal_carelink --model ministral-3:3b
 iints ai trends results/personal_carelink --model ministral-3:3b
 iints ai explain results/personal_carelink --model ministral-3:3b
 ```
+
+## Digital Patient Review
+
+The Raspberry Pi live runtime also plugs into the same AI layer.
+
+After a live patient session has written its bundle under `patient_runtime/live_bundle/`, run:
+
+```bash
+iints patient review \
+  --workspace patient_runtime \
+  --model ministral-3:3b
+```
+
+That automatically prepares the runtime bundle, checks the MDMP gate, and writes:
+
+- `patient_runtime/live_bundle/ai/realism_review.md`
+
+This is useful for expo demos where you want the Pi to both simulate and critique the realism of the current run.
 
 ## Generation Commands
 
@@ -403,7 +421,7 @@ If it reports a package ownership conflict, repair the environment:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 ```
 

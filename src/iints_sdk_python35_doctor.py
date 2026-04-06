@@ -9,7 +9,9 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
     import importlib_metadata as metadata  # type: ignore
 
 
-RECOMMENDED_VERSION = "1.5.1"
+RECOMMENDED_VERSION = "1.5.2"
+FULL_INSTALL = f"iints-sdk-python35[full,mdmp]=={RECOMMENDED_VERSION}"
+EDGE_INSTALL = f"iints-sdk-python35[edge,mdmp]=={RECOMMENDED_VERSION}"
 
 
 @dataclass(frozen=True)
@@ -72,19 +74,22 @@ def main() -> int:
         print()
         print("Fix it with:")
         print("  python -m pip uninstall -y iints iints-sdk-python35")
-        print(f"  python -m pip install -U \"iints-sdk-python35[mdmp]=={RECOMMENDED_VERSION}\"")
+        print(f"  python -m pip install -U \"{FULL_INSTALL}\"")
+        print(f"  # On Raspberry Pi / UNO Q use: python -m pip install -U \"{EDGE_INSTALL}\"")
         print("  hash -r")
         return 1
 
     if diagnosis.installed_sdk_version is None:
         print("`iints-sdk-python35` is not installed in this environment.")
         print("Install it with:")
-        print(f"  python -m pip install -U \"iints-sdk-python35[mdmp]=={RECOMMENDED_VERSION}\"")
+        print(f"  python -m pip install -U \"{FULL_INSTALL}\"")
+        print(f"  # On Raspberry Pi / UNO Q use: python -m pip install -U \"{EDGE_INSTALL}\"")
         return 1
 
     print("No package ownership conflict detected.")
     print("If `iints ai` is still missing, reinstall the SDK in the active virtual environment:")
-    print(f"  python -m pip install -U \"iints-sdk-python35[mdmp]=={RECOMMENDED_VERSION}\"")
+    print(f"  python -m pip install -U \"{FULL_INSTALL}\"")
+    print(f"  # On Raspberry Pi / UNO Q use: python -m pip install -U \"{EDGE_INSTALL}\"")
     print("  hash -r")
     return 0
 

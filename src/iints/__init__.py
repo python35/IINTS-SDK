@@ -11,10 +11,17 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.5.1"
+    __version__ = "1.5.2"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
+
+
+def _missing_reports_dependency(feature: str, exc: Exception) -> None:
+    raise ImportError(
+        f"{feature} requires the optional reporting stack. Install "
+        f"'iints-sdk-python35[reports]' or 'iints-sdk-python35[full]'."
+    ) from exc
 
 # API Components for Algorithm Development
 from .api.base_algorithm import (
@@ -72,15 +79,57 @@ from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .data.study_corruption import AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv
 from .analysis.metrics import generate_benchmark_metrics # Added for benchmark
-from .analysis.booth_demo import build_booth_demo
-from .analysis.carelink_workbench import build_carelink_workbench
-from .analysis.poster import generate_results_poster
-from .analysis.reporting import ClinicalReportGenerator
 from .analysis.study_protocol import build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle
 from .analysis.edge_efficiency import EnergyEstimate, estimate_energy_per_decision
 from .ai import AIResponse, IINTSAssistant, MDMPGuard
+from .live_patient import (
+    create_edge_bundle,
+    export_edge_setup,
+    LivePatientDaemon,
+    PatientRuntimeConfig,
+    create_patient_app,
+    export_uno_q_bridge,
+    get_runtime_scenario_profile,
+    list_runtime_scenario_profiles,
+    run_edge_benchmark,
+    summarize_edge_workspace,
+    write_edge_update_script,
+)
 from .highlevel import run_simulation, run_full, run_population
 from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
+
+try:
+    from .analysis.booth_demo import build_booth_demo
+except Exception as exc:  # pragma: no cover - optional reports stack
+    _build_booth_demo_exc = exc
+
+    def build_booth_demo(*args, **kwargs):  # type: ignore[misc,no-redef]
+        _missing_reports_dependency("build_booth_demo()", _build_booth_demo_exc)
+
+try:
+    from .analysis.carelink_workbench import build_carelink_workbench
+except Exception as exc:  # pragma: no cover - optional reports stack
+    _build_carelink_workbench_exc = exc
+
+    def build_carelink_workbench(*args, **kwargs):  # type: ignore[misc,no-redef]
+        _missing_reports_dependency("build_carelink_workbench()", _build_carelink_workbench_exc)
+
+try:
+    from .analysis.poster import generate_results_poster
+except Exception as exc:  # pragma: no cover - optional reports stack
+    _generate_results_poster_exc = exc
+
+    def generate_results_poster(*args, **kwargs):  # type: ignore[misc,no-redef]
+        _missing_reports_dependency("generate_results_poster()", _generate_results_poster_exc)
+
+try:
+    from .analysis.reporting import ClinicalReportGenerator
+except Exception as exc:  # pragma: no cover - optional reports stack
+    _clinical_report_generator_exc = exc
+
+    class ClinicalReportGenerator:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            _missing_reports_dependency("ClinicalReportGenerator", _clinical_report_generator_exc)
 
 # Population testing
 from .population import (
@@ -202,6 +251,17 @@ __all__ = [
     "AIResponse",
     "IINTSAssistant",
     "MDMPGuard",
+    "create_edge_bundle",
+    "export_edge_setup",
+    "LivePatientDaemon",
+    "PatientRuntimeConfig",
+    "create_patient_app",
+    "export_uno_q_bridge",
+    "get_runtime_scenario_profile",
+    "list_runtime_scenario_profiles",
+    "run_edge_benchmark",
+    "summarize_edge_workspace",
+    "write_edge_update_script",
     # Reporting
     "generate_report",
     "generate_quickstart_report",

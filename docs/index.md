@@ -15,6 +15,8 @@ It combines three layers:
 
 - [Quick Start](GETTING_STARTED.md)
 - [Installation And Paths](INSTALLATION.md)
+- [Edge Hardware Profiles](EDGE_HARDWARE.md)
+- [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md)
@@ -31,6 +33,15 @@ It combines three layers:
 | [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Installation And Paths](INSTALLATION.md) | [Quick Start](GETTING_STARTED.md) | [Developer CLI Guide](TECHNICAL_README.md) |
 | Understand what the SDK does and does not do. | Know which folder to use and which install path fits your setup. | Install, run baseline, inspect outputs. | Full command reference and technical integration details. |
 
+For a live Raspberry Pi installation:
+- [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
+- [Edge Hardware Profiles](EDGE_HARDWARE.md)
+
+Core edge commands:
+- `iints edge setup`
+- `iints edge status`
+- `iints edge bundle`
+
 For the local research assistant:
 - [AI Assistant Guide](AI_ASSISTANT.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
@@ -42,7 +53,7 @@ For the local research assistant:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 iints doctor --smoke-run
 iints quickstart --project-name iints_quickstart

@@ -24,12 +24,9 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
+from iints.cli.patient_cli import app as patient_app
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
-from iints.analysis.booth_demo import build_booth_demo
-from iints.analysis.carelink_workbench import build_carelink_workbench
-from iints.analysis.poster import generate_results_poster
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
-from iints.analysis.study_poster import generate_study_poster
 from iints.analysis.study_protocol import write_study_protocol_bundle
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
@@ -65,6 +62,14 @@ from iints.data.registry import (
 from iints.data.contracts import load_contract_yaml
 from iints.data.synthetic_mirror import generate_synthetic_mirror
 from iints.demo_assets import export_live_stage_demo
+from iints.live_patient.edge_benchmark import run_edge_benchmark
+from iints.live_patient.edge_ops import (
+    create_edge_bundle,
+    export_edge_setup,
+    summarize_edge_workspace,
+    write_edge_update_script,
+)
+from iints.live_patient.uno_q import export_uno_q_bridge
 from iints.mdmp.backend import (
     MDMP_GRADE_ORDER,
     active_mdmp_backend,
@@ -105,6 +110,22 @@ from iints.validation import (
 )
 
 
+def _require_reports_feature(console: Console, module_path: str, attribute: str, feature_name: str):
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, attribute)
+    except Exception as exc:
+        console.print(
+            f"[bold red]{feature_name} is not available in the minimal edge install.[/bold red]\n"
+            "Install the optional reporting stack with:\n"
+            "  [cyan]python -m pip install -U \"iints-sdk-python35[reports]\"[/cyan]\n"
+            "or:\n"
+            "  [cyan]python -m pip install -U \"iints-sdk-python35[full]\"[/cyan]\n"
+            f"Details: {exc}"
+        )
+        raise typer.Exit(code=1)
+
+
 IINTS_ASCII_LOGO = r"""
  /$$$$$$ /$$$$$$ /$$   /$$ /$$$$$$$$ /$$$$$$           /$$$$$$  /$$$$$$$  /$$   /$$
 |_  $$_/|_  $$_/| $$$ | $$|__  $$__//$$__  $$         /$$__  $$| $$__  $$| $$  /$$/
@@ -139,6 +160,7 @@ data_app = typer.Typer(help="Data import, certification, and public data packs."
 mdmp_app = typer.Typer(help="Legacy MDMP namespace kept for backwards compatibility.")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
+edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
@@ -147,6 +169,8 @@ app.add_typer(mdmp_app, name="mdmp", hidden=True, deprecated=True)
 app.add_typer(ai_app, name="ai")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
+app.add_typer(edge_app, name="edge")
+app.add_typer(patient_app, name="patient")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     if not algo.is_file():
@@ -1383,6 +1407,12 @@ def poster_study(
 ) -> None:
     """Generate a poster-style visual summary from study results."""
     console = Console()
+    generate_study_poster = _require_reports_feature(
+        console,
+        "iints.analysis.study_poster",
+        "generate_study_poster",
+        "Study poster generation",
+    )
     try:
         outputs = generate_study_poster(study_input, output_path=output_path, title=title, subtitle=subtitle)
     except Exception as exc:
@@ -1401,6 +1431,18 @@ def demo_expo(
 ) -> None:
     """Build the public expo bundle: three runs, study summary, study poster, and evidence tables."""
     console = Console()
+    build_booth_demo = _require_reports_feature(
+        console,
+        "iints.analysis.booth_demo",
+        "build_booth_demo",
+        "Expo demo bundle generation",
+    )
+    generate_study_poster = _require_reports_feature(
+        console,
+        "iints.analysis.study_poster",
+        "generate_study_poster",
+        "Study poster generation",
+    )
     try:
         booth_outputs = build_booth_demo(
             output_dir=output_dir,
@@ -1468,6 +1510,12 @@ def run_eucys_study(
 ) -> None:
     """Run the fixed EUCYS study matrix and generate summaries, comparisons, and posters."""
     console = Console()
+    generate_study_poster = _require_reports_feature(
+        console,
+        "iints.analysis.study_poster",
+        "generate_study_poster",
+        "Study poster generation",
+    )
     parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
     if not parsed_seeds:
         console.print("[bold red]Please provide at least one seed.[/bold red]")
@@ -3389,6 +3437,12 @@ def poster(
 ):
     """Generate a poster-style PNG from one to three IINTS run bundles."""
     console = Console()
+    generate_results_poster = _require_reports_feature(
+        console,
+        "iints.analysis.poster",
+        "generate_results_poster",
+        "Run poster generation",
+    )
     try:
         outputs = generate_results_poster(
             run_dirs=run_dir,
@@ -3450,6 +3504,12 @@ def demo_booth(
 ) -> None:
     """Build a full expo/jury demo bundle with runs, poster, and talk track."""
     console = Console()
+    build_booth_demo = _require_reports_feature(
+        console,
+        "iints.analysis.booth_demo",
+        "build_booth_demo",
+        "Booth demo generation",
+    )
     try:
         outputs = build_booth_demo(
             output_dir=output_dir,
@@ -3547,9 +3607,11 @@ def report(
         output_path = bundle_dir / "clinical_report.pdf"
         audit_output_dir = bundle_dir / "audit"
         plots_dir = bundle_dir / "plots"
+        _require_reports_feature(console, "iints.analysis.reporting", "ClinicalReportGenerator", "Clinical PDF reporting")
         generator = iints.ClinicalReportGenerator()
         generator.export_plots(results_df, str(plots_dir))
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    _require_reports_feature(console, "iints.analysis.reporting", "ClinicalReportGenerator", "Clinical PDF reporting")
     iints.generate_report(results_df, str(output_path), safety_report)
     console.print(f"PDF report saved to: [link=file://{output_path}]{output_path}[/link]")
 
@@ -5036,6 +5098,12 @@ def carelink_workbench(
         console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
         raise typer.Exit(code=1)
 
+    build_carelink_workbench = _require_reports_feature(
+        console,
+        "iints.analysis.carelink_workbench",
+        "build_carelink_workbench",
+        "CareLink workbench",
+    )
     try:
         outputs = build_carelink_workbench(
             input_csv,
@@ -5337,7 +5405,7 @@ def docs_algo(
         console.print(f"[bold red]Error loading algorithm module {algo_path}: {e}[/bold red]")
         raise typer.Exit(code=1)
 
-    algorithm_class = None
+    algorithm_class: Optional[type[iints.InsulinAlgorithm]] = None
     for name_in_module, obj in module.__dict__.items():
         if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
             algorithm_class = obj
@@ -5353,6 +5421,7 @@ def docs_algo(
 
     # Ensure algorithm_class is not None (it shouldn't be if algorithm_instance is not None)
     assert algorithm_class is not None
+    algorithm_class = cast(type[iints.InsulinAlgorithm], algorithm_class)
 
     # Extract class docstring
     class_doc = algorithm_class.__doc__ if algorithm_class.__doc__ else "No class docstring available."
@@ -5639,3 +5708,275 @@ def benchmark(
             console.print(f"Run manifest signature: {signature_path}")
     else:
         console.print("[yellow]No benchmark results were generated.[/yellow]")
+
+
+@app.command("edge-benchmark")
+def edge_benchmark(
+    algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file used for the edge benchmark.")],
+    output_json: Annotated[Path, typer.Option(help="Output JSON path for the hardware benchmark results.")] = Path("results/edge_benchmark.json"),
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    scenario_profile: Annotated[str, typer.Option(help="Digital patient scenario profile.")] = "normal_day",
+    steps: Annotated[int, typer.Option(help="Number of simulated steps used for throughput measurement.")] = 72,
+    platform_name: Annotated[str, typer.Option("--platform", help="Platform label written into the benchmark report. Use 'auto' to detect locally.")] = "auto",
+    api_host: Annotated[str, typer.Option(help="Host used for the local dashboard probe.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Port used for the local dashboard probe.")] = 8766,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+) -> None:
+    """Measure digital-patient throughput, memory use, and dashboard response time on edge hardware."""
+    console = Console()
+    if not algo.is_file():
+        console.print(f"[bold red]Algorithm file '{algo}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        payload = run_edge_benchmark(
+            algo_path=algo,
+            patient_config=patient_config,
+            patient_model_type=patient_model,
+            scenario_profile=scenario_profile,
+            steps=steps,
+            platform_name=platform_name,
+            api_host=api_host,
+            api_port=api_port,
+            seed=seed,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Edge benchmark failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    output_json.parent.mkdir(parents=True, exist_ok=True)
+    output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    runtime = payload["runtime"]
+    dashboard = payload["dashboard"]
+    table = Table(title="IINTS Edge Benchmark")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value")
+    table.add_row("Platform", str(payload["platform"]))
+    table.add_row("Scenario", str(payload["scenario_profile"]))
+    table.add_row("Seed", str(payload["seed"]))
+    table.add_row("Steps / second", f"{runtime['steps_per_second']:.2f}")
+    table.add_row("Mean step latency", f"{runtime['mean_step_latency_ms']:.2f} ms")
+    table.add_row("Peak process memory", f"{runtime['peak_process_memory_mb']:.2f} MB")
+    table.add_row("Dashboard response", f"{dashboard['dashboard_response_ms']['mean_ms']:.2f} ms")
+    table.add_row("Status response", f"{dashboard['status_response_ms']['mean_ms']:.2f} ms")
+    console.print(table)
+    console.print(f"[green]Edge benchmark JSON written:[/green] {output_json}")
+
+
+def _parse_edge_speed(value: str | float) -> float:
+    if isinstance(value, (int, float)):
+        parsed = float(value)
+    else:
+        text = str(value).strip().lower()
+        if text.endswith("x"):
+            text = text[:-1]
+        parsed = float(text)
+    if parsed <= 0.0:
+        raise typer.BadParameter("Speed must be a positive number such as 60 or 60x.")
+    return parsed
+
+
+@edge_app.command("setup")
+def edge_setup(
+    output_dir: Annotated[Path, typer.Option(help="Directory where the edge-ready project scaffold should be written.")] = Path("iints_edge_demo"),
+    board: Annotated[str, typer.Option(help="Edge board target: raspberry_pi or uno_q.")] = "raspberry_pi",
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder name used for the persistent patient runtime.")] = "patient_runtime",
+    scenario_profile: Annotated[str, typer.Option(help="Initial live scenario profile.")] = "normal_day",
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    mode: Annotated[str, typer.Option(help="Clock mode for the generated edge project.")] = "demo-time",
+    speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts 60 or 60x.")] = "60x",
+    api_host: Annotated[str, typer.Option(help="Dashboard host to bake into the generated runtime config.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Dashboard port to bake into the generated runtime config.")] = 8765,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+    service_name: Annotated[str, typer.Option(help="systemd service name without the .service suffix.")] = "iints-digital-patient",
+    user_name: Annotated[Optional[str], typer.Option(help="Linux user that should own the generated systemd service.")] = None,
+) -> None:
+    console = Console()
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+
+    outputs = export_edge_setup(
+        output_dir,
+        board=normalized_board,
+        workspace_name=workspace_name,
+        scenario_profile=scenario_profile,
+        patient_config=patient_config,
+        patient_model_type=patient_model,
+        mode=mode,
+        speed=_parse_edge_speed(speed),
+        api_host=api_host,
+        api_port=api_port,
+        seed=seed,
+        service_name=service_name,
+        user_name=user_name,
+        include_uno_bridge=normalized_board == "uno_q",
+    )
+
+    table = Table(title="IINTS Edge Setup")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key in [
+        "root",
+        "algorithm",
+        "workspace",
+        "config",
+        "run_script",
+        "kiosk_script",
+        "update_script",
+        "service_file",
+        "service_notes",
+        "setup_guide",
+    ]:
+        table.add_row(key, outputs[key])
+    if "uno_q_bridge" in outputs:
+        table.add_row("uno_q_bridge", outputs["uno_q_bridge"])
+    console.print(table)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Board profile: {normalized_board}",
+                    f"Start script: {outputs['run_script']}",
+                    f"Kiosk launcher: {outputs['kiosk_script']}",
+                    f"Setup guide: {outputs['setup_guide']}",
+                ]
+            ),
+            title="Edge Setup Ready",
+            border_style="green",
+        )
+    )
+
+
+@edge_app.command("status")
+def edge_status(
+    workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
+) -> None:
+    console = Console()
+    summary = summarize_edge_workspace(workspace)
+    if not summary:
+        console.print(f"[bold red]No edge runtime found in {workspace}.[/bold red]")
+        raise typer.Exit(code=1)
+
+    certification = summary.get("certification") or {}
+    review = summary.get("review") or {}
+
+    table = Table(title="IINTS Edge Runtime Status")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    rows = [
+        ("daemon_status", summary.get("daemon_status", "-")),
+        ("pid_alive", summary.get("pid_alive", "-")),
+        ("algorithm_name", summary.get("algorithm_name", "-")),
+        ("scenario_profile", summary.get("scenario_profile", "-")),
+        ("active_seed", summary.get("active_seed", "-")),
+        ("simulated_clock", summary.get("simulated_clock", "-")),
+        ("last_glucose_mgdl", summary.get("last_glucose_mgdl", "-")),
+        ("dashboard_url", summary.get("dashboard_url", "-")),
+        ("kiosk_url", summary.get("kiosk_url", "-")),
+        ("certification", certification.get("label", "-")),
+        ("review", review.get("label", "-")),
+        ("workspace_size_mb", summary.get("workspace_size_mb", "-")),
+        ("bundle_size_mb", summary.get("bundle_size_mb", "-")),
+        ("last_heartbeat_utc", summary.get("last_heartbeat_utc", "-")),
+    ]
+    for field, value in rows:
+        table.add_row(str(field), str(value))
+    console.print(table)
+
+
+@edge_app.command("bundle")
+def edge_bundle(
+    workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
+    output: Annotated[Path, typer.Option(help="ZIP archive written for workstation-side analysis.")] = Path("results/edge_runtime_bundle.zip"),
+    include_log: Annotated[bool, typer.Option(help="Include the patient log in the archive.")] = True,
+    include_database: Annotated[bool, typer.Option(help="Include the SQLite runtime database in the archive.")] = True,
+) -> None:
+    console = Console()
+    payload = create_edge_bundle(
+        workspace,
+        output_path=output,
+        include_log=include_log,
+        include_database=include_database,
+    )
+    summary = payload["summary"]
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Archive: {payload['archive']}",
+                    f"Scenario: {summary.get('scenario_profile', '-')}",
+                    f"Certification: {(summary.get('certification') or {}).get('label', '-')}",
+                    f"Review: {(summary.get('review') or {}).get('label', '-')}",
+                ]
+            ),
+            title="Edge Bundle Ready",
+            border_style="cyan",
+        )
+    )
+
+
+@edge_app.command("update")
+def edge_update(
+    output_script: Annotated[Path, typer.Option(help="Where to write the edge update shell script.")] = Path("update_edge_runtime.sh"),
+    profile: Annotated[str, typer.Option(help="Install profile to upgrade: edge or full.")] = "edge",
+    version_pin: Annotated[Optional[str], typer.Option(help="Optional exact SDK version pin, for example 1.5.2.")] = None,
+) -> None:
+    console = Console()
+    normalized = profile.strip().lower()
+    if normalized not in {"edge", "full"}:
+        console.print("[bold red]Profile must be `edge` or `full`.[/bold red]")
+        raise typer.Exit(code=1)
+    script_path = write_edge_update_script(output_script, profile=normalized, version_pin=version_pin)
+    console.print(f"[green]Edge update script written:[/green] {script_path}")
+
+
+@edge_app.command("hardware-bridge")
+def edge_hardware_bridge(
+    board: Annotated[str, typer.Option(help="Hardware bridge target. Currently supported: uno_q.")] = "uno_q",
+    output_dir: Annotated[Path, typer.Option(help="Directory where the hardware bridge scaffold should be written.")] = Path("uno_q_bridge"),
+) -> None:
+    console = Console()
+    normalized = board.strip().lower()
+    if normalized != "uno_q":
+        console.print("[bold red]Only the `uno_q` hardware bridge is currently implemented.[/bold red]")
+        raise typer.Exit(code=1)
+    outputs = export_uno_q_bridge(output_dir)
+    table = Table(title="IINTS Edge Hardware Bridge")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("sketch", outputs["sketch"])
+    table.add_row("readme", outputs["readme"])
+    table.add_row("protocol", outputs["protocol"])
+    console.print(table)
+
+
+@edge_app.command("benchmark")
+def edge_benchmark_alias(
+    algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file used for the edge benchmark.")],
+    output_json: Annotated[Path, typer.Option(help="Output JSON path for the hardware benchmark results.")] = Path("results/edge_benchmark.json"),
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    scenario_profile: Annotated[str, typer.Option(help="Digital patient scenario profile.")] = "normal_day",
+    steps: Annotated[int, typer.Option(help="Number of simulated steps used for throughput measurement.")] = 72,
+    platform_name: Annotated[str, typer.Option("--platform", help="Platform label written into the benchmark report. Use 'auto' to detect locally.")] = "auto",
+    api_host: Annotated[str, typer.Option(help="Host used for the local dashboard probe.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Port used for the local dashboard probe.")] = 8766,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+) -> None:
+    edge_benchmark(
+        algo=algo,
+        output_json=output_json,
+        patient_config=patient_config,
+        patient_model=patient_model,
+        scenario_profile=scenario_profile,
+        steps=steps,
+        platform_name=platform_name,
+        api_host=api_host,
+        api_port=api_port,
+        seed=seed,
+    )

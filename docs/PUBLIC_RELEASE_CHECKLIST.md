@@ -10,7 +10,7 @@ Run this on a clean macOS or Linux machine:
 python3 -m venv .venv-iints
 source .venv-iints/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 iints doctor --smoke-run
 ```
 
@@ -34,6 +34,22 @@ Expected result:
 - the demo runs on a non-repository machine
 - `results/booth_demo_live/booth_demo_poster.png` is created
 - `results/booth_demo_live/JURY_TALK_TRACK.md` is created
+
+## 2b. SBC Edge Smoke Test
+
+Verify that the installed SDK can scaffold the new edge runtime:
+
+```bash
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
+```
+
+Expected result:
+
+- `patient_runtime/patient_runtime_config.json` is created
+- `patient_runtime/iints-digital-patient.service` is created
+- `launch_kiosk.sh` and `update_edge_runtime.sh` are present
 
 ## 3. Local AI Readiness
 

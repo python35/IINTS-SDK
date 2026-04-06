@@ -172,3 +172,31 @@ Suggested walkthrough:
 - one poster to show
 - one markdown talk track to read from
 - one safety story that non-technical people can understand
+
+## Alternative: Live Raspberry Pi Demo
+
+If you want a more "alive" booth setup, use the new persistent patient runtime instead of the three-panel booth bundle:
+
+```bash
+iints quickstart --project-name iints_pi_demo
+cd iints_pi_demo
+iints patient scenarios
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x
+```
+
+Then present:
+
+- the dashboard at `http://127.0.0.1:8765/dashboard`
+- `iints patient inject-meal --carbs 60 --workspace patient_runtime`
+- `iints patient expo-reset --workspace patient_runtime`
+- `iints patient export-service --workspace patient_runtime`
+- optionally `iints patient review --workspace patient_runtime --model ministral-3:3b`
+
+That path is documented in:
+
+- [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)

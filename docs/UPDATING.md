@@ -4,6 +4,8 @@ Use this guide when you already have IINTS installed and want to move to the lat
 
 If you are not sure which folder you should be in, read [Installation And Paths](INSTALLATION.md) first.
 
+This page assumes the full workstation install. If you are updating a Raspberry Pi or UNO Q runtime, substitute `iints-sdk-python35[edge,mdmp]` instead.
+
 ## The safest upgrade path
 
 Always upgrade inside the virtual environment you actually use for IINTS:
@@ -12,7 +14,7 @@ Always upgrade inside the virtual environment you actually use for IINTS:
 source .venv/bin/activate
 python --version
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 ```
 
@@ -26,7 +28,7 @@ iints --help
 If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[mdmp]==1.5.1"
+python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.2"
 ```
 
 ## If you installed from source
@@ -38,7 +40,7 @@ cd /path/to/IINTS-SDK
 git pull
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[mdmp]"
+python -m pip install -U -e ".[full,mdmp]"
 hash -r
 ```
 
@@ -48,7 +50,7 @@ If you see:
 ERROR: file:///home/your-user does not appear to be a Python project
 ```
 
-then you ran `pip install -e ".[mdmp]"` from the wrong folder. Move into the SDK repository root first, where `pyproject.toml` lives.
+then you ran `pip install -e ".[full,mdmp]"` from the wrong folder. Move into the SDK repository root first, where `pyproject.toml` lives.
 
 The repository root is the folder containing:
 
@@ -71,7 +73,7 @@ If it reports a conflict, repair it with:
 
 ```bash
 python -m pip uninstall -y iints iints-sdk-python35
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 hash -r
 ```
 
@@ -90,7 +92,7 @@ If you are on Python `3.8` or `3.9`, create a fresh environment with Python `3.1
 ```bash
 python3.11 -m venv .venv-iints
 source .venv-iints/bin/activate
-python -m pip install -U "iints-sdk-python35[mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
 ```
 
 ## Recommended post-upgrade checks
@@ -118,7 +120,7 @@ iints demo-booth --output-dir results/booth_demo
 
 - activated the correct virtual environment
 - upgraded `pip`
-- installed the latest `iints-sdk-python35[mdmp]` release
+- installed the latest `iints-sdk-python35[full,mdmp]` release
 - ran `hash -r`
 - confirmed `python -c "import iints; print(iints.__version__)"`
 - ran `iints --help`
