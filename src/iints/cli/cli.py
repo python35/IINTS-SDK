@@ -25,6 +25,7 @@ import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.cli.patient_cli import app as patient_app
+from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
 from iints.analysis.study_protocol import write_study_protocol_bundle
@@ -1407,12 +1408,6 @@ def poster_study(
 ) -> None:
     """Generate a poster-style visual summary from study results."""
     console = Console()
-    generate_study_poster = _require_reports_feature(
-        console,
-        "iints.analysis.study_poster",
-        "generate_study_poster",
-        "Study poster generation",
-    )
     try:
         outputs = generate_study_poster(study_input, output_path=output_path, title=title, subtitle=subtitle)
     except Exception as exc:
@@ -1431,18 +1426,6 @@ def demo_expo(
 ) -> None:
     """Build the public expo bundle: three runs, study summary, study poster, and evidence tables."""
     console = Console()
-    build_booth_demo = _require_reports_feature(
-        console,
-        "iints.analysis.booth_demo",
-        "build_booth_demo",
-        "Expo demo bundle generation",
-    )
-    generate_study_poster = _require_reports_feature(
-        console,
-        "iints.analysis.study_poster",
-        "generate_study_poster",
-        "Study poster generation",
-    )
     try:
         booth_outputs = build_booth_demo(
             output_dir=output_dir,
@@ -1510,12 +1493,6 @@ def run_eucys_study(
 ) -> None:
     """Run the fixed EUCYS study matrix and generate summaries, comparisons, and posters."""
     console = Console()
-    generate_study_poster = _require_reports_feature(
-        console,
-        "iints.analysis.study_poster",
-        "generate_study_poster",
-        "Study poster generation",
-    )
     parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
     if not parsed_seeds:
         console.print("[bold red]Please provide at least one seed.[/bold red]")
@@ -3504,12 +3481,6 @@ def demo_booth(
 ) -> None:
     """Build a full expo/jury demo bundle with runs, poster, and talk track."""
     console = Console()
-    build_booth_demo = _require_reports_feature(
-        console,
-        "iints.analysis.booth_demo",
-        "build_booth_demo",
-        "Booth demo generation",
-    )
     try:
         outputs = build_booth_demo(
             output_dir=output_dir,
@@ -5098,12 +5069,6 @@ def carelink_workbench(
         console.print(f"[bold red]Error: Input CSV '{input_csv}' not found.[/bold red]")
         raise typer.Exit(code=1)
 
-    build_carelink_workbench = _require_reports_feature(
-        console,
-        "iints.analysis.carelink_workbench",
-        "build_carelink_workbench",
-        "CareLink workbench",
-    )
     try:
         outputs = build_carelink_workbench(
             input_csv,
