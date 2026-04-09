@@ -14,7 +14,6 @@ from iints.core.simulator import Simulator
 from iints.core.devices.models import SensorModel
 from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
-from iints.analysis import ClinicalReportGenerator
 from iints.validation import (
     build_stress_events,
     load_scenario,
@@ -32,6 +31,13 @@ from iints.utils.run_io import (
     resolve_seed,
     write_json,
 )
+
+
+def _get_clinical_report_generator() -> type:
+    # Keep the optional reporting stack lazy so basic SDK imports stay lightweight.
+    from iints.analysis import ClinicalReportGenerator
+
+    return ClinicalReportGenerator
 
 
 def _predictor_metadata(predictor: Optional[object]) -> Optional[Dict[str, Any]]:
@@ -202,7 +208,7 @@ def run_simulation(
 
     if generate_report:
         report_path = output_path / "clinical_report.pdf"
-        generator = ClinicalReportGenerator()
+        generator = _get_clinical_report_generator()()
         generator.generate_pdf(results_df, safety_report, str(report_path))
         outputs["report_pdf"] = str(report_path)
 
@@ -359,7 +365,7 @@ def run_full(
     outputs["baseline_files"] = write_baseline_comparison(comparison, output_path / "baseline")
 
     report_path = output_path / "clinical_report.pdf"
-    generator = ClinicalReportGenerator()
+    generator = _get_clinical_report_generator()()
     generator.generate_pdf(results_df, safety_report, str(report_path))
     outputs["report_pdf"] = str(report_path)
 

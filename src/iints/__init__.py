@@ -1,7 +1,7 @@
 # src/iints/__init__.py
 
 import pandas as pd # Required for type hints like pd.DataFrame
-from typing import Optional
+from typing import Any, Optional
 
 try:
     from importlib.metadata import PackageNotFoundError, version
@@ -95,8 +95,25 @@ from .live_patient import (
     summarize_edge_workspace,
     write_edge_update_script,
 )
-from .highlevel import run_simulation, run_full, run_population
 from .scenarios import ScenarioGeneratorConfig, generate_random_scenario
+
+
+def run_simulation(*args: Any, **kwargs: Any) -> Any:
+    from .highlevel import run_simulation as _run_simulation
+
+    return _run_simulation(*args, **kwargs)
+
+
+def run_full(*args: Any, **kwargs: Any) -> Any:
+    from .highlevel import run_full as _run_full
+
+    return _run_full(*args, **kwargs)
+
+
+def run_population(*args: Any, **kwargs: Any) -> Any:
+    from .highlevel import run_population as _run_population
+
+    return _run_population(*args, **kwargs)
 
 try:
     from .analysis.booth_demo import build_booth_demo
