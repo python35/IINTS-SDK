@@ -9,8 +9,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from fastapi.testclient import TestClient
-
 from iints.live_patient.api import create_patient_app
 from iints.live_patient.daemon import _start_api_server
 from iints.live_patient.runtime import LivePatientDaemon, PatientRuntimeConfig
@@ -53,6 +51,8 @@ def _measure_http_ms(url: str, requests: int = 5) -> dict[str, float]:
 
 
 def _measure_asgi_ms(app: Any, path: str, requests: int = 5) -> dict[str, float]:
+    from fastapi.testclient import TestClient
+
     timings: list[float] = []
     with TestClient(app) as client:
         for _ in range(max(1, requests)):
