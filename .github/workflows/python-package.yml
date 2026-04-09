@@ -126,7 +126,7 @@ jobs:
       run: |
         python -m venv .venv_ci_test
         ./.venv_ci_test/bin/python -m pip install --upgrade pip
-        WHEEL_URI="$(python -c 'from pathlib import Path; wheels = sorted(Path("dist").glob(\"*.whl\"), key=lambda path: path.stat().st_mtime, reverse=True); print(wheels[0].resolve().as_uri())')"
+        WHEEL_URI="$(python -c 'from pathlib import Path; wheels = sorted(Path("dist").glob("*.whl"), key=lambda path: path.stat().st_mtime, reverse=True); print(wheels[0].resolve().as_uri())')"
         ./.venv_ci_test/bin/python -m pip install "iints-sdk-python35[edge] @ ${WHEEL_URI}"
         ./.venv_ci_test/bin/python tools/ci/check_installed_edge_cli.py --iints-bin ./.venv_ci_test/bin/iints
 
