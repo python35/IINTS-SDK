@@ -14,7 +14,7 @@ from iints.core.simulator import Simulator
 from iints.core.devices.models import SensorModel
 from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
-from iints.analysis.reporting import ClinicalReportGenerator
+from iints.analysis import ClinicalReportGenerator
 from iints.validation import (
     build_stress_events,
     load_scenario,
