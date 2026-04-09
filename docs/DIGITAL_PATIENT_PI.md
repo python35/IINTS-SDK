@@ -25,24 +25,25 @@ Why this setup works well:
 
 ## Runtime Command Set
 
-The persistent runtime lives under the `iints patient ...` namespace.
+The recommended Raspberry Pi flow is now CLI-first through the `iints edge ...` namespace.
 
 Common commands:
 
 ```bash
-iints patient start
-iints patient status
-iints patient kiosk
+iints edge doctor --board raspberry_pi
+iints edge setup --board raspberry_pi
+iints edge up
+iints edge status
+iints edge kiosk
+iints edge reset
+iints edge stop
+iints edge service
+iints edge bundle
+iints edge update
 iints patient inject-meal
 iints patient pause
 iints patient resume
 iints patient scenarios
-iints patient expo-reset
-iints patient stop
-iints patient export-service
-iints edge status
-iints edge bundle
-iints edge update
 iints patient review
 ```
 
@@ -56,19 +57,12 @@ source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[edge,mdmp]"
 
-iints quickstart --project-name iints_pi_demo
+iints edge doctor --board raspberry_pi
+iints edge setup --output-dir iints_pi_demo --board raspberry_pi
 cd iints_pi_demo
-```
-
-Start the persistent patient runtime:
-
-```bash
-iints patient start \
-  --algo algorithms/example_algorithm.py \
-  --workspace patient_runtime \
-  --scenario-profile normal_day \
-  --mode demo-time \
-  --speed 60x
+iints edge up --project-dir .
+iints edge status --project-dir .
+iints edge kiosk --project-dir .
 ```
 
 That starts:
@@ -83,8 +77,7 @@ That starts:
 Check status:
 
 ```bash
-iints patient status --workspace patient_runtime
-iints edge status --workspace patient_runtime
+iints edge status --project-dir .
 ```
 
 List built-in day profiles:
@@ -109,7 +102,7 @@ iints patient resume --workspace patient_runtime
 Reset to the prepared presentation profile:
 
 ```bash
-iints patient expo-reset --workspace patient_runtime
+iints edge reset --project-dir .
 ```
 
 By default, `expo-reset` switches to the `expo_hot_start` profile so the runtime resumes in an already active scenario instead of a flat baseline.
@@ -117,21 +110,21 @@ By default, `expo-reset` switches to the `expo_hot_start` profile so the runtime
 Jump to a specific profile instead:
 
 ```bash
-iints patient expo-reset \
-  --workspace patient_runtime \
+iints edge reset \
+  --project-dir . \
   --scenario-profile sport_day
 ```
 
 Stop the runtime:
 
 ```bash
-iints patient stop --workspace patient_runtime
+iints edge stop --project-dir .
 ```
 
 Export the live runtime for workstation-side analysis:
 
 ```bash
-iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
+iints edge bundle --project-dir . --output results/edge_runtime_bundle.zip
 ```
 
 ## Dashboard URLs
@@ -175,13 +168,9 @@ Each profile has a fixed default seed, so the same profile and algorithm can be 
 Override the default seed if needed:
 
 ```bash
-iints patient start \
-  --algo algorithms/example_algorithm.py \
-  --workspace patient_runtime \
-  --scenario-profile bad_carb_count \
-  --seed 7777 \
-  --mode demo-time \
-  --speed 60x
+iints edge setup --output-dir iints_pi_demo_seeded --board raspberry_pi --scenario-profile bad_carb_count --seed 7777
+cd iints_pi_demo_seeded
+iints edge up --project-dir . --reset
 ```
 
 ## Remote Presentation With Raspberry Pi Connect
@@ -201,7 +190,7 @@ This keeps the actual runtime on the Pi while the laptop or workstation acts onl
 If the device should come back automatically after a reboot, export a `systemd` unit after the runtime has started once:
 
 ```bash
-iints patient export-service --workspace patient_runtime
+iints edge service --project-dir .
 ```
 
 This writes:
@@ -271,11 +260,11 @@ Output goes to:
 One simple live flow is:
 
 1. `iints patient scenarios`
-2. `iints patient start --algo algorithms/example_algorithm.py --workspace patient_runtime --scenario-profile normal_day --mode demo-time --speed 60x`
+2. `iints edge up --project-dir .`
 3. open `http://127.0.0.1:8765/dashboard`
 4. explain the live glucose curve and current state
 5. run `iints patient inject-meal --carbs 60 --workspace patient_runtime`
-6. run `iints patient expo-reset --workspace patient_runtime`
+6. run `iints edge reset --project-dir .`
 7. optionally run `iints patient review --workspace patient_runtime --model ministral-3:3b`
 
 ## Scope

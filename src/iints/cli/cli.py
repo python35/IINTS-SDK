@@ -12,6 +12,7 @@ import sys
 import json
 import tempfile
 import time
+import shutil
 import yaml # Added for Virtual Patient Registry
 import pandas as pd # Added for DataFrame in benchmark results
 import numpy as np
@@ -24,6 +25,7 @@ from rich.panel import Panel  # type: ignore # For nicer auto-doc output
 import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
+from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
 from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
@@ -70,7 +72,16 @@ from iints.live_patient.edge_ops import (
     summarize_edge_workspace,
     write_edge_update_script,
 )
-from iints.live_patient.uno_q import export_uno_q_bridge
+from iints.live_patient.runtime import PatientRuntimeConfig
+from iints.live_patient.uno_q import (
+    UNO_Q_BRIDGE_BAUDRATE,
+    export_uno_q_bridge,
+    flash_uno_q_bridge,
+    list_uno_q_serial_ports,
+    run_uno_q_bridge_forwarder,
+    run_uno_q_bridge_test,
+    uno_q_bridge_environment_report,
+)
 from iints.mdmp.backend import (
     MDMP_GRADE_ORDER,
     active_mdmp_backend,
@@ -5743,6 +5754,39 @@ def _parse_edge_speed(value: str | float) -> float:
     return parsed
 
 
+def _resolve_edge_project_dir(project_dir: Path) -> Path:
+    return project_dir.expanduser().resolve()
+
+
+def _resolve_edge_workspace(
+    *,
+    project_dir: Path | None = None,
+    workspace: Path | None = None,
+    workspace_name: str = "patient_runtime",
+) -> Path:
+    if workspace is not None:
+        return workspace.expanduser().resolve()
+    if project_dir is not None:
+        return _resolve_edge_project_dir(project_dir) / workspace_name
+    return Path("./digital_patient_runtime").expanduser().resolve()
+
+
+def _load_edge_project_config(project_dir: Path, workspace_name: str = "patient_runtime") -> PatientRuntimeConfig:
+    root = _resolve_edge_project_dir(project_dir)
+    config_path = root / workspace_name / "patient_runtime_config.json"
+    if not config_path.is_file():
+        raise FileNotFoundError(
+            f"No edge runtime config found at {config_path}. "
+            "Run `iints edge setup` first."
+        )
+    return PatientRuntimeConfig.from_path(config_path)
+
+
+def _detect_edge_board(project_dir: Path) -> str:
+    root = _resolve_edge_project_dir(project_dir)
+    return "uno_q" if (root / "uno_q_bridge").is_dir() else "raspberry_pi"
+
+
 @edge_app.command("setup")
 def edge_setup(
     output_dir: Annotated[Path, typer.Option(help="Directory where the edge-ready project scaffold should be written.")] = Path("iints_edge_demo"),
@@ -5806,8 +5850,8 @@ def edge_setup(
             "\n".join(
                 [
                     f"Board profile: {normalized_board}",
-                    f"Start script: {outputs['run_script']}",
-                    f"Kiosk launcher: {outputs['kiosk_script']}",
+                    f"CLI start: iints edge up --project-dir {outputs['root']}",
+                    f"CLI kiosk: iints edge kiosk --project-dir {outputs['root']}",
                     f"Setup guide: {outputs['setup_guide']}",
                 ]
             ),
@@ -5817,14 +5861,201 @@ def edge_setup(
     )
 
 
-@edge_app.command("status")
-def edge_status(
-    workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
+@edge_app.command("doctor")
+def edge_doctor(
+    board: Annotated[str, typer.Option(help="Board target to validate: raspberry_pi or uno_q.")] = "raspberry_pi",
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
 ) -> None:
     console = Console()
-    summary = summarize_edge_workspace(workspace)
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Edge Doctor")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Detail", overflow="fold")
+
+    failures: list[str] = []
+
+    py_ok = sys.version_info >= (3, 10)
+    table.add_row(
+        "Python >= 3.10",
+        "[green]OK[/green]" if py_ok else "[red]FAIL[/red]",
+        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+    )
+    if not py_ok:
+        failures.append("python")
+
+    fastapi_ok = _module_available("fastapi")
+    table.add_row(
+        "Module: fastapi",
+        "[green]OK[/green]" if fastapi_ok else "[red]MISSING[/red]",
+        "required for the live dashboard API",
+    )
+    if not fastapi_ok:
+        failures.append("fastapi")
+
+    if project_dir is not None:
+        root = _resolve_edge_project_dir(project_dir)
+        config_path = root / workspace_name / "patient_runtime_config.json"
+        has_project = config_path.is_file()
+        detected_board = _detect_edge_board(root)
+        table.add_row(
+            "Edge project",
+            "[green]OK[/green]" if has_project else "[yellow]not found[/yellow]",
+            str(config_path) if has_project else f"expected {config_path}",
+        )
+        table.add_row("Detected board", "[green]OK[/green]", detected_board)
+
+    if normalized_board == "raspberry_pi":
+        launcher_ok = shutil.which("xdg-open") is not None or shutil.which("open") is not None
+        table.add_row(
+            "Browser launcher",
+            "[green]OK[/green]" if launcher_ok else "[yellow]optional[/yellow]",
+            "Used by `iints edge kiosk` shortcuts.",
+        )
+    else:
+        report = uno_q_bridge_environment_report()
+        pyserial_ok = bool(report["pyserial_available"])
+        table.add_row(
+            "Module: pyserial",
+            "[green]OK[/green]" if pyserial_ok else "[red]MISSING[/red]",
+            report["pyserial_error"] or "Serial bridge commands are available.",
+        )
+        if not pyserial_ok:
+            failures.append("pyserial")
+
+        ports = report["serial_ports"]
+        table.add_row(
+            "Serial ports",
+            "[green]OK[/green]" if ports else "[yellow]check manually[/yellow]",
+            ", ".join(ports) if ports else "No ports auto-detected right now.",
+        )
+
+        arduino_cli_path = report["arduino_cli_path"]
+        table.add_row(
+            "Arduino CLI",
+            "[green]OK[/green]" if arduino_cli_path else "[yellow]optional[/yellow]",
+            arduino_cli_path or "Needed for `iints edge bridge-flash`.",
+        )
+
+    console.print(table)
+
+    suggested_dir = f"./iints_{normalized_board}_demo"
+    next_steps = [
+        f"Setup: iints edge setup --board {normalized_board} --output-dir {suggested_dir}",
+        f"Start: iints edge up --project-dir {suggested_dir}",
+        f"Status: iints edge status --project-dir {suggested_dir}",
+    ]
+    if normalized_board == "uno_q":
+        next_steps.extend(
+            [
+                "Bridge test: iints edge bridge-test --port /dev/ttyACM0",
+                "Bridge run: iints edge bridge-run --project-dir ./iints_uno_q_demo --port /dev/ttyACM0",
+            ]
+        )
+    console.print(Panel("\n".join(next_steps), title="Next Commands", border_style="cyan"))
+
+    if failures:
+        raise typer.Exit(code=1)
+
+
+@edge_app.command("up")
+def edge_up(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    foreground: Annotated[bool, typer.Option(help="Run the digital patient in the foreground instead of spawning the daemon.")] = False,
+    reset: Annotated[bool, typer.Option(help="Reset the runtime state before starting.")] = False,
+    max_steps: Annotated[Optional[int], typer.Option("--max-steps", hidden=True)] = None,
+) -> None:
+    cfg = _load_edge_project_config(project_dir, workspace_name=workspace_name)
+    patient_cli_module.start(
+        algo=Path(cfg.algo_path),
+        patient_config=cfg.patient_config,
+        patient_model=cfg.patient_model_type,
+        scenario_profile=cfg.scenario_profile,
+        workspace=Path(cfg.workspace),
+        mode=cfg.mode,
+        speed=f"{cfg.speed:g}x",
+        api_host=cfg.api_host,
+        api_port=cfg.api_port,
+        seed=cfg.seed,
+        foreground=foreground,
+        max_steps=max_steps,
+        reset=reset,
+    )
+
+
+@edge_app.command("kiosk")
+def edge_kiosk(
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+) -> None:
+    patient_cli_module.kiosk(
+        workspace=_resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name)
+    )
+
+
+@edge_app.command("reset")
+def edge_reset(
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    scenario_profile: Annotated[Optional[str], typer.Option(help="Optional profile to load after reset. Defaults to expo_hot_start.")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override for the reset profile.")] = None,
+) -> None:
+    patient_cli_module.expo_reset(
+        scenario_profile=scenario_profile,
+        seed=seed,
+        workspace=_resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name),
+    )
+
+
+@edge_app.command("stop")
+def edge_stop(
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+) -> None:
+    patient_cli_module.stop(
+        workspace=_resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name)
+    )
+
+
+@edge_app.command("service")
+def edge_service(
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    output: Annotated[Optional[Path], typer.Option(help="Optional output service file path.")] = None,
+    service_name: Annotated[str, typer.Option(help="systemd service name without the .service suffix.")] = "iints-digital-patient",
+    user_name: Annotated[Optional[str], typer.Option(help="Linux user that should run the service. Defaults to the current shell user.")] = None,
+    python_path: Annotated[Optional[Path], typer.Option(help="Python executable used in ExecStart. Defaults to the current interpreter.")] = None,
+) -> None:
+    patient_cli_module.export_service(
+        workspace=_resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name),
+        output=output,
+        service_name=service_name,
+        user_name=user_name,
+        python_path=python_path,
+    )
+
+
+@edge_app.command("status")
+def edge_status(
+    workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+) -> None:
+    console = Console()
+    resolved_workspace = _resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name)
+    summary = summarize_edge_workspace(resolved_workspace)
     if not summary:
-        console.print(f"[bold red]No edge runtime found in {workspace}.[/bold red]")
+        console.print(f"[bold red]No edge runtime found in {resolved_workspace}.[/bold red]")
         raise typer.Exit(code=1)
 
     certification = summary.get("certification") or {}
@@ -5856,14 +6087,17 @@ def edge_status(
 
 @edge_app.command("bundle")
 def edge_bundle(
-    workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
+    workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
     output: Annotated[Path, typer.Option(help="ZIP archive written for workstation-side analysis.")] = Path("results/edge_runtime_bundle.zip"),
     include_log: Annotated[bool, typer.Option(help="Include the patient log in the archive.")] = True,
     include_database: Annotated[bool, typer.Option(help="Include the SQLite runtime database in the archive.")] = True,
 ) -> None:
     console = Console()
+    resolved_workspace = _resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name)
     payload = create_edge_bundle(
-        workspace,
+        resolved_workspace,
         output_path=output,
         include_log=include_log,
         include_database=include_database,
@@ -5918,6 +6152,116 @@ def edge_hardware_bridge(
     table.add_row("readme", outputs["readme"])
     table.add_row("protocol", outputs["protocol"])
     console.print(table)
+
+
+@edge_app.command("bridge-test")
+def edge_bridge_test(
+    port: Annotated[Optional[str], typer.Option(help="Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.")] = None,
+    baudrate: Annotated[int, typer.Option(help="Serial baud rate used by the UNO Q bridge sketch.")] = UNO_Q_BRIDGE_BAUDRATE,
+    delay_seconds: Annotated[float, typer.Option(help="Pause between test states in seconds.")] = 0.75,
+) -> None:
+    console = Console()
+    try:
+        results = run_uno_q_bridge_test(port, baudrate=baudrate, delay_seconds=delay_seconds)
+    except Exception as exc:
+        console.print(f"[bold red]UNO Q bridge test failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="UNO Q Bridge Test")
+    table.add_column("State", style="cyan")
+    table.add_column("Port")
+    table.add_column("Response", overflow="fold")
+    for result in results:
+        table.add_row(result["state"], result["port"], str(result.get("response") or "-"))
+    console.print(table)
+
+
+@edge_app.command("bridge-run")
+def edge_bridge_run(
+    port: Annotated[Optional[str], typer.Option(help="Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.")] = None,
+    workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
+    project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    baudrate: Annotated[int, typer.Option(help="Serial baud rate used by the UNO Q bridge sketch.")] = UNO_Q_BRIDGE_BAUDRATE,
+    poll_interval: Annotated[float, typer.Option(help="Polling interval in seconds while following runtime status.")] = 1.0,
+    once: Annotated[bool, typer.Option(help="Send the current state once and exit.")] = False,
+    max_cycles: Annotated[Optional[int], typer.Option("--max-cycles", hidden=True)] = None,
+) -> None:
+    console = Console()
+    resolved_workspace = _resolve_edge_workspace(project_dir=project_dir, workspace=workspace, workspace_name=workspace_name)
+    if not once:
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"Workspace: {resolved_workspace}",
+                        f"Port: {port or 'auto'}",
+                        f"Baud rate: {baudrate}",
+                        "Press Ctrl+C to stop the bridge forwarder.",
+                    ]
+                ),
+                title="UNO Q Bridge Forwarder",
+                border_style="cyan",
+            )
+        )
+    try:
+        payload = run_uno_q_bridge_forwarder(
+            resolved_workspace,
+            port,
+            baudrate=baudrate,
+            poll_interval=poll_interval,
+            once=once,
+            max_cycles=max_cycles,
+        )
+    except KeyboardInterrupt:
+        console.print("[yellow]UNO Q bridge forwarder stopped.[/yellow]")
+        raise typer.Exit(code=0)
+    except Exception as exc:
+        console.print(f"[bold red]UNO Q bridge forwarder failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    if once:
+        console.print(
+            f"[green]UNO Q bridge state sent:[/green] {payload.get('state', '-')} -> {payload.get('port', '-')}"
+        )
+
+
+@edge_app.command("bridge-flash")
+def edge_bridge_flash(
+    port: Annotated[str, typer.Option(help="Serial port used to upload the UNO Q bridge sketch.")] ,
+    fqbn: Annotated[str, typer.Option(help="Arduino CLI FQBN for the UNO Q board package.")] ,
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
+    sketch_dir: Annotated[Optional[Path], typer.Option(help="Optional bridge sketch directory. Defaults to <project-dir>/uno_q_bridge.")] = None,
+    arduino_cli: Annotated[str, typer.Option(help="Arduino CLI executable name or path.")] = "arduino-cli",
+) -> None:
+    console = Console()
+    resolved_project = _resolve_edge_project_dir(project_dir)
+    resolved_sketch_dir = (sketch_dir.expanduser().resolve() if sketch_dir is not None else resolved_project / "uno_q_bridge")
+    try:
+        payload = flash_uno_q_bridge(
+            resolved_sketch_dir,
+            port=port,
+            fqbn=fqbn,
+            arduino_cli=arduino_cli,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]UNO Q bridge flash failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Sketch directory: {payload['sketch_dir']}",
+                    f"Port: {payload['port']}",
+                    f"FQBN: {payload['fqbn']}",
+                    f"Arduino CLI: {payload['arduino_cli']}",
+                ]
+            ),
+            title="UNO Q Bridge Flashed",
+            border_style="green",
+        )
+    )
 
 
 @edge_app.command("benchmark")

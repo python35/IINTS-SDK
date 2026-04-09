@@ -83,3 +83,6 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert Path(outputs["service_file"]).is_file()
     assert Path(outputs["setup_guide"]).is_file()
     assert Path(outputs["uno_q_bridge"]).is_dir()
+    guide_text = Path(outputs["setup_guide"]).read_text(encoding="utf-8")
+    assert "iints edge up --project-dir ." in guide_text
+    assert "iints edge bridge-run --project-dir . --port /dev/ttyACM0" in guide_text

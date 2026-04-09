@@ -148,9 +148,9 @@ The new edge namespace ties the SBC story together:
 ```bash
 iints edge setup --output-dir iints_edge_demo --board raspberry_pi
 cd iints_edge_demo
-./run_edge_patient.sh
-iints edge status --workspace patient_runtime
-iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
+iints edge up --project-dir .
+iints edge status --project-dir .
+iints edge bundle --project-dir . --output results/edge_runtime_bundle.zip
 ```
 
 That gives you:
@@ -173,12 +173,11 @@ Recommended starting setup:
 Typical live runtime flow:
 
 ```bash
-iints patient start \
-  --algo algorithms/example_algorithm.py \
-  --workspace patient_runtime \
-  --scenario-profile normal_day \
-  --mode demo-time \
-  --speed 60x
+iints edge setup --output-dir iints_pi_demo --board raspberry_pi
+cd iints_pi_demo
+iints edge up --project-dir .
+iints edge status --project-dir .
+iints edge kiosk --project-dir .
 ```
 
 For most users, the `8 GB` Pi 5 is the default recommendation.
@@ -196,7 +195,8 @@ The recommended path is:
 2. generate a UNO Q scaffold with `iints edge setup --board uno_q`
 3. start the Linux-side digital patient
 4. flash the generated bridge sketch onto the STM32 side
-5. verify the bridge manually with `OK`, `OVERRIDE`, and `CRITICAL`
+5. run `iints edge bridge-test --port ...`
+6. run `iints edge bridge-run --project-dir . --port ...`
 
 Fastest scaffold command:
 
@@ -221,7 +221,7 @@ UNO Q is still a secondary target. It is a good fit when you want visible hardwa
 After starting the patient once, export a service unit:
 
 ```bash
-iints patient export-service --workspace patient_runtime
+iints edge service --project-dir .
 ```
 
 Then install it on the device:
@@ -252,8 +252,8 @@ The generated folder already contains:
 For the presentation layer:
 
 ```bash
-iints patient kiosk --workspace patient_runtime
-iints edge status --workspace patient_runtime
+iints edge kiosk --project-dir .
+iints edge status --project-dir .
 ```
 
 The kiosk view highlights:

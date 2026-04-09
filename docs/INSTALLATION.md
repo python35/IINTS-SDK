@@ -51,19 +51,31 @@ Use this when you mainly need:
 - local FastAPI dashboard
 - SQLite runtime state
 - CLI control
+- UNO Q serial bridge support
 - optional local AI review
+
+Important for UNO Q users:
+
+- if `iints edge ...` says `No such command 'edge'`, your installed CLI is older than the current docs
+- in that case, use the source install method below instead of the released package path
+- the dedicated UNO Q guide follows the source-install path on purpose so the commands match exactly
 
 Typical SBC bootstrap:
 
 ```bash
 iints edge setup --output-dir iints_edge_demo --board raspberry_pi
 cd iints_edge_demo
-./run_edge_patient.sh
+iints edge up --project-dir .
+iints edge status --project-dir .
 ```
 
 ## Option 2: Install From Source
 
 Use this only if you are developing the SDK itself.
+
+Exception:
+
+- for `Arduino UNO Q`, this is currently the recommended path because it guarantees the `iints edge ...` commands match the docs
 
 First go to the repository root. That is the folder containing:
 
@@ -221,7 +233,7 @@ Use Raspberry Pi Connect screen sharing from your laptop to present the live das
 If this Pi will be left running unattended, export a ready-made systemd unit after the first start:
 
 ```bash
-iints patient export-service --workspace patient_runtime
+iints edge service --project-dir .
 ```
 
 Full guide:

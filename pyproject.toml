@@ -35,7 +35,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-edge = []
+edge = [
+  "pyserial>=3.5",
+]
 reports = [
   "fpdf2>=2.8.0",
   "matplotlib>=3.5.0",
@@ -47,6 +49,7 @@ full = [
   "fpdf2>=2.8.0",
   "matplotlib>=3.5.0",
   "openpyxl>=3.0.0",
+  "pyserial>=3.5",
   "pillow>=12.1.1",
   "seaborn>=0.11.0",
 ]
