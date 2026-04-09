@@ -4,13 +4,17 @@ on:
   push:
     branches: [ main ]
     paths:
-      - "src/iints/mdmp/**"
+      - "src/iints/**"
+      - "tests/**"
+      - "requirements-dev.txt"
       - "pyproject.toml"
       - ".github/workflows/mdmp-backend-ci.yml"
   pull_request:
     branches: [ main ]
     paths:
-      - "src/iints/mdmp/**"
+      - "src/iints/**"
+      - "tests/**"
+      - "requirements-dev.txt"
       - "pyproject.toml"
       - ".github/workflows/mdmp-backend-ci.yml"
 
