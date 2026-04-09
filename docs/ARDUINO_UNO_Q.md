@@ -89,6 +89,13 @@ If you want the fastest possible route to a working baseline, follow these four 
 
     - `iints doctor --smoke-run` works
     - `python -c "import iints; print(iints.__version__)"` prints a version
+    - `iints edge doctor --board uno_q` explains the next fixes in plain language instead of leaving you guessing
+
+    Before you create the project, run:
+
+    ```bash
+    iints edge doctor --board uno_q
+    ```
 
 !!! info "Step 2 - Generate the UNO Q project"
     Run:

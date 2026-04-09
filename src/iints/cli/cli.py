@@ -5873,30 +5873,48 @@ def edge_doctor(
         console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
         raise typer.Exit(code=1)
 
-    table = Table(title="IINTS Edge Doctor")
-    table.add_column("Check", style="cyan")
-    table.add_column("Status", style="bold")
-    table.add_column("Detail", overflow="fold")
+    board_label = "Raspberry Pi" if normalized_board == "raspberry_pi" else "Arduino UNO Q"
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"This check helps you bring a {board_label} demo online without guesswork.",
+                    "We verify the Python runtime, edge dependencies, and the board-specific pieces you need next.",
+                ]
+            ),
+            title=f"{board_label} Edge Check",
+            border_style="cyan",
+        )
+    )
+
+    table = Table(title=f"IINTS Edge Doctor - {board_label}")
+    table.add_column("What We Checked", style="cyan")
+    table.add_column("Result", style="bold")
+    table.add_column("What It Means", overflow="fold")
 
     failures: list[str] = []
+    action_items: list[str] = []
+    note_items: list[str] = []
 
     py_ok = sys.version_info >= (3, 10)
     table.add_row(
-        "Python >= 3.10",
-        "[green]OK[/green]" if py_ok else "[red]FAIL[/red]",
-        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        "Python runtime",
+        "[green]Ready[/green]" if py_ok else "[red]Update needed[/red]",
+        f"Found Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}. Edge commands need Python 3.10 or newer.",
     )
     if not py_ok:
         failures.append("python")
+        action_items.append("Install Python 3.10 or newer, then rerun `iints edge doctor`.")
 
     fastapi_ok = _module_available("fastapi")
     table.add_row(
-        "Module: fastapi",
-        "[green]OK[/green]" if fastapi_ok else "[red]MISSING[/red]",
-        "required for the live dashboard API",
+        "Dashboard dependency",
+        "[green]Ready[/green]" if fastapi_ok else "[red]Install needed[/red]",
+        "FastAPI powers the live dashboard and kiosk.",
     )
     if not fastapi_ok:
         failures.append("fastapi")
+        action_items.append('Install the edge runtime extras: `python3 -m pip install -U "iints-sdk-python35[edge,mdmp]"`.')
 
     if project_dir is not None:
         root = _resolve_edge_project_dir(project_dir)
@@ -5904,59 +5922,130 @@ def edge_doctor(
         has_project = config_path.is_file()
         detected_board = _detect_edge_board(root)
         table.add_row(
-            "Edge project",
-            "[green]OK[/green]" if has_project else "[yellow]not found[/yellow]",
-            str(config_path) if has_project else f"expected {config_path}",
+            "Project scaffold",
+            "[green]Ready[/green]" if has_project else "[yellow]Create it first[/yellow]",
+            str(config_path) if has_project else f"Expected {config_path} after `iints edge setup`.",
         )
         table.add_row("Detected board", "[green]OK[/green]", detected_board)
+        if not has_project:
+            action_items.append(f"Create the edge project first: `iints edge setup --board {normalized_board} --output-dir {root}`.")
+        elif detected_board != normalized_board:
+            note_items.append(
+                f"The project in `{root}` looks like `{detected_board}` while you asked for `{normalized_board}`. Use matching board settings to avoid mixed instructions."
+            )
+    else:
+        table.add_row(
+            "Project scaffold",
+            "[blue]Skipped[/blue]",
+            "Pass `--project-dir` if you already created a board project and want doctor to verify it too.",
+        )
 
     if normalized_board == "raspberry_pi":
         launcher_ok = shutil.which("xdg-open") is not None or shutil.which("open") is not None
         table.add_row(
             "Browser launcher",
-            "[green]OK[/green]" if launcher_ok else "[yellow]optional[/yellow]",
-            "Used by `iints edge kiosk` shortcuts.",
+            "[green]Ready[/green]" if launcher_ok else "[yellow]Optional[/yellow]",
+            "Used by `iints edge kiosk`. If missing, you can still open the kiosk URL manually in a browser.",
         )
+        if not launcher_ok:
+            note_items.append("If `iints edge kiosk` cannot open a browser, start the runtime first and visit the kiosk URL manually.")
     else:
         report = uno_q_bridge_environment_report()
         pyserial_ok = bool(report["pyserial_available"])
         table.add_row(
-            "Module: pyserial",
-            "[green]OK[/green]" if pyserial_ok else "[red]MISSING[/red]",
-            report["pyserial_error"] or "Serial bridge commands are available.",
+            "USB serial support",
+            "[green]Ready[/green]" if pyserial_ok else "[red]Install needed[/red]",
+            report["pyserial_error"] or "The bridge commands can talk to the STM32 side over USB serial.",
         )
         if not pyserial_ok:
             failures.append("pyserial")
+            action_items.append('Install serial support with the edge extras: `python3 -m pip install -U "iints-sdk-python35[edge,mdmp]"`.')
 
         ports = report["serial_ports"]
         table.add_row(
-            "Serial ports",
-            "[green]OK[/green]" if ports else "[yellow]check manually[/yellow]",
-            ", ".join(ports) if ports else "No ports auto-detected right now.",
+            "UNO Q USB link",
+            "[green]Detected[/green]" if ports else "[yellow]Check cable[/yellow]",
+            ", ".join(ports) if ports else "No serial device was auto-detected right now.",
         )
+        if not ports:
+            note_items.append(
+                "Plug the UNO Q in with a USB data cable, then rerun `iints edge doctor --board uno_q`. You can still pass `--port /dev/ttyACM0` directly to bridge commands if you already know the port."
+            )
 
         arduino_cli_path = report["arduino_cli_path"]
         table.add_row(
-            "Arduino CLI",
-            "[green]OK[/green]" if arduino_cli_path else "[yellow]optional[/yellow]",
-            arduino_cli_path or "Needed for `iints edge bridge-flash`.",
+            "Arduino flashing tool",
+            "[green]Ready[/green]" if arduino_cli_path else "[yellow]Optional[/yellow]",
+            arduino_cli_path or "Install `arduino-cli` if you want `iints edge bridge-flash` to program the STM32 side from the terminal.",
         )
+        if not arduino_cli_path:
+            note_items.append("You can still run the Linux-side demo now. Add `arduino-cli` later if you want fully CLI-based flashing.")
 
     console.print(table)
 
+    if failures:
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"You're not blocked forever; there are just {len(failures)} required fix(es) before the {board_label} path is fully ready.",
+                        "Work through the items below, then rerun `iints edge doctor`.",
+                    ]
+                ),
+                title="Not Ready Yet",
+                border_style="red",
+            )
+        )
+    elif action_items:
+        console.print(
+            Panel(
+                "A few required setup actions are still listed below. Once they are done, the rest of the flow is straightforward.",
+                title="Almost Ready",
+                border_style="yellow",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"Good news: the core {board_label} prerequisites are in place. You can move straight into setup and runtime commands.",
+                title="Ready To Go",
+                border_style="green",
+            )
+        )
+
+    if action_items:
+        console.print(
+            Panel(
+                "\n".join(f"{index}. {item}" for index, item in enumerate(action_items, start=1)),
+                title="Do This Next",
+                border_style="yellow",
+            )
+        )
+
+    if note_items:
+        console.print(
+            Panel(
+                "\n".join(f"{index}. {item}" for index, item in enumerate(note_items, start=1)),
+                title="Helpful Notes",
+                border_style="blue",
+            )
+        )
+
     suggested_dir = f"./iints_{normalized_board}_demo"
     next_steps = [
-        f"Setup: iints edge setup --board {normalized_board} --output-dir {suggested_dir}",
-        f"Start: iints edge up --project-dir {suggested_dir}",
-        f"Status: iints edge status --project-dir {suggested_dir}",
+        f"1. Create the project: iints edge setup --board {normalized_board} --output-dir {suggested_dir}",
+        f"2. Start the runtime: iints edge up --project-dir {suggested_dir}",
+        f"3. Check that it is alive: iints edge status --project-dir {suggested_dir}",
     ]
     if normalized_board == "uno_q":
         next_steps.extend(
             [
-                "Bridge test: iints edge bridge-test --port /dev/ttyACM0",
-                "Bridge run: iints edge bridge-run --project-dir ./iints_uno_q_demo --port /dev/ttyACM0",
+                "4. Test the serial bridge: iints edge bridge-test --port /dev/ttyACM0",
+                "5. Forward live states to the board: iints edge bridge-run --project-dir ./iints_uno_q_demo --port /dev/ttyACM0",
             ]
         )
+    else:
+        next_steps.append(f"4. Open the kiosk view: iints edge kiosk --project-dir {suggested_dir}")
     console.print(Panel("\n".join(next_steps), title="Next Commands", border_style="cyan"))
 
     if failures:

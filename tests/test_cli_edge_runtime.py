@@ -151,5 +151,27 @@ def test_edge_bridge_commands_and_doctor(monkeypatch, tmp_path) -> None:
     )
     doctor = runner.invoke(app, ["edge", "doctor", "--board", "uno_q", "--project-dir", str(project_dir)])
     assert doctor.exit_code == 0
-    assert "IINTS Edge Doctor" in doctor.stdout
+    assert "Arduino UNO Q Edge Check" in doctor.stdout
+    assert "Do This Next" in doctor.stdout
     assert "/usr/local/bin/arduino-cli" in doctor.stdout
+    assert "Create the project" in doctor.stdout
+
+
+def test_edge_doctor_explains_missing_uno_q_requirements(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "iints.cli.cli.uno_q_bridge_environment_report",
+        lambda: {
+            "pyserial_available": False,
+            "pyserial_error": "No module named 'serial'",
+            "serial_ports": [],
+            "arduino_cli_path": None,
+        },
+    )
+
+    doctor = runner.invoke(app, ["edge", "doctor", "--board", "uno_q"])
+
+    assert doctor.exit_code == 1
+    assert "Not Ready Yet" in doctor.stdout
+    assert "Install serial support with the edge extras" in doctor.stdout
+    assert "USB data cable" in doctor.stdout
+    assert "You can still run the Linux-side demo now" in doctor.stdout

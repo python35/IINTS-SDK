@@ -65,6 +65,8 @@ iints edge status --project-dir .
 iints edge kiosk --project-dir .
 ```
 
+`iints edge doctor --board raspberry_pi` is the friendly preflight check. It tells you what is ready, what is optional, and the exact next command to run.
+
 That starts:
 - the persistent simulation loop
 - the SQLite runtime store
