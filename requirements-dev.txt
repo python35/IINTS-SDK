@@ -11,5 +11,6 @@ rich>=12.0.0
 PyYAML
 openpyxl>=3.0.0
 hypothesis>=6.0.0
+httpx>=0.27.0
 mkdocs>=1.6.0
 mkdocs-material>=9.5.0

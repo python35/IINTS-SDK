@@ -54,6 +54,7 @@ dev = [
   "pytest>=7.0.0",
   "hypothesis>=6.0.0",
   "flake8",
+  "httpx>=0.27.0",
   "mypy",
   "pandas-stubs",
   "types-PyYAML",
