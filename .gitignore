@@ -43,6 +43,7 @@ models/
 # Coverage
 .coverage
 coverage.xml
+.hypothesis/
 
 # Temporary files
 *.tmp
