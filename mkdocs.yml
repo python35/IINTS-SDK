@@ -52,6 +52,7 @@ nav:
   - Edge & Deployment:
       - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
+      - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
       - MDMP Guide: MDMP_FULL_GUIDE.md

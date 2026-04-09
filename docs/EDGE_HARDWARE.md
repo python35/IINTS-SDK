@@ -185,35 +185,36 @@ For most users, the `8 GB` Pi 5 is the default recommendation.
 
 ## Arduino UNO Q
 
-UNO Q is different from a normal Raspberry Pi because it combines:
+UNO Q combines:
 
-- a Linux-capable MPU
-- an STM32 MCU
+- a Linux-capable side for the IINTS runtime
+- an STM32 side for simple physical feedback
 
-That makes a split design possible:
+The recommended path is:
 
-- Linux side runs the IINTS patient runtime
-- MCU side drives LEDs and a buzzer for supervisor events
+1. install the `edge` profile on the Linux side
+2. generate a UNO Q scaffold with `iints edge setup --board uno_q`
+3. start the Linux-side digital patient
+4. flash the generated bridge sketch onto the STM32 side
+5. verify the bridge manually with `OK`, `OVERRIDE`, and `CRITICAL`
 
-Export the bridge scaffold with:
+Fastest scaffold command:
 
 ```bash
-iints patient export-uno-bridge --output-dir uno_q_bridge
+iints edge setup --output-dir iints_uno_q_demo --board uno_q
 ```
 
-That writes:
+If you only need the bridge sketch:
 
-- `iints_supervisor_bridge.ino`
-- `README.md`
-- `bridge_protocol.txt`
+```bash
+iints edge hardware-bridge --board uno_q --output-dir uno_q_bridge
+```
 
-The UNO Q story is strongest when the MCU becomes physical feedback:
+Use the dedicated guide for the full step-by-step flow:
 
-- green LED: normal operation
-- red LED: supervisor override
-- buzzer: critical intervention
+- [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
 
-UNO Q is a secondary target: useful when physical MCU feedback is part of the installation, but not the default starting point.
+UNO Q is still a secondary target. It is a good fit when you want visible hardware feedback on top of the Linux-side runtime, but it is not the default first install for most SDK users.
 
 ## Auto-Start With systemd
 
