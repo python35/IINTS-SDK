@@ -4,6 +4,68 @@ Use this guide when you want the Linux side of an Arduino UNO Q to run the IINTS
 
 This page is intentionally step by step. Follow it top to bottom once, get the baseline working, and only then start customizing it.
 
+## Quick Path
+
+If you want the fastest possible route to a working baseline, follow these four blocks first.
+
+!!! success "Step 1 - Install IINTS on the Linux side"
+    Run:
+
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -U pip
+    python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+    ```
+
+    Success looks like:
+
+    - `iints doctor --smoke-run` works
+    - `python -c "import iints; print(iints.__version__)"` prints a version
+
+!!! info "Step 2 - Generate the UNO Q project"
+    Run:
+
+    ```bash
+    iints edge setup --output-dir iints_uno_q_demo --board uno_q
+    cd iints_uno_q_demo
+    ```
+
+    Success looks like:
+
+    - `run_edge_patient.sh` exists
+    - `uno_q_bridge/iints_supervisor_bridge.ino` exists
+
+!!! tip "Step 3 - Start the Linux runtime"
+    Run:
+
+    ```bash
+    ./run_edge_patient.sh
+    iints edge status --workspace patient_runtime
+    ```
+
+    Success looks like:
+
+    - `daemon_status` is `running`
+    - the kiosk opens at `http://127.0.0.1:8765/kiosk`
+
+!!! warning "Step 4 - Flash and test the STM32 bridge"
+    Open `uno_q_bridge/iints_supervisor_bridge.ino` in Arduino IDE, upload it, open Serial Monitor at `115200` baud, and send:
+
+    ```text
+    OK
+    OVERRIDE
+    CRITICAL
+    ```
+
+    Success looks like:
+
+    - `OK` turns the green LED on
+    - `OVERRIDE` turns the red LED on
+    - `CRITICAL` turns the red LED on and chirps the buzzer
+
+Once those four blocks work, you have a real working UNO Q baseline.
+
 ## What Works Today
 
 The current UNO Q path gives you:
