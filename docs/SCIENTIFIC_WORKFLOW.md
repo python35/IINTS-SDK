@@ -1,54 +1,50 @@
 # Scientific Workflow
 
-Use this workflow when you want the SDK to support a real experimental claim, not just a demo.
+Use this workflow when you want reproducible experimental comparisons rather than a single illustrative run.
 
 ## Goal
 
-The strongest public IINTS story is:
-
-- same scenarios
+A strong SDK study compares the same algorithms under controlled conditions:
+- same scenario set
 - same seeds
-- same algorithms
-- different data quality or safety conditions
-- measurable deltas in TIR, hypo exposure, interventions, and realism review
+- clearly defined condition changes
+- measurable differences in safety and glycemic metrics
 
-That gives you a clear hypothesis-and-evidence loop.
+This gives you a clean hypothesis-and-evidence loop.
 
 ## Recommended Command Sequence
 
-1. Export the official study pack:
+### 1) Export The Study Pack
 
 ```bash
 iints scenarios export-study-pack --output-dir scenarios/study_pack
 ```
 
-For a fixed fair-ready matrix, use:
+For the fixed EUCYS-oriented matrix, use:
 
 ```bash
 iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack
 ```
 
-2. Write a reproducible study protocol bundle:
+### 2) Write A Reproducible Protocol Bundle
 
 ```bash
 iints study-protocol --preset eucys --output-dir results/study_protocol
 ```
 
 This writes:
-
 - `STUDY_PROTOCOL.md`
 - `study_design.json`
 - `study_matrix.csv`
 
 The `eucys` preset fixes:
-
 - the seed list
 - the official scenario pack
 - a clean certified arm
 - a corrupted uncertified arm
 - a supervisor-off ablation arm
 
-3. Generate deliberately corrupted data for the uncertified arm:
+### 3) Generate Corrupted Data For The Comparison Arm
 
 ```bash
 iints data corrupt-for-study data/demo/diabetes_cgm.csv \
@@ -58,7 +54,7 @@ iints data corrupt-for-study data/demo/diabetes_cgm.csv \
   --mode glucose_spikes
 ```
 
-4. Run your scenarios:
+### 4) Run The Study Scenarios
 
 ```bash
 for seed in 1 2 3 4 5; do
@@ -70,7 +66,7 @@ for seed in 1 2 3 4 5; do
 done
 ```
 
-5. Analyze the study:
+### 5) Analyze The Result Folder
 
 ```bash
 iints analyze results/study_clean \
@@ -80,7 +76,9 @@ iints analyze results/study_clean \
   --output-evidence-markdown results/study_clean/evidence_table.md
 ```
 
-6. If you have a CareLink workbench, add an external plausibility check:
+### 6) Add An External Plausibility Check If Available
+
+If you have a CareLink workbench, compare the simulated metrics against imported real-world traces:
 
 ```bash
 iints analyze results/study_clean \
@@ -88,7 +86,7 @@ iints analyze results/study_clean \
   --carelink-metrics results/personal_carelink/carelink_metrics.json
 ```
 
-7. Compare clean vs corrupted or supervisor-on vs supervisor-off:
+### 7) Compare Study Arms
 
 ```bash
 iints compare-study results/study_clean results/study_corrupted \
@@ -96,14 +94,14 @@ iints compare-study results/study_clean results/study_corrupted \
   --output-markdown results/study_comparison.md
 ```
 
-8. Build a study poster:
+### 8) Build A Study Poster
 
 ```bash
 iints poster-study results/study_clean/study_summary.json \
   --output-path results/study_clean/study_poster.png
 ```
 
-Or let the SDK execute the full fixed matrix for you:
+### 9) Run The Full Fixed Matrix Automatically
 
 ```bash
 iints run-eucys-study \
@@ -112,34 +110,31 @@ iints run-eucys-study \
   --carelink-metrics results/personal_carelink/carelink_metrics.json
 ```
 
-That command exports the EUCYS preset, runs the clean/corrupted/supervisor-off arms, and writes summaries plus comparisons automatically.
+That command exports the EUCYS preset, runs the clean, corrupted, and supervisor-off arms, then writes summaries and comparisons automatically.
 
 ## What Makes This Scientific
 
-- A predefined protocol with explicit hypotheses
-- Controlled corruption operators instead of vague “bad data”
-- Shared seeds across conditions
-- More than one metric
-- Descriptive statistics with 95% confidence intervals
-- Failure analysis, not just best-case runs
-- Optional plausibility comparison against imported real-world CGM traces
+A solid study includes:
+- a predefined protocol with explicit hypotheses
+- shared seeds across conditions
+- controlled corruption operators instead of vague “bad data”
+- more than one outcome metric
+- descriptive statistics with confidence intervals
+- failure analysis, not just best-case runs
+- optional plausibility checks against imported real-world traces
 
-## What `iints analyze` Now Adds
+## What `iints analyze` Adds
 
+The study summary includes:
 - aggregate means for TIR, hypo, hyper, glucose, CV, and GMI
 - standard deviation and 95% confidence intervals
 - certified vs uncertified split
-- failure analysis:
-  - terminated early runs
-  - severe hypo runs
-  - supervisor-heavy runs
-  - worst TIR runs
+- failure analysis for terminated, severe-hypo, supervisor-heavy, and worst-TIR runs
 - optional external validation against `carelink_metrics.json`
 
 ## Controlled Corruption Modes
 
 `iints data corrupt-for-study` supports:
-
 - `timestamp_shift`
 - `missing_block`
 - `duplicate_rows`
@@ -147,23 +142,21 @@ That command exports the EUCYS preset, runs the clean/corrupted/supervisor-off a
 - `drop_meal_annotations`
 - `unit_scale_error`
 
-Each corrupted export also writes a manifest JSON so you can document exactly what was changed.
+Each corrupted export also writes a manifest JSON so the modifications are documented explicitly.
 
 ## AI Review
 
-After you prepare a run or CareLink workbench, use:
+After preparing a run or CareLink workbench, you can add a realism review layer:
 
 ```bash
 iints ai review results/<run_id> --model ministral-3:3b
 ```
 
 The review is structured into:
-
 - realism verdict
-- what looks realistic
-- what looks suspicious
+- realistic patterns
+- suspicious patterns
 - priority fixes
-- what to improve next
-- follow-up validation checks
+- next validation steps
 
-That makes the model useful as a critique layer, not just a narration layer.
+That makes the model useful as a critique layer, not just a narrative layer.

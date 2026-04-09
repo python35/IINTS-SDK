@@ -12,7 +12,6 @@ theme:
   favicon: assets/iints-logo.png
   features:
     - navigation.sections
-    - navigation.expand
     - navigation.top
     - content.code.copy
     - search.suggest
@@ -41,33 +40,34 @@ extra_css:
 nav:
   - Home: index.md
   - Start Here:
+      - Overview In Plain Language: PLAIN_LANGUAGE_GUIDE.md
       - Quick Start: GETTING_STARTED.md
-      - Installation And Paths: INSTALLATION.md
-      - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
-      - Digital Patient On Raspberry Pi: DIGITAL_PATIENT_PI.md
+      - Installation: INSTALLATION.md
+      - Updating An Existing Install: UPDATING.md
+  - User Guides:
+      - AI Assistant: AI_ASSISTANT.md
       - Study Analysis: STUDY_ANALYSIS.md
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
-      - Updating The SDK: UPDATING.md
-      - Plain Language Overview: PLAIN_LANGUAGE_GUIDE.md
-      - Documentation Map: DOCUMENTATION_INDEX.md
-      - Public Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
-      - AI Assistant Guide: AI_ASSISTANT.md
-      - Booth Demo Guide: BOOTH_DEMO.md
+      - Booth Demo & Presentation Flow: BOOTH_DEMO.md
+  - Edge & Deployment:
+      - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
+      - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
-      - MDMP Full Guide: MDMP_FULL_GUIDE.md
+      - MDMP Guide: MDMP_FULL_GUIDE.md
       - MDMP Specification (Draft): MDMP.md
-  - Developer Guides:
-      - Developer CLI Guide: TECHNICAL_README.md
-      - Architecture & Deep Dive: COMPREHENSIVE_GUIDE.md
-      - Dual-Repo Workflow: DUAL_REPO_WORKFLOW.md
+  - Reference:
+      - CLI & Advanced Reference: TECHNICAL_README.md
+      - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
       - Emulation Notes: emulation_references.md
-  - Manuals:
+      - Evidence Base: EVIDENCE_BASE.md
+      - Documentation By Role: DOCUMENTATION_INDEX.md
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
-  - Governance & Evidence:
-      - Public Documentation Overview: PUBLIC_DOCUMENTATION.md
-      - Scientific Evidence & Sources: EVIDENCE_BASE.md
+  - Maintainers & Governance:
+      - Maintainer Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
+      - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
+      - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Release Notes:
       - Latest (v1.5.2): releases/v1.5.2.md
       - Release Archive: releases/INDEX.md

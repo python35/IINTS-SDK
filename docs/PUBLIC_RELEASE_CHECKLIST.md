@@ -1,6 +1,6 @@
-# Public Release Checklist
+# Maintainer Release Checklist
 
-Use this checklist the day before a public release, booth demo, or external handoff.
+Use this checklist before a public release, external handoff, or maintained demo environment update.
 
 ## 1. Fresh-Machine Install Smoke Test
 

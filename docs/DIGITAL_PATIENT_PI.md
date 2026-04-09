@@ -1,49 +1,33 @@
-# Digital Patient On Raspberry Pi
+# Raspberry Pi Digital Patient
 
-This guide explains the new persistent `iints patient ...` flow for a Raspberry Pi 5 demo rig.
+Use this guide when you want the SDK to keep a virtual patient running continuously on a Raspberry Pi.
 
-The idea is simple:
-
-- the Raspberry Pi keeps a virtual diabetes patient running
-- the patient advances every 5 minutes of simulated time
-- the state stays on disk in SQLite
-- a small local dashboard shows the live glucose curve
-- Raspberry Pi Connect is used to present that dashboard from a laptop
-
-This gives you a live "digital patient" instead of a one-shot script.
-
-The current implementation now includes the four pieces that matter most for a fair setup:
-
-- persistent runtime with SQLite state
-- reproducible scenario profiles with fixed default seeds
-- an `expo-reset` command that warm-starts into an interesting situation
-- systemd export so the Pi can auto-restart after a reboot
+The Raspberry Pi digital-patient workflow gives you:
+- a persistent virtual patient runtime
+- SQLite-backed state on disk
+- a lightweight dashboard for the live glucose view
+- exportable run bundles for later workstation-side analysis
+- optional auto-start through `systemd`
 
 ## Recommended Hardware
 
-The safest starting setup is:
-
+Recommended starting setup:
 - `Raspberry Pi 5` with `8 GB` RAM
 - active cooling
 - Raspberry Pi OS `Bookworm` Desktop
 - Raspberry Pi Connect enabled
 - Python `3.10+`
 
-Why this setup:
+Why this setup works well:
+- Raspberry Pi 5 has enough headroom for the runtime and dashboard
+- Desktop edition makes browser-based presentation and remote viewing simpler
+- Raspberry Pi Connect makes it easy to present the Pi from another machine
 
-- Desktop edition makes screen sharing easier for an expo table
-- Raspberry Pi Connect gives browser-based remote access
-- Pi 5 has enough headroom for the SDK runtime and the dashboard
+## Runtime Command Set
 
-## What The Runtime Gives You
+The persistent runtime lives under the `iints patient ...` namespace.
 
-The new namespace is:
-
-```bash
-iints patient ...
-```
-
-Core commands:
+Common commands:
 
 ```bash
 iints patient start
@@ -62,9 +46,9 @@ iints edge update
 iints patient review
 ```
 
-## Fastest Pi Setup
+## Fastest Setup
 
-Start from a clean project folder on the Pi:
+Start from a clean project directory on the Pi:
 
 ```bash
 python3 -m venv .venv
@@ -76,7 +60,7 @@ iints quickstart --project-name iints_pi_demo
 cd iints_pi_demo
 ```
 
-Then start the persistent patient:
+Start the persistent patient runtime:
 
 ```bash
 iints patient start \
@@ -88,14 +72,13 @@ iints patient start \
 ```
 
 That starts:
-
-- the persistent loop
+- the persistent simulation loop
 - the SQLite runtime store
 - the local dashboard API
 - a run-like bundle under `patient_runtime/live_bundle/`
-- a kiosk-capable fullscreen dashboard at `/kiosk`
+- a fullscreen-friendly kiosk view at `/kiosk`
 
-## Daily Expo Flow
+## Day-To-Day Runtime Operations
 
 Check status:
 
@@ -104,35 +87,34 @@ iints patient status --workspace patient_runtime
 iints edge status --workspace patient_runtime
 ```
 
-List the available day profiles before a jury chooses one:
+List built-in day profiles:
 
 ```bash
 iints patient scenarios
 ```
 
-Inject a manual meal during a live explanation:
+Inject a meal during a live session:
 
 ```bash
 iints patient inject-meal --carbs 60 --workspace patient_runtime
 ```
 
-Pause and resume:
+Pause and resume the runtime:
 
 ```bash
 iints patient pause --workspace patient_runtime
 iints patient resume --workspace patient_runtime
 ```
 
-Reset to a clean expo-ready morning:
+Reset to the prepared presentation profile:
 
 ```bash
 iints patient expo-reset --workspace patient_runtime
 ```
 
-By default, `expo-reset` switches to the special `expo_hot_start` profile.
-That profile is warm-started into the middle of an under-counted lunch challenge so visitors do not arrive to a flat curve.
+By default, `expo-reset` switches to the `expo_hot_start` profile so the runtime resumes in an already active scenario instead of a flat baseline.
 
-If you want to jump to a specific profile instead:
+Jump to a specific profile instead:
 
 ```bash
 iints patient expo-reset \
@@ -152,58 +134,45 @@ Export the live runtime for workstation-side analysis:
 iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
 ```
 
-## Dashboard
+## Dashboard URLs
 
-By default the dashboard lives at:
+Default dashboard URL:
 
 ```text
 http://127.0.0.1:8765/dashboard
 ```
 
-The fullscreen expo view lives at:
+Fullscreen kiosk URL:
 
 ```text
 http://127.0.0.1:8765/kiosk
 ```
 
-Open that page on the Pi itself and present it with Raspberry Pi Connect screen sharing.
-
-The dashboard is intentionally lightweight:
-
+The dashboard is intentionally lightweight and focuses on:
 - current glucose
 - simulated clock
-- last event
+- recent event history
 - certification badge
 - realism review status
 - live glucose curve
-- pause / resume / meal / expo reset buttons
-- one-click scenario shortcuts
-
-This makes it robust for offline or low-friction fair demos.
+- pause, resume, meal, and reset controls
+- quick scenario shortcuts
 
 ## Scenario Profiles
 
-The digital patient now ships with these built-in profiles:
-
+Built-in profiles:
 - `normal_day`
 - `sport_day`
 - `bad_carb_count`
 - `night_hypo_risk`
 - `expo_hot_start`
 
-The first four are the main scientific day profiles.
-`expo_hot_start` is a presentation-oriented profile designed to start mid-challenge.
+The first four represent general study or demo days.
+`expo_hot_start` is the fast-start presentation profile.
 
-Each profile has a fixed default seed.
-That means:
+Each profile has a fixed default seed, so the same profile and algorithm can be reproduced more easily across sessions.
 
-- same profile
-- same seed
-- same algorithm
-
-should produce the same live start conditions again, which is much easier to defend in front of a jury.
-
-If you want to override the default seed:
+Override the default seed if needed:
 
 ```bash
 iints patient start \
@@ -215,35 +184,31 @@ iints patient start \
   --speed 60x
 ```
 
-## Raspberry Pi Connect Workflow
+## Remote Presentation With Raspberry Pi Connect
 
-The cleanest fair setup is:
+A simple remote presentation flow is:
 
-1. Start the patient on the Pi.
-2. Open the dashboard on the Pi in a browser.
-3. Use Raspberry Pi Connect from your laptop.
-4. Screen-share the Pi browser window.
-5. Use the shell or dashboard buttons live during the conversation.
+1. Start the patient runtime on the Pi.
+2. Open the dashboard in a browser on the Pi.
+3. Connect to the Pi from another machine with Raspberry Pi Connect.
+4. Share the Pi browser window.
+5. Use the dashboard controls or CLI commands during the session.
 
-This keeps the real application on the Pi while the laptop only acts as the remote presenter.
+This keeps the actual runtime on the Pi while the laptop or workstation acts only as the remote presenter.
 
 ## systemd Auto-Start
 
-For an expo table, auto-restart matters.
-If the Pi reboots, the patient should come back without manual repair work.
-
-After starting the runtime once, export a ready-to-install systemd unit:
+If the device should come back automatically after a reboot, export a `systemd` unit after the runtime has started once:
 
 ```bash
 iints patient export-service --workspace patient_runtime
 ```
 
-That writes:
-
+This writes:
 - `patient_runtime/iints-digital-patient.service`
 - `patient_runtime/iints-digital-patient.INSTALL.txt`
 
-Then install it on the Pi:
+Install it on the Pi:
 
 ```bash
 sudo cp patient_runtime/iints-digital-patient.service /etc/systemd/system/iints-digital-patient.service
@@ -253,12 +218,9 @@ sudo systemctl start iints-digital-patient.service
 systemctl status iints-digital-patient.service
 ```
 
-This is the recommended way to make the demo resilient for the fair.
-
 ## What Gets Stored
 
 Inside `patient_runtime/` you will see:
-
 - `patient_state.db`
 - `patient_runtime_config.json`
 - `patient.log`
@@ -268,34 +230,32 @@ Inside `patient_runtime/` you will see:
 - `live_bundle/run_metadata.json`
 - `live_bundle/audit/audit_summary.json`
 
-That means the "digital patient" is not just a display.
-It keeps a traceable, reviewable history that can later feed the wider IINTS analysis pipeline.
+This means the digital patient is not just a display layer. It keeps a traceable runtime history that can be analyzed later with the wider SDK workflow.
 
 ## Edge Setup And Update Helpers
 
-If you want the Pi project scaffold generated for you, use:
+Generate a Pi-friendly project scaffold with:
 
 ```bash
 iints edge setup --output-dir iints_edge_demo --board raspberry_pi
 ```
 
 That writes:
-
 - `run_edge_patient.sh`
 - `launch_kiosk.sh`
 - `update_edge_runtime.sh`
 - `patient_runtime/iints-digital-patient.service`
 - `EDGE_SETUP.md`
 
-To refresh the SDK on the device later:
+Generate an update helper later with:
 
 ```bash
 iints edge update --output-script update_edge_runtime.sh
 ```
 
-## AI Review On Demand
+## Optional AI Review
 
-If Ollama and a local Ministral model are available, you can ask for a realism review of the live runtime:
+If Ollama and a local Ministral model are available, you can request a realism review of the live runtime:
 
 ```bash
 iints patient review \
@@ -304,30 +264,21 @@ iints patient review \
 ```
 
 Output goes to:
-
 - `patient_runtime/live_bundle/ai/realism_review.md`
 
-That is useful when you want the Pi to do more than just simulate:
+## Example Live Session
 
-- simulate
-- log
-- certify
-- explain
-- critique realism
-
-## Expo Script In One Minute
-
-The most reliable fair flow is:
+One simple live flow is:
 
 1. `iints patient scenarios`
 2. `iints patient start --algo algorithms/example_algorithm.py --workspace patient_runtime --scenario-profile normal_day --mode demo-time --speed 60x`
 3. open `http://127.0.0.1:8765/dashboard`
-4. explain the live glucose curve
-5. trigger `iints patient inject-meal --carbs 60 --workspace patient_runtime`
-6. show `iints patient expo-reset --workspace patient_runtime`
+4. explain the live glucose curve and current state
+5. run `iints patient inject-meal --carbs 60 --workspace patient_runtime`
+6. run `iints patient expo-reset --workspace patient_runtime`
 7. optionally run `iints patient review --workspace patient_runtime --model ministral-3:3b`
 
-## Current Scope
+## Scope
 
 - built for Raspberry Pi demos, teaching, and long-running virtual patient studies
 - research use only

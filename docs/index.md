@@ -1,51 +1,36 @@
 # IINTS-AF SDK Documentation
 
-IINTS-AF is one platform for insulin-algorithm research.
+IINTS-AF is a research SDK for testing insulin algorithms on virtual patients, validating data quality, and reviewing outputs with reproducible reports.
 
-It combines three layers:
+It combines three core workflows:
 - **Simulate** closed-loop behavior on virtual patients
 - **Certify** datasets and outputs with built-in trust grading
-- **Understand** results with reports, posters, and local AI review
+- **Review** runs with reports, posters, and optional local AI tooling
 
 !!! important "Use a Virtual Environment"
-    Always run SDK commands from an active Python virtual environment (`.venv`).
+    Run SDK commands from an active Python virtual environment such as `.venv`.
     This avoids package conflicts and missing dependency issues.
 
 ## Start Here
 
-- [Quick Start](GETTING_STARTED.md)
-- [Installation And Paths](INSTALLATION.md)
-- [Edge Hardware Profiles](EDGE_HARDWARE.md)
-- [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md)
-- [Documentation Map](DOCUMENTATION_INDEX.md)
-- [AI Assistant Guide](AI_ASSISTANT.md)
-- [MDMP Quickstart](MDMP_QUICKSTART.md)
-- [MDMP Full Guide](MDMP_FULL_GUIDE.md)
-- [Demos (GitHub)](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
+If you are new to the SDK, read these pages in order:
+
+1. [Overview In Plain Language](PLAIN_LANGUAGE_GUIDE.md)
+2. [Quick Start](GETTING_STARTED.md)
+3. [Installation](INSTALLATION.md)
+4. [CLI & Advanced Reference](TECHNICAL_README.md)
 
 ## Choose Your Path
 
-| New to IINTS | Install Correctly | Build First Run | Engineering Reference |
-|---|---|---|---|
-| [Plain Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Installation And Paths](INSTALLATION.md) | [Quick Start](GETTING_STARTED.md) | [Developer CLI Guide](TECHNICAL_README.md) |
-| Understand what the SDK does and does not do. | Know which folder to use and which install path fits your setup. | Install, run baseline, inspect outputs. | Full command reference and technical integration details. |
-
-For a live Raspberry Pi installation:
-- [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
-- [Edge Hardware Profiles](EDGE_HARDWARE.md)
-
-Core edge commands:
-- `iints edge setup`
-- `iints edge status`
-- `iints edge bundle`
-
-For the local research assistant:
-- [AI Assistant Guide](AI_ASSISTANT.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+| Goal | Best page | What you get |
+|---|---|---|
+| Understand the scope and terminology | [Overview In Plain Language](PLAIN_LANGUAGE_GUIDE.md) | A simple explanation of what the SDK does and does not do |
+| Install and complete a first run | [Quick Start](GETTING_STARTED.md) | A reliable first workflow from install to outputs |
+| Pick the right install profile | [Installation](INSTALLATION.md) | Package options, paths, extras, and environment checks |
+| Run on Raspberry Pi or another SBC | [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md) | Hardware guidance, edge install profile, and deployment choices |
+| Operate a persistent digital patient | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) | Runtime control, kiosk view, export, and service setup |
+| Build reproducible experiments | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, corruption modes, study comparisons, and summaries |
+| Explore the full CLI surface | [CLI & Advanced Reference](TECHNICAL_README.md) | Command reference and advanced workflows |
 
 ## 10-Minute Quick Start
 
@@ -63,30 +48,44 @@ iints data certify contracts/clinical_mdmp_contract.yaml results/<run_id>/result
 iints ai report results/<run_id>
 ```
 
-Expected outputs:
+Typical outputs:
 - `results.csv`
 - `clinical_report.pdf`
 - `audit/`
 - `run_manifest.json`
+- `certification.json`
 
-If you are unsure which folder these commands should run from, start with [Installation And Paths](INSTALLATION.md).
+If you are unsure which directory to use, start with [Installation](INSTALLATION.md).
 
-## Data Certification in 60 Seconds
+## Common Workflows
 
-Data certification is the trust layer inside IINTS.
+### Simulation + Certification + AI Review
 
-- `Contract`: required columns, types, units, and value bounds.
-- `Validation`: dataset is checked against contract rules.
-- `Grading`: output receives `draft`, `research_grade`, or `clinical_grade`.
-- `Fingerprinting`: deterministic hashes support reproducibility and audits.
+Use this when you want a complete baseline workflow:
 
-Use it with:
+1. `iints presets run`
+2. `iints data certify`
+3. `iints ai report`
 
-```bash
-iints data certify-template --output-path data_contract.yaml
-iints data certify data_contract.yaml data/my_cgm.csv --output-json results/certification.json
-iints data certify-visualizer results/certification.json --output-html results/mdmp_dashboard.html
-```
+### Study And Evidence Workflows
+
+Use these pages when you want reproducible multi-run comparisons:
+
+- [Study Analysis](STUDY_ANALYSIS.md)
+- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+- [Evidence Base](EVIDENCE_BASE.md)
+
+### Edge And SBC Workflows
+
+Use these pages when the SDK needs to stay running on a device:
+
+- [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
+- [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
+
+Core edge commands:
+- `iints edge setup`
+- `iints edge status`
+- `iints edge bundle`
 
 ## Scope
 

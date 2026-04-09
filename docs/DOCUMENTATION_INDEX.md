@@ -1,32 +1,45 @@
-# Documentation Map
+# Documentation By Role
 
-This page tells you exactly where to go, based on your role and task.
+Use this page when you want a quick route to the right part of the documentation site.
 
-## If You Are New
+## New Users
 
 Read in this order:
 
-1. `PLAIN_LANGUAGE_GUIDE.md` - what the SDK does in simple language.
-2. `GETTING_STARTED.md` - install and first successful run.
-3. `TECHNICAL_README.md` - full CLI and integration commands.
+1. `PLAIN_LANGUAGE_GUIDE.md` - SDK scope and terminology in simple language
+2. `GETTING_STARTED.md` - first successful workflow from install to outputs
+3. `INSTALLATION.md` - package extras, paths, and environment guidance
+4. `TECHNICAL_README.md` - full CLI and advanced command reference
 
-## If You Are a Researcher
+## Researchers
 
-- Study execution workflow: `GETTING_STARTED.md`
-- Data quality and contracts: `MDMP_QUICKSTART.md` and `MDMP.md`
-- Reproducibility and outputs: `PUBLIC_DOCUMENTATION.md`
-- Predictor research track: `../research/README.md`
+Start here when you are building reproducible experiments:
+- study execution: `SCIENTIFIC_WORKFLOW.md`
+- run aggregation and summaries: `STUDY_ANALYSIS.md`
+- data quality and contracts: `MDMP_QUICKSTART.md` and `MDMP.md`
+- evidence and source grounding: `EVIDENCE_BASE.md`
+- full manual: `manuals/IINTS-AF_SDK_Manual.md`
 
-## If You Are a Developer
+## Edge And Deployment Users
 
+Start here when the SDK needs to stay running on a device:
+- board selection and install profile: `EDGE_HARDWARE.md`
+- Raspberry Pi runtime operations: `DIGITAL_PATIENT_PI.md`
+- installation details: `INSTALLATION.md`
+- advanced command reference: `TECHNICAL_README.md`
+
+## Developers And Integrators
+
+Use these pages when you are extending or embedding the SDK:
 - CLI and automation flows: `TECHNICAL_README.md`
-- Architecture and module map: `COMPREHENSIVE_GUIDE.md`
-- Device emulation: `emulation_references.md`
-- Full manual: `manuals/IINTS-AF_SDK_Manual.md`
+- architecture and module map: `COMPREHENSIVE_GUIDE.md`
+- device emulation notes: `emulation_references.md`
+- manual overview: `OFFICIAL_MANUAL.md`
 
-## If You Are Reviewing Evidence
+## Reviewers And Maintainers
 
-- Source grounding and references: `EVIDENCE_BASE.md`
-- Public documentation scope: `PUBLIC_DOCUMENTATION.md`
-- Release history: `releases/INDEX.md`
-- Legal context: `../PRIVACY_POLICY.md`, `../TERMS_OF_USE.md`
+Use these pages when you are auditing the documentation set or preparing releases:
+- documentation coverage: `PUBLIC_DOCUMENTATION.md`
+- release checklist: `PUBLIC_RELEASE_CHECKLIST.md`
+- release history: `releases/INDEX.md`
+- MDMP packaging notes: `DUAL_REPO_WORKFLOW.md`

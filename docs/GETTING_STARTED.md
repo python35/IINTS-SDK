@@ -1,12 +1,14 @@
 # Getting Started
 
-This page gives the fastest reliable path through the new IINTS story:
+Use this page for the fastest reliable path from installation to a first complete SDK run.
 
-1. `iints run` or `iints presets run` to simulate
-2. `iints data certify` to certify the data
-3. `iints ai report` to explain what happened
+The core workflow is:
 
-If you mainly need help with folder choice and install mode, read [Installation And Paths](INSTALLATION.md) first.
+1. run a simulation
+2. certify the output data
+3. review the run report
+
+If you mainly need help choosing folders, install extras, or repository vs package usage, read [Installation](INSTALLATION.md) first.
 
 ## 1) Create and Activate a Virtual Environment
 
@@ -18,7 +20,7 @@ python -m pip install -U pip
 
 All commands below assume this `.venv` is active.
 
-## 2) Install
+## 2) Install The SDK
 
 ```bash
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
@@ -32,22 +34,22 @@ pip install "iints-sdk-python35[nightscout]"
 pip install "iints-sdk-python35[edge,mdmp]"
 ```
 
-## 3) Verify Environment
+## 3) Verify The Environment
 
 ```bash
 iints doctor --smoke-run
 ```
 
-If this fails, fix environment issues before running long experiments.
+If this fails, fix the environment before starting longer runs.
 
-## 4) Create a Project
+## 4) Create A Project
 
 ```bash
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 ```
 
-Generated structure includes:
+The generated structure includes:
 - `algorithms/`
 - `scenarios/`
 - `contracts/`
@@ -58,15 +60,15 @@ Generated structure includes:
 Important:
 - before `iints quickstart`, commands can be run from any folder
 - after `iints quickstart`, move into the generated project folder
-- repo scripts such as `./scripts/run_live_stage_demo.sh` belong to the SDK repository, not the quickstart project
+- repository helper scripts such as `./scripts/run_live_stage_demo.sh` belong to the SDK repository, not the quickstart project
 
-## 5) Run a Baseline Simulation
+## 5) Run A Baseline Simulation
 
 ```bash
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-## 6) Certify the Run Data
+## 6) Certify The Run Data
 
 Use the generated results CSV plus the project contract:
 
@@ -85,42 +87,42 @@ iints data certify-visualizer \
   --output-html results/<run_id>/certification_dashboard.html
 ```
 
-## 7) Ask the Local AI to Explain the Run
+## 7) Review The Run With The Local AI Layer
 
 ```bash
 iints ai report results/<run_id>
 ```
 
-That gives the public demo flow in three commands:
+That gives the main SDK workflow in three commands:
 
 1. `iints presets run`
 2. `iints data certify`
 3. `iints ai report`
 
-## 8) Check Outputs
+## 8) Inspect The Outputs
 
 A typical run writes:
-- `results.csv`: time-series simulation output.
-- `clinical_report.pdf`: report for review.
-- `audit/`: decision and safety trail.
-- `run_manifest.json`: file hashes for reproducibility.
-- `run_metadata.json`: run config and environment details.
-- `certification.json`: trust-grade and dataset checks after `iints data certify`
+- `results.csv`: time-series simulation output
+- `clinical_report.pdf`: summary report for review
+- `audit/`: safety and decision trail
+- `run_manifest.json`: file hashes for reproducibility
+- `run_metadata.json`: run configuration and environment details
+- `certification.json`: trust grade and dataset checks after `iints data certify`
 
-## 9) Build a Study-Ready Bundle
+## 9) Build A Study-Ready Bundle
 
 ```bash
 iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
 ```
 
-Adds:
+This adds:
 - `validation_report.json`
 - `sources_manifest.json`
 - `SUMMARY.md`
 
-## 10) Next Steps
+## 10) Common Next Steps
 
-- Import a Medtronic CareLink / MiniMed CSV export:
+### Import Personal Pump / CGM Data
 
 ```bash
 iints import-carelink \
@@ -128,7 +130,7 @@ iints import-carelink \
   --output-dir results/imported_carelink
 ```
 
-- Or build the full personal-data workspace at once:
+Or build the full personal-data workspace at once:
 
 ```bash
 iints carelink-workbench \
@@ -136,33 +138,19 @@ iints carelink-workbench \
   --output-dir results/personal_carelink
 ```
 
-- Optional AI assistant (Ministral 3 via Ollama):
+### Enable The Optional Local AI Assistant
 
 ```bash
 iints ai models
 ollama pull ministral-3:8b
 iints ai local-check --model ministral-3:8b
-iints quickstart --project-name iints_quickstart
-cd iints_quickstart
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 iints ai prepare results/<run_id>
 iints ai report results/<run_id>
 ```
 
-- CareLink + local AI flow:
+If `iints ai local-check` reports that Ollama closed the connection, the most likely causes are a restarting daemon or insufficient memory. In that case, try `ministral-3:3b`.
 
-```bash
-ollama pull ministral-3:3b
-iints ai local-check --model ministral-3:3b
-iints carelink-workbench \
-  --input-csv "/path/to/CareLink export.csv" \
-  --output-dir results/personal_carelink
-iints ai report results/personal_carelink --model ministral-3:3b
-```
-
-`iints ai local-check` now runs a tiny smoke-test generation by default. If it reports that Ollama closed the generation connection, the most likely causes are a restarting daemon or insufficient memory; in that case, try `ministral-3:3b`.
-
-- Jury/demo poster from real run bundles:
+### Build A Poster From Existing Run Bundles
 
 ```bash
 iints poster \
@@ -175,44 +163,23 @@ iints poster \
   --output-path results/posters/iints_results_poster.png
 ```
 
-- One-command booth / jury demo:
+### Run A Prepared Presentation Demo
 
 ```bash
 ./scripts/run_live_stage_demo.sh
 ```
 
-This is the easiest script to show on a fair stand because `examples/demos/07_live_stage_demo.py` exposes the patient profile and runtime knobs right at the top of the file.
+This is a convenient repository wrapper when you want a ready-made live walkthrough with code, outputs, and presentation assets.
 
-It also visibly shows these SDK features in one place:
-
-- `run_full(...)`
-- `generate_results_poster(...)`
-- `prepare_ai_ready_artifacts(...)`
-
-You can still use the full booth bundle command:
+If the machine only has the installed SDK and not the repository checkout, export the same demo code first:
 
 ```bash
-./scripts/run_booth_demo.sh
+iints demo-export --output-dir iints_demo
+cd iints_demo
+python 07_live_stage_demo.py
 ```
 
-This creates `results/booth_demo/` with three scenario runs, a poster PNG, and `JURY_TALK_TRACK.md`.
-
-- Aggregate a study or build a result poster:
-
-```bash
-iints analyze results/study --output-json results/study_summary.json --output-markdown results/study_summary.md
-iints poster-study results/study_summary.json --output-path results/study_poster.png
-iints study-protocol --preset eucys --output-dir results/study_protocol
-iints run-eucys-study --algo algorithms/example_algorithm.py --output-dir results/eucys_study
-```
-
-- Export the official scenario pack for repeatable studies:
-
-```bash
-iints scenarios export-study-pack --output-dir scenarios/study_pack
-```
-
-- Run a persistent digital patient on a Raspberry Pi:
+### Run A Persistent Digital Patient On Raspberry Pi
 
 ```bash
 iints quickstart --project-name iints_pi_demo
@@ -228,15 +195,13 @@ iints patient status --workspace patient_runtime
 ```
 
 That flow gives you:
-
 - a persistent SQLite-backed runtime
 - a live dashboard on `http://127.0.0.1:8765/dashboard`
 - a run-like bundle under `patient_runtime/live_bundle/`
 
-This is the cleanest setup for Raspberry Pi Connect demos and classroom use.
-Full guide: [Digital Patient On Raspberry Pi](DIGITAL_PATIENT_PI.md)
+Full guide: [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 
-- Build an edge-ready SBC project in one shot:
+### Build An Edge-Ready SBC Project
 
 ```bash
 iints edge setup --output-dir iints_edge_demo --board raspberry_pi
@@ -244,7 +209,7 @@ cd iints_edge_demo
 ./run_edge_patient.sh
 ```
 
-- Show the fullscreen kiosk view and export the runtime back to a laptop:
+Export the live runtime back to a workstation with:
 
 ```bash
 iints patient kiosk --workspace patient_runtime
@@ -253,49 +218,20 @@ iints edge bundle --workspace patient_runtime --output results/edge_runtime_bund
 ```
 
 That edge flow gives you:
-
 - a generated edge project scaffold
 - a service file and update script for the board
 - a kiosk dashboard URL for Raspberry Pi Connect screen sharing
 - a ZIP bundle for workstation-side analysis and reporting
 
-For a fair or jury table, the cleanest live flow is:
+## Related Guides
 
-1. open `examples/demos/07_live_stage_demo.py`
-2. point to the patient profile and runtime constants
-3. run `./scripts/run_live_stage_demo.sh`
-4. open the generated poster and scenario folders under `results/booth_demo_live/`
-
-That wrapper script resolves the repository root automatically, so it is more forgiving than running raw relative Python commands by hand.
-
-If the machine only has the installed SDK and not the repository checkout, export the same demo code first:
-
-```bash
-iints demo-export --output-dir iints_demo
-cd iints_demo
-python 07_live_stage_demo.py
-```
-
-- Updating an existing install to the latest release:
-
-```bash
-source .venv/bin/activate
-python -m pip install -U "iints-sdk-python35[full,mdmp]"
-hash -r
-python -c "import iints; print(iints.__version__)"
-```
-
-- Full update guide: [Updating The SDK](UPDATING.md)
-- Full install/path guide: [Installation And Paths](INSTALLATION.md)
-- Multi-run evidence summary: [Study Analysis](STUDY_ANALYSIS.md)
-- Hypotheses, corruption operators, and protocol bundles: [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- Full Ollama + local AI setup guide: [AI Assistant Guide](AI_ASSISTANT.md)
-- Full source legend: [Scientific Evidence & Source Legend](EVIDENCE_BASE.md)
-- Need a fixed environment for a demo or paper? Pin a specific version only when reproducibility matters.
-
-- Data validation: [MDMP Quickstart](MDMP_QUICKSTART.md)
-- Full command reference: [Technical README](TECHNICAL_README.md)
-- End-to-end examples: [Demos](https://github.com/python35/IINTS-SDK/tree/main/examples/demos)
+- [Updating An Existing Install](UPDATING.md)
+- [Study Analysis](STUDY_ANALYSIS.md)
+- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+- [AI Assistant](AI_ASSISTANT.md)
+- [Evidence Base](EVIDENCE_BASE.md)
+- [MDMP Quickstart](MDMP_QUICKSTART.md)
+- [CLI & Advanced Reference](TECHNICAL_README.md)
 
 ## Safety Scope
 

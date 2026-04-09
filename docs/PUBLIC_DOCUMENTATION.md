@@ -1,15 +1,15 @@
-# Public Documentation Overview
+# Documentation Coverage Reference
 
-This document is the public, single‑entry documentation index for the IINTS‑AF SDK. It summarizes
-**software**, **data**, **content**, and **AI system** documentation in one place.
+This document summarizes the main documentation surfaces in the IINTS-AF SDK across
+**software**, **data**, **content**, and **AI system** topics.
 
 Public docs site: `https://python35.github.io/IINTS-SDK/`
 
 ## Who This Page Is For
 
-- External reviewers and collaborators who need a documentation map.
-- Researchers preparing study or audit packages.
-- Developers onboarding to the SDK documentation landscape.
+- reviewers who need a documentation map
+- researchers preparing study or audit packages
+- maintainers checking documentation coverage across the SDK
 
 ## Terminology Used Consistently In Public Docs
 
