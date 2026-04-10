@@ -1135,6 +1135,8 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
         )
     if isinstance(uncertainty_summary, dict):
         overall = uncertainty_summary.get("overall", {})
+        alignment = uncertainty_summary.get("uncertainty_vs_error", {}) if isinstance(uncertainty_summary.get("uncertainty_vs_error"), dict) else {}
+        alignment_overall = alignment.get("overall", {}) if isinstance(alignment.get("overall"), dict) else {}
         lines.extend(
             [
                 "## Uncertainty Summary",
@@ -1145,6 +1147,17 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
                 "",
             ]
         )
+        if alignment_overall:
+            lines.extend(
+                [
+                    "### Uncertainty Vs Error",
+                    "",
+                    f"- Mean absolute error: `{alignment_overall.get('mean_abs_error')}`",
+                    f"- Correlation between predicted std and absolute error: `{alignment_overall.get('uncertainty_abs_error_corr')}`",
+                    f"- High-vs-low uncertainty error gap: `{alignment_overall.get('high_vs_low_abs_error_gap')}`",
+                    "",
+                ]
+            )
     if isinstance(external_validation, dict):
         lines.extend(
             [
@@ -4087,6 +4100,7 @@ def demo_booth(
         "showcase_study_summary_json",
         "showcase_study_poster_png",
         "showcase_research_sync_md",
+        "showcase_explanation_panel_md",
         "01_normal_run_dir",
         "02_meal_stress_test_dir",
         "03_supervisor_override_dir",

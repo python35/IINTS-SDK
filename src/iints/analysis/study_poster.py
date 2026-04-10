@@ -160,6 +160,9 @@ def _uncertainty_panel(ax: Any, payload: dict[str, Any]) -> None:
         ax.text(0.5, 0.5, "No uncertainty data", ha="center", va="center", color=IINTS_NAVY, transform=ax.transAxes)
         return
 
+    alignment = uncertainty.get("uncertainty_vs_error", {}) if isinstance(uncertainty.get("uncertainty_vs_error"), dict) else {}
+    alignment_overall = alignment.get("overall", {}) if isinstance(alignment.get("overall"), dict) else {}
+
     labels = ["Overall", "Safe", "Heavy", "Worst TIR"]
     buckets = [
         uncertainty.get("overall", {}),
@@ -179,6 +182,20 @@ def _uncertainty_panel(ax: Any, payload: dict[str, Any]) -> None:
     ax.set_title("Uncertainty vs Risk", color=IINTS_NAVY, fontweight="bold")
     ax.legend(frameon=False, fontsize=8)
     ax.grid(axis="y", alpha=0.2)
+    if alignment_overall:
+        corr = alignment_overall.get("uncertainty_abs_error_corr")
+        gap = alignment_overall.get("high_vs_low_abs_error_gap")
+        ax.text(
+            0.02,
+            0.98,
+            f"corr(std,error): {_format_metric(corr)}\nhigh-low error gap: {_format_metric(gap, ' mg/dL')}",
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=8,
+            color=IINTS_NAVY,
+            bbox={"facecolor": "white", "edgecolor": "#cfd8dc", "boxstyle": "round,pad=0.25", "alpha": 0.95},
+        )
 
 
 def _notes_panel(ax: Any, payload: dict[str, Any]) -> None:
@@ -190,6 +207,8 @@ def _notes_panel(ax: Any, payload: dict[str, Any]) -> None:
     uncertainty = payload.get("uncertainty_summary", {}) if isinstance(payload.get("uncertainty_summary"), dict) else {}
     overall_calibration = calibration.get("overall", {}) if isinstance(calibration.get("overall"), dict) else {}
     overall_uncertainty = uncertainty.get("overall", {}) if isinstance(uncertainty.get("overall"), dict) else {}
+    uncertainty_vs_error = uncertainty.get("uncertainty_vs_error", {}) if isinstance(uncertainty.get("uncertainty_vs_error"), dict) else {}
+    uncertainty_vs_error_overall = uncertainty_vs_error.get("overall", {}) if isinstance(uncertainty_vs_error.get("overall"), dict) else {}
 
     lines = [
         "Key Findings",
@@ -207,6 +226,13 @@ def _notes_panel(ax: Any, payload: dict[str, Any]) -> None:
                 "Uncertainty summary:",
                 f"- Mean predictor std: {_format_metric(overall_uncertainty.get('mean'), ' mg/dL')}",
                 f"- P95 predictor std: {_format_metric(overall_uncertainty.get('p95'), ' mg/dL')}",
+            ]
+        )
+    if uncertainty_vs_error_overall:
+        lines.extend(
+            [
+                f"- Corr(std,error): {_format_metric(uncertainty_vs_error_overall.get('uncertainty_abs_error_corr'))}",
+                f"- High-vs-low error gap: {_format_metric(uncertainty_vs_error_overall.get('high_vs_low_abs_error_gap'), ' mg/dL')}",
             ]
         )
     if overall_calibration:

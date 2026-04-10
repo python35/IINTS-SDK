@@ -73,6 +73,7 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     assert Path(outputs["showcase_study_summary_json"]).is_file()
     assert Path(outputs["showcase_study_poster_png"]).is_file()
     assert Path(outputs["showcase_research_sync_md"]).is_file()
+    assert Path(outputs["showcase_explanation_panel_md"]).is_file()
     assert Path(outputs["showcase_baseline_vs_candidate_json"]).is_file()
     assert Path(outputs["showcase_safety_on_vs_off_json"]).is_file()
 
@@ -86,3 +87,5 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     research_sync = Path(outputs["showcase_research_sync_md"]).read_text(encoding="utf-8")
     assert "Baseline vs candidate comparison" in research_sync
     assert "Safety-on vs safety-off comparison" in research_sync
+    explanation_panel = Path(outputs["showcase_explanation_panel_md"]).read_text(encoding="utf-8")
+    assert "Plain-language talking points" in explanation_panel

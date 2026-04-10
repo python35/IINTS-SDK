@@ -135,6 +135,8 @@ def test_analyze_study_directory_aggregates_runs(tmp_path) -> None:
     assert "safety_summary" in payload
     assert payload["calibration_summary"]["overall"]["run_count"] == 2
     assert payload["uncertainty_summary"]["overall"]["count"] == 2
+    assert "uncertainty_vs_error" in payload["uncertainty_summary"]
+    assert payload["uncertainty_summary"]["uncertainty_vs_error"]["overall"]["run_count"] == 2
 
 
 def test_analyze_study_directory_parses_nested_run_metadata_shape(tmp_path) -> None:
@@ -206,6 +208,7 @@ def test_analyze_study_directory_adds_subgroup_and_pairwise_summaries(tmp_path) 
     assert "PID Controller" in payload["pairwise_baseline_deltas"]["baselines"]
     assert payload["safety_summary"]["mean_interventions_by_algorithm"]["Standard Pump"] == 4.0
     assert payload["safety_summary"]["supervisor_on_vs_off"]["supervisor_on_runs"] == 3
+    assert "by_algorithm" in payload["uncertainty_summary"]["uncertainty_vs_error"]
 
 
 def test_cli_analyze_writes_json_and_markdown(tmp_path) -> None:

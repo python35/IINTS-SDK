@@ -73,6 +73,7 @@ Key files:
 - `results/booth_demo/showcase_study/showcase_study_summary.json`
 - `results/booth_demo/showcase_study/showcase_study_poster.png`
 - `results/booth_demo/showcase_study/SHOWCASE_RESEARCH_SYNC.md`
+- `results/booth_demo/showcase_study/SHOWCASE_EXPLANATION_PANEL.md`
 
 For the larger public story, you can also build:
 
@@ -101,6 +102,7 @@ The `showcase_study/` subfolder is the research-sync layer for fairs and jury ta
 - baseline vs candidate
 - safety-on vs safety-off
 - the same TIR, hypo, intervention, uncertainty, and calibration vocabulary used in study bundles
+- a plain-language explanation panel you can read out on the stand without changing the scientific terminology
 
 ## Best Live Flow
 

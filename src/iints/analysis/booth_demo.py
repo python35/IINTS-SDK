@@ -330,6 +330,37 @@ def _write_showcase_research_sync(
     baseline_vs_candidate_json.write_text(json.dumps(baseline_vs_candidate, indent=2), encoding="utf-8")
     safety_on_vs_off_json.write_text(json.dumps(safety_on_vs_off, indent=2), encoding="utf-8")
 
+    baseline_delta = baseline_vs_candidate.get("delta", {})
+    safety_delta = safety_on_vs_off.get("delta", {})
+    explanation_lines = [
+        "# Showcase Explanation Panel",
+        "",
+        "Use this panel when you want the booth story to match the benchmark language used in the scientific workflow.",
+        "",
+        "## Baseline vs candidate",
+        "",
+        "- Baseline: `PID Controller`",
+        "- Candidate: `Runaway AI Candidate`",
+        f"- TIR delta (baseline - candidate): `{baseline_delta.get('mean_tir_70_180')}`",
+        f"- Intervention delta (baseline - candidate): `{baseline_delta.get('mean_supervisor_interventions')}`",
+        "",
+        "## Safety on vs safety off",
+        "",
+        "- Same candidate algorithm, same profile, same scenario",
+        f"- TIR delta (safety on - safety off): `{safety_delta.get('mean_tir_70_180')}`",
+        f"- Severe hypo delta: `{safety_delta.get('severe_hypo_runs')}`",
+        f"- Early termination delta: `{safety_delta.get('terminated_early_runs')}`",
+        "",
+        "## Plain-language talking points",
+        "",
+        "- This panel compares a stable baseline with a deliberately bad candidate.",
+        "- Then it compares the same candidate with the safety layer on and off.",
+        "- That makes the public demo line up with the benchmark logic used in the full study engine.",
+        "",
+    ]
+    explanation_panel = showcase_dir / "SHOWCASE_EXPLANATION_PANEL.md"
+    _write_text(explanation_panel, "\n".join(explanation_lines))
+
     sync_lines = [
         "# Showcase Research Sync",
         "",
@@ -367,6 +398,7 @@ def _write_showcase_research_sync(
         "showcase_baseline_vs_candidate_json": str(baseline_vs_candidate_json),
         "showcase_safety_on_vs_off_json": str(safety_on_vs_off_json),
         "showcase_research_sync_md": str(sync_markdown),
+        "showcase_explanation_panel_md": str(explanation_panel),
     }
 
 

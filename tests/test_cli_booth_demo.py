@@ -21,6 +21,7 @@ def test_cli_demo_booth_prints_artifacts(tmp_path: Path, monkeypatch) -> None:
         "showcase_study_summary_json": str(tmp_path / "showcase_study" / "showcase_study_summary.json"),
         "showcase_study_poster_png": str(tmp_path / "showcase_study" / "showcase_study_poster.png"),
         "showcase_research_sync_md": str(tmp_path / "showcase_study" / "SHOWCASE_RESEARCH_SYNC.md"),
+        "showcase_explanation_panel_md": str(tmp_path / "showcase_study" / "SHOWCASE_EXPLANATION_PANEL.md"),
         "01_normal_run_dir": str(tmp_path / "01_normal_run"),
         "02_meal_stress_test_dir": str(tmp_path / "02_meal_stress_test"),
         "03_supervisor_override_dir": str(tmp_path / "03_supervisor_override"),
@@ -35,3 +36,4 @@ def test_cli_demo_booth_prints_artifacts(tmp_path: Path, monkeypatch) -> None:
     assert "JURY_TALK_TRACK.md" in result.stdout
     assert "BEURS_LIVE_DEMO_SCRIPT.txt" in result.stdout
     assert "SHOWCASE_RESEARCH_SYNC" in result.stdout
+    assert "SHOWCASE_EXPLANATION_PANEL" in result.stdout

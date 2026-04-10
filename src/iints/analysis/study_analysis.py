@@ -9,6 +9,7 @@ from statistics import mean, median, stdev
 from typing import Any, Callable
 
 import pandas as pd
+import numpy as np
 
 from iints.analysis.study_engine import slugify_study_token
 from iints.research.evaluation import forecast_error_report
@@ -470,6 +471,48 @@ def _uncertainty_metrics_from_results(results_df: pd.DataFrame) -> tuple[float |
     return float(pd.Series(values).mean()), float(pd.Series(values).quantile(0.95)), float(max(values))
 
 
+def _uncertainty_error_alignment(
+    observed: np.ndarray,
+    predicted: np.ndarray,
+    predicted_std: np.ndarray | None,
+) -> dict[str, Any] | None:
+    if predicted_std is None:
+        return None
+    obs = np.asarray(observed, dtype=float).reshape(-1)
+    pred = np.asarray(predicted, dtype=float).reshape(-1)
+    std = np.asarray(predicted_std, dtype=float).reshape(-1)
+    if obs.shape != pred.shape or obs.shape != std.shape:
+        return None
+
+    abs_error = np.abs(pred - obs)
+    frame = pd.DataFrame({"std": std, "abs_error": abs_error}).dropna()
+    if frame.empty:
+        return None
+
+    corr = None
+    if len(frame) > 1 and frame["std"].nunique() > 1 and frame["abs_error"].nunique() > 1:
+        corr = float(frame["std"].corr(frame["abs_error"]))
+
+    high_threshold = float(frame["std"].quantile(0.75))
+    low_threshold = float(frame["std"].quantile(0.25))
+    high_group = frame[frame["std"] >= high_threshold]
+    low_group = frame[frame["std"] <= low_threshold]
+    high_error = float(high_group["abs_error"].mean()) if not high_group.empty else None
+    low_error = float(low_group["abs_error"].mean()) if not low_group.empty else None
+
+    return {
+        "count": int(len(frame)),
+        "mean_abs_error": float(frame["abs_error"].mean()),
+        "mean_predicted_std": float(frame["std"].mean()),
+        "uncertainty_abs_error_corr": corr,
+        "high_uncertainty_threshold": high_threshold,
+        "low_uncertainty_threshold": low_threshold,
+        "high_uncertainty_mean_abs_error": high_error,
+        "low_uncertainty_mean_abs_error": low_error,
+        "high_vs_low_abs_error_gap": None if high_error is None or low_error is None else high_error - low_error,
+    }
+
+
 def _calibration_from_results(results_df: pd.DataFrame) -> dict[str, Any] | None:
     observed_column = "glucose_actual_mgdl"
     predicted_column = "predicted_glucose_ai_30min"
@@ -483,6 +526,13 @@ def _calibration_from_results(results_df: pd.DataFrame) -> dict[str, Any] | None
         results_df[predicted_column].to_numpy(dtype=float),
         predicted_std,
     )
+    alignment = _uncertainty_error_alignment(
+        results_df[observed_column].to_numpy(dtype=float),
+        results_df[predicted_column].to_numpy(dtype=float),
+        predicted_std,
+    )
+    if alignment is not None:
+        report["uncertainty_error_alignment"] = alignment
     return report
 
 
@@ -583,6 +633,27 @@ def _aggregate_calibration_reports(reports: list[dict[str, Any]]) -> dict[str, A
         summary["gate_pass_count"] = sum(1 for gate in gates if gate.get("passed") is True)
         summary["gate_fail_count"] = sum(1 for gate in gates if gate.get("passed") is False)
         summary["gate_profiles"] = sorted({str(gate.get("profile")) for gate in gates if gate.get("profile")})
+    return summary
+
+
+def _aggregate_uncertainty_alignment(reports: list[dict[str, Any]]) -> dict[str, Any] | None:
+    alignments = [
+        report.get("uncertainty_error_alignment")
+        for report in reports
+        if isinstance(report, dict) and isinstance(report.get("uncertainty_error_alignment"), dict)
+    ]
+    if not alignments:
+        return None
+    summary = {"run_count": len(alignments)}
+    for metric in (
+        "mean_abs_error",
+        "mean_predicted_std",
+        "uncertainty_abs_error_corr",
+        "high_uncertainty_mean_abs_error",
+        "low_uncertainty_mean_abs_error",
+        "high_vs_low_abs_error_gap",
+    ):
+        summary[metric] = _mean([_first_numeric(alignment, [metric]) for alignment in alignments])
     return summary
 
 
@@ -749,12 +820,62 @@ def _build_uncertainty_summary(runs: list[StudyRunSummary]) -> dict[str, Any] | 
         if float(run.metrics.get("terminated_early", 0.0)) < 1.0 and float(run.metrics.get("tir_below_54", 0.0)) <= 0.0
     ]
     heavy_intervention_runs = [run for run in runs if float(run.metrics.get("supervisor_interventions", 0.0)) >= 10.0]
-    return {
+    summary = {
         "overall": overall,
         "safe_runs": _uncertainty_distribution(safe_runs),
         "heavy_intervention_runs": _uncertainty_distribution(heavy_intervention_runs),
         "worst_tir_runs": _uncertainty_distribution(_worst_tir_subset(runs)),
     }
+    reports = [run.calibration_report for run in runs if run.calibration_report]
+    alignment_overall = _aggregate_uncertainty_alignment(reports)
+    if alignment_overall is not None:
+        summary["uncertainty_vs_error"] = {
+            "overall": alignment_overall,
+            "by_algorithm": {
+                key: value
+                for key, value in (
+                    (
+                        algorithm,
+                        _aggregate_uncertainty_alignment(
+                            [run.calibration_report for run in runs if run.algorithm == algorithm and run.calibration_report]
+                        ),
+                    )
+                    for algorithm in sorted({run.algorithm for run in runs})
+                )
+                if value is not None
+            },
+            "by_profile": {
+                key: value
+                for key, value in (
+                    (
+                        profile,
+                        _aggregate_uncertainty_alignment(
+                            [run.calibration_report for run in runs if run.profile_id == profile and run.calibration_report]
+                        ),
+                    )
+                    for profile in sorted({run.profile_id for run in runs if run.profile_id})
+                )
+                if value is not None
+            },
+            "by_scenario": {
+                key: value
+                for key, value in (
+                    (
+                        scenario,
+                        _aggregate_uncertainty_alignment(
+                            [
+                                run.calibration_report
+                                for run in runs
+                                if (run.scenario_slug or run.scenario_name) == scenario and run.calibration_report
+                            ]
+                        ),
+                    )
+                    for scenario in sorted({run.scenario_slug or run.scenario_name for run in runs})
+                )
+                if value is not None
+            },
+        }
+    return summary
 
 
 def analyze_run_directory(run_dir: Path) -> StudyRunSummary:

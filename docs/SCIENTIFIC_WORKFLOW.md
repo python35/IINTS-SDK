@@ -207,6 +207,8 @@ If the run outputs contain prediction and uncertainty columns, the summary also 
 - `calibration_summary`
 - `uncertainty_summary`
 
+That uncertainty summary now also includes an `uncertainty_vs_error` block so you can see whether larger predicted uncertainty actually lines up with larger forecast error.
+
 That means the generated study JSON can support:
 - cohort-level overview
 - subgroup analysis
