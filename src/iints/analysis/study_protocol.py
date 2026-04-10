@@ -5,21 +5,14 @@ import json
 from pathlib import Path
 from typing import Any
 
-
-DEFAULT_HYPOTHESES = [
-    {
-        "id": "H1",
-        "statement": "Certified data produces more reliable closed-loop evaluation summaries than uncertified or deliberately corrupted data.",
-    },
-    {
-        "id": "H2",
-        "statement": "The safety supervisor reduces severe hypo exposure and early terminations without an unacceptable loss in time in range.",
-    },
-    {
-        "id": "H3",
-        "statement": "AI realism review flags suspicious runs that also appear in quantitative failure-analysis outputs.",
-    },
-]
+from iints.analysis.study_engine import (
+    DEFAULT_BASELINE_ALGORITHMS,
+    DEFAULT_HYPOTHESES,
+    DEFAULT_METRICS,
+    DEFAULT_PROFILE_SET,
+    StudyDesignPayload,
+    build_study_design_payload,
+)
 
 DEFAULT_SCENARIOS = [
     "baseline_day",
@@ -37,18 +30,9 @@ DEFAULT_CORRUPTION_MODES = [
     "unit_scale_error",
 ]
 
-DEFAULT_METRICS = [
-    "tir_70_180",
-    "tir_below_70",
-    "tir_below_54",
-    "tir_above_180",
-    "tir_above_250",
-    "mean_glucose",
-    "cv",
-    "gmi",
-    "supervisor_interventions",
-    "terminated_early",
-]
+
+def _candidate_source_type(candidate_algorithm: str) -> str:
+    return "path" if candidate_algorithm.endswith(".py") or "/" in candidate_algorithm or "\\" in candidate_algorithm else "plugin"
 
 
 def build_study_protocol_payload(
@@ -61,131 +45,46 @@ def build_study_protocol_payload(
     algorithms: list[str] | None = None,
     corruption_modes: list[str] | None = None,
     external_reference_label: str = "CareLink personal workbench metrics",
+    profile_set: str = DEFAULT_PROFILE_SET,
+    include_default_baselines: bool = True,
+    extra_algorithms: list[str] | None = None,
 ) -> dict[str, Any]:
-    normalized_preset = preset.strip().lower()
-    if normalized_preset not in {"default", "eucys"}:
-        raise ValueError("preset must be 'default' or 'eucys'")
+    legacy_algorithms = [item.strip() for item in (algorithms or []) if str(item).strip()]
+    candidate_algorithm = legacy_algorithms[0] if legacy_algorithms else "your_algorithm"
+    comparison_algorithms = legacy_algorithms[1:] + [item.strip() for item in (extra_algorithms or []) if item.strip()]
 
-    scenario_list = scenarios or list(DEFAULT_SCENARIOS)
-    seed_list = seeds or [1, 2, 3, 4, 5]
-    algorithm_list = algorithms or ["your_algorithm", "Standard PID", "Standard Pump"]
-    corruption_list = corruption_modes or list(DEFAULT_CORRUPTION_MODES)
-    hypotheses = list(DEFAULT_HYPOTHESES)
-    if primary_hypothesis is not None:
-        hypotheses[0] = {"id": "H1", "statement": primary_hypothesis}
-    elif normalized_preset == "eucys":
-        hypotheses[0] = {
-            "id": "H1",
-            "statement": "Certified data produces more reliable and defendable evaluation evidence than deliberately corrupted uncertified data.",
-        }
-        seed_list = seeds or list(range(1, 11))
-        corruption_list = corruption_modes or ["timestamp_shift", "missing_block", "glucose_spikes", "unit_scale_error"]
-        title = title if title != "IINTS Scientific Validation Protocol" else "IINTS EUCYS Scientific Validation Protocol"
-
-    conditions = [
-        {
-            "name": "clean_certified",
-            "description": "Nominal run with certification artifacts generated and grade checked.",
-        },
-        {
-            "name": "corrupted_uncertified",
-            "description": "Same scenario with one or more deliberate corruption operators applied.",
-        },
-        {
-            "name": "supervisor_on",
-            "description": "Safety supervisor enabled to measure intervention rate and severe hypo prevention.",
-        },
-        {
-            "name": "supervisor_off",
-            "description": "Ablation condition used only for controlled comparisons and failure analysis.",
-        },
-    ]
-
-    recommended_commands = [
-        "iints scenarios export-study-pack --output-dir scenarios/study_pack",
-        "iints study-protocol --output-dir results/study_protocol",
-        "iints data corrupt-for-study data/demo/diabetes_cgm.csv --output-csv data/demo/diabetes_cgm_corrupted.csv --mode timestamp_shift --mode missing_block",
-        "iints analyze results/study --output-json results/study_summary.json --output-markdown results/study_summary.md",
-        "iints compare-study results/study_clean results/study_corrupted --output-json results/study_comparison.json",
-        "iints poster-study results/study_summary.json --output-path results/study_poster.png",
-    ]
-    if normalized_preset == "eucys":
-        recommended_commands[0] = "iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack"
-        recommended_commands[1] = "iints study-protocol --preset eucys --output-dir results/study_protocol"
-
-    return {
-        "preset": normalized_preset,
-        "title": title,
-        "research_question": "Does certified data improve the reliability and interpretability of closed-loop insulin algorithm evaluation?",
-        "hypotheses": hypotheses,
-        "algorithms": algorithm_list,
-        "scenarios": scenario_list,
-        "conditions": conditions,
-        "seed_policy": {
-            "seeds": seed_list,
-            "note": "Reuse the same seeds across all conditions to keep paired comparisons fair.",
-        },
-        "corruption_plan": [
-            {
-                "mode": mode,
-                "purpose": {
-                    "timestamp_shift": "Stress provenance and temporal consistency checks.",
-                    "missing_block": "Simulate sensor outages or dropped rows.",
-                    "duplicate_rows": "Simulate export duplication or stitching bugs.",
-                    "glucose_spikes": "Stress plausibility filters and realism review.",
-                    "drop_meal_annotations": "Test how missing meal context changes evaluation.",
-                    "unit_scale_error": "Expose unit-mismatch errors and impossible ranges.",
-                }.get(mode, "Controlled corruption operator for scientific ablation."),
-            }
-            for mode in corruption_list
-        ],
-        "metrics": DEFAULT_METRICS,
-        "statistics_plan": {
-            "descriptive": ["mean", "median", "std", "min", "max", "95% confidence interval"],
-            "comparative": ["difference in means", "Cohen's d"],
-            "failure_analysis": [
-                "terminated_early_runs",
-                "severe_hypo_runs",
-                "supervisor_heavy_runs",
-                "worst_tir_runs",
-            ],
-        },
-        "external_validation": {
-            "reference_label": external_reference_label,
-            "compare_metrics": [
-                "mean_glucose_mgdl",
-                "cv_pct",
-                "time_in_range_70_180_pct",
-                "time_below_70_pct",
-                "time_above_180_pct",
-            ],
-            "note": "Use imported CareLink-style real data only as a plausibility reference, not as a clinical efficacy claim.",
-        },
-        "exclusion_rules": [
-            "Document early-terminated runs instead of silently discarding them.",
-            "Exclude only runs with missing results.csv or unreadable metadata.",
-            "Keep a manifest of every corrupted dataset generated for the study.",
-        ],
-        "reproducibility_checklist": [
-            "Export the official study pack.",
-            "Write the protocol bundle before running scenarios.",
-            "Reuse the same seeds across conditions.",
-            "Store certification JSON next to each run.",
-            "Run analyze, compare-study, and poster-study on the final bundle.",
-        ],
-        "recommended_commands": recommended_commands,
-    }
+    design = build_study_design_payload(
+        preset=preset,
+        title=title,
+        primary_hypothesis=primary_hypothesis,
+        scenarios=scenarios,
+        seeds=seeds,
+        candidate_algorithm=candidate_algorithm,
+        include_default_baselines=include_default_baselines,
+        extra_algorithms=comparison_algorithms,
+        profile_set=profile_set,
+        external_reference_label=external_reference_label,
+        candidate_source_type=_candidate_source_type(candidate_algorithm),
+        candidate_source_ref=candidate_algorithm,
+    )
+    payload = design.to_dict()
+    if corruption_modes:
+        payload["corruption_plan"] = [
+            item for item in payload.get("corruption_plan", []) if item.get("mode") in set(corruption_modes)
+        ]
+    return payload
 
 
 def render_study_protocol_markdown(payload: dict[str, Any]) -> str:
     hypotheses = payload.get("hypotheses", [])
-    scenarios = payload.get("scenarios", [])
+    profiles = payload.get("profiles", [])
     algorithms = payload.get("algorithms", [])
-    corruption_plan = payload.get("corruption_plan", [])
-    commands = payload.get("recommended_commands", [])
+    scenarios = payload.get("scenarios", [])
+    study_arms = payload.get("study_arms", [])
     metrics = payload.get("metrics", [])
     statistics_plan = payload.get("statistics_plan", {})
     external_validation = payload.get("external_validation", {})
+    commands = payload.get("recommended_commands", [])
 
     lines = [
         f"# {payload.get('title', 'IINTS Scientific Validation Protocol')}",
@@ -203,17 +102,56 @@ def render_study_protocol_markdown(payload: dict[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "## Study Design",
+            "## Profile Set",
             "",
-            f"- Algorithms: `{', '.join(str(item) for item in algorithms)}`",
-            f"- Scenarios: `{', '.join(str(item) for item in scenarios)}`",
+            f"- Active profile set: `{payload.get('profile_set', DEFAULT_PROFILE_SET)}`",
+            f"- Profile count: `{len(profiles)}`",
+            "",
+        ]
+    )
+    for profile in profiles:
+        lines.append(
+            f"- `{profile.get('profile_id', '')}` — {profile.get('label', '')}: {profile.get('description', '')}"
+        )
+
+    lines.extend(["", "## Algorithm Registry", ""])
+    for algorithm in algorithms:
+        lines.append(
+            "- "
+            f"`{algorithm.get('algorithm_id', '')}` — {algorithm.get('display_name', '')} "
+            f"({algorithm.get('role', '')}, {algorithm.get('source_type', '')})"
+        )
+
+    lines.extend(["", "## Scenario Families", ""])
+    for scenario in scenarios:
+        lines.append(
+            f"- `{scenario.get('slug', '')}` — {scenario.get('label', '')} "
+            f"({scenario.get('recommended_duration_minutes', 'n/a')} min)"
+        )
+
+    lines.extend(["", "## Study Arms", ""])
+    for arm in study_arms:
+        lines.append(
+            f"- `{arm.get('arm_id', '')}` — {arm.get('label', '')}; "
+            f"certification=`{arm.get('expected_certification', '')}`, "
+            f"supervisor_enabled=`{arm.get('supervisor_enabled', False)}`, "
+            f"corruption_modes=`{', '.join(arm.get('corruption_modes', [])) or 'none'}`"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Study Matrix",
+            "",
+            f"- Total matrix rows: `{len(payload.get('matrix_rows', []))}`",
             f"- Seeds: `{', '.join(str(item) for item in payload.get('seed_policy', {}).get('seeds', []))}`",
+            "- Cross-product: profiles × scenarios × arms × algorithms × seeds",
             "",
             "## Controlled Corruption Operators",
             "",
         ]
     )
-    for item in corruption_plan:
+    for item in payload.get("corruption_plan", []):
         lines.append(f"- `{item.get('mode', '')}`: {item.get('purpose', '')}")
 
     lines.extend(
@@ -221,7 +159,13 @@ def render_study_protocol_markdown(payload: dict[str, Any]) -> str:
             "",
             "## Outcome Metrics",
             "",
-            "- " + "\n- ".join(str(metric) for metric in metrics),
+        ]
+    )
+    for metric in metrics:
+        lines.append(f"- `{metric}`")
+
+    lines.extend(
+        [
             "",
             "## Statistics Plan",
             "",
@@ -260,6 +204,9 @@ def write_study_protocol_bundle(
     algorithms: list[str] | None = None,
     corruption_modes: list[str] | None = None,
     external_reference_label: str = "CareLink personal workbench metrics",
+    profile_set: str = DEFAULT_PROFILE_SET,
+    include_default_baselines: bool = True,
+    extra_algorithms: list[str] | None = None,
 ) -> dict[str, str]:
     target = Path(output_dir).expanduser().resolve()
     target.mkdir(parents=True, exist_ok=True)
@@ -273,38 +220,51 @@ def write_study_protocol_bundle(
         algorithms=algorithms,
         corruption_modes=corruption_modes,
         external_reference_label=external_reference_label,
+        profile_set=profile_set,
+        include_default_baselines=include_default_baselines,
+        extra_algorithms=extra_algorithms,
     )
 
     markdown_path = target / "STUDY_PROTOCOL.md"
     design_json = target / "study_design.json"
     matrix_csv = target / "study_matrix.csv"
+    algorithms_json = target / "algorithms.json"
 
     markdown_path.write_text(render_study_protocol_markdown(payload), encoding="utf-8")
     design_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    algorithms_json.write_text(json.dumps(payload.get("algorithms", []), indent=2), encoding="utf-8")
 
     with matrix_csv.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=["scenario", "algorithm", "seed", "clean_certified", "corrupted_uncertified", "supervisor_on", "supervisor_off"],
-        )
+        fieldnames = [
+            "arm_id",
+            "condition_group",
+            "profile_id",
+            "profile_label",
+            "algorithm_id",
+            "algorithm_label",
+            "algorithm_role",
+            "algorithm_source_type",
+            "scenario_slug",
+            "scenario_label",
+            "seed",
+            "recommended_duration_minutes",
+            "supervisor_enabled",
+            "expected_certification",
+            "corruption_modes",
+        ]
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        for scenario in payload["scenarios"]:
-            for algorithm in payload["algorithms"]:
-                for seed in payload["seed_policy"]["seeds"]:
-                    writer.writerow(
-                        {
-                            "scenario": scenario,
-                            "algorithm": algorithm,
-                            "seed": seed,
-                            "clean_certified": "yes",
-                            "corrupted_uncertified": "yes",
-                            "supervisor_on": "yes",
-                            "supervisor_off": "optional",
-                        }
-                    )
+        for row in payload.get("matrix_rows", []):
+            writer.writerow(
+                {
+                    **row,
+                    "corruption_modes": ",".join(row.get("corruption_modes", [])),
+                }
+            )
 
     return {
         "protocol_markdown": str(markdown_path),
         "study_design_json": str(design_json),
         "study_matrix_csv": str(matrix_csv),
+        "algorithms_json": str(algorithms_json),
     }

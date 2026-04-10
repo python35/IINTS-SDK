@@ -30,6 +30,7 @@ from iints.cli.patient_cli import app as patient_app
 from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
+from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
 from iints.analysis.study_protocol import write_study_protocol_bundle
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
@@ -1027,8 +1028,17 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
     aggregate_stats = payload.get("aggregate_stats", {})
     certification = payload.get("certification_comparison", {})
     failure_analysis = payload.get("failure_analysis", {})
-    external_validation = payload.get("external_validation")
     study_protocol = payload.get("study_protocol")
+    safety_summary = payload.get("safety_summary", {}) if isinstance(payload.get("safety_summary"), dict) else {}
+    pairwise = payload.get("pairwise_baseline_deltas", {}) if isinstance(payload.get("pairwise_baseline_deltas"), dict) else {}
+    external_validation = payload.get("external_validation")
+    calibration_summary = payload.get("calibration_summary") if isinstance(payload.get("calibration_summary"), dict) else None
+    uncertainty_summary = payload.get("uncertainty_summary") if isinstance(payload.get("uncertainty_summary"), dict) else None
+    by_algorithm = payload.get("by_algorithm", {}) if isinstance(payload.get("by_algorithm"), dict) else {}
+    by_profile = payload.get("by_profile", {}) if isinstance(payload.get("by_profile"), dict) else {}
+    by_arm = payload.get("by_arm", {}) if isinstance(payload.get("by_arm"), dict) else {}
+    by_scenario = payload.get("by_scenario", {}) if isinstance(payload.get("by_scenario"), dict) else {}
+
     lines = [
         "# IINTS Study Summary",
         "",
@@ -1045,6 +1055,7 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
         f"- Mean glucose: `{aggregate.get('mean_glucose')}`",
         f"- Mean CV: `{aggregate.get('mean_cv')}`",
         f"- Mean GMI: `{aggregate.get('mean_gmi')}`",
+        f"- Mean predictor uncertainty: `{aggregate.get('mean_predictor_uncertainty_mean')}`",
         "",
         "## Descriptive Statistics",
         "",
@@ -1067,7 +1078,12 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
         f"- Supervisor-heavy runs: `{failure_analysis.get('supervisor_heavy_runs')}`",
         f"- Needs-review runs: `{failure_analysis.get('needs_review_runs')}`",
         "",
-        "## Runs",
+        "## Safety Summary",
+        "",
+        f"- Severe hypo run count: `{safety_summary.get('severe_hypo_run_count')}`",
+        f"- Terminated early run count: `{safety_summary.get('terminated_early_run_count')}`",
+        f"- Supervisor-on runs: `{safety_summary.get('supervisor_on_vs_off', {}).get('supervisor_on_runs')}`",
+        f"- Supervisor-off runs: `{safety_summary.get('supervisor_on_vs_off', {}).get('supervisor_off_runs')}`",
         "",
     ]
     if isinstance(study_protocol, dict):
@@ -1077,6 +1093,55 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
                 "",
                 f"- Protocol source: `{study_protocol.get('source_path', '')}`",
                 f"- Research question: {study_protocol.get('research_question', '')}",
+                "",
+            ]
+        )
+    if pairwise.get("baselines"):
+        lines.extend(["## Candidate vs Baselines", ""])
+        for baseline, details in pairwise.get("baselines", {}).items():
+            lines.append(f"- `{baseline}` mean TIR delta: `{details.get('mean_deltas', {}).get('tir_70_180')}`")
+        lines.append("")
+    if by_algorithm:
+        lines.extend(["## By Algorithm", ""])
+        for algorithm, details in by_algorithm.items():
+            lines.append(f"- `{algorithm}` mean TIR: `{details.get('aggregate', {}).get('mean_tir_70_180')}`")
+        lines.append("")
+    if by_profile:
+        lines.extend(["## By Profile", ""])
+        for profile, details in by_profile.items():
+            lines.append(f"- `{profile}` mean TIR: `{details.get('aggregate', {}).get('mean_tir_70_180')}`")
+        lines.append("")
+    if by_arm:
+        lines.extend(["## By Arm", ""])
+        for arm, details in by_arm.items():
+            lines.append(f"- `{arm}` mean TIR: `{details.get('aggregate', {}).get('mean_tir_70_180')}`")
+        lines.append("")
+    if by_scenario:
+        lines.extend(["## By Scenario", ""])
+        for scenario, details in by_scenario.items():
+            lines.append(f"- `{scenario}` mean TIR: `{details.get('aggregate', {}).get('mean_tir_70_180')}`")
+        lines.append("")
+    if isinstance(calibration_summary, dict):
+        overall = calibration_summary.get("overall", {})
+        lines.extend(
+            [
+                "## Calibration Summary",
+                "",
+                f"- Mean MAE: `{overall.get('mean_mae')}`",
+                f"- Mean RMSE: `{overall.get('mean_rmse')}`",
+                f"- Mean interval coverage: `{overall.get('mean_interval_95_coverage_pct')}`",
+                "",
+            ]
+        )
+    if isinstance(uncertainty_summary, dict):
+        overall = uncertainty_summary.get("overall", {})
+        lines.extend(
+            [
+                "## Uncertainty Summary",
+                "",
+                f"- Mean predictor std: `{overall.get('mean')}`",
+                f"- P95 predictor std: `{overall.get('p95')}`",
+                f"- Max predictor std: `{overall.get('max')}`",
                 "",
             ]
         )
@@ -1093,18 +1158,22 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
                 "",
             ]
         )
+    lines.extend(["## Runs", ""])
     for run in payload.get("runs", []):
         metrics = run.get("metrics", {})
         lines.extend(
             [
                 f"### {run.get('scenario_name', run.get('run_id', 'run'))}",
                 f"- Run id: `{run.get('run_id')}`",
-                f"- Algorithm: `{run.get('algorithm')}`",
+                f"- Algorithm: `{run.get('algorithm')}` (`{run.get('algorithm_role')}`)",
+                f"- Profile: `{run.get('profile_id')}`",
                 f"- Condition group: `{run.get('condition_group')}`",
+                f"- Scenario slug: `{run.get('scenario_slug')}`",
                 f"- TIR 70-180: `{metrics.get('tir_70_180')}`",
                 f"- TIR <70: `{metrics.get('tir_below_70')}`",
                 f"- TIR >180: `{metrics.get('tir_above_180')}`",
                 f"- Supervisor interventions: `{metrics.get('supervisor_interventions')}`",
+                f"- Predictor uncertainty mean: `{run.get('predictor_uncertainty_mean')}`",
                 f"- Certification grade: `{run.get('certification_grade')}`",
                 "",
             ]
@@ -1124,8 +1193,12 @@ def _write_evidence_table_markdown(payload: Dict[str, Any], output_path: Path) -
         return
     columns = [
         "scenario_name",
+        "scenario_slug",
+        "study_arm",
         "condition_group",
         "algorithm",
+        "algorithm_role",
+        "profile_id",
         "seed",
         "tir_70_180",
         "tir_below_70",
@@ -1137,6 +1210,7 @@ def _write_evidence_table_markdown(payload: Dict[str, Any], output_path: Path) -
         "gmi",
         "terminated_early",
         "supervisor_interventions",
+        "predictor_uncertainty_mean",
         "certification_grade",
         "quality_badges",
     ]
@@ -1166,6 +1240,7 @@ def _study_comparison_markdown(payload: Dict[str, Any]) -> str:
         f"- Mean supervisor interventions: `{delta.get('mean_supervisor_interventions')}`",
         f"- Mean glucose: `{delta.get('mean_glucose')}`",
         f"- Mean CV: `{delta.get('mean_cv')}`",
+        f"- Mean predictor uncertainty: `{delta.get('mean_predictor_uncertainty_mean')}`",
         f"- Certified runs: `{delta.get('certified_runs')}`",
         f"- Uncertified runs: `{delta.get('uncertified_runs')}`",
         f"- Severe hypo runs: `{delta.get('severe_hypo_runs')}`",
@@ -1183,6 +1258,17 @@ def _study_comparison_markdown(payload: Dict[str, Any]) -> str:
                 "",
             ]
         )
+    for section_name in ("by_algorithm", "by_profile", "by_scenario"):
+        section = payload.get(section_name, {})
+        if not isinstance(section, dict) or not section:
+            continue
+        lines.extend([f"## {section_name.replace('_', ' ').title()}", ""])
+        for label, metrics in section.items():
+            lines.append(f"### {label}")
+            tir = metrics.get("tir_70_180", {}) if isinstance(metrics, dict) else {}
+            lines.append(f"- TIR diff: `{tir.get('difference_in_means')}`")
+            lines.append(f"- TIR Cohen's d: `{tir.get('cohens_d')}`")
+            lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
@@ -1246,6 +1332,434 @@ def _annotate_eucys_run(
         else:
             payload = config
         candidate.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+_PLUGIN_ALGORITHM_CLASS_CACHE: Dict[str, Any] = {}
+
+
+def _algorithm_display_name(instance: Any, fallback: str) -> str:
+    metadata_fn = getattr(instance, "get_algorithm_metadata", None)
+    if callable(metadata_fn):
+        try:
+            metadata = metadata_fn()
+            name = getattr(metadata, "name", None)
+            if name:
+                return str(name)
+        except Exception:
+            pass
+    return fallback
+
+
+def _load_algorithm_plugin_instance(display_name: str) -> iints.InsulinAlgorithm:
+    if display_name not in _PLUGIN_ALGORITHM_CLASS_CACHE:
+        entries = list_algorithm_plugins()
+        match = next((entry for entry in entries if entry.name == display_name and entry.status == "available"), None)
+        algorithm_class = None
+        if match is not None:
+            class_path = match.class_path.replace(":", ".")
+            module_name, class_name = class_path.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            algorithm_class = getattr(module, class_name)
+        else:
+            fallback_registry = {
+                "PID Controller": ("iints.core.algorithms.pid_controller", "PIDController"),
+                "Standard Pump": ("iints.core.algorithms.standard_pump_algo", "StandardPumpAlgorithm"),
+                "Correction Bolus": ("iints.core.algorithms.correction_bolus", "CorrectionBolus"),
+            }
+            fallback = fallback_registry.get(display_name)
+            if fallback is None:
+                raise ValueError(f"Algorithm plugin '{display_name}' is not available")
+            module_name, class_name = fallback
+            module = importlib.import_module(module_name)
+            algorithm_class = getattr(module, class_name)
+        _PLUGIN_ALGORITHM_CLASS_CACHE[display_name] = algorithm_class
+    algorithm_class = _PLUGIN_ALGORITHM_CLASS_CACHE[display_name]
+    return algorithm_class()
+
+
+def _arm_output_dir_name(arm_id: str) -> str:
+    return {
+        "clean_certified": "study_clean",
+        "corrupted_uncertified": "study_corrupted",
+        "supervisor_off_ablation": "study_supervisor_off",
+    }.get(arm_id, f"study_{slugify_study_token(arm_id)}")
+
+
+def _annotate_study_run(
+    run_dir: Path,
+    *,
+    condition_group: str,
+    study_arm: str,
+    protocol_preset: str,
+    supervisor_enabled: bool,
+    corruption_modes: List[str],
+    algorithm_id: str,
+    algorithm_role: str,
+    profile_id: str,
+    scenario_slug: str,
+) -> None:
+    for candidate in (run_dir / "run_metadata.json", run_dir / "config.json"):
+        if not candidate.is_file():
+            continue
+        payload = json.loads(candidate.read_text(encoding="utf-8"))
+        config: Dict[str, Any]
+        if candidate.name == "run_metadata.json":
+            config = payload.get("config", {}) if isinstance(payload.get("config"), dict) else {}
+        else:
+            config = payload if isinstance(payload, dict) else {}
+
+        config["condition_group"] = condition_group
+        config["study_condition"] = study_arm
+        config["study_arm"] = study_arm
+        config["study_protocol_preset"] = protocol_preset
+        config["supervisor_enabled"] = supervisor_enabled
+        config["corruption_modes"] = corruption_modes
+        config["algorithm_id"] = algorithm_id
+        config["algorithm_role"] = algorithm_role
+        config["profile_id"] = profile_id
+        config["scenario_slug"] = scenario_slug
+        scenario_payload = config.get("scenario", {}) if isinstance(config.get("scenario"), dict) else {}
+        if scenario_payload:
+            scenario_payload["condition_group"] = condition_group
+            scenario_payload["study_arm"] = study_arm
+            scenario_payload["study_protocol_preset"] = protocol_preset
+            scenario_payload["supervisor_enabled"] = supervisor_enabled
+            scenario_payload["corruption_modes"] = corruption_modes
+            scenario_payload["scenario_slug"] = scenario_slug
+            config["scenario"] = scenario_payload
+
+        if candidate.name == "run_metadata.json":
+            payload["config"] = config
+            payload["algorithm_id"] = algorithm_id
+            payload["algorithm_role"] = algorithm_role
+            payload["profile_id"] = profile_id
+        else:
+            payload = config
+        candidate.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_run_forecast_evaluation(
+    run_dir: Path,
+    *,
+    gate_profile: Optional[str],
+    gate_profiles_path: Optional[Path],
+    fail_on_gate: bool,
+) -> Optional[Path]:
+    results_csv = run_dir / "results.csv"
+    if not results_csv.is_file():
+        return None
+    df = pd.read_csv(results_csv)
+    observed_column = "glucose_actual_mgdl"
+    predicted_column = "predicted_glucose_ai_30min"
+    if observed_column not in df.columns or predicted_column not in df.columns:
+        return None
+
+    from iints.research.evaluation import forecast_error_report
+
+    predicted_std = None
+    if "predictor_uncertainty_std_mgdl" in df.columns:
+        predicted_std = pd.to_numeric(df["predictor_uncertainty_std_mgdl"], errors="coerce").to_numpy(dtype=float)
+    report = forecast_error_report(
+        df[observed_column].to_numpy(dtype=float),
+        df[predicted_column].to_numpy(dtype=float),
+        predicted_std,
+    )
+
+    if gate_profile:
+        from iints.research.calibration_gate import evaluate_calibration_gate, load_calibration_gate_profiles
+
+        profiles = load_calibration_gate_profiles(gate_profiles_path)
+        gate = profiles.get(gate_profile)
+        if gate is None:
+            available = ", ".join(sorted(profiles.keys()))
+            raise ValueError(f"Unknown calibration gate '{gate_profile}'. Available: {available}")
+        checks = evaluate_calibration_gate(report, gate)
+        passed = all(check.get("passed", False) for check in checks.values()) if checks else True
+        report["calibration_gate"] = {
+            "profile": gate_profile,
+            "passed": passed,
+            "checks": checks,
+        }
+        if fail_on_gate and not passed:
+            raise ValueError(f"Calibration gate '{gate_profile}' failed for run {run_dir.name}")
+
+    output_path = run_dir / "forecast_evaluation.json"
+    output_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return output_path
+
+
+def _write_study_arm_outputs(
+    *,
+    arm_dirs: Dict[str, Path],
+    carelink_metrics: Optional[Path],
+    title_prefix: str,
+) -> Dict[str, Dict[str, Path]]:
+    outputs: Dict[str, Dict[str, Path]] = {}
+    for arm_id, study_root in arm_dirs.items():
+        summary = analyze_study_directory(study_root, external_reference_metrics=carelink_metrics)
+        payload = summary.to_dict()
+        summary_json = study_root / "study_summary.json"
+        summary_md = study_root / "study_summary.md"
+        evidence_csv = study_root / "evidence_table.csv"
+        evidence_md = study_root / "evidence_table.md"
+        summary_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        summary_md.write_text(_study_summary_markdown(payload), encoding="utf-8")
+        _write_evidence_table_csv(payload, evidence_csv)
+        _write_evidence_table_markdown(payload, evidence_md)
+        poster_outputs = generate_study_poster(
+            summary,
+            output_path=study_root / "study_poster.png",
+            title=f"{title_prefix} - {arm_id.replace('_', ' ').title()}",
+            subtitle="Closed-loop study evidence with fixed protocol metadata and subgroup summaries.",
+            summary_output_path=study_root / "study_poster.json",
+        )
+        outputs[arm_id] = {
+            "summary_json": summary_json,
+            "summary_md": summary_md,
+            "evidence_csv": evidence_csv,
+            "evidence_md": evidence_md,
+            "poster_png": Path(poster_outputs["poster_png"]),
+            "poster_summary_json": Path(poster_outputs["poster_summary_json"]),
+        }
+    return outputs
+
+
+def _write_study_comparisons(root_dir: Path, arm_dirs: Dict[str, Path]) -> list[Path]:
+    comparisons_dir = root_dir / "comparisons"
+    comparisons_dir.mkdir(parents=True, exist_ok=True)
+    comparison_specs = [
+        ("clean_vs_corrupted", arm_dirs.get("clean_certified"), arm_dirs.get("corrupted_uncertified")),
+        ("clean_vs_supervisor_off", arm_dirs.get("clean_certified"), arm_dirs.get("supervisor_off_ablation")),
+    ]
+    outputs: list[Path] = []
+    for slug, left_path, right_path in comparison_specs:
+        if left_path is None or right_path is None:
+            continue
+        comparison = compare_studies(left_path, right_path, left_label=left_path.name, right_label=right_path.name)
+        payload = comparison.to_dict()
+        json_path = comparisons_dir / f"{slug}.json"
+        md_path = comparisons_dir / f"{slug}.md"
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        md_path.write_text(_study_comparison_markdown(payload), encoding="utf-8")
+        outputs.extend([json_path, md_path])
+    return outputs
+
+
+def _write_eucys_result_package(
+    *,
+    root_dir: Path,
+    protocol_outputs: Dict[str, str],
+    per_arm_outputs: Dict[str, Dict[str, Path]],
+    comparison_outputs: list[Path],
+) -> Dict[str, Path]:
+    summary_path = root_dir / "EUCYS_SUMMARY.md"
+    results_table_path = root_dir / "EUCYS_RESULTS_TABLE.csv"
+    figure_manifest_path = root_dir / "EUCYS_FIGURE_MANIFEST.json"
+
+    table_rows: list[Dict[str, Any]] = []
+    for arm_id, outputs in per_arm_outputs.items():
+        payload = json.loads(outputs["summary_json"].read_text(encoding="utf-8"))
+        aggregate = payload.get("aggregate", {})
+        safety = payload.get("safety_summary", {})
+        table_rows.append(
+            {
+                "arm_id": arm_id,
+                "run_count": payload.get("run_count"),
+                "mean_tir_70_180": aggregate.get("mean_tir_70_180"),
+                "mean_tir_below_70": aggregate.get("mean_tir_below_70"),
+                "mean_supervisor_interventions": aggregate.get("mean_supervisor_interventions"),
+                "severe_hypo_run_count": safety.get("severe_hypo_run_count"),
+                "terminated_early_run_count": safety.get("terminated_early_run_count"),
+                "poster_png": str(outputs["poster_png"]),
+            }
+        )
+    pd.DataFrame(table_rows).to_csv(results_table_path, index=False)
+
+    summary_lines = [
+        "# EUCYS Study Summary",
+        "",
+        f"- Protocol: `{protocol_outputs['protocol_markdown']}`",
+        f"- Result table: `{results_table_path}`",
+        f"- Comparison files: `{len(comparison_outputs)}`",
+        "",
+        "## Arms",
+        "",
+    ]
+    for row in table_rows:
+        summary_lines.extend(
+            [
+                f"### {row['arm_id']}",
+                f"- Run count: `{row['run_count']}`",
+                f"- Mean TIR 70-180: `{row['mean_tir_70_180']}`",
+                f"- Mean TIR <70: `{row['mean_tir_below_70']}`",
+                f"- Mean interventions: `{row['mean_supervisor_interventions']}`",
+                f"- Severe hypo runs: `{row['severe_hypo_run_count']}`",
+                f"- Early terminations: `{row['terminated_early_run_count']}`",
+                "",
+            ]
+        )
+    summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
+
+    manifest_payload = {
+        "protocol": protocol_outputs,
+        "per_arm_outputs": {
+            arm_id: {name: str(path) for name, path in outputs.items()}
+            for arm_id, outputs in per_arm_outputs.items()
+        },
+        "comparison_outputs": [str(path) for path in comparison_outputs],
+        "results_table_csv": str(results_table_path),
+        "summary_markdown": str(summary_path),
+    }
+    figure_manifest_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+    return {
+        "summary_markdown": summary_path,
+        "results_table_csv": results_table_path,
+        "figure_manifest_json": figure_manifest_path,
+    }
+
+
+def _run_study_bundle(
+    *,
+    algo: Path,
+    output_dir: Path,
+    preset: str,
+    seeds: List[int],
+    duration: Optional[int],
+    time_step: int,
+    carelink_metrics: Optional[Path],
+    prepare_ai: bool,
+    reference_csv: Optional[Path],
+    profile_set: str,
+    include_default_baselines: bool,
+    gate_profile: Optional[str],
+    gate_profiles_path: Optional[Path],
+    fail_on_gate: bool,
+) -> Dict[str, Any]:
+    target_root = output_dir.expanduser().resolve()
+    target_root.mkdir(parents=True, exist_ok=True)
+
+    candidate_instance = _load_algorithm_instance_silent(algo)
+    candidate_label = _algorithm_display_name(candidate_instance, algo.stem)
+    design = build_study_design_payload(
+        preset=preset,
+        seeds=seeds,
+        candidate_algorithm=candidate_label,
+        include_default_baselines=include_default_baselines,
+        profile_set=profile_set,
+        candidate_source_type="path",
+        candidate_source_ref=str(algo),
+    )
+    design_payload = design.to_dict()
+
+    if preset == "eucys":
+        pack_outputs = export_eucys_study_pack(target_root / "scenarios", seeds=seeds)
+    else:
+        pack_outputs = export_official_study_pack(target_root / "scenarios", seeds=seeds)
+    protocol_outputs = write_study_protocol_bundle(
+        target_root / "protocol",
+        preset=preset,
+        title="IINTS EUCYS Scientific Validation Protocol" if preset == "eucys" else "IINTS Scientific Validation Protocol",
+        seeds=seeds,
+        algorithms=[candidate_label],
+        profile_set=profile_set,
+        include_default_baselines=include_default_baselines,
+    )
+    if reference_csv is not None and reference_csv.is_file():
+        write_corrupted_study_csv(
+            reference_csv,
+            output_csv=target_root / "protocol" / "reference_corrupted.csv",
+            manifest_output=target_root / "protocol" / "reference_corrupted.manifest.json",
+            modes=["timestamp_shift", "missing_block", "glucose_spikes"],
+        )
+
+    scenario_lookup = {str(item["slug"]): item for item in design_payload["scenarios"]}
+    arm_lookup = {str(item["arm_id"]): item for item in design_payload["study_arms"]}
+    algorithm_lookup = {str(item["algorithm_id"]): item for item in design_payload["algorithms"]}
+    arm_dirs = {
+        arm_id: target_root / _arm_output_dir_name(arm_id)
+        for arm_id in arm_lookup
+    }
+
+    for row in design_payload["matrix_rows"]:
+        scenario_meta = scenario_lookup[str(row["scenario_slug"])]
+        arm = arm_lookup[str(row["arm_id"])]
+        algorithm_spec = algorithm_lookup[str(row["algorithm_id"])]
+        base_scenario = dict(scenario_meta["scenario"])
+        scenario_payload, arm_manifest = build_eucys_arm_scenario(base_scenario, arm_id=str(row["arm_id"]))
+        scenario_duration = int(duration or row["recommended_duration_minutes"])
+
+        if algorithm_spec["source_type"] == "path":
+            algorithm_instance = _load_algorithm_instance_silent(algo)
+        else:
+            algorithm_instance = _load_algorithm_plugin_instance(str(algorithm_spec["display_name"]))
+
+        run_dir = (
+            arm_dirs[str(row["arm_id"])]
+            / str(row["algorithm_id"])
+            / str(row["profile_id"])
+            / f"{row['scenario_slug']}_seed_{row['seed']}"
+        )
+        safety_config = None if bool(arm["supervisor_enabled"]) else _supervisor_off_safety_config()
+        outputs = iints.run_full(
+            algorithm=algorithm_instance,
+            scenario=scenario_payload,
+            patient_config=str(row["profile_id"]),
+            duration_minutes=scenario_duration,
+            time_step=time_step,
+            seed=int(row["seed"]),
+            output_dir=run_dir,
+            safety_config=safety_config,
+        )
+        resolved_run_dir = Path(outputs["output_dir"])
+        _annotate_study_run(
+            resolved_run_dir,
+            condition_group=str(row["condition_group"]),
+            study_arm=str(row["arm_id"]),
+            protocol_preset=preset,
+            supervisor_enabled=bool(arm["supervisor_enabled"]),
+            corruption_modes=[str(item) for item in arm.get("corruption_modes", [])],
+            algorithm_id=str(row["algorithm_id"]),
+            algorithm_role=str(algorithm_spec["role"]),
+            profile_id=str(row["profile_id"]),
+            scenario_slug=str(row["scenario_slug"]),
+        )
+        write_json(
+            resolved_run_dir / "study_arm_manifest.json",
+            {
+                "matrix_row": row,
+                "study_preset": preset,
+                "candidate_algorithm": candidate_label,
+                "algorithm_spec": algorithm_spec,
+                "scenario_mutation": arm_manifest,
+            },
+        )
+        _write_run_forecast_evaluation(
+            resolved_run_dir,
+            gate_profile=gate_profile,
+            gate_profiles_path=gate_profiles_path,
+            fail_on_gate=fail_on_gate,
+        )
+        if prepare_ai and str(row["arm_id"]) != "corrupted_uncertified":
+            _maybe_prepare_ai_artifacts(resolved_run_dir, Console())
+
+    per_arm_outputs = _write_study_arm_outputs(
+        arm_dirs=arm_dirs,
+        carelink_metrics=carelink_metrics,
+        title_prefix="IINTS EUCYS Study" if preset == "eucys" else "IINTS Study",
+    )
+    comparison_outputs = _write_study_comparisons(target_root, arm_dirs)
+    root_summary = analyze_study_directory(target_root, external_reference_metrics=carelink_metrics)
+    root_summary_json = target_root / "study_summary.json"
+    root_summary_json.write_text(json.dumps(root_summary.to_dict(), indent=2), encoding="utf-8")
+
+    return {
+        "target_root": target_root,
+        "protocol_outputs": protocol_outputs,
+        "pack_outputs": pack_outputs,
+        "per_arm_outputs": per_arm_outputs,
+        "comparison_outputs": comparison_outputs,
+        "root_summary_json": root_summary_json,
+    }
 
 
 @app.command("analyze")
@@ -1483,11 +1997,99 @@ def demo_expo(
     console.print(table)
 
 
+@app.command("run-study")
+def run_study(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    output_dir: Annotated[Path, typer.Option(help="Root directory for the study bundle")] = Path("results/study_bundle"),
+    preset: Annotated[str, typer.Option(help="Study preset: default or eucys")] = "default",
+    profile_set: Annotated[str, typer.Option(help="Patient profile set to evaluate")] = DEFAULT_PROFILE_SET,
+    seeds: Annotated[str, typer.Option(help="Comma-separated seed list")] = "1,2,3,4,5",
+    duration: Annotated[Optional[int], typer.Option(help="Override scenario duration in minutes")] = None,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
+    carelink_metrics: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional CareLink metrics JSON or workbench directory for plausibility comparison"),
+    ] = None,
+    prepare_ai: Annotated[bool, typer.Option(help="Generate AI-ready artifacts for non-corrupted study arms")] = True,
+    reference_csv: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional source CSV to corrupt and archive alongside the study protocol"),
+    ] = None,
+    include_default_baselines: Annotated[
+        bool,
+        typer.Option("--include-default-baselines/--no-include-default-baselines", help="Include the default baseline registry in the study matrix"),
+    ] = True,
+    gate_profile: Annotated[Optional[str], typer.Option(help="Optional calibration gate profile id")] = None,
+    gate_profiles_path: Annotated[Optional[Path], typer.Option(help="Optional calibration gate profiles YAML path")] = None,
+    fail_on_gate: Annotated[bool, typer.Option(help="Exit with code 1 when any run fails the calibration gate")] = False,
+) -> None:
+    """Run the generic benchmark study engine with protocol, subgroup summaries, and posters."""
+    console = Console()
+    parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
+    if not parsed_seeds:
+        console.print("[bold red]Please provide at least one seed.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        outputs = _run_study_bundle(
+            algo=algo,
+            output_dir=output_dir,
+            preset=preset.strip().lower(),
+            seeds=parsed_seeds,
+            duration=duration,
+            time_step=time_step,
+            carelink_metrics=carelink_metrics,
+            prepare_ai=prepare_ai,
+            reference_csv=reference_csv,
+            profile_set=profile_set,
+            include_default_baselines=include_default_baselines,
+            gate_profile=gate_profile,
+            gate_profiles_path=gate_profiles_path,
+            fail_on_gate=fail_on_gate,
+        )
+        eucys_outputs = None
+        if preset.strip().lower() == "eucys":
+            eucys_outputs = _write_eucys_result_package(
+                root_dir=outputs["target_root"],
+                protocol_outputs=outputs["protocol_outputs"],
+                per_arm_outputs=outputs["per_arm_outputs"],
+                comparison_outputs=outputs["comparison_outputs"],
+            )
+    except Exception as exc:
+        console.print(f"[bold red]Study run failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Study Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("Scenario pack", outputs["pack_outputs"].get("output_dir", "n/a"))
+    table.add_row("Protocol markdown", outputs["protocol_outputs"]["protocol_markdown"])
+    table.add_row("Protocol matrix", outputs["protocol_outputs"]["study_matrix_csv"])
+    table.add_row("Algorithm registry", outputs["protocol_outputs"]["algorithms_json"])
+    table.add_row("Bundle summary", str(outputs["root_summary_json"]))
+    clean_summary = outputs["per_arm_outputs"].get("clean_certified", {}).get("summary_json")
+    corrupted_summary = outputs["per_arm_outputs"].get("corrupted_uncertified", {}).get("summary_json")
+    supervisor_summary = outputs["per_arm_outputs"].get("supervisor_off_ablation", {}).get("summary_json")
+    if clean_summary is not None:
+        table.add_row("Clean study summary", str(clean_summary))
+    if corrupted_summary is not None:
+        table.add_row("Corrupted study summary", str(corrupted_summary))
+    if supervisor_summary is not None:
+        table.add_row("Supervisor-off summary", str(supervisor_summary))
+    if outputs["comparison_outputs"]:
+        table.add_row("First comparison", str(outputs["comparison_outputs"][0]))
+    if eucys_outputs is not None:
+        table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
+        table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
+        table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
+    console.print(table)
+
+
 @app.command("run-eucys-study")
 def run_eucys_study(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
-    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration")] = "default_patient",
-    patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
+    patient_config_name: Annotated[str, typer.Option(help="Legacy option kept for compatibility; the EUCYS preset now uses the fixed clinic_safe_core profile set")] = "default_patient",
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Legacy option kept for compatibility; the EUCYS preset now uses the fixed clinic_safe_core profile set")] = None,
     output_dir: Annotated[Path, typer.Option(help="Root directory for the EUCYS study bundle")] = Path("results/eucys_study"),
     seeds: Annotated[str, typer.Option(help="Comma-separated seed list")] = "1,2,3,4,5,6,7,8,9,10",
     duration: Annotated[Optional[int], typer.Option(help="Override scenario duration in minutes")] = None,
@@ -1501,138 +2103,49 @@ def run_eucys_study(
         Optional[Path],
         typer.Option(help="Optional source CSV to corrupt and archive alongside the study protocol"),
     ] = None,
+    include_default_baselines: Annotated[
+        bool,
+        typer.Option("--include-default-baselines/--no-include-default-baselines", help="Include the default baseline registry in the EUCYS matrix"),
+    ] = True,
+    gate_profile: Annotated[Optional[str], typer.Option(help="Optional calibration gate profile id")] = None,
+    gate_profiles_path: Annotated[Optional[Path], typer.Option(help="Optional calibration gate profiles YAML path")] = None,
+    fail_on_gate: Annotated[bool, typer.Option(help="Exit with code 1 when any run fails the calibration gate")] = False,
 ) -> None:
-    """Run the fixed EUCYS study matrix and generate summaries, comparisons, and posters."""
+    """Run the fixed EUCYS study matrix and generate summaries, comparisons, and EUCYS artifacts."""
     console = Console()
     parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
     if not parsed_seeds:
         console.print("[bold red]Please provide at least one seed.[/bold red]")
         raise typer.Exit(code=1)
-
-    patient_config: Union[str, Path]
-    if patient_config_path:
-        if not patient_config_path.is_file():
-            console.print(f"[bold red]Error: Patient config file '{patient_config_path}' not found.[/bold red]")
-            raise typer.Exit(code=1)
-        patient_config = patient_config_path
-    else:
-        patient_config = patient_config_name
-
-    target_root = output_dir.expanduser().resolve()
-    target_root.mkdir(parents=True, exist_ok=True)
+    if patient_config_path is not None or patient_config_name != "default_patient":
+        console.print(
+            "[yellow]Note:[/yellow] `run-eucys-study` now uses the fixed `clinic_safe_core` profile set. "
+            "Legacy patient-config overrides are ignored so the study matrix stays reproducible."
+        )
 
     try:
-        pack_outputs = export_eucys_study_pack(target_root / "scenarios", seeds=parsed_seeds)
-        protocol_outputs = write_study_protocol_bundle(
-            target_root / "protocol",
+        outputs = _run_study_bundle(
+            algo=algo,
+            output_dir=output_dir,
             preset="eucys",
             seeds=parsed_seeds,
-            title="IINTS EUCYS Scientific Validation Protocol",
+            duration=duration,
+            time_step=time_step,
+            carelink_metrics=carelink_metrics,
+            prepare_ai=prepare_ai,
+            reference_csv=reference_csv,
+            profile_set=DEFAULT_PROFILE_SET,
+            include_default_baselines=include_default_baselines,
+            gate_profile=gate_profile,
+            gate_profiles_path=gate_profiles_path,
+            fail_on_gate=fail_on_gate,
         )
-        if reference_csv is not None and reference_csv.is_file():
-            write_corrupted_study_csv(
-                reference_csv,
-                output_csv=target_root / "protocol" / "reference_corrupted.csv",
-                manifest_output=target_root / "protocol" / "reference_corrupted.manifest.json",
-                modes=["timestamp_shift", "missing_block", "glucose_spikes"],
-            )
-
-        pack = build_eucys_study_pack(seeds=parsed_seeds)
-        arm_dirs = {
-            "clean_certified": target_root / "study_clean",
-            "corrupted_uncertified": target_root / "study_corrupted",
-            "supervisor_off_ablation": target_root / "study_supervisor_off",
-        }
-
-        for scenario_row in pack["scenarios"]:
-            base_scenario = dict(scenario_row["scenario"])
-            scenario_slug = str(scenario_row["slug"])
-            scenario_duration = int(duration or scenario_row["recommended_duration_minutes"])
-            for arm in pack["study_arms"]:
-                arm_id = str(arm["arm_id"])
-                supervisor_enabled = bool(arm["supervisor_enabled"])
-                corruption_modes = [str(item) for item in arm.get("corruption_modes", [])]
-                scenario_payload, arm_manifest = build_eucys_arm_scenario(base_scenario, arm_id=arm_id)
-                for resolved_seed in parsed_seeds:
-                    algorithm_instance = _load_algorithm_instance_silent(algo)
-                    run_dir = arm_dirs[arm_id] / f"{scenario_slug}_seed_{resolved_seed}"
-                    safety_config = None if supervisor_enabled else _supervisor_off_safety_config()
-                    outputs = iints.run_full(
-                        algorithm=algorithm_instance,
-                        scenario=scenario_payload,
-                        patient_config=patient_config,
-                        duration_minutes=scenario_duration,
-                        time_step=time_step,
-                        seed=resolved_seed,
-                        output_dir=run_dir,
-                        safety_config=safety_config,
-                    )
-                    resolved_run_dir = Path(outputs["output_dir"])
-                    _annotate_eucys_run(
-                        resolved_run_dir,
-                        condition_group=arm_id,
-                        study_arm=arm_id,
-                        protocol_preset="eucys",
-                        supervisor_enabled=supervisor_enabled,
-                        corruption_modes=corruption_modes,
-                    )
-                    write_json(
-                        resolved_run_dir / "study_arm_manifest.json",
-                        {
-                            "scenario_slug": scenario_slug,
-                            "seed": resolved_seed,
-                            "arm_id": arm_id,
-                            "supervisor_enabled": supervisor_enabled,
-                            "corruption_modes": corruption_modes,
-                            "scenario_mutation": arm_manifest,
-                        },
-                    )
-                    if prepare_ai and arm_id != "corrupted_uncertified":
-                        _maybe_prepare_ai_artifacts(resolved_run_dir, console)
-
-        per_arm_outputs: Dict[str, Dict[str, Path]] = {}
-        for arm_id, study_root in arm_dirs.items():
-            summary = analyze_study_directory(study_root, external_reference_metrics=carelink_metrics)
-            payload = summary.to_dict()
-            summary_json = study_root / "study_summary.json"
-            summary_md = study_root / "study_summary.md"
-            evidence_csv = study_root / "evidence_table.csv"
-            evidence_md = study_root / "evidence_table.md"
-            summary_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-            summary_md.write_text(_study_summary_markdown(payload), encoding="utf-8")
-            _write_evidence_table_csv(payload, evidence_csv)
-            _write_evidence_table_markdown(payload, evidence_md)
-            poster_outputs = generate_study_poster(
-                summary,
-                output_path=study_root / "study_poster.png",
-                title=f"IINTS EUCYS Study - {arm_id.replace('_', ' ').title()}",
-                subtitle="Closed-loop simulation evidence with fixed seeds and study arms.",
-                summary_output_path=study_root / "study_poster.json",
-            )
-            per_arm_outputs[arm_id] = {
-                "summary_json": summary_json,
-                "summary_md": summary_md,
-                "evidence_csv": evidence_csv,
-                "evidence_md": evidence_md,
-                "poster_png": Path(poster_outputs["poster_png"]),
-                "poster_summary_json": Path(poster_outputs["poster_summary_json"]),
-            }
-
-        comparisons_dir = target_root / "comparisons"
-        comparisons_dir.mkdir(parents=True, exist_ok=True)
-        comparison_specs = [
-            ("clean_vs_corrupted", arm_dirs["clean_certified"], arm_dirs["corrupted_uncertified"]),
-            ("clean_vs_supervisor_off", arm_dirs["clean_certified"], arm_dirs["supervisor_off_ablation"]),
-        ]
-        comparison_outputs: list[Path] = []
-        for slug, left_path, right_path in comparison_specs:
-            comparison = compare_studies(left_path, right_path, left_label=left_path.name, right_label=right_path.name)
-            payload = comparison.to_dict()
-            json_path = comparisons_dir / f"{slug}.json"
-            md_path = comparisons_dir / f"{slug}.md"
-            json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-            md_path.write_text(_study_comparison_markdown(payload), encoding="utf-8")
-            comparison_outputs.extend([json_path, md_path])
+        eucys_outputs = _write_eucys_result_package(
+            root_dir=outputs["target_root"],
+            protocol_outputs=outputs["protocol_outputs"],
+            per_arm_outputs=outputs["per_arm_outputs"],
+            comparison_outputs=outputs["comparison_outputs"],
+        )
     except Exception as exc:
         console.print(f"[bold red]EUCYS study run failed: {exc}[/bold red]")
         raise typer.Exit(code=1)
@@ -1640,14 +2153,20 @@ def run_eucys_study(
     table = Table(title="IINTS EUCYS Study Bundle")
     table.add_column("Artifact", style="cyan")
     table.add_column("Path", overflow="fold")
-    table.add_row("Scenario pack", pack_outputs["output_dir"])
-    table.add_row("Protocol markdown", protocol_outputs["protocol_markdown"])
-    table.add_row("Protocol matrix", protocol_outputs["study_matrix_csv"])
-    table.add_row("Clean study summary", str(per_arm_outputs["clean_certified"]["summary_json"]))
-    table.add_row("Corrupted study summary", str(per_arm_outputs["corrupted_uncertified"]["summary_json"]))
-    table.add_row("Supervisor-off summary", str(per_arm_outputs["supervisor_off_ablation"]["summary_json"]))
-    table.add_row("Clean vs corrupted", str(comparison_outputs[0]))
-    table.add_row("Clean vs supervisor-off", str(comparison_outputs[2]))
+    table.add_row("Scenario pack", outputs["pack_outputs"].get("output_dir", "n/a"))
+    table.add_row("Protocol markdown", outputs["protocol_outputs"]["protocol_markdown"])
+    table.add_row("Protocol matrix", outputs["protocol_outputs"]["study_matrix_csv"])
+    table.add_row("Algorithm registry", outputs["protocol_outputs"]["algorithms_json"])
+    table.add_row("Clean study summary", str(outputs["per_arm_outputs"]["clean_certified"]["summary_json"]))
+    table.add_row("Corrupted study summary", str(outputs["per_arm_outputs"]["corrupted_uncertified"]["summary_json"]))
+    table.add_row("Supervisor-off summary", str(outputs["per_arm_outputs"]["supervisor_off_ablation"]["summary_json"]))
+    if outputs["comparison_outputs"]:
+        table.add_row("Clean vs corrupted", str(outputs["comparison_outputs"][0]))
+        if len(outputs["comparison_outputs"]) >= 3:
+            table.add_row("Clean vs supervisor-off", str(outputs["comparison_outputs"][2]))
+    table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
+    table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
+    table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
     console.print(table)
 
 
@@ -1661,8 +2180,14 @@ def study_protocol(
         typer.Option(help="Optional override for the primary H1 hypothesis"),
     ] = None,
     seeds: Annotated[str, typer.Option(help="Comma-separated seed list")] = "1,2,3,4,5",
-    algorithms: Annotated[str, typer.Option(help="Comma-separated algorithms to compare")] = "your_algorithm,Standard PID,Standard Pump",
+    algorithms: Annotated[str, typer.Option(help="Comma-separated candidate+comparison algorithms (legacy; first entry becomes the candidate)")] = "your_algorithm",
     scenarios: Annotated[str, typer.Option(help="Comma-separated scenario names")] = "baseline_day,meal_challenge,exercise_challenge,supervisor_override",
+    profile_set: Annotated[str, typer.Option(help="Patient profile set to encode in the study protocol")] = DEFAULT_PROFILE_SET,
+    include_default_baselines: Annotated[
+        bool,
+        typer.Option("--include-default-baselines/--no-include-default-baselines", help="Include the default baseline registry in the protocol bundle"),
+    ] = True,
+    extra_algorithms: Annotated[str, typer.Option(help="Comma-separated additional algorithm labels for the protocol bundle")] = "",
     corruption_modes: Annotated[
         str,
         typer.Option(help="Comma-separated corruption modes for the protocol plan"),
@@ -1682,6 +2207,9 @@ def study_protocol(
             scenarios=[item.strip() for item in scenarios.split(",") if item.strip()],
             corruption_modes=[item.strip() for item in corruption_modes.split(",") if item.strip()],
             external_reference_label=external_reference_label,
+            profile_set=profile_set,
+            include_default_baselines=include_default_baselines,
+            extra_algorithms=[item.strip() for item in extra_algorithms.split(",") if item.strip()],
         )
     except Exception as exc:
         console.print(f"[bold red]Could not write study protocol bundle: {exc}[/bold red]")
@@ -1693,6 +2221,7 @@ def study_protocol(
     table.add_row("Protocol markdown", outputs["protocol_markdown"])
     table.add_row("Study design JSON", outputs["study_design_json"])
     table.add_row("Study matrix CSV", outputs["study_matrix_csv"])
+    table.add_row("Algorithm registry", outputs["algorithms_json"])
     console.print(table)
 
 

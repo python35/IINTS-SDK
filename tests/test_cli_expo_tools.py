@@ -127,10 +127,13 @@ def test_demo_expo_writes_bundle_summary(monkeypatch, tmp_path) -> None:
         design.write_text("{}", encoding="utf-8")
         matrix = target / "study_matrix.csv"
         matrix.write_text("scenario,algorithm,seed\n", encoding="utf-8")
+        algorithms = target / "algorithms.json"
+        algorithms.write_text("[]", encoding="utf-8")
         return {
             "protocol_markdown": str(markdown),
             "study_design_json": str(design),
             "study_matrix_csv": str(matrix),
+            "algorithms_json": str(algorithms),
         }
 
     monkeypatch.setattr("iints.cli.cli.build_booth_demo", _fake_booth_demo)
@@ -221,6 +224,7 @@ def test_run_eucys_study_builds_scientific_bundle(monkeypatch, tmp_path) -> None
         return None
 
     monkeypatch.setattr("iints.cli.cli._load_algorithm_instance_silent", _fake_load_algorithm_instance_silent)
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_plugin_instance", lambda _name: object())
     monkeypatch.setattr("iints.cli.cli._maybe_prepare_ai_artifacts", _fake_prepare)
     monkeypatch.setattr("iints.cli.cli.iints.run_full", _fake_run_full)
 
@@ -244,3 +248,85 @@ def test_run_eucys_study_builds_scientific_bundle(monkeypatch, tmp_path) -> None
     assert (output_dir / "study_clean" / "study_summary.json").is_file()
     assert (output_dir / "study_corrupted" / "study_summary.json").is_file()
     assert (output_dir / "comparisons" / "clean_vs_corrupted.json").is_file()
+    assert (output_dir / "EUCYS_SUMMARY.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS_TABLE.csv").is_file()
+    assert (output_dir / "EUCYS_FIGURE_MANIFEST.json").is_file()
+
+
+def test_run_study_builds_generic_scientific_bundle(monkeypatch, tmp_path) -> None:
+    output_dir = tmp_path / "study_bundle"
+    algo_path = tmp_path / "algo.py"
+    algo_path.write_text("class Dummy: pass\n", encoding="utf-8")
+
+    def _fake_load_algorithm_instance_silent(_path):
+        return object()
+
+    def _fake_run_full(*, algorithm, scenario, patient_config, duration_minutes, time_step, seed, output_dir, safety_config=None, **kwargs):
+        target = Path(output_dir)
+        (target / "audit").mkdir(parents=True, exist_ok=True)
+        (target / "baseline").mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "time_minutes": [0, 5, 10],
+                "glucose_actual_mgdl": [105.0 + seed, 115.0 + seed, 125.0 + seed],
+                "predicted_glucose_ai_30min": [110.0 + seed, 120.0 + seed, 130.0 + seed],
+                "predictor_uncertainty_std_mgdl": [2.0, 3.0, 4.0],
+                "safety_triggered": [False, False, False],
+            }
+        ).to_csv(target / "results.csv", index=False)
+        payload = {
+            "algorithm": {
+                "class": "algorithms.DemoAlgorithm",
+                "metadata": {"name": "DemoAlgorithm"},
+            },
+            "duration_minutes": duration_minutes,
+            "scenario": scenario,
+        }
+        (target / "run_metadata.json").write_text(
+            json.dumps({"run_id": target.name, "seed": seed, "config": payload}),
+            encoding="utf-8",
+        )
+        (target / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+        (target / "audit" / "audit_summary.json").write_text(
+            json.dumps({"bolus_interventions_count": 2, "terminated_early": False}),
+            encoding="utf-8",
+        )
+        (target / "baseline" / "baseline_comparison.json").write_text(
+            json.dumps(
+                {
+                    "reference": "PID Controller",
+                    "rows": [
+                        {"algorithm": "DemoAlgorithm", "tir_70_180": 82.0, "bolus_interventions": 2},
+                        {"algorithm": "PID Controller", "tir_70_180": 79.0, "bolus_interventions": 3},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return {"output_dir": str(target)}
+
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_instance_silent", _fake_load_algorithm_instance_silent)
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_plugin_instance", lambda _name: object())
+    monkeypatch.setattr("iints.cli.cli._maybe_prepare_ai_artifacts", lambda _output_dir, _console: None)
+    monkeypatch.setattr("iints.cli.cli.iints.run_full", _fake_run_full)
+
+    result = runner.invoke(
+        app,
+        [
+            "run-study",
+            "--algo",
+            str(algo_path),
+            "--output-dir",
+            str(output_dir),
+            "--seeds",
+            "1",
+            "--no-prepare-ai",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "protocol" / "algorithms.json").is_file()
+    assert (output_dir / "study_clean" / "study_summary.json").is_file()
+    assert (output_dir / "study_corrupted" / "study_summary.json").is_file()
+    assert (output_dir / "study_supervisor_off" / "study_summary.json").is_file()
+    assert (output_dir / "comparisons" / "clean_vs_supervisor_off.json").is_file()

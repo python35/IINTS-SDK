@@ -22,6 +22,12 @@ def _write_run(
     interventions: int,
     grade: str | None,
     nested_config: bool = False,
+    algorithm_role: str | None = None,
+    profile_id: str = "clinic_safe_baseline",
+    study_arm: str = "clean_certified",
+    condition_group: str = "clean_certified",
+    scenario_slug: str = "baseline_day",
+    supervisor_enabled: bool = True,
 ) -> None:
     (run_dir / "audit").mkdir(parents=True, exist_ok=True)
     (run_dir / "baseline").mkdir(parents=True, exist_ok=True)
@@ -29,6 +35,8 @@ def _write_run(
         {
             "time_minutes": [idx * 5 for idx in range(len(glucose))],
             "glucose_actual_mgdl": glucose,
+            "predicted_glucose_ai_30min": [value + 5.0 for value in glucose],
+            "predictor_uncertainty_std_mgdl": [2.0 + idx for idx in range(len(glucose))],
             "safety_triggered": [False] * len(glucose),
         }
     )
@@ -41,9 +49,18 @@ def _write_run(
             },
             "duration_minutes": len(glucose) * 5,
             "seed": 42,
+            "study_condition": study_arm,
+            "condition_group": condition_group,
+            "algorithm_role": algorithm_role,
+            "profile_id": profile_id,
+            "scenario_slug": scenario_slug,
+            "supervisor_enabled": supervisor_enabled,
             "scenario": {
                 "scenario_name": run_dir.name,
-                "condition_group": "nested_arm",
+                "condition_group": condition_group,
+                "study_arm": study_arm,
+                "scenario_slug": scenario_slug,
+                "supervisor_enabled": supervisor_enabled,
             },
         }
         if nested_config
@@ -51,10 +68,25 @@ def _write_run(
             "algorithm": algorithm,
             "duration_minutes": len(glucose) * 5,
             "scenario_name": run_dir.name,
+            "study_condition": study_arm,
+            "condition_group": condition_group,
+            "algorithm_role": algorithm_role,
+            "profile_id": profile_id,
+            "scenario_slug": scenario_slug,
+            "supervisor_enabled": supervisor_enabled,
         }
     )
     (run_dir / "run_metadata.json").write_text(
-        json.dumps({"run_id": run_id, "seed": 42, "config": config_payload}),
+        json.dumps(
+            {
+                "run_id": run_id,
+                "seed": 42,
+                "algorithm_id": algorithm.lower().replace(" ", "_"),
+                "algorithm_role": algorithm_role,
+                "profile_id": profile_id,
+                "config": config_payload,
+            }
+        ),
         encoding="utf-8",
     )
     (run_dir / "audit" / "audit_summary.json").write_text(
@@ -99,6 +131,10 @@ def test_analyze_study_directory_aggregates_runs(tmp_path) -> None:
     assert payload["certification_comparison"]["certified_runs"] == 1
     assert payload["baseline_summary"]["mean_tir_70_180_by_algorithm"]["AlgoA"] == 90.0
     assert "failure_analysis" in payload
+    assert "by_algorithm" in payload
+    assert "safety_summary" in payload
+    assert payload["calibration_summary"]["overall"]["run_count"] == 2
+    assert payload["uncertainty_summary"]["overall"]["count"] == 2
 
 
 def test_analyze_study_directory_parses_nested_run_metadata_shape(tmp_path) -> None:
@@ -115,7 +151,61 @@ def test_analyze_study_directory_parses_nested_run_metadata_shape(tmp_path) -> N
 
     payload = analyze_study_directory(study_dir).to_dict()
     assert payload["runs"][0]["algorithm"] == "AlgoNested"
-    assert payload["runs"][0]["condition_group"] == "nested_arm"
+    assert payload["runs"][0]["condition_group"] == "clean_certified"
+
+
+def test_analyze_study_directory_adds_subgroup_and_pairwise_summaries(tmp_path) -> None:
+    study_dir = tmp_path / "study"
+    _write_run(
+        study_dir / "candidate",
+        run_id="run-candidate",
+        algorithm="AlgoA",
+        glucose=[110.0, 118.0, 126.0],
+        interventions=2,
+        grade="research_grade",
+        algorithm_role="candidate",
+        profile_id="clinic_safe_baseline",
+        study_arm="clean_certified",
+        condition_group="clean_certified",
+        scenario_slug="baseline_day",
+    )
+    _write_run(
+        study_dir / "baseline_pid",
+        run_id="run-pid",
+        algorithm="PID Controller",
+        glucose=[120.0, 128.0, 136.0],
+        interventions=3,
+        grade="research_grade",
+        algorithm_role="baseline",
+        profile_id="clinic_safe_baseline",
+        study_arm="clean_certified",
+        condition_group="clean_certified",
+        scenario_slug="baseline_day",
+    )
+    _write_run(
+        study_dir / "baseline_pump",
+        run_id="run-pump",
+        algorithm="Standard Pump",
+        glucose=[130.0, 138.0, 146.0],
+        interventions=4,
+        grade=None,
+        algorithm_role="baseline",
+        profile_id="clinic_safe_baseline",
+        study_arm="clean_certified",
+        condition_group="clean_certified",
+        scenario_slug="baseline_day",
+    )
+
+    payload = analyze_study_directory(study_dir).to_dict()
+
+    assert payload["by_algorithm"]["AlgoA"]["run_count"] == 1
+    assert payload["by_profile"]["clinic_safe_baseline"]["run_count"] == 3
+    assert payload["by_arm"]["clean_certified"]["run_count"] == 3
+    assert payload["by_scenario"]["baseline_day"]["run_count"] == 3
+    assert payload["pairwise_baseline_deltas"]["candidate_algorithm"] == "AlgoA"
+    assert "PID Controller" in payload["pairwise_baseline_deltas"]["baselines"]
+    assert payload["safety_summary"]["mean_interventions_by_algorithm"]["Standard Pump"] == 4.0
+    assert payload["safety_summary"]["supervisor_on_vs_off"]["supervisor_on_runs"] == 3
 
 
 def test_cli_analyze_writes_json_and_markdown(tmp_path) -> None:
@@ -158,14 +248,15 @@ def test_cli_analyze_writes_json_and_markdown(tmp_path) -> None:
 def test_compare_studies_reports_delta(tmp_path) -> None:
     left = tmp_path / "left"
     right = tmp_path / "right"
-    _write_run(left / "run_1", run_id="left-1", algorithm="AlgoA", glucose=[110.0, 115.0, 120.0], interventions=1, grade="clinical_grade")
-    _write_run(right / "run_1", run_id="right-1", algorithm="AlgoA", glucose=[210.0, 215.0, 220.0], interventions=5, grade=None)
+    _write_run(left / "run_1", run_id="left-1", algorithm="AlgoA", glucose=[110.0, 115.0, 120.0], interventions=1, grade="clinical_grade", algorithm_role="candidate")
+    _write_run(right / "run_1", run_id="right-1", algorithm="AlgoA", glucose=[210.0, 215.0, 220.0], interventions=5, grade=None, algorithm_role="candidate")
 
     comparison = compare_studies(left, right).to_dict()
     assert comparison["delta"]["mean_supervisor_interventions"] == -4.0
     assert comparison["delta"]["certified_runs"] == 1.0
     assert "effect_estimates" in comparison
     assert "tir_70_180" in comparison["effect_estimates"]
+    assert "AlgoA" in comparison["by_algorithm"]
 
 
 def test_cli_compare_study_and_poster_study(tmp_path) -> None:

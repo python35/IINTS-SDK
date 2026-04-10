@@ -8,6 +8,7 @@ from typing import Any
 os.environ.setdefault("MPLBACKEND", "Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from iints.analysis.study_analysis import StudySummary, load_study_summary
 from iints.utils.plotting import IINTS_BLUE, IINTS_GOLD, IINTS_NAVY, IINTS_RED, IINTS_TEAL, apply_plot_style
@@ -27,6 +28,157 @@ def _load_summary(summary_input: str | Path | StudySummary) -> StudySummary:
     return load_study_summary(summary_input)
 
 
+def _format_metric(value: float | int | None, suffix: str = "") -> str:
+    if value is None:
+        return "n/a"
+    return f"{float(value):.1f}{suffix}"
+
+
+def _candidate_vs_baseline_panel(ax: Any, payload: dict[str, Any]) -> None:
+    pairwise = payload.get("pairwise_baseline_deltas", {}) if isinstance(payload.get("pairwise_baseline_deltas"), dict) else {}
+    baselines = pairwise.get("baselines", {}) if isinstance(pairwise.get("baselines"), dict) else {}
+    if baselines:
+        labels = list(baselines.keys())
+        values = [
+            float((details.get("mean_deltas", {}) or {}).get("tir_70_180") or 0.0)
+            for details in baselines.values()
+        ]
+        colors = [IINTS_BLUE if value >= 0 else IINTS_RED for value in values]
+        ax.bar(range(len(labels)), values, color=colors)
+        ax.axhline(0.0, color=IINTS_NAVY, linewidth=1.0, alpha=0.5)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=20, ha="right")
+        ax.set_ylabel("Candidate - baseline TIR (%)")
+        candidate = pairwise.get("candidate_algorithm") or "Candidate"
+        ax.set_title(f"{candidate} vs Baselines", color=IINTS_NAVY, fontweight="bold")
+        ax.grid(axis="y", alpha=0.2)
+        return
+
+    baseline = payload.get("baseline_summary", {}) if isinstance(payload.get("baseline_summary"), dict) else {}
+    tir_by_algorithm = baseline.get("mean_tir_70_180_by_algorithm", {}) if isinstance(baseline.get("mean_tir_70_180_by_algorithm"), dict) else {}
+    labels = [label for label, value in tir_by_algorithm.items() if value is not None]
+    values = [float(tir_by_algorithm[label]) for label in labels]
+    if labels:
+        ax.bar(range(len(labels)), values, color=IINTS_BLUE)
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels, rotation=20, ha="right")
+        ax.set_ylabel("Mean TIR 70-180 (%)")
+    else:
+        ax.text(0.5, 0.5, "No baseline data", ha="center", va="center", color=IINTS_NAVY, transform=ax.transAxes)
+    ax.set_title("Baseline Comparison", color=IINTS_NAVY, fontweight="bold")
+    ax.grid(axis="y", alpha=0.2)
+
+
+def _profile_heatmap(ax: Any, payload: dict[str, Any]) -> None:
+    by_profile = payload.get("by_profile", {}) if isinstance(payload.get("by_profile"), dict) else {}
+    if not by_profile:
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No profile-level study data", ha="center", va="center", color=IINTS_NAVY, transform=ax.transAxes)
+        return
+
+    profile_labels = list(by_profile.keys())
+    metrics = ["mean_tir_70_180", "mean_tir_below_70", "mean_supervisor_interventions"]
+    column_labels = ["TIR", "<70", "Interventions"]
+    matrix = []
+    for profile in profile_labels:
+        aggregate = by_profile[profile].get("aggregate", {}) if isinstance(by_profile[profile], dict) else {}
+        matrix.append([
+            float(aggregate.get("mean_tir_70_180") or 0.0),
+            float(aggregate.get("mean_tir_below_70") or 0.0),
+            float(aggregate.get("mean_supervisor_interventions") or 0.0),
+        ])
+    data = np.array(matrix, dtype=float)
+    image = ax.imshow(data, aspect="auto", cmap="Blues")
+    ax.set_title("Profile Heatmap", color=IINTS_NAVY, fontweight="bold")
+    ax.set_xticks(range(len(column_labels)))
+    ax.set_xticklabels(column_labels)
+    ax.set_yticks(range(len(profile_labels)))
+    ax.set_yticklabels(profile_labels)
+    for row_idx in range(data.shape[0]):
+        for col_idx in range(data.shape[1]):
+            ax.text(col_idx, row_idx, f"{data[row_idx, col_idx]:.1f}", ha="center", va="center", color=IINTS_NAVY, fontsize=8)
+    plt.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+
+
+def _safety_panel(ax: Any, payload: dict[str, Any]) -> None:
+    safety = payload.get("safety_summary", {}) if isinstance(payload.get("safety_summary"), dict) else {}
+    on_off = safety.get("supervisor_on_vs_off", {}) if isinstance(safety.get("supervisor_on_vs_off"), dict) else {}
+    labels = ["Severe hypo", "Early stop", "On interv.", "Off interv."]
+    values = [
+        float(safety.get("severe_hypo_run_count") or 0.0),
+        float(safety.get("terminated_early_run_count") or 0.0),
+        float(on_off.get("mean_interventions_supervisor_on") or 0.0),
+        float(on_off.get("mean_interventions_supervisor_off") or 0.0),
+    ]
+    ax.bar(range(len(labels)), values, color=[IINTS_RED, IINTS_RED, IINTS_TEAL, IINTS_BLUE])
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.set_title("Safety Outcomes", color=IINTS_NAVY, fontweight="bold")
+    ax.grid(axis="y", alpha=0.2)
+
+
+def _notes_panel(ax: Any, payload: dict[str, Any]) -> None:
+    aggregate = payload.get("aggregate", {}) if isinstance(payload.get("aggregate"), dict) else {}
+    certification = payload.get("certification_comparison", {}) if isinstance(payload.get("certification_comparison"), dict) else {}
+    failure_analysis = payload.get("failure_analysis", {}) if isinstance(payload.get("failure_analysis"), dict) else {}
+    external_validation = payload.get("external_validation")
+    calibration = payload.get("calibration_summary", {}) if isinstance(payload.get("calibration_summary"), dict) else {}
+    uncertainty = payload.get("uncertainty_summary", {}) if isinstance(payload.get("uncertainty_summary"), dict) else {}
+    overall_calibration = calibration.get("overall", {}) if isinstance(calibration.get("overall"), dict) else {}
+    overall_uncertainty = uncertainty.get("overall", {}) if isinstance(uncertainty.get("overall"), dict) else {}
+
+    lines = [
+        "Key Findings",
+        "",
+        f"- Mean glucose: {_format_metric(aggregate.get('mean_glucose'), ' mg/dL')}",
+        f"- Mean CV: {_format_metric(aggregate.get('mean_cv'), '%')}",
+        f"- Certified TIR advantage: {_format_metric(certification.get('tir_delta_certified_minus_uncertified'), '%')}",
+        f"- Severe hypo runs: {failure_analysis.get('severe_hypo_runs', 'n/a')}",
+        f"- Early terminations: {failure_analysis.get('terminated_early_runs', 'n/a')}",
+    ]
+    if overall_uncertainty:
+        lines.extend(
+            [
+                "",
+                "Uncertainty summary:",
+                f"- Mean predictor std: {_format_metric(overall_uncertainty.get('mean'), ' mg/dL')}",
+                f"- P95 predictor std: {_format_metric(overall_uncertainty.get('p95'), ' mg/dL')}",
+            ]
+        )
+    if overall_calibration:
+        lines.extend(
+            [
+                "",
+                "Calibration summary:",
+                f"- Mean MAE: {_format_metric(overall_calibration.get('mean_mae'), ' mg/dL')}",
+                f"- Mean RMSE: {_format_metric(overall_calibration.get('mean_rmse'), ' mg/dL')}",
+                f"- Interval coverage: {_format_metric(overall_calibration.get('mean_interval_95_coverage_pct'), '%')}",
+            ]
+        )
+    if isinstance(external_validation, dict):
+        lines.extend(
+            [
+                "",
+                "External plausibility:",
+                f"- Verdict: {external_validation.get('plausibility_verdict', 'n/a')}",
+                f"- Mean glucose delta: {external_validation.get('delta_mean_glucose_mgdl', 'n/a')}",
+                f"- TIR delta: {external_validation.get('delta_tir_70_180_pct', 'n/a')}",
+            ]
+        )
+    ax.axis("off")
+    ax.text(
+        0.02,
+        0.98,
+        "\n".join(lines),
+        va="top",
+        ha="left",
+        fontsize=10,
+        color=IINTS_NAVY,
+        bbox={"facecolor": "white", "edgecolor": "#cfd8dc", "boxstyle": "round,pad=0.55", "alpha": 0.95},
+        transform=ax.transAxes,
+    )
+
+
 def generate_study_poster(
     summary_input: str | Path | StudySummary,
     *,
@@ -39,29 +191,26 @@ def generate_study_poster(
     payload = summary.to_dict()
     aggregate = payload["aggregate"]
     certification = payload["certification_comparison"]
-    baseline = payload["baseline_summary"]
-    failure_analysis = payload.get("failure_analysis", {})
-    external_validation = payload.get("external_validation")
     runs = payload["runs"]
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    apply_plot_style(dpi=180, font_scale=1.05)
-    fig = plt.figure(figsize=(15, 9), facecolor="#f8fbfd")
-    grid = fig.add_gridspec(3, 4, height_ratios=[0.9, 1.5, 1.8], hspace=0.35, wspace=0.28)
+    apply_plot_style(dpi=180, font_scale=1.02)
+    fig = plt.figure(figsize=(16, 10), facecolor="#f8fbfd")
+    grid = fig.add_gridspec(3, 4, height_ratios=[0.9, 1.6, 1.8], hspace=0.38, wspace=0.35)
 
     fig.suptitle(title, fontsize=24, fontweight="bold", color=IINTS_NAVY, y=0.98)
     fig.text(0.5, 0.94, subtitle, ha="center", va="center", fontsize=11, color=IINTS_NAVY)
 
     _kpi(fig.add_subplot(grid[0, 0]), "Run count", str(payload["run_count"]), "Total bundles analyzed")
-    _kpi(fig.add_subplot(grid[0, 1]), "Mean TIR 70-180", f"{aggregate['mean_tir_70_180']:.1f}%" if aggregate["mean_tir_70_180"] is not None else "n/a", "Average time in range")
-    _kpi(fig.add_subplot(grid[0, 2]), "Mean interventions", f"{aggregate['mean_supervisor_interventions']:.1f}" if aggregate["mean_supervisor_interventions"] is not None else "n/a", "Supervisor actions per run")
-    _kpi(fig.add_subplot(grid[0, 3]), "Certified vs uncertified", f"{certification['certified_runs']} / {certification['uncertified_runs']}", "Research-grade split")
+    _kpi(fig.add_subplot(grid[0, 1]), "Mean TIR 70-180", _format_metric(aggregate.get("mean_tir_70_180"), "%"), "Average time in range")
+    _kpi(fig.add_subplot(grid[0, 2]), "Mean interventions", _format_metric(aggregate.get("mean_supervisor_interventions")), "Supervisor actions per run")
+    _kpi(fig.add_subplot(grid[0, 3]), "Certified vs uncertified", f"{certification.get('certified_runs', 0)} / {certification.get('uncertified_runs', 0)}", "Research-grade split")
 
     ax_tir = fig.add_subplot(grid[1, 0:2])
     scenario_names = [str(run["scenario_name"]) for run in runs]
-    tir_values = [float(run["metrics"]["tir_70_180"]) for run in runs]
+    tir_values = [float(run["metrics"].get("tir_70_180", 0.0)) for run in runs]
     ax_tir.bar(range(len(runs)), tir_values, color=IINTS_TEAL)
     ax_tir.axhline(70, color=IINTS_GOLD, linestyle="--", linewidth=1.3)
     ax_tir.set_title("Time In Range Per Run", color=IINTS_NAVY, fontweight="bold")
@@ -70,73 +219,22 @@ def generate_study_poster(
     ax_tir.set_xticklabels(scenario_names, rotation=25, ha="right")
     ax_tir.grid(axis="y", alpha=0.2)
 
-    ax_interventions = fig.add_subplot(grid[1, 2:4])
-    intervention_values = [float(run["metrics"]["supervisor_interventions"]) for run in runs]
-    ax_interventions.bar(range(len(runs)), intervention_values, color=IINTS_RED)
-    ax_interventions.set_title("Supervisor Interventions Per Run", color=IINTS_NAVY, fontweight="bold")
-    ax_interventions.set_ylabel("Interventions")
-    ax_interventions.set_xticks(range(len(runs)))
-    ax_interventions.set_xticklabels(scenario_names, rotation=25, ha="right")
-    ax_interventions.grid(axis="y", alpha=0.2)
+    ax_baseline = fig.add_subplot(grid[1, 2:4])
+    _candidate_vs_baseline_panel(ax_baseline, payload)
 
-    ax_baseline = fig.add_subplot(grid[2, 0:2])
-    tir_by_algorithm = baseline.get("mean_tir_70_180_by_algorithm", {})
-    if tir_by_algorithm:
-        labels = list(tir_by_algorithm.keys())
-        values = [float(tir_by_algorithm[item]) for item in labels if tir_by_algorithm[item] is not None]
-        labels = [item for item in labels if tir_by_algorithm[item] is not None]
-        ax_baseline.bar(range(len(labels)), values, color=IINTS_BLUE)
-        ax_baseline.set_xticks(range(len(labels)))
-        ax_baseline.set_xticklabels(labels, rotation=20, ha="right")
-        ax_baseline.set_ylabel("Mean TIR 70-180 (%)")
-    ax_baseline.set_title("Baseline Comparison", color=IINTS_NAVY, fontweight="bold")
-    ax_baseline.grid(axis="y", alpha=0.2)
+    ax_heatmap = fig.add_subplot(grid[2, 0:2])
+    _profile_heatmap(ax_heatmap, payload)
 
-    ax_notes = fig.add_subplot(grid[2, 2:4])
-    ax_notes.axis("off")
-    badge_counts = baseline.get("run_quality_badge_counts", {})
-    top_badges = sorted(badge_counts.items(), key=lambda item: (-item[1], item[0]))
-    lines = [
-        "Key Findings",
-        "",
-        f"- Mean glucose: {aggregate['mean_glucose']:.1f} mg/dL" if aggregate["mean_glucose"] is not None else "- Mean glucose: n/a",
-        f"- Mean CV: {aggregate['mean_cv']:.1f}%" if aggregate["mean_cv"] is not None else "- Mean CV: n/a",
-        f"- Certified TIR advantage: {certification['tir_delta_certified_minus_uncertified']:.1f}%" if certification["tir_delta_certified_minus_uncertified"] is not None else "- Certified TIR advantage: n/a",
-        f"- Severe hypo runs: {failure_analysis.get('severe_hypo_runs', 'n/a')}",
-        f"- Early terminations: {failure_analysis.get('terminated_early_runs', 'n/a')}",
-        "",
-        "Top run badges:",
-    ]
-    if top_badges:
-        lines.extend([f"- {badge}: {count}" for badge, count in top_badges[:6]])
-    else:
-        lines.append("- no badge counts available")
-    if isinstance(external_validation, dict):
-        lines.extend(
-            [
-                "",
-                "External plausibility:",
-                f"- Verdict: {external_validation.get('plausibility_verdict', 'n/a')}",
-                f"- Mean glucose delta: {external_validation.get('delta_mean_glucose_mgdl', 'n/a')}",
-                f"- TIR delta: {external_validation.get('delta_tir_70_180_pct', 'n/a')}",
-            ]
-        )
-    ax_notes.text(
-        0.02,
-        0.98,
-        "\n".join(lines),
-        va="top",
-        ha="left",
-        fontsize=11,
-        color=IINTS_NAVY,
-        bbox={"facecolor": "white", "edgecolor": "#cfd8dc", "boxstyle": "round,pad=0.55", "alpha": 0.95},
-        transform=ax_notes.transAxes,
-    )
+    ax_safety = fig.add_subplot(grid[2, 2])
+    _safety_panel(ax_safety, payload)
+
+    ax_notes = fig.add_subplot(grid[2, 3])
+    _notes_panel(ax_notes, payload)
 
     fig.text(
         0.5,
         0.03,
-        "Built from IINTS run bundles with simulation, certification, and evidence aggregation.",
+        "Built from IINTS run bundles with study protocol metadata, safety aggregation, and subgroup evidence.",
         ha="center",
         fontsize=10,
         color=IINTS_NAVY,
