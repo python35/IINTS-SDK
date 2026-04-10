@@ -251,6 +251,7 @@ def test_run_eucys_study_builds_scientific_bundle(monkeypatch, tmp_path) -> None
     assert (output_dir / "EUCYS_SUMMARY.md").is_file()
     assert (output_dir / "EUCYS_RESULTS_TABLE.csv").is_file()
     assert (output_dir / "EUCYS_FIGURE_MANIFEST.json").is_file()
+    assert (output_dir / "EUCYS_LIMITATIONS.md").is_file()
 
 
 def test_run_study_builds_generic_scientific_bundle(monkeypatch, tmp_path) -> None:

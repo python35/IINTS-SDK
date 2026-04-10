@@ -118,6 +118,7 @@ The EUCYS shortcut also writes:
 - `EUCYS_SUMMARY.md`
 - `EUCYS_RESULTS_TABLE.csv`
 - `EUCYS_FIGURE_MANIFEST.json`
+- `EUCYS_LIMITATIONS.md`
 
 ### 4. Re-Analyze A Study Folder On Demand
 

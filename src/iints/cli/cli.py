@@ -1555,6 +1555,7 @@ def _write_eucys_result_package(
     summary_path = root_dir / "EUCYS_SUMMARY.md"
     results_table_path = root_dir / "EUCYS_RESULTS_TABLE.csv"
     figure_manifest_path = root_dir / "EUCYS_FIGURE_MANIFEST.json"
+    limitations_path = root_dir / "EUCYS_LIMITATIONS.md"
 
     table_rows: list[Dict[str, Any]] = []
     for arm_id, outputs in per_arm_outputs.items():
@@ -1600,7 +1601,38 @@ def _write_eucys_result_package(
         )
     summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
 
+    limitations_lines = [
+        "# EUCYS Limitations And Scope",
+        "",
+        "This package is a preclinical benchmark bundle, not a clinical efficacy claim.",
+        "",
+        "## What this bundle does support",
+        "",
+        "- Reproducible simulation-first comparisons",
+        "- Baseline-vs-candidate benchmarking",
+        "- Safety-on vs safety-off analysis",
+        "- Corrupted-data ablation",
+        "- Audit-friendly study artifacts",
+        "",
+        "## What this bundle does not support",
+        "",
+        "- Real-world dosing advice",
+        "- Clinical deployment claims",
+        "- Population-wide generalization claims beyond the included profiles and scenarios",
+        "- Replacement of supervised medical evaluation",
+        "",
+        "## Important caveats",
+        "",
+        "- The patient profiles are simulated abstractions.",
+        "- External reference metrics are plausibility checks, not proof of clinical validity.",
+        "- Safety conclusions are relative to the encoded supervisor and scenario design.",
+        "- Controller ranking may change with different patient populations, dynamics, or feature sets.",
+        "",
+    ]
+    limitations_path.write_text("\n".join(limitations_lines), encoding="utf-8")
+
     manifest_payload = {
+        "bundle_kind": "eucys_result_package",
         "protocol": protocol_outputs,
         "per_arm_outputs": {
             arm_id: {name: str(path) for name, path in outputs.items()}
@@ -1609,12 +1641,19 @@ def _write_eucys_result_package(
         "comparison_outputs": [str(path) for path in comparison_outputs],
         "results_table_csv": str(results_table_path),
         "summary_markdown": str(summary_path),
+        "limitations_markdown": str(limitations_path),
+        "poster_assets": {
+            arm_id: str(outputs["poster_png"])
+            for arm_id, outputs in per_arm_outputs.items()
+            if "poster_png" in outputs
+        },
     }
     figure_manifest_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
     return {
         "summary_markdown": summary_path,
         "results_table_csv": results_table_path,
         "figure_manifest_json": figure_manifest_path,
+        "limitations_markdown": limitations_path,
     }
 
 
@@ -2082,6 +2121,7 @@ def run_study(
         table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
         table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
         table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
+        table.add_row("EUCYS limitations", str(eucys_outputs["limitations_markdown"]))
     console.print(table)
 
 
@@ -2167,6 +2207,7 @@ def run_eucys_study(
     table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
     table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
     table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
+    table.add_row("EUCYS limitations", str(eucys_outputs["limitations_markdown"]))
     console.print(table)
 
 
@@ -4043,6 +4084,9 @@ def demo_booth(
         "jury_talk_track",
         "live_demo_script",
         "run_commands",
+        "showcase_study_summary_json",
+        "showcase_study_poster_png",
+        "showcase_research_sync_md",
         "01_normal_run_dir",
         "02_meal_stress_test_dir",
         "03_supervisor_override_dir",
@@ -4051,8 +4095,12 @@ def demo_booth(
         if key in outputs:
             table.add_row(key, outputs[key])
     console.print(table)
+    if "jury_talk_track" in outputs:
+        console.print(f"[green]Jury talk track:[/green] {outputs['jury_talk_track']}")
     if "live_demo_script" in outputs:
         console.print(f"[green]Live booth script:[/green] {outputs['live_demo_script']}")
+    if "showcase_research_sync_md" in outputs:
+        console.print(f"[green]Showcase research sync:[/green] {outputs['showcase_research_sync_md']}")
     console.print(
         "[green]Next:[/green] open the poster and use the jury talk track to walk people through the story."
     )

@@ -9,6 +9,7 @@ from iints.ai.prepare import prepare_ai_ready_artifacts
 from iints.analysis.poster import generate_results_poster
 from iints.core.algorithms.mock_algorithms import RunawayAIAlgorithm
 from iints.core.algorithms.pid_controller import PIDController
+from iints.core.safety.config import SafetyConfig
 from iints.highlevel import run_full
 
 
@@ -136,6 +137,237 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 def _write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def _booth_profile_id(patient_config: str | Path | dict[str, Any]) -> str:
+    if isinstance(patient_config, dict):
+        return str(patient_config.get("patient_name") or patient_config.get("profile_id") or "booth_demo_patient")
+    if isinstance(patient_config, Path):
+        return patient_config.stem
+    return Path(str(patient_config)).stem if str(patient_config).endswith(".json") else str(patient_config)
+
+
+def _booth_supervisor_off_safety_config() -> SafetyConfig:
+    return SafetyConfig(
+        min_glucose=10.0,
+        max_glucose=1000.0,
+        max_glucose_delta_per_5_min=250.0,
+        hypoglycemia_threshold=-1000.0,
+        severe_hypoglycemia_threshold=-1000.0,
+        hyperglycemia_threshold=10000.0,
+        max_insulin_per_bolus=1000.0,
+        glucose_rate_alarm=-1000.0,
+        max_insulin_per_hour=1000.0,
+        max_iob=1000.0,
+        trend_stop=-1000.0,
+        hypo_cutoff=-1000.0,
+        predicted_hypoglycemia_threshold=-1000.0,
+        predictor_uncertainty_gate_enabled=False,
+        predictor_ood_gate_enabled=False,
+        contract_enabled=False,
+        critical_glucose_threshold=-1000.0,
+        critical_glucose_duration_minutes=100000,
+    )
+
+
+def _annotate_showcase_run(
+    run_dir: Path,
+    *,
+    study_arm: str,
+    condition_group: str,
+    algorithm_name: str,
+    algorithm_role: str,
+    profile_id: str,
+    scenario_slug: str,
+    supervisor_enabled: bool,
+) -> None:
+    from iints.analysis.study_engine import slugify_study_token
+
+    algorithm_id = slugify_study_token(algorithm_name)
+    for candidate in (run_dir / "run_metadata.json", run_dir / "config.json"):
+        payload: dict[str, Any]
+        if candidate.is_file():
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        else:
+            payload = {}
+
+        if candidate.name == "run_metadata.json":
+            config = payload.get("config", {}) if isinstance(payload.get("config"), dict) else {}
+        else:
+            config = payload if isinstance(payload, dict) else {}
+
+        config["study_condition"] = study_arm
+        config["study_arm"] = study_arm
+        config["condition_group"] = condition_group
+        config["study_protocol_preset"] = "showcase_demo"
+        config["algorithm_id"] = algorithm_id
+        config["algorithm_role"] = algorithm_role
+        config["profile_id"] = profile_id
+        config["scenario_slug"] = scenario_slug
+        config["supervisor_enabled"] = supervisor_enabled
+        config["corruption_modes"] = []
+        scenario_payload = config.get("scenario", {}) if isinstance(config.get("scenario"), dict) else {}
+        scenario_payload["condition_group"] = condition_group
+        scenario_payload["study_arm"] = study_arm
+        scenario_payload["study_protocol_preset"] = "showcase_demo"
+        scenario_payload["scenario_slug"] = scenario_slug
+        scenario_payload["supervisor_enabled"] = supervisor_enabled
+        config["scenario"] = scenario_payload
+
+        if candidate.name == "run_metadata.json":
+            payload["config"] = config
+            payload["algorithm_id"] = algorithm_id
+            payload["algorithm_role"] = algorithm_role
+            payload["profile_id"] = profile_id
+        else:
+            payload = config
+
+        candidate.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def _write_showcase_research_sync(
+    *,
+    output_dir: Path,
+    patient_config: str | Path | dict[str, Any],
+    duration_minutes: int,
+    time_step: int,
+    seed: int,
+    ai_status: str,
+) -> dict[str, str]:
+    from iints.analysis.study_analysis import analyze_study_directory, compare_studies
+    from iints.analysis.study_poster import generate_study_poster
+
+    profile_id = _booth_profile_id(patient_config)
+    showcase_dir = output_dir / "showcase_study"
+    baseline_dir = showcase_dir / "baseline_reference" / "pid_supervisor_override"
+    candidate_on_dir = showcase_dir / "candidate_safety_on" / "runaway_supervisor_override"
+    candidate_off_dir = showcase_dir / "candidate_safety_off" / "runaway_supervisor_override"
+
+    supervisor_spec = next(spec for spec in _scenario_specs() if spec.slug == "03_supervisor_override")
+    showcase_runs = [
+        {
+            "run_dir": baseline_dir,
+            "algorithm_factory": PIDController,
+            "algorithm_name": "PID Controller",
+            "algorithm_role": "baseline",
+            "study_arm": "showcase_baseline_vs_candidate",
+            "condition_group": "showcase_baseline_vs_candidate",
+            "supervisor_enabled": True,
+        },
+        {
+            "run_dir": candidate_on_dir,
+            "algorithm_factory": supervisor_spec.algorithm_factory,
+            "algorithm_name": "Runaway AI Candidate",
+            "algorithm_role": "candidate",
+            "study_arm": "showcase_baseline_vs_candidate",
+            "condition_group": "showcase_baseline_vs_candidate",
+            "supervisor_enabled": True,
+        },
+        {
+            "run_dir": candidate_off_dir,
+            "algorithm_factory": supervisor_spec.algorithm_factory,
+            "algorithm_name": "Runaway AI Candidate",
+            "algorithm_role": "candidate",
+            "study_arm": "showcase_candidate_safety_off",
+            "condition_group": "showcase_candidate_safety_off",
+            "supervisor_enabled": False,
+        },
+    ]
+
+    for run_spec in showcase_runs:
+        run_full(
+            algorithm=run_spec["algorithm_factory"](),
+            scenario=supervisor_spec.scenario,
+            patient_config=patient_config,
+            duration_minutes=duration_minutes,
+            time_step=time_step,
+            seed=seed,
+            output_dir=run_spec["run_dir"],
+            safety_config=None if run_spec["supervisor_enabled"] else _booth_supervisor_off_safety_config(),
+            enable_profiling=False,
+        )
+        _annotate_showcase_run(
+            run_spec["run_dir"],
+            study_arm=str(run_spec["study_arm"]),
+            condition_group=str(run_spec["condition_group"]),
+            algorithm_name=str(run_spec["algorithm_name"]),
+            algorithm_role=str(run_spec["algorithm_role"]),
+            profile_id=profile_id,
+            scenario_slug="showcase_supervisor_override",
+            supervisor_enabled=bool(run_spec["supervisor_enabled"]),
+        )
+
+    summary = analyze_study_directory(showcase_dir)
+    payload = summary.to_dict()
+    summary_json = showcase_dir / "showcase_study_summary.json"
+    summary_md = showcase_dir / "showcase_study_summary.md"
+    summary_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    summary_md.write_text(
+        "# Showcase Research Sync\n\n"
+        "This mini-study mirrors the benchmark story used elsewhere in the SDK.\n\n"
+        f"- Profile: `{profile_id}`\n"
+        "- Scenario: `showcase_supervisor_override`\n"
+        "- Baseline: `PID Controller`\n"
+        "- Candidate: `Runaway AI Candidate`\n"
+        "- Safety comparison: candidate with supervisor on vs candidate with supervisor off\n",
+        encoding="utf-8",
+    )
+
+    poster_outputs = generate_study_poster(
+        summary,
+        output_path=showcase_dir / "showcase_study_poster.png",
+        title="IINTS Showcase Benchmark Sync",
+        subtitle="Baseline vs candidate, plus safety-on vs safety-off, with the same metrics used in study bundles.",
+        summary_output_path=showcase_dir / "showcase_study_poster.json",
+    )
+
+    baseline_vs_candidate = compare_studies(baseline_dir, candidate_on_dir, left_label="PID baseline", right_label="Candidate safety on").to_dict()
+    safety_on_vs_off = compare_studies(candidate_on_dir, candidate_off_dir, left_label="Candidate safety on", right_label="Candidate safety off").to_dict()
+    comparisons_dir = showcase_dir / "comparisons"
+    comparisons_dir.mkdir(parents=True, exist_ok=True)
+    baseline_vs_candidate_json = comparisons_dir / "baseline_vs_candidate.json"
+    safety_on_vs_off_json = comparisons_dir / "candidate_safety_on_vs_off.json"
+    baseline_vs_candidate_json.write_text(json.dumps(baseline_vs_candidate, indent=2), encoding="utf-8")
+    safety_on_vs_off_json.write_text(json.dumps(safety_on_vs_off, indent=2), encoding="utf-8")
+
+    sync_lines = [
+        "# Showcase Research Sync",
+        "",
+        "This artifact links the fair demo to the scientific benchmark language used elsewhere in the SDK.",
+        "",
+        "## What this mirrors",
+        "",
+        "- Baseline vs candidate comparison",
+        "- Safety-on vs safety-off comparison",
+        "- The same TIR, hypo, intervention, uncertainty, and calibration vocabulary used in `run-study` bundles",
+        "",
+        "## Files",
+        "",
+        f"- Summary JSON: `{summary_json}`",
+        f"- Poster PNG: `{poster_outputs['poster_png']}`",
+        f"- Baseline vs candidate: `{baseline_vs_candidate_json}`",
+        f"- Safety on vs off: `{safety_on_vs_off_json}`",
+        "",
+        "## AI explanation note",
+        "",
+        ai_status,
+        "",
+        "If local AI is available, use the candidate safety-on run as the explanation target so the live explanation matches the benchmark story.",
+        "",
+    ]
+    sync_markdown = showcase_dir / "SHOWCASE_RESEARCH_SYNC.md"
+    _write_text(sync_markdown, "\n".join(sync_lines))
+
+    return {
+        "showcase_study_dir": str(showcase_dir),
+        "showcase_study_summary_json": str(summary_json),
+        "showcase_study_summary_md": str(summary_md),
+        "showcase_study_poster_png": str(poster_outputs["poster_png"]),
+        "showcase_study_poster_json": str(poster_outputs["poster_summary_json"]),
+        "showcase_baseline_vs_candidate_json": str(baseline_vs_candidate_json),
+        "showcase_safety_on_vs_off_json": str(safety_on_vs_off_json),
+        "showcase_research_sync_md": str(sync_markdown),
+    }
 
 
 def _build_jury_brief(
@@ -386,6 +618,15 @@ def build_booth_demo(
         except Exception as exc:
             ai_status = f"AI preparation did not block the demo, but it could not finish cleanly: {exc}"
 
+    showcase_outputs = _write_showcase_research_sync(
+        output_dir=resolved_output,
+        patient_config=patient_config,
+        duration_minutes=duration_minutes,
+        time_step=time_step,
+        seed=seed,
+        ai_status=ai_status,
+    )
+
     summary_payload = {
         "output_dir": str(resolved_output),
         "patient_config": str(patient_config),
@@ -406,6 +647,7 @@ def build_booth_demo(
             }
             for spec in specs
         ],
+        "showcase_sync": showcase_outputs,
     }
     _write_json(resolved_output / "demo_summary.json", summary_payload)
 
@@ -450,4 +692,5 @@ def build_booth_demo(
     for spec in specs:
         artifact_paths[f"{spec.slug}_dir"] = run_outputs[spec.slug]["output_dir"]
     artifact_paths.update(ai_outputs)
+    artifact_paths.update(showcase_outputs)
     return artifact_paths

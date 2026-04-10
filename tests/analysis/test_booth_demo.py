@@ -70,6 +70,11 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     assert Path(outputs["run_commands"]).is_file()
     assert Path(outputs["demo_summary_json"]).is_file()
     assert Path(outputs["mdmp_cert"]).is_file()
+    assert Path(outputs["showcase_study_summary_json"]).is_file()
+    assert Path(outputs["showcase_study_poster_png"]).is_file()
+    assert Path(outputs["showcase_research_sync_md"]).is_file()
+    assert Path(outputs["showcase_baseline_vs_candidate_json"]).is_file()
+    assert Path(outputs["showcase_safety_on_vs_off_json"]).is_file()
 
     talk_track = Path(outputs["jury_talk_track"]).read_text(encoding="utf-8")
     assert "Supervisor Override" in talk_track
@@ -78,3 +83,6 @@ def test_build_booth_demo_writes_bundle_files(tmp_path: Path, monkeypatch) -> No
     assert "WHAT CODE TO SHOW FIRST" in live_script
     assert "./scripts/run_live_stage_demo.sh" in live_script
     assert "07_live_stage_demo.py" in live_script
+    research_sync = Path(outputs["showcase_research_sync_md"]).read_text(encoding="utf-8")
+    assert "Baseline vs candidate comparison" in research_sync
+    assert "Safety-on vs safety-off comparison" in research_sync

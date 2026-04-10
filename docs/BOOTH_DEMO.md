@@ -70,6 +70,9 @@ Key files:
 - `results/booth_demo/BEURS_LIVE_DEMO_SCRIPT.txt`
 - `results/booth_demo/run_commands.md`
 - `results/booth_demo/demo_summary.json`
+- `results/booth_demo/showcase_study/showcase_study_summary.json`
+- `results/booth_demo/showcase_study/showcase_study_poster.png`
+- `results/booth_demo/showcase_study/SHOWCASE_RESEARCH_SYNC.md`
 
 For the larger public story, you can also build:
 
@@ -92,6 +95,12 @@ Each scenario also gets its own full run bundle with:
 - `baseline/`
 - `clinical_report.pdf`
 - `run_manifest.json`
+
+The `showcase_study/` subfolder is the research-sync layer for fairs and jury tables. It mirrors the benchmark language used by `iints run-study`:
+
+- baseline vs candidate
+- safety-on vs safety-off
+- the same TIR, hypo, intervention, uncertainty, and calibration vocabulary used in study bundles
 
 ## Best Live Flow
 

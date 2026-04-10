@@ -117,6 +117,70 @@ def _safety_panel(ax: Any, payload: dict[str, Any]) -> None:
     ax.grid(axis="y", alpha=0.2)
 
 
+def _calibration_panel(ax: Any, payload: dict[str, Any]) -> None:
+    calibration = payload.get("calibration_summary", {}) if isinstance(payload.get("calibration_summary"), dict) else {}
+    overall = calibration.get("overall", {}) if isinstance(calibration.get("overall"), dict) else {}
+    by_algorithm = calibration.get("by_algorithm", {}) if isinstance(calibration.get("by_algorithm"), dict) else {}
+
+    if by_algorithm:
+        labels = list(by_algorithm.keys())
+        mae = [float((by_algorithm[label] or {}).get("mean_mae") or 0.0) for label in labels]
+        rmse = [float((by_algorithm[label] or {}).get("mean_rmse") or 0.0) for label in labels]
+        positions = np.arange(len(labels))
+        width = 0.36
+        ax.bar(positions - width / 2, mae, width=width, color=IINTS_BLUE, label="MAE")
+        ax.bar(positions + width / 2, rmse, width=width, color=IINTS_GOLD, label="RMSE")
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels, rotation=20, ha="right")
+        ax.legend(frameon=False, fontsize=8)
+        ax.set_ylabel("mg/dL")
+    elif overall:
+        labels = ["MAE", "RMSE", "Coverage"]
+        values = [
+            float(overall.get("mean_mae") or 0.0),
+            float(overall.get("mean_rmse") or 0.0),
+            float(overall.get("mean_interval_95_coverage_pct") or 0.0),
+        ]
+        ax.bar(range(len(labels)), values, color=[IINTS_BLUE, IINTS_GOLD, IINTS_TEAL])
+        ax.set_xticks(range(len(labels)))
+        ax.set_xticklabels(labels)
+    else:
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No calibration data", ha="center", va="center", color=IINTS_NAVY, transform=ax.transAxes)
+        return
+
+    ax.set_title("Calibration Panel", color=IINTS_NAVY, fontweight="bold")
+    ax.grid(axis="y", alpha=0.2)
+
+
+def _uncertainty_panel(ax: Any, payload: dict[str, Any]) -> None:
+    uncertainty = payload.get("uncertainty_summary", {}) if isinstance(payload.get("uncertainty_summary"), dict) else {}
+    if not uncertainty:
+        ax.axis("off")
+        ax.text(0.5, 0.5, "No uncertainty data", ha="center", va="center", color=IINTS_NAVY, transform=ax.transAxes)
+        return
+
+    labels = ["Overall", "Safe", "Heavy", "Worst TIR"]
+    buckets = [
+        uncertainty.get("overall", {}),
+        uncertainty.get("safe_runs", {}),
+        uncertainty.get("heavy_intervention_runs", {}),
+        uncertainty.get("worst_tir_runs", {}),
+    ]
+    mean_values = [float((bucket or {}).get("mean") or 0.0) for bucket in buckets]
+    p95_values = [float((bucket or {}).get("p95") or 0.0) for bucket in buckets]
+    positions = np.arange(len(labels))
+    width = 0.36
+    ax.bar(positions - width / 2, mean_values, width=width, color=IINTS_TEAL, label="Mean std")
+    ax.bar(positions + width / 2, p95_values, width=width, color=IINTS_RED, label="P95 std")
+    ax.set_xticks(positions)
+    ax.set_xticklabels(labels, rotation=15, ha="right")
+    ax.set_ylabel("Predictor std (mg/dL)")
+    ax.set_title("Uncertainty vs Risk", color=IINTS_NAVY, fontweight="bold")
+    ax.legend(frameon=False, fontsize=8)
+    ax.grid(axis="y", alpha=0.2)
+
+
 def _notes_panel(ax: Any, payload: dict[str, Any]) -> None:
     aggregate = payload.get("aggregate", {}) if isinstance(payload.get("aggregate"), dict) else {}
     certification = payload.get("certification_comparison", {}) if isinstance(payload.get("certification_comparison"), dict) else {}
@@ -197,8 +261,8 @@ def generate_study_poster(
     output.parent.mkdir(parents=True, exist_ok=True)
 
     apply_plot_style(dpi=180, font_scale=1.02)
-    fig = plt.figure(figsize=(16, 10), facecolor="#f8fbfd")
-    grid = fig.add_gridspec(3, 4, height_ratios=[0.9, 1.6, 1.8], hspace=0.38, wspace=0.35)
+    fig = plt.figure(figsize=(16, 13), facecolor="#f8fbfd")
+    grid = fig.add_gridspec(4, 4, height_ratios=[0.9, 1.5, 1.5, 1.4], hspace=0.4, wspace=0.35)
 
     fig.suptitle(title, fontsize=24, fontweight="bold", color=IINTS_NAVY, y=0.98)
     fig.text(0.5, 0.94, subtitle, ha="center", va="center", fontsize=11, color=IINTS_NAVY)
@@ -228,7 +292,13 @@ def generate_study_poster(
     ax_safety = fig.add_subplot(grid[2, 2])
     _safety_panel(ax_safety, payload)
 
-    ax_notes = fig.add_subplot(grid[2, 3])
+    ax_calibration = fig.add_subplot(grid[2, 3])
+    _calibration_panel(ax_calibration, payload)
+
+    ax_uncertainty = fig.add_subplot(grid[3, 0:2])
+    _uncertainty_panel(ax_uncertainty, payload)
+
+    ax_notes = fig.add_subplot(grid[3, 2:4])
     _notes_panel(ax_notes, payload)
 
     fig.text(
