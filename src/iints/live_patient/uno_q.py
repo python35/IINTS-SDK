@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import time
+from contextlib import contextmanager
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, Mapping
@@ -10,6 +11,9 @@ from typing import Any, Mapping
 
 UNO_Q_BRIDGE_BAUDRATE = 115200
 UNO_Q_BRIDGE_STATES = ("OK", "OVERRIDE", "CRITICAL")
+UNO_Q_BRIDGE_READY_BANNER = "IINTS UNO Q supervisor bridge ready"
+UNO_Q_BRIDGE_BOOT_DELAY_SECONDS = 1.2
+UNO_Q_BRIDGE_READ_POLL_SECONDS = 0.1
 
 
 def _require_pyserial():
@@ -91,10 +95,15 @@ def export_uno_q_bridge(output_dir: str | Path) -> dict[str, str]:
             [
                 "IINTS UNO Q serial bridge protocol",
                 f"Baud rate: {UNO_Q_BRIDGE_BAUDRATE}",
+                f"Startup banner: {UNO_Q_BRIDGE_READY_BANNER}",
                 "Messages:",
                 "  OK",
                 "  OVERRIDE",
                 "  CRITICAL",
+                "Acknowledgements:",
+                "  STATE=OK",
+                "  STATE=OVERRIDE",
+                "  STATE=CRITICAL",
             ]
         )
         + "\n",
@@ -137,6 +146,109 @@ def bridge_state_from_runtime_status(status: Mapping[str, Any] | None) -> str:
     return "OK"
 
 
+def _decode_serial_line(raw: bytes) -> str | None:
+    text = raw.decode("utf-8", errors="replace").strip()
+    return text or None
+
+
+def _response_matches_state(response: str, state: str) -> bool:
+    normalized_response = str(response).strip().upper()
+    normalized_state = _normalize_bridge_state(state)
+    return normalized_response in {
+        normalized_state,
+        f"STATE={normalized_state}",
+        f"ACK={normalized_state}",
+        f"ACK: {normalized_state}",
+    }
+
+
+def _pick_bridge_response(lines: list[str], state: str) -> str | None:
+    if not lines:
+        return None
+    for line in lines:
+        if _response_matches_state(line, state):
+            return line
+    for line in lines:
+        if line.upper().startswith("STATE=") or line.upper().startswith("ACK"):
+            return line
+    return lines[-1]
+
+
+def _read_serial_lines(connection: Any, *, duration_seconds: float, stop_on_match: str | None = None) -> list[str]:
+    deadline = time.monotonic() + max(duration_seconds, UNO_Q_BRIDGE_READ_POLL_SECONDS)
+    lines: list[str] = []
+    while time.monotonic() < deadline:
+        raw = connection.readline()
+        if raw:
+            line = _decode_serial_line(raw)
+            if line:
+                lines.append(line)
+                if stop_on_match is not None and _response_matches_state(line, stop_on_match):
+                    break
+            continue
+        time.sleep(0.02)
+    return lines
+
+
+@contextmanager
+def _uno_q_serial_connection(
+    port: str,
+    *,
+    baudrate: int,
+    timeout_seconds: float,
+    boot_delay_seconds: float = UNO_Q_BRIDGE_BOOT_DELAY_SECONDS,
+):
+    serial, _ = _require_pyserial()
+    with serial.Serial(  # type: ignore[attr-defined]
+        port,
+        baudrate=baudrate,
+        timeout=min(timeout_seconds, UNO_Q_BRIDGE_READ_POLL_SECONDS),
+        write_timeout=timeout_seconds,
+    ) as connection:
+        try:
+            connection.reset_input_buffer()
+            connection.reset_output_buffer()
+        except Exception:
+            pass
+        if boot_delay_seconds > 0:
+            time.sleep(boot_delay_seconds)
+        startup_lines = _read_serial_lines(connection, duration_seconds=0.35)
+        yield connection, startup_lines
+
+
+def _send_state_over_connection(
+    connection: Any,
+    state: str,
+    *,
+    timeout_seconds: float,
+    expect_response: bool,
+) -> dict[str, Any]:
+    normalized_state = _normalize_bridge_state(state)
+    try:
+        connection.reset_input_buffer()
+    except Exception:
+        pass
+    payload = f"{normalized_state}\n".encode("utf-8")
+    connection.write(payload)
+    connection.flush()
+
+    response_lines: list[str] = []
+    response = None
+    if expect_response:
+        response_lines = _read_serial_lines(
+            connection,
+            duration_seconds=timeout_seconds,
+            stop_on_match=normalized_state,
+        )
+        response = _pick_bridge_response(response_lines, normalized_state)
+
+    return {
+        "state": normalized_state,
+        "response": response,
+        "response_lines": response_lines,
+    }
+
+
 def send_uno_q_bridge_state(
     port: str | None,
     state: str,
@@ -145,37 +257,26 @@ def send_uno_q_bridge_state(
     timeout_seconds: float = 1.5,
     expect_response: bool = True,
 ) -> dict[str, Any]:
-    serial, _ = _require_pyserial()
     resolved_port = resolve_uno_q_port(port)
-    normalized_state = _normalize_bridge_state(state)
-
-    with serial.Serial(  # type: ignore[attr-defined]
+    with _uno_q_serial_connection(
         resolved_port,
         baudrate=baudrate,
-        timeout=timeout_seconds,
-        write_timeout=timeout_seconds,
-    ) as connection:
-        try:
-            connection.reset_input_buffer()
-            connection.reset_output_buffer()
-        except Exception:
-            pass
-
-        payload = f"{normalized_state}\n".encode("utf-8")
-        connection.write(payload)
-        connection.flush()
-
-        response = None
-        if expect_response:
-            raw = connection.readline()
-            if raw:
-                response = raw.decode("utf-8", errors="replace").strip()
+        timeout_seconds=timeout_seconds,
+    ) as (connection, startup_lines):
+        send_result = _send_state_over_connection(
+            connection,
+            state,
+            timeout_seconds=timeout_seconds,
+            expect_response=expect_response,
+        )
 
     return {
         "port": resolved_port,
-        "state": normalized_state,
+        "state": send_result["state"],
         "baudrate": baudrate,
-        "response": response,
+        "response": send_result["response"],
+        "startup_lines": startup_lines,
+        "response_lines": send_result["response_lines"],
     }
 
 
@@ -186,17 +287,32 @@ def run_uno_q_bridge_test(
     delay_seconds: float = 0.75,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
-    for state in UNO_Q_BRIDGE_STATES:
-        result = send_uno_q_bridge_state(
-            port,
-            state,
-            baudrate=baudrate,
-            timeout_seconds=max(delay_seconds, 0.5),
-            expect_response=True,
-        )
-        results.append(result)
-        if delay_seconds > 0:
-            time.sleep(delay_seconds)
+    resolved_port = resolve_uno_q_port(port)
+    timeout_seconds = max(delay_seconds, 0.5)
+    with _uno_q_serial_connection(
+        resolved_port,
+        baudrate=baudrate,
+        timeout_seconds=timeout_seconds,
+    ) as (connection, startup_lines):
+        for index, state in enumerate(UNO_Q_BRIDGE_STATES):
+            send_result = _send_state_over_connection(
+                connection,
+                state,
+                timeout_seconds=timeout_seconds,
+                expect_response=True,
+            )
+            results.append(
+                {
+                    "port": resolved_port,
+                    "state": send_result["state"],
+                    "baudrate": baudrate,
+                    "response": send_result["response"],
+                    "response_lines": send_result["response_lines"],
+                    "startup_lines": startup_lines if index == 0 else [],
+                }
+            )
+            if delay_seconds > 0:
+                time.sleep(delay_seconds)
     return results
 
 
@@ -218,31 +334,43 @@ def run_uno_q_bridge_forwarder(
     last_payload: dict[str, Any] | None = None
     cycles = 0
 
-    while True:
-        status = load_runtime_status(workspace_path)
-        state = bridge_state_from_runtime_status(status)
-        if state != last_state:
-            last_payload = send_uno_q_bridge_state(
-                resolved_port,
-                state,
-                baudrate=baudrate,
-                timeout_seconds=max(poll_interval, 0.5),
-                expect_response=False,
-            )
-            last_state = state
-            messages_sent += 1
+    with _uno_q_serial_connection(
+        resolved_port,
+        baudrate=baudrate,
+        timeout_seconds=max(poll_interval, 0.5),
+    ) as (connection, startup_lines):
+        while True:
+            status = load_runtime_status(workspace_path)
+            state = bridge_state_from_runtime_status(status)
+            if state != last_state:
+                send_result = _send_state_over_connection(
+                    connection,
+                    state,
+                    timeout_seconds=max(poll_interval, 0.5),
+                    expect_response=False,
+                )
+                last_payload = {
+                    "port": resolved_port,
+                    "state": send_result["state"],
+                    "baudrate": baudrate,
+                    "response": send_result["response"],
+                    "startup_lines": startup_lines if messages_sent == 0 else [],
+                    "response_lines": send_result["response_lines"],
+                }
+                last_state = state
+                messages_sent += 1
 
-        cycles += 1
-        if once or (max_cycles is not None and cycles >= max_cycles):
-            return {
-                "workspace": str(workspace_path),
-                "port": resolved_port,
-                "state": last_state,
-                "messages_sent": messages_sent,
-                "last_payload": last_payload,
-            }
+            cycles += 1
+            if once or (max_cycles is not None and cycles >= max_cycles):
+                return {
+                    "workspace": str(workspace_path),
+                    "port": resolved_port,
+                    "state": last_state,
+                    "messages_sent": messages_sent,
+                    "last_payload": last_payload,
+                }
 
-        time.sleep(max(poll_interval, 0.1))
+            time.sleep(max(poll_interval, 0.1))
 
 
 def flash_uno_q_bridge(

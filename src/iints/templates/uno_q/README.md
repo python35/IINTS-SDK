@@ -38,9 +38,14 @@ The sketch listens at:
 
 ## Pin Mapping
 
-- green LED: `LED_BUILTIN`
+- status LED: `LED_BUILTIN`
 - red LED: pin `6`
 - buzzer: pin `9`
+
+Important:
+
+- on some UNO Q boards the built-in status LED looks blue instead of green
+- the bridge latches the last received state until you send a new one
 
 If you only want a first smoke test, the built-in LED is enough to verify the `OK` state.
 
@@ -74,7 +79,7 @@ CRITICAL
 
 Expected behavior:
 
-- `OK`: green LED on
+- `OK`: status LED on
 - `OVERRIDE`: red LED on
 - `CRITICAL`: red LED on and buzzer chirps
 
@@ -89,6 +94,14 @@ Or use the CLI shortcut:
 ```bash
 iints edge bridge-test --port /dev/ttyACM0
 ```
+
+The CLI now waits for the board to finish its USB reset cycle and accepts acknowledgements such as:
+
+- `STATE=OK`
+- `STATE=OVERRIDE`
+- `STATE=CRITICAL`
+
+If the test finishes on `CRITICAL`, the LEDs may stay in that state until you send `OK` or start `iints edge bridge-run`.
 
 ## Where To Read More
 

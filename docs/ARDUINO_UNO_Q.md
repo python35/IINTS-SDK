@@ -147,7 +147,7 @@ If you want the fastest possible route to a working baseline, follow these four 
 
     Success looks like:
 
-    - `OK` turns the green LED on
+    - `OK` turns the built-in status LED on
     - `OVERRIDE` turns the red LED on
     - `CRITICAL` turns the red LED on and chirps the buzzer
 
@@ -188,9 +188,14 @@ You need:
 
 Optional hardware for the bridge demo:
 
-- green LED: built-in `LED_BUILTIN`
+- status LED: built-in `LED_BUILTIN`
 - red LED on pin `6`
 - buzzer on pin `9`
+
+Notes:
+
+- on some UNO Q boards the built-in status LED appears blue instead of green
+- the bridge latches the last state it received, so a bridge test that ends on `CRITICAL` can leave LEDs lit until you send `OK`
 
 If you do not wire an external red LED or buzzer yet, you can still complete the setup and verify the sketch through the built-in LED plus serial output.
 
@@ -342,7 +347,7 @@ CRITICAL
 Expected behavior:
 
 - `OK`
-  - green LED on
+  - built-in status LED on
 - `OVERRIDE`
   - red LED on
 - `CRITICAL`
@@ -356,6 +361,8 @@ STATE=OK
 STATE=OVERRIDE
 STATE=CRITICAL
 ```
+
+The CLI bridge test now waits for the USB serial reset cycle and accepts the sketch acknowledgements after startup. If the response column still shows `-` but the LEDs react, the board is receiving commands and the remaining issue is the serial echo path, not the runtime or flashing path.
 
 If this works, the STM32 side is ready.
 

@@ -10,6 +10,8 @@
   runs the IINTS digital patient runtime.
 */
 
+// On some UNO Q boards the built-in status LED appears blue instead of green.
+// The SDK docs refer to this as the "status LED" rather than assuming a color.
 const int GREEN_LED_PIN = LED_BUILTIN;
 const int RED_LED_PIN = 6;
 const int BUZZER_PIN = 9;
@@ -46,6 +48,7 @@ void setup() {
     delay(10);
   }
   Serial.println("IINTS UNO Q supervisor bridge ready");
+  Serial.flush();
 }
 
 void loop() {
@@ -57,6 +60,7 @@ void loop() {
         applyState(incomingLine);
         Serial.print("STATE=");
         Serial.println(incomingLine);
+        Serial.flush();
       }
       incomingLine = "";
     } else {

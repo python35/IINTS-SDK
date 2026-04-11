@@ -6852,7 +6852,11 @@ def edge_bridge_test(
     table.add_column("Port")
     table.add_column("Response", overflow="fold")
     for result in results:
-        table.add_row(result["state"], result["port"], str(result.get("response") or "-"))
+        response = result.get("response")
+        if not response:
+            startup_lines = result.get("startup_lines") or []
+            response = startup_lines[-1] if startup_lines else "-"
+        table.add_row(result["state"], result["port"], str(response))
     console.print(table)
 
 
