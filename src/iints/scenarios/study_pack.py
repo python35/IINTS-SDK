@@ -147,14 +147,10 @@ def build_eucys_arm_scenario(base_scenario: dict[str, Any], *, arm_id: str) -> t
 
     if arm_id == "clean_certified":
         scenario["scenario_name"] = f"{scenario.get('scenario_name', 'Scenario')} [Clean Certified]"
-        scenario["study_arm"] = arm_id
-        scenario["condition_group"] = arm_id
         return scenario, metadata
 
     if arm_id == "supervisor_off_ablation":
         scenario["scenario_name"] = f"{scenario.get('scenario_name', 'Scenario')} [Supervisor Off]"
-        scenario["study_arm"] = arm_id
-        scenario["condition_group"] = arm_id
         metadata["operations"].append({"mode": "supervisor_off", "applied": True})
         return scenario, metadata
 
@@ -193,9 +189,6 @@ def build_eucys_arm_scenario(base_scenario: dict[str, Any], *, arm_id: str) -> t
 
     scenario["stress_events"] = corrupted_events
     scenario["scenario_name"] = f"{scenario.get('scenario_name', 'Scenario')} [Corrupted Uncertified]"
-    scenario["study_arm"] = arm_id
-    scenario["condition_group"] = arm_id
-    scenario["corruption_modes"] = ["timestamp_shift", "duplicate_event", "meal_annotation_mismatch", "sensor_error_injection"]
     return scenario, metadata
 
 
