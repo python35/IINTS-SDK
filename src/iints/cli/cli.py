@@ -4070,11 +4070,19 @@ def demo_booth(
             table.add_row(key, outputs[key])
     console.print(table)
     if "jury_talk_track" in outputs:
-        console.print(f"[green]Jury talk track:[/green] {outputs['jury_talk_track']}")
+        jury_track_name = Path(str(outputs["jury_talk_track"])).name
+        console.print(f"[green]Jury talk track:[/green] {jury_track_name} ({outputs['jury_talk_track']})")
     if "live_demo_script" in outputs:
-        console.print(f"[green]Live booth script:[/green] {outputs['live_demo_script']}")
+        live_script_name = Path(str(outputs["live_demo_script"])).name
+        console.print(f"[green]Live booth script:[/green] {live_script_name} ({outputs['live_demo_script']})")
     if "showcase_research_sync_md" in outputs:
-        console.print(f"[green]Showcase research sync:[/green] {outputs['showcase_research_sync_md']}")
+        showcase_sync_name = Path(str(outputs["showcase_research_sync_md"])).name
+        console.print(f"[green]Showcase research sync:[/green] {showcase_sync_name} ({outputs['showcase_research_sync_md']})")
+    if "showcase_explanation_panel_md" in outputs:
+        explanation_name = Path(str(outputs["showcase_explanation_panel_md"])).name
+        console.print(
+            f"[green]Showcase explanation panel:[/green] {explanation_name} ({outputs['showcase_explanation_panel_md']})"
+        )
     console.print(
         "[green]Next:[/green] open the poster and use the jury talk track to walk people through the story."
     )
