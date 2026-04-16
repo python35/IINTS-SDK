@@ -628,7 +628,12 @@ def _aggregate_calibration_reports(reports: list[dict[str, Any]]) -> dict[str, A
     summary: dict[str, Any] = {"run_count": len(valid_reports)}
     for metric in CALIBRATION_METRICS:
         summary[f"mean_{metric}"] = _mean([_first_numeric(report, [metric]) for report in valid_reports])
-    gates = [report.get("calibration_gate") for report in valid_reports if isinstance(report.get("calibration_gate"), dict)]
+    gates: list[dict[str, Any]] = [
+        gate
+        for report in valid_reports
+        for gate in [report.get("calibration_gate")]
+        if isinstance(gate, dict)
+    ]
     if gates:
         summary["gate_pass_count"] = sum(1 for gate in gates if gate.get("passed") is True)
         summary["gate_fail_count"] = sum(1 for gate in gates if gate.get("passed") is False)
@@ -637,14 +642,15 @@ def _aggregate_calibration_reports(reports: list[dict[str, Any]]) -> dict[str, A
 
 
 def _aggregate_uncertainty_alignment(reports: list[dict[str, Any]]) -> dict[str, Any] | None:
-    alignments = [
-        report.get("uncertainty_error_alignment")
+    alignments: list[dict[str, Any]] = [
+        alignment
         for report in reports
-        if isinstance(report, dict) and isinstance(report.get("uncertainty_error_alignment"), dict)
+        for alignment in [report.get("uncertainty_error_alignment")]
+        if isinstance(alignment, dict)
     ]
     if not alignments:
         return None
-    summary = {"run_count": len(alignments)}
+    summary: dict[str, Any] = {"run_count": len(alignments)}
     for metric in (
         "mean_abs_error",
         "mean_predicted_std",

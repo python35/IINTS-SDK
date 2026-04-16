@@ -23,6 +23,17 @@ class BoothScenarioSpec:
     algorithm_factory: Callable[[], Any]
 
 
+@dataclass(frozen=True)
+class ShowcaseRunSpec:
+    run_dir: Path
+    algorithm_factory: Callable[[], Any]
+    algorithm_name: str
+    algorithm_role: str
+    study_arm: str
+    condition_group: str
+    supervisor_enabled: bool
+
+
 def _scenario_specs() -> list[BoothScenarioSpec]:
     return [
         BoothScenarioSpec(
@@ -245,56 +256,56 @@ def _write_showcase_research_sync(
 
     supervisor_spec = next(spec for spec in _scenario_specs() if spec.slug == "03_supervisor_override")
     showcase_runs = [
-        {
-            "run_dir": baseline_dir,
-            "algorithm_factory": PIDController,
-            "algorithm_name": "PID Controller",
-            "algorithm_role": "baseline",
-            "study_arm": "showcase_baseline_vs_candidate",
-            "condition_group": "showcase_baseline_vs_candidate",
-            "supervisor_enabled": True,
-        },
-        {
-            "run_dir": candidate_on_dir,
-            "algorithm_factory": supervisor_spec.algorithm_factory,
-            "algorithm_name": "Runaway AI Candidate",
-            "algorithm_role": "candidate",
-            "study_arm": "showcase_baseline_vs_candidate",
-            "condition_group": "showcase_baseline_vs_candidate",
-            "supervisor_enabled": True,
-        },
-        {
-            "run_dir": candidate_off_dir,
-            "algorithm_factory": supervisor_spec.algorithm_factory,
-            "algorithm_name": "Runaway AI Candidate",
-            "algorithm_role": "candidate",
-            "study_arm": "showcase_candidate_safety_off",
-            "condition_group": "showcase_candidate_safety_off",
-            "supervisor_enabled": False,
-        },
+        ShowcaseRunSpec(
+            run_dir=baseline_dir,
+            algorithm_factory=PIDController,
+            algorithm_name="PID Controller",
+            algorithm_role="baseline",
+            study_arm="showcase_baseline_vs_candidate",
+            condition_group="showcase_baseline_vs_candidate",
+            supervisor_enabled=True,
+        ),
+        ShowcaseRunSpec(
+            run_dir=candidate_on_dir,
+            algorithm_factory=supervisor_spec.algorithm_factory,
+            algorithm_name="Runaway AI Candidate",
+            algorithm_role="candidate",
+            study_arm="showcase_baseline_vs_candidate",
+            condition_group="showcase_baseline_vs_candidate",
+            supervisor_enabled=True,
+        ),
+        ShowcaseRunSpec(
+            run_dir=candidate_off_dir,
+            algorithm_factory=supervisor_spec.algorithm_factory,
+            algorithm_name="Runaway AI Candidate",
+            algorithm_role="candidate",
+            study_arm="showcase_candidate_safety_off",
+            condition_group="showcase_candidate_safety_off",
+            supervisor_enabled=False,
+        ),
     ]
 
     for run_spec in showcase_runs:
         run_full(
-            algorithm=run_spec["algorithm_factory"](),
+            algorithm=run_spec.algorithm_factory(),
             scenario=supervisor_spec.scenario,
             patient_config=patient_config,
             duration_minutes=duration_minutes,
             time_step=time_step,
             seed=seed,
-            output_dir=run_spec["run_dir"],
-            safety_config=None if run_spec["supervisor_enabled"] else _booth_supervisor_off_safety_config(),
+            output_dir=run_spec.run_dir,
+            safety_config=None if run_spec.supervisor_enabled else _booth_supervisor_off_safety_config(),
             enable_profiling=False,
         )
         _annotate_showcase_run(
-            run_spec["run_dir"],
-            study_arm=str(run_spec["study_arm"]),
-            condition_group=str(run_spec["condition_group"]),
-            algorithm_name=str(run_spec["algorithm_name"]),
-            algorithm_role=str(run_spec["algorithm_role"]),
+            run_spec.run_dir,
+            study_arm=run_spec.study_arm,
+            condition_group=run_spec.condition_group,
+            algorithm_name=run_spec.algorithm_name,
+            algorithm_role=run_spec.algorithm_role,
             profile_id=profile_id,
             scenario_slug="showcase_supervisor_override",
-            supervisor_enabled=bool(run_spec["supervisor_enabled"]),
+            supervisor_enabled=run_spec.supervisor_enabled,
         )
 
     summary = analyze_study_directory(showcase_dir)

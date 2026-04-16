@@ -185,8 +185,12 @@ def _candidate_and_baseline_snapshot(clean_summary: dict[str, Any]) -> dict[str,
         )
         for baseline_name in baseline_names
     ]
-    baseline_tir_rows = [row for row in baseline_tir_rows if row[1] is not None]
-    strongest_baseline = max(baseline_tir_rows, key=lambda item: float(item[1]))[0] if baseline_tir_rows else None
+    filtered_baseline_tir_rows: list[tuple[str, float]] = [
+        (baseline_name, tir)
+        for baseline_name, tir in baseline_tir_rows
+        if tir is not None
+    ]
+    strongest_baseline = max(filtered_baseline_tir_rows, key=lambda item: item[1])[0] if filtered_baseline_tir_rows else None
 
     candidate_aggregate = _algorithm_aggregate(clean_summary, candidate) if candidate else {}
     strongest_baseline_aggregate = _algorithm_aggregate(clean_summary, strongest_baseline) if strongest_baseline else {}
