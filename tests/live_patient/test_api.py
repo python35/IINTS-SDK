@@ -49,7 +49,48 @@ def test_live_patient_api_exposes_status_history_and_commands(tmp_path) -> None:
     assert history.status_code == 200
     assert history.json()["records"][0]["glucose_mgdl"] == 132.0
 
-    queued = client.post("/events/meal", json={"carbs": 60})
+    queued = client.post("/events/meal", json={"carbs": 60}, headers={"X-IINTS-Control": "1"})
     assert queued.status_code == 200
     pending = store.fetch_pending_commands()
     assert pending[0]["command"] == "inject_meal"
+
+
+def test_live_patient_api_rejects_mutations_without_control_header(tmp_path) -> None:
+    workspace = tmp_path / "patient"
+    store = PatientRuntimeStore(workspace / "patient_state.db")
+    store.update_status(daemon_status="running", paused=0, workspace=str(workspace))
+
+    client = TestClient(create_patient_app(workspace))
+    response = client.post("/control/pause")
+
+    assert response.status_code == 403
+    assert "control header" in response.json()["detail"]
+
+
+def test_live_patient_api_requires_bearer_token_when_configured(tmp_path) -> None:
+    workspace = tmp_path / "patient"
+    store = PatientRuntimeStore(workspace / "patient_state.db")
+    store.update_status(daemon_status="running", paused=0, workspace=str(workspace))
+
+    client = TestClient(create_patient_app(workspace, api_token="secret-token"))
+
+    missing = client.post("/control/pause", headers={"X-IINTS-Control": "1"})
+    assert missing.status_code == 401
+
+    wrong = client.post(
+        "/control/pause",
+        headers={"X-IINTS-Control": "1", "Authorization": "Bearer nope"},
+    )
+    assert wrong.status_code == 401
+
+    okay = client.post(
+        "/control/pause",
+        headers={"X-IINTS-Control": "1", "Authorization": "Bearer secret-token"},
+    )
+    assert okay.status_code == 200
+
+    hidden_status = client.get("/status")
+    assert hidden_status.status_code == 401
+
+    visible_status = client.get("/status", headers={"Authorization": "Bearer secret-token"})
+    assert visible_status.status_code == 200

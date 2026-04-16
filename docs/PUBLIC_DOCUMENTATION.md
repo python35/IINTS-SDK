@@ -110,6 +110,14 @@ iints data info <dataset_id>
 iints data fetch <dataset_id> --output-dir data_packs/<dataset_id>
 ```
 
+If a public source does not publish a pinned SHA-256 yet, the secure fallback is explicit:
+
+```bash
+iints data fetch <dataset_id> --output-dir data_packs/<dataset_id> --no-verify
+```
+
+That is a trust decision, not a cryptographic verification. Add a pinned hash to `src/iints/data/datasets.json` when one becomes available.
+
 Registry documentation:
 - `data_packs/DATASETS.md`
 

@@ -22,6 +22,9 @@ The scientific workflow now centers on five commands:
 - `iints compare-study`
 - `iints poster-study`
 
+For competition packaging, there is now a sixth useful command:
+- `iints eucys-results`
+
 `iints run-eucys-study` still exists, but it is now the fixed shortcut for the EUCYS-oriented preset rather than the only research workflow.
 
 ## Recommended Flow
@@ -118,6 +121,32 @@ The EUCYS shortcut also writes:
 - `EUCYS_SUMMARY.md`
 - `EUCYS_RESULTS_TABLE.csv`
 - `EUCYS_FIGURE_MANIFEST.json`
+- `EUCYS_ABSTRACT_FILLED.md`
+- `EUCYS_MAIN_FIGURE.png`
+- `EUCYS_LIMITATIONS.md`
+- `EUCYS_RESULTS/` with a packaged competition folder
+
+### 3b. Freeze A Competition-Ready Results Folder
+
+If you already have a completed study bundle and want the EUCYS-facing package in one place:
+
+```bash
+iints eucys-results results/eucys_study
+```
+
+That writes a deterministic `EUCYS_RESULTS/` folder containing:
+
+- copied protocol files
+- per-arm summaries
+- copied comparison files
+- `EUCYS_RESULTS_TABLE.csv`
+- `EUCYS_REPRODUCIBILITY_BUNDLE.json`
+- `EUCYS_ABSTRACT_DRAFT.md`
+- `EUCYS_ABSTRACT_FILLED.md`
+- `EUCYS_MAIN_FIGURE.png`
+- `EUCYS_MAIN_FIGURE.csv`
+- `EUCYS_POSTER_OUTLINE.md`
+- `EUCYS_JURY_QA.md`
 - `EUCYS_LIMITATIONS.md`
 
 ### 4. Re-Analyze A Study Folder On Demand

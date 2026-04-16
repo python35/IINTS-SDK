@@ -182,6 +182,9 @@ class PatientRuntimeConfig:
     time_step_minutes: int = 5
     api_host: str = "127.0.0.1"
     api_port: int = 8765
+    allow_remote_api: bool = False
+    api_token_env: str | None = None
+    api_token_file: str | None = None
     scenario_profile: str = "normal_day"
     seed: int | None = None
 

@@ -591,13 +591,18 @@ iints import-demo --output-dir results/demo_import
 ### Nightscout Import (Optional Dependency)
 ```bash
 pip install iints-sdk-python35[nightscout]
+export IINTS_NIGHTSCOUT_TOKEN="replace-me"
 iints import-nightscout --url https://your-nightscout.example \
+  --token-env IINTS_NIGHTSCOUT_TOKEN \
   --output-dir results/nightscout_import
 ```
 
+Prefer `--api-secret-env`, `--api-secret-file`, `--token-env`, or `--token-file` over plain CLI secrets.
+
 ### Tidepool Client Skeleton (Future Cloud Imports)
 ```bash
-iints import-tidepool --base-url https://api.tidepool.org --token YOUR_TOKEN
+export IINTS_TIDEPOOL_TOKEN="replace-me"
+iints import-tidepool --base-url https://api.tidepool.org --token-env IINTS_TIDEPOOL_TOKEN
 ```
 
 ### Demo Quickstart Workflow (Script)

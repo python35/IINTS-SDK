@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -135,3 +136,90 @@ def test_patient_scenarios_and_service_export(monkeypatch, tmp_path) -> None:
     assert bridge.exit_code == 0
     assert (bridge_dir / "iints_supervisor_bridge.ino").is_file()
     assert (bridge_dir / "bridge_protocol.txt").is_file()
+
+
+def test_patient_start_rejects_remote_api_without_opt_in(tmp_path) -> None:
+    workspace = tmp_path / "patient_runtime"
+    algo = tmp_path / "algo.py"
+    algo.write_text(ALGO_TEMPLATE, encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "patient",
+            "start",
+            "--algo",
+            str(algo),
+            "--workspace",
+            str(workspace),
+            "--api-host",
+            "0.0.0.0",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Remote API exposure is blocked by default" in result.stdout
+
+
+def test_patient_start_rejects_remote_api_without_token(monkeypatch, tmp_path) -> None:
+    workspace = tmp_path / "patient_runtime"
+    algo = tmp_path / "algo.py"
+    algo.write_text(ALGO_TEMPLATE, encoding="utf-8")
+    monkeypatch.setattr("iints.cli.patient_cli._start_api_server", lambda cfg: (_FakeServer(), _FakeThread()))
+
+    result = runner.invoke(
+        app,
+        [
+            "patient",
+            "start",
+            "--algo",
+            str(algo),
+            "--workspace",
+            str(workspace),
+            "--api-host",
+            "0.0.0.0",
+            "--allow-remote-api",
+            "--foreground",
+            "--max-steps",
+            "1",
+            "--reset",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "requires a control token" in result.stdout
+
+
+def test_patient_start_allows_remote_api_with_env_token(monkeypatch, tmp_path) -> None:
+    workspace = tmp_path / "patient_runtime"
+    algo = tmp_path / "algo.py"
+    algo.write_text(ALGO_TEMPLATE, encoding="utf-8")
+
+    monkeypatch.setenv("IINTS_REMOTE_TOKEN", "demo-token")
+    monkeypatch.setattr("iints.cli.patient_cli._start_api_server", lambda cfg: (_FakeServer(), _FakeThread()))
+
+    result = runner.invoke(
+        app,
+        [
+            "patient",
+            "start",
+            "--algo",
+            str(algo),
+            "--workspace",
+            str(workspace),
+            "--api-host",
+            "0.0.0.0",
+            "--allow-remote-api",
+            "--api-token-env",
+            "IINTS_REMOTE_TOKEN",
+            "--foreground",
+            "--max-steps",
+            "1",
+            "--reset",
+        ],
+    )
+
+    assert result.exit_code == 0
+    config = json.loads((workspace / "patient_runtime_config.json").read_text(encoding="utf-8"))
+    assert config["allow_remote_api"] is True
+    assert config["api_token_env"] == "IINTS_REMOTE_TOKEN"

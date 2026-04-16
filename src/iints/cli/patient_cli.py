@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Optional
 
@@ -72,6 +74,55 @@ def _parse_speed(value: str | float) -> float:
     return parsed
 
 
+def _is_loopback_api_host(host: str) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def _resolve_api_token_sources(
+    *,
+    api_token: str | None,
+    api_token_env: str | None,
+    api_token_file: Path | None,
+) -> tuple[str | None, str | None]:
+    configured_sources = [
+        source
+        for source, value in (
+            ("api_token", api_token),
+            ("api_token_env", api_token_env),
+            ("api_token_file", api_token_file),
+        )
+        if value
+    ]
+    if len(configured_sources) > 1:
+        raise typer.BadParameter(
+            "Choose only one API token source: --api-token, --api-token-env, or --api-token-file."
+        )
+    if api_token:
+        env_name = "IINTS_PATIENT_API_TOKEN"
+        os.environ[env_name] = api_token
+        return env_name, None
+    if api_token_env:
+        value = os.getenv(api_token_env, "").strip()
+        if not value:
+            raise typer.BadParameter(
+                f"Environment variable '{api_token_env}' is not set or is empty."
+            )
+        return api_token_env, None
+    if api_token_file:
+        token_path = api_token_file.expanduser().resolve()
+        if not token_path.is_file():
+            raise typer.BadParameter(f"API token file does not exist: {token_path}")
+        if not token_path.read_text(encoding="utf-8").strip():
+            raise typer.BadParameter(f"API token file is empty: {token_path}")
+        return None, str(token_path)
+    return None, None
+
+
 def _resolve_review_inputs(workspace: Path, mdmp_cert: Path | None) -> tuple[Path, Path, Path | None]:
     bundle_dir = workspace.expanduser().resolve() / "live_bundle"
     outputs = prepare_ai_ready_artifacts(bundle_dir, create_dev_mdmp_cert=mdmp_cert is None)
@@ -104,8 +155,21 @@ def start(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
     mode: Annotated[str, typer.Option(help="Clock mode: real-time or demo-time.")] = "demo-time",
     speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts values like 60 or 60x.")] = "60x",
-    api_host: Annotated[str, typer.Option(help="Host for the local FastAPI dashboard service.")] = "127.0.0.1",
+    api_host: Annotated[str, typer.Option(help="Host for the FastAPI dashboard service. Loopback is the safe default; non-loopback requires --allow-remote-api plus a token.")] = "127.0.0.1",
     api_port: Annotated[int, typer.Option(help="Port for the local FastAPI dashboard service.")] = 8765,
+    allow_remote_api: Annotated[bool, typer.Option(help="Allow the dashboard API to listen on a non-loopback host. Use this only with --api-token-env, --api-token-file, or --api-token.")] = False,
+    api_token: Annotated[
+        Optional[str],
+        typer.Option(help="Bearer token for dashboard and control access. Prefer --api-token-env or --api-token-file in shared environments."),
+    ] = None,
+    api_token_env: Annotated[
+        Optional[str],
+        typer.Option(help="Environment variable name that stores the dashboard/control bearer token."),
+    ] = None,
+    api_token_file: Annotated[
+        Optional[Path],
+        typer.Option(help="Path to a file containing the dashboard/control bearer token."),
+    ] = None,
     seed: Annotated[Optional[int], typer.Option(help="Optional deterministic simulation seed.")] = None,
     foreground: Annotated[bool, typer.Option("--foreground", hidden=True)] = False,
     max_steps: Annotated[Optional[int], typer.Option("--max-steps", hidden=True)] = None,
@@ -122,6 +186,22 @@ def start(
     speed_value = _parse_speed(speed)
     profile = get_runtime_scenario_profile(scenario_profile)
     effective_seed = seed if seed is not None else profile.default_seed
+    token_env_name, token_file_value = _resolve_api_token_sources(
+        api_token=api_token,
+        api_token_env=api_token_env,
+        api_token_file=api_token_file,
+    )
+    if not _is_loopback_api_host(api_host):
+        if not allow_remote_api:
+            console.print(
+                "[bold red]Remote API exposure is blocked by default. Re-run with --allow-remote-api if you really want a non-loopback host.[/bold red]"
+            )
+            raise typer.Exit(code=1)
+        if token_env_name is None and token_file_value is None:
+            console.print(
+                "[bold red]Remote API exposure requires a control token. Use --api-token-env, --api-token-file, or --api-token.[/bold red]"
+            )
+            raise typer.Exit(code=1)
     cfg = PatientRuntimeConfig(
         workspace=str(workspace),
         algo_path=str(algo.expanduser().resolve()),
@@ -132,6 +212,9 @@ def start(
         speed=speed_value,
         api_host=api_host,
         api_port=api_port,
+        allow_remote_api=allow_remote_api,
+        api_token_env=token_env_name,
+        api_token_file=token_file_value,
         seed=effective_seed,
     )
     workspace.mkdir(parents=True, exist_ok=True)
@@ -180,6 +263,8 @@ def start(
             f"Dashboard: {cfg.dashboard_url}",
             f"API: {cfg.api_url}",
             f"Mode: {mode} ({speed_value:g}x)" if mode == "demo-time" else f"Mode: {mode}",
+            "Control API: protected with bearer token" if (token_env_name or token_file_value) else "Control API: localhost-only header guard",
+            "Dashboard auth: append ?token=<your-token> to browser URLs when token protection is enabled." if (token_env_name or token_file_value) else "Dashboard auth: not required on loopback URLs.",
             f"Status: iints patient status --workspace {workspace}",
             f"Reset: iints patient expo-reset --workspace {workspace}",
             f"Review: iints patient review --workspace {workspace} --model {DEFAULT_MINISTRAL_MODEL}",

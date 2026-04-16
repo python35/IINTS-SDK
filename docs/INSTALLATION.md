@@ -54,6 +54,12 @@ Use this when you mainly need:
 - UNO Q serial bridge support
 - optional local AI review
 
+Security defaults in this profile:
+
+- the digital-patient dashboard API stays on loopback by default
+- remote API binding now requires both `--allow-remote-api` and a bearer token source
+- public dataset downloads without a published SHA-256 now require `--no-verify` so the CLI does not pretend to verify an unknown checksum
+
 Important for UNO Q users:
 
 - if `iints edge ...` says `No such command 'edge'`, your installed CLI is older than the current docs
@@ -229,6 +235,91 @@ http://127.0.0.1:8765/dashboard
 ```
 
 Use Raspberry Pi Connect screen sharing from your laptop to present the live dashboard.
+
+Remote presentation note:
+
+- Raspberry Pi Connect does **not** require `--allow-remote-api`
+- the safest demo path is still to keep the API on `127.0.0.1`
+- only use remote API binding if another machine must talk to the dashboard directly
+
+If you really do need a remote API bind, use a token-backed start command:
+
+```bash
+export IINTS_PATIENT_API_TOKEN="replace-this-with-a-random-secret"
+
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x \
+  --api-host 0.0.0.0 \
+  --allow-remote-api \
+  --api-token-env IINTS_PATIENT_API_TOKEN
+```
+
+When token protection is enabled:
+
+- browser reads of `/dashboard`, `/kiosk`, `/status`, and glucose history also require the token
+- the simplest browser form is `http://<host>:8765/dashboard?token=<your-token>`
+- command-line or scripted access should prefer `Authorization: Bearer <token>`
+
+## Dataset Fetch Verification
+
+`iints data fetch` is stricter now.
+
+If a public source does **not** publish a pinned SHA-256, the SDK will no longer call that a verified download.
+
+So this can now happen intentionally:
+
+```bash
+iints data fetch aide_t1d --output-dir data_packs/public/aide_t1d
+```
+
+If the registry entry has no pinned hash yet, the secure fallback is:
+
+```bash
+iints data fetch aide_t1d \
+  --output-dir data_packs/public/aide_t1d \
+  --no-verify
+```
+
+Use `--no-verify` only when:
+
+- you trust the upstream source
+- the dataset entry still lacks a published checksum
+- you understand this is a trust decision, not a cryptographic verification
+
+The long-term fix is to add a pinned SHA-256 to `src/iints/data/datasets.json`.
+
+## Safer Nightscout And Tidepool Secrets
+
+Prefer environment variables or files over plain CLI secrets.
+
+Nightscout:
+
+```bash
+export IINTS_NIGHTSCOUT_SECRET="replace-me"
+export IINTS_NIGHTSCOUT_TOKEN="replace-me"
+
+iints import-nightscout \
+  --url https://your-nightscout.example \
+  --api-secret-env IINTS_NIGHTSCOUT_SECRET \
+  --token-env IINTS_NIGHTSCOUT_TOKEN \
+  --output-dir results/nightscout_import
+```
+
+Tidepool:
+
+```bash
+export IINTS_TIDEPOOL_TOKEN="replace-me"
+
+iints import-tidepool \
+  --base-url https://api.tidepool.org \
+  --token-env IINTS_TIDEPOOL_TOKEN
+```
+
+Plain `--token` and `--api-secret` still work for compatibility, but the CLI now warns because those values can leak into shell history and process lists.
 
 If this Pi will be left running unattended, export a ready-made systemd unit after the first start:
 

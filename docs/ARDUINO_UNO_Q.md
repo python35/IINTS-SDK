@@ -69,6 +69,12 @@ Success looks like:
 - `uno_q_bridge/iints_supervisor_bridge.ino` exists
 - the kiosk is available at `http://127.0.0.1:8765/kiosk`
 
+Security defaults:
+
+- the Linux-side dashboard stays on `127.0.0.1` unless you opt into remote binding
+- remote binding now requires both `--allow-remote-api` and a token source
+- bridge flashing and bridge testing do not require remote API exposure
+
 ## Quick Path
 
 If you want the fastest possible route to a working baseline, follow these four blocks first.
@@ -123,6 +129,7 @@ If you want the fastest possible route to a working baseline, follow these four 
 
     - `daemon_status` is `running`
     - the kiosk opens at `http://127.0.0.1:8765/kiosk`
+    - you can keep the dashboard local and still present it through Raspberry Pi Connect or another local screen-sharing path
 
 !!! warning "Step 4 - Flash and test the STM32 bridge"
     Flash the sketch with Arduino IDE or:
@@ -258,6 +265,41 @@ If you only want the MCU bridge scaffold without the full edge project, you can 
 ```bash
 iints edge hardware-bridge --board uno_q --output-dir uno_q_bridge
 ```
+
+## Linux Runtime API Security
+
+For most UNO Q setups, keep the Linux-side dashboard local:
+
+- use the default `127.0.0.1`
+- open the browser on the device itself
+- avoid exposing the dashboard port to the LAN unless you truly need it
+
+If you do need a remote browser or tool to reach the Linux-side dashboard directly, start it with an explicit token:
+
+```bash
+export IINTS_PATIENT_API_TOKEN="replace-this-with-a-random-secret"
+
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x \
+  --api-host 0.0.0.0 \
+  --allow-remote-api \
+  --api-token-env IINTS_PATIENT_API_TOKEN
+```
+
+When token protection is enabled:
+
+- browser access can use `http://<host>:8765/kiosk?token=<your-token>`
+- CLI and scripted access should prefer `Authorization: Bearer <token>`
+- control endpoints still require the extra `X-IINTS-Control: 1` header
+
+Important:
+
+- this protection is for the Linux dashboard/API only
+- the STM32 serial bridge still uses the separate UNO Q bridge protocol
 
 ## Step 3: Start The Linux-Side Digital Patient
 

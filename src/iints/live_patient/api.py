@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -18,13 +19,18 @@ class ScenarioResetRequest(BaseModel):
     scenario_profile: str = Field(..., description="Scenario profile to load during expo reset")
 
 
-def _render_dashboard_html(*, kiosk: bool = False) -> str:
+CONTROL_HEADER_NAME = "X-IINTS-Control"
+CONTROL_HEADER_VALUE = "1"
+
+
+def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None) -> str:
     body_class = "kiosk" if kiosk else ""
     subtitle = (
         "Fullscreen expo view for the persistent IINTS digital patient."
         if kiosk
         else "A live virtual diabetes patient running on-device for expo demos, teaching, and long-horizon algorithm validation."
     )
+    token_literal = json.dumps(api_token or "")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -118,6 +124,10 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
     <p class="footer">Tip: present this page full-screen on the Raspberry Pi and use <code>Raspberry Pi Connect</code> screen sharing to control it from your laptop.</p>
   </div>
   <script>
+    const CONTROL_HEADER_NAME = {json.dumps(CONTROL_HEADER_NAME)};
+    const CONTROL_HEADER_VALUE = {json.dumps(CONTROL_HEADER_VALUE)};
+    const AUTH_TOKEN = {token_literal};
+
     async function fetchJson(path, options) {{
       const response = await fetch(path, options);
       if (!response.ok) {{
@@ -126,13 +136,31 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
       return response.json();
     }}
 
+    function buildControlHeaders() {{
+      const headers = {{
+        'Content-Type': 'application/json',
+        [CONTROL_HEADER_NAME]: CONTROL_HEADER_VALUE,
+      }};
+      if (AUTH_TOKEN) {{
+        headers['Authorization'] = `Bearer ${{AUTH_TOKEN}}`;
+      }}
+      return headers;
+    }}
+
+    function buildReadHeaders() {{
+      if (!AUTH_TOKEN) {{
+        return {{}};
+      }}
+      return {{ 'Authorization': `Bearer ${{AUTH_TOKEN}}` }};
+    }}
+
     function setStatusNote(message) {{
       document.getElementById('status-note').textContent = message;
     }}
 
     async function sendCommand(path) {{
       try {{
-        await fetchJson(path, {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }} }});
+        await fetchJson(path, {{ method: 'POST', headers: buildControlHeaders() }});
         setStatusNote(`Queued: ${{path.split('/').pop()}}`);
         await refresh();
       }} catch (error) {{
@@ -145,7 +173,7 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
       try {{
         await fetchJson('/control/scenario-reset', {{
           method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
+          headers: buildControlHeaders(),
           body: JSON.stringify({{ scenario_profile: profile }})
         }});
         setStatusNote(`Queued scenario reset: ${{profile}}`);
@@ -160,7 +188,7 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
       try {{
         await fetchJson('/events/meal', {{
           method: 'POST',
-          headers: {{ 'Content-Type': 'application/json' }},
+          headers: buildControlHeaders(),
           body: JSON.stringify({{ carbs }})
         }});
         setStatusNote(`Queued: manual meal (${{carbs}} g)`);
@@ -223,8 +251,8 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
     async function refresh() {{
       try {{
         const [status, history] = await Promise.all([
-          fetchJson('/status'),
-          fetchJson('/glucose/history?limit=96')
+          fetchJson('/status', {{ headers: buildReadHeaders() }}),
+          fetchJson('/glucose/history?limit=96', {{ headers: buildReadHeaders() }})
         ]);
         document.getElementById('runtime-status').textContent = status.daemon_status || '-';
         document.getElementById('runtime-clock').textContent = status.simulated_clock || '-';
@@ -253,36 +281,63 @@ def _render_dashboard_html(*, kiosk: bool = False) -> str:
 """
 
 
-def create_patient_app(workspace: str | Path) -> FastAPI:
+def create_patient_app(workspace: str | Path, api_token: str | None = None) -> FastAPI:
     workspace_path = Path(workspace).expanduser().resolve()
     store = PatientRuntimeStore(workspace_path / "patient_state.db")
     app = FastAPI(title="IINTS Digital Patient")
 
+    def _request_token(request: Request) -> str | None:
+        authorization = request.headers.get("Authorization", "")
+        if authorization.startswith("Bearer "):
+            return authorization[7:].strip()
+        query_token = request.query_params.get("token")
+        return query_token.strip() if query_token else None
+
+    def _require_read_access(request: Request) -> None:
+        if api_token is None:
+            return
+        if _request_token(request) != api_token:
+            raise HTTPException(status_code=401, detail="Missing or invalid bearer token.")
+
+    def _require_control_access(request: Request) -> None:
+        _require_read_access(request)
+        if request.headers.get(CONTROL_HEADER_NAME) != CONTROL_HEADER_VALUE:
+            raise HTTPException(
+                status_code=403,
+                detail="Control requests must include the dedicated IINTS control header.",
+            )
+
     @app.get("/", response_class=HTMLResponse)
-    def root() -> str:
-        return _render_dashboard_html()
+    def root(request: Request) -> str:
+        _require_read_access(request)
+        return _render_dashboard_html(api_token=api_token)
 
     @app.get("/dashboard", response_class=HTMLResponse)
-    def dashboard() -> str:
-        return _render_dashboard_html()
+    def dashboard(request: Request) -> str:
+        _require_read_access(request)
+        return _render_dashboard_html(api_token=api_token)
 
     @app.get("/kiosk", response_class=HTMLResponse)
-    def kiosk() -> str:
-        return _render_dashboard_html(kiosk=True)
+    def kiosk(request: Request) -> str:
+        _require_read_access(request)
+        return _render_dashboard_html(kiosk=True, api_token=api_token)
 
     @app.get("/status")
-    def status() -> JSONResponse:
+    def status(request: Request) -> JSONResponse:
+        _require_read_access(request)
         return JSONResponse(summarize_edge_workspace(workspace_path))
 
     @app.get("/glucose/latest")
-    def glucose_latest() -> JSONResponse:
+    def glucose_latest(request: Request) -> JSONResponse:
+        _require_read_access(request)
         latest = store.get_latest_reading()
         if latest is None:
             raise HTTPException(status_code=404, detail="No glucose samples recorded yet.")
         return JSONResponse(latest)
 
     @app.get("/glucose/history")
-    def glucose_history(limit: int = 288) -> JSONResponse:
+    def glucose_history(request: Request, limit: int = 288) -> JSONResponse:
+        _require_read_access(request)
         rows = store.get_recent_readings(limit=limit)
         payload = {
             "records": [
@@ -299,32 +354,38 @@ def create_patient_app(workspace: str | Path) -> FastAPI:
         return JSONResponse(payload)
 
     @app.post("/events/meal")
-    def inject_meal(request: MealRequest) -> JSONResponse:
+    def inject_meal(request: MealRequest, http_request: Request) -> JSONResponse:
+        _require_control_access(http_request)
         command_id = store.enqueue_command("inject_meal", {"carbs": request.carbs})
         return JSONResponse({"command_id": command_id, "queued": True})
 
     @app.post("/control/pause")
-    def pause() -> JSONResponse:
+    def pause(request: Request) -> JSONResponse:
+        _require_control_access(request)
         command_id = store.enqueue_command("pause")
         return JSONResponse({"command_id": command_id, "queued": True})
 
     @app.post("/control/resume")
-    def resume() -> JSONResponse:
+    def resume(request: Request) -> JSONResponse:
+        _require_control_access(request)
         command_id = store.enqueue_command("resume")
         return JSONResponse({"command_id": command_id, "queued": True})
 
     @app.post("/control/expo-reset")
-    def expo_reset() -> JSONResponse:
+    def expo_reset(request: Request) -> JSONResponse:
+        _require_control_access(request)
         command_id = store.enqueue_command("expo_reset")
         return JSONResponse({"command_id": command_id, "queued": True})
 
     @app.post("/control/scenario-reset")
-    def scenario_reset(request: ScenarioResetRequest) -> JSONResponse:
+    def scenario_reset(request: ScenarioResetRequest, http_request: Request) -> JSONResponse:
+        _require_control_access(http_request)
         command_id = store.enqueue_command("expo_reset", {"scenario_profile": request.scenario_profile})
         return JSONResponse({"command_id": command_id, "queued": True})
 
     @app.post("/control/stop")
-    def stop() -> JSONResponse:
+    def stop(request: Request) -> JSONResponse:
+        _require_control_access(request)
         command_id = store.enqueue_command("stop")
         return JSONResponse({"command_id": command_id, "queued": True})
 

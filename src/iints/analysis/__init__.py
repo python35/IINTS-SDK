@@ -25,6 +25,15 @@ from .study_analysis import (
     StudyRunSummary,
     StudySummary,
 )
+from .eucys_results import (
+    build_eucys_abstract_draft_markdown,
+    build_eucys_filled_abstract_markdown,
+    build_eucys_jury_qa_markdown,
+    build_eucys_limitations_and_ethics_markdown,
+    build_eucys_poster_outline_markdown,
+    generate_eucys_main_figure,
+    generate_eucys_results_bundle,
+)
 
 
 def _missing_reports_dependency(feature: str, exc: Exception) -> None:
@@ -90,7 +99,14 @@ __all__ = [
     "ClinicalReportGenerator",
     "compute_metrics",
     "compare_studies",
+    "build_eucys_abstract_draft_markdown",
+    "build_eucys_filled_abstract_markdown",
+    "build_eucys_jury_qa_markdown",
+    "build_eucys_limitations_and_ethics_markdown",
+    "build_eucys_poster_outline_markdown",
+    "generate_eucys_main_figure",
     "resolve_profile_specs",
+    "generate_eucys_results_bundle",
     "generate_results_poster",
     "generate_study_poster",
     "build_algorithm_registry",

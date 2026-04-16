@@ -29,6 +29,7 @@ from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
 from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.analysis.eucys_results import generate_eucys_results_bundle
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
 from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
 from iints.analysis.study_protocol import write_study_protocol_bundle
@@ -1565,108 +1566,30 @@ def _write_eucys_result_package(
     per_arm_outputs: Dict[str, Dict[str, Path]],
     comparison_outputs: list[Path],
 ) -> Dict[str, Path]:
+    bundle_outputs = generate_eucys_results_bundle(root_dir, output_dir=root_dir / "EUCYS_RESULTS")
     summary_path = root_dir / "EUCYS_SUMMARY.md"
     results_table_path = root_dir / "EUCYS_RESULTS_TABLE.csv"
     figure_manifest_path = root_dir / "EUCYS_FIGURE_MANIFEST.json"
     limitations_path = root_dir / "EUCYS_LIMITATIONS.md"
+    abstract_filled_path = root_dir / "EUCYS_ABSTRACT_FILLED.md"
+    main_figure_path = root_dir / "EUCYS_MAIN_FIGURE.png"
+    main_figure_csv_path = root_dir / "EUCYS_MAIN_FIGURE.csv"
 
-    table_rows: list[Dict[str, Any]] = []
-    for arm_id, outputs in per_arm_outputs.items():
-        payload = json.loads(outputs["summary_json"].read_text(encoding="utf-8"))
-        aggregate = payload.get("aggregate", {})
-        safety = payload.get("safety_summary", {})
-        table_rows.append(
-            {
-                "arm_id": arm_id,
-                "run_count": payload.get("run_count"),
-                "mean_tir_70_180": aggregate.get("mean_tir_70_180"),
-                "mean_tir_below_70": aggregate.get("mean_tir_below_70"),
-                "mean_supervisor_interventions": aggregate.get("mean_supervisor_interventions"),
-                "severe_hypo_run_count": safety.get("severe_hypo_run_count"),
-                "terminated_early_run_count": safety.get("terminated_early_run_count"),
-                "poster_png": str(outputs["poster_png"]),
-            }
-        )
-    pd.DataFrame(table_rows).to_csv(results_table_path, index=False)
-
-    summary_lines = [
-        "# EUCYS Study Summary",
-        "",
-        f"- Protocol: `{protocol_outputs['protocol_markdown']}`",
-        f"- Result table: `{results_table_path}`",
-        f"- Comparison files: `{len(comparison_outputs)}`",
-        "",
-        "## Arms",
-        "",
-    ]
-    for row in table_rows:
-        summary_lines.extend(
-            [
-                f"### {row['arm_id']}",
-                f"- Run count: `{row['run_count']}`",
-                f"- Mean TIR 70-180: `{row['mean_tir_70_180']}`",
-                f"- Mean TIR <70: `{row['mean_tir_below_70']}`",
-                f"- Mean interventions: `{row['mean_supervisor_interventions']}`",
-                f"- Severe hypo runs: `{row['severe_hypo_run_count']}`",
-                f"- Early terminations: `{row['terminated_early_run_count']}`",
-                "",
-            ]
-        )
-    summary_path.write_text("\n".join(summary_lines), encoding="utf-8")
-
-    limitations_lines = [
-        "# EUCYS Limitations And Scope",
-        "",
-        "This package is a preclinical benchmark bundle, not a clinical efficacy claim.",
-        "",
-        "## What this bundle does support",
-        "",
-        "- Reproducible simulation-first comparisons",
-        "- Baseline-vs-candidate benchmarking",
-        "- Safety-on vs safety-off analysis",
-        "- Corrupted-data ablation",
-        "- Audit-friendly study artifacts",
-        "",
-        "## What this bundle does not support",
-        "",
-        "- Real-world dosing advice",
-        "- Clinical deployment claims",
-        "- Population-wide generalization claims beyond the included profiles and scenarios",
-        "- Replacement of supervised medical evaluation",
-        "",
-        "## Important caveats",
-        "",
-        "- The patient profiles are simulated abstractions.",
-        "- External reference metrics are plausibility checks, not proof of clinical validity.",
-        "- Safety conclusions are relative to the encoded supervisor and scenario design.",
-        "- Controller ranking may change with different patient populations, dynamics, or feature sets.",
-        "",
-    ]
-    limitations_path.write_text("\n".join(limitations_lines), encoding="utf-8")
-
-    manifest_payload = {
-        "bundle_kind": "eucys_result_package",
-        "protocol": protocol_outputs,
-        "per_arm_outputs": {
-            arm_id: {name: str(path) for name, path in outputs.items()}
-            for arm_id, outputs in per_arm_outputs.items()
-        },
-        "comparison_outputs": [str(path) for path in comparison_outputs],
-        "results_table_csv": str(results_table_path),
-        "summary_markdown": str(summary_path),
-        "limitations_markdown": str(limitations_path),
-        "poster_assets": {
-            arm_id: str(outputs["poster_png"])
-            for arm_id, outputs in per_arm_outputs.items()
-            if "poster_png" in outputs
-        },
-    }
-    figure_manifest_path.write_text(json.dumps(manifest_payload, indent=2), encoding="utf-8")
+    shutil.copy2(bundle_outputs["summary_markdown"], summary_path)
+    shutil.copy2(bundle_outputs["results_table_csv"], results_table_path)
+    shutil.copy2(bundle_outputs["figure_manifest_json"], figure_manifest_path)
+    shutil.copy2(bundle_outputs["limitations_markdown"], limitations_path)
+    shutil.copy2(bundle_outputs["abstract_filled_markdown"], abstract_filled_path)
+    shutil.copy2(bundle_outputs["main_figure_png"], main_figure_path)
+    shutil.copy2(bundle_outputs["main_figure_csv"], main_figure_csv_path)
     return {
         "summary_markdown": summary_path,
         "results_table_csv": results_table_path,
         "figure_manifest_json": figure_manifest_path,
         "limitations_markdown": limitations_path,
+        "abstract_filled_markdown": abstract_filled_path,
+        "main_figure_png": main_figure_path,
+        "main_figure_csv": main_figure_csv_path,
     }
 
 
@@ -2134,6 +2057,8 @@ def run_study(
         table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
         table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
         table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
+        table.add_row("EUCYS filled abstract", str(eucys_outputs["abstract_filled_markdown"]))
+        table.add_row("EUCYS main figure", str(eucys_outputs["main_figure_png"]))
         table.add_row("EUCYS limitations", str(eucys_outputs["limitations_markdown"]))
     console.print(table)
 
@@ -2220,7 +2145,42 @@ def run_eucys_study(
     table.add_row("EUCYS summary", str(eucys_outputs["summary_markdown"]))
     table.add_row("EUCYS results table", str(eucys_outputs["results_table_csv"]))
     table.add_row("EUCYS figure manifest", str(eucys_outputs["figure_manifest_json"]))
+    table.add_row("EUCYS filled abstract", str(eucys_outputs["abstract_filled_markdown"]))
+    table.add_row("EUCYS main figure", str(eucys_outputs["main_figure_png"]))
     table.add_row("EUCYS limitations", str(eucys_outputs["limitations_markdown"]))
+    console.print(table)
+
+
+@app.command("eucys-results")
+def eucys_results(
+    study_dir: Annotated[Path, typer.Argument(help="Root directory of a completed EUCYS or run-study bundle.")],
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional output directory for the packaged EUCYS results bundle. Defaults to <study_dir>/EUCYS_RESULTS."),
+    ] = None,
+) -> None:
+    """Build a competition-ready EUCYS results folder from an existing study bundle."""
+    console = Console()
+    try:
+        outputs = generate_eucys_results_bundle(study_dir, output_dir=output_dir)
+    except Exception as exc:
+        console.print(f"[bold red]EUCYS results generation failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS EUCYS Results Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("Bundle root", outputs["bundle_root"])
+    table.add_row("Summary markdown", outputs["summary_markdown"])
+    table.add_row("Results table", outputs["results_table_csv"])
+    table.add_row("Figure manifest", outputs["figure_manifest_json"])
+    table.add_row("Reproducibility bundle", outputs["reproducibility_bundle_json"])
+    table.add_row("Abstract draft", outputs["abstract_markdown"])
+    table.add_row("Abstract filled", outputs["abstract_filled_markdown"])
+    table.add_row("Poster outline", outputs["poster_outline_markdown"])
+    table.add_row("Jury Q&A", outputs["jury_qa_markdown"])
+    table.add_row("Limitations & ethics", outputs["limitations_markdown"])
+    table.add_row("Main figure", outputs["main_figure_png"])
     console.print(table)
 
 
@@ -4337,7 +4297,7 @@ def data_fetch(
     dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
     output_dir: Annotated[Optional[Path], typer.Option(help="Output directory (default: data_packs/official/<id>)")] = None,
     extract: Annotated[bool, typer.Option(help="Extract zip files if present")] = True,
-    verify: Annotated[bool, typer.Option(help="Verify SHA-256 if available and emit SHA256SUMS.txt")] = True,
+    verify: Annotated[bool, typer.Option(help="Verify pinned SHA-256 hashes and emit SHA256SUMS.txt. Public sources without published hashes now require --no-verify.")] = True,
 ):
     """Download a dataset (public-download only)."""
     console = Console()
@@ -4371,6 +4331,49 @@ def data_fetch(
     except DatasetFetchError as e:
         console.print(f"[bold red]{e}[/bold red]")
         raise typer.Exit(code=1)
+
+
+def _resolve_secret_option(
+    *,
+    console: Console,
+    label: str,
+    direct_value: Optional[str],
+    env_name: Optional[str],
+    file_path: Optional[Path],
+) -> Optional[str]:
+    configured_sources = [
+        source
+        for source, value in (
+            ("direct", direct_value),
+            ("env", env_name),
+            ("file", file_path),
+        )
+        if value
+    ]
+    if len(configured_sources) > 1:
+        raise typer.BadParameter(
+            f"Choose only one source for {label}: direct value, --{label.replace('_', '-')}-env, or --{label.replace('_', '-')}-file."
+        )
+    if direct_value:
+        console.print(
+            f"[yellow]Warning:[/yellow] passing {label} directly on the command line can leak into shell history or process lists. "
+            f"Prefer --{label.replace('_', '-')}-env or --{label.replace('_', '-')}-file."
+        )
+        return direct_value
+    if env_name:
+        value = os.getenv(env_name, "").strip()
+        if not value:
+            raise typer.BadParameter(f"Environment variable '{env_name}' is not set or is empty.")
+        return value
+    if file_path:
+        resolved_path = file_path.expanduser().resolve()
+        if not resolved_path.is_file():
+            raise typer.BadParameter(f"Secret file does not exist: {resolved_path}")
+        value = resolved_path.read_text(encoding="utf-8").strip()
+        if not value:
+            raise typer.BadParameter(f"Secret file is empty: {resolved_path}")
+        return value
+    return None
 
 
 def _build_data_contract_template() -> Dict[str, Any]:
@@ -5821,7 +5824,11 @@ def import_nightscout_cmd(
     url: Annotated[str, typer.Option(help="Nightscout base URL")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/nightscout_import"),
     api_secret: Annotated[Optional[str], typer.Option(help="API secret (if required)")] = None,
+    api_secret_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Nightscout API secret.")] = None,
+    api_secret_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Nightscout API secret.")] = None,
     token: Annotated[Optional[str], typer.Option(help="API token (if required)")] = None,
+    token_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Nightscout API token.")] = None,
+    token_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Nightscout API token.")] = None,
     start: Annotated[Optional[str], typer.Option(help="Start time (ISO string)")] = None,
     end: Annotated[Optional[str], typer.Option(help="End time (ISO string)")] = None,
     limit: Annotated[Optional[int], typer.Option(help="Limit number of entries")] = None,
@@ -5829,10 +5836,24 @@ def import_nightscout_cmd(
 ):
     """Import CGM entries from Nightscout into a scenario + standard CSV."""
     console = Console()
+    resolved_api_secret = _resolve_secret_option(
+        console=console,
+        label="api_secret",
+        direct_value=api_secret,
+        env_name=api_secret_env,
+        file_path=api_secret_file,
+    )
+    resolved_token = _resolve_secret_option(
+        console=console,
+        label="token",
+        direct_value=token,
+        env_name=token_env,
+        file_path=token_file,
+    )
     config = NightscoutConfig(
         url=url,
-        api_secret=api_secret,
-        token=token,
+        api_secret=resolved_api_secret,
+        token=resolved_token,
         start=start,
         end=end,
         limit=limit,
@@ -5859,10 +5880,19 @@ def import_nightscout_cmd(
 def import_tidepool_cmd(
     base_url: Annotated[str, typer.Option(help="Tidepool API base URL")] = "https://api.tidepool.org",
     token: Annotated[Optional[str], typer.Option(help="Bearer token")] = None,
+    token_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Tidepool bearer token.")] = None,
+    token_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Tidepool bearer token.")] = None,
 ):
     """Skeleton Tidepool client for future cloud imports."""
     console = Console()
-    client = TidepoolClient(base_url=base_url, token=token)
+    resolved_token = _resolve_secret_option(
+        console=console,
+        label="token",
+        direct_value=token,
+        env_name=token_env,
+        file_path=token_file,
+    )
+    client = TidepoolClient(base_url=base_url, token=resolved_token)
     try:
         _ = client._headers()
     except Exception as exc:

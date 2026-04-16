@@ -199,6 +199,12 @@ That flow gives you:
 - a live dashboard on `http://127.0.0.1:8765/dashboard`
 - a run-like bundle under `patient_runtime/live_bundle/`
 
+Security default:
+
+- the dashboard stays on loopback by default
+- for remote presentation, prefer Raspberry Pi Connect instead of opening the API to the LAN
+- if you truly need a non-loopback bind, use `--allow-remote-api` together with `--api-token-env` or `--api-token-file`
+
 Full guide: [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 
 ### Build An Edge-Ready SBC Project

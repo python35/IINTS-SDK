@@ -1300,9 +1300,10 @@ iints run \
 pip install iints-sdk-python35[nightscout]
 
 # Import from Nightscout
+export IINTS_NIGHTSCOUT_TOKEN="replace-me"
 iints import-nightscout \
   --url https://your-nightscout-site.herokuapp.com \
-  --days 7 \
+  --token-env IINTS_NIGHTSCOUT_TOKEN \
   --output-dir results/nightscout_import
 ```
 
@@ -1312,7 +1313,7 @@ iints import-nightscout \
 iints data list
 
 # Fetch specific dataset
-iints data fetch aide_t1d --output-dir data_packs/aide
+iints data fetch aide_t1d --output-dir data_packs/aide --no-verify
 
 # Use in simulation
 iints run \
@@ -1363,7 +1364,7 @@ iints data list
 iints data info aide_t1d
 
 # Fetch dataset
-iints data fetch aide_t1d --output-dir data_packs/aide
+iints data fetch aide_t1d --output-dir data_packs/aide --no-verify
 
 # Cite dataset in publication
 iints data cite aide_t1d
@@ -1376,6 +1377,8 @@ iints data cite aide_t1d
 - `sample`: Bundled demo data (no download needed)
 
 **Integrity and reproducibility**
+- Public sources without a published pinned SHA-256 now require `--no-verify`.
+- Use that flag only when you trust the upstream source and understand that this is not cryptographic verification.
 - Every dataset entry includes a SHA-256 checksum and citation metadata.
 - The fetch command validates the checksum automatically.
 - Use `iints data info <dataset>` to record version and hash in your paper.

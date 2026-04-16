@@ -5,6 +5,7 @@ import urllib.request
 import zipfile
 import hashlib
 import shutil
+import stat
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Dict, List, Optional, IO, cast
@@ -114,8 +115,30 @@ def _maybe_extract_zip(path: Path, output_dir: Path) -> None:
     if path.suffix.lower() != ".zip":
         return
     try:
+        output_root = output_dir.resolve()
         with zipfile.ZipFile(path, "r") as zip_ref:
-            zip_ref.extractall(output_dir)
+            for info in zip_ref.infolist():
+                target = (output_dir / info.filename).resolve()
+                try:
+                    target.relative_to(output_root)
+                except ValueError as exc:
+                    raise DatasetFetchError(
+                        f"Refusing to extract unsafe ZIP member '{info.filename}' from {path.name}."
+                    ) from exc
+
+                mode = (info.external_attr >> 16) & 0o170000
+                if stat.S_IFMT(mode) == stat.S_IFLNK:
+                    raise DatasetFetchError(
+                        f"Refusing to extract symlink ZIP member '{info.filename}' from {path.name}."
+                    )
+
+                if info.is_dir():
+                    target.mkdir(parents=True, exist_ok=True)
+                    continue
+
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with zip_ref.open(info, "r") as src, target.open("wb") as dst:
+                    shutil.copyfileobj(src, dst)
     except Exception as exc:
         raise DatasetFetchError(f"Failed to extract {path.name}: {exc}") from exc
 
@@ -168,6 +191,18 @@ def fetch_dataset(
         raise DatasetFetchError(
             "This dataset requires manual download or approval. Use 'iints data info' for instructions."
         )
+    if verify and access == "public-download":
+        missing_hash_urls = [
+            url
+            for idx, url in enumerate(urls)
+            if _get_expected_hash(dataset, idx) is None
+        ]
+        if missing_hash_urls:
+            raise DatasetFetchError(
+                f"Dataset '{dataset_id}' does not publish a pinned SHA-256 for one or more downloads. "
+                "Verification would be misleading here, so the fetch was blocked. "
+                "Retry with --no-verify only if you trust the source, or add the checksum to datasets.json."
+            )
     output_dir.mkdir(parents=True, exist_ok=True)
     downloaded: List[Path] = []
     for idx, url in enumerate(urls):

@@ -74,6 +74,12 @@ That starts:
 - a run-like bundle under `patient_runtime/live_bundle/`
 - a fullscreen-friendly kiosk view at `/kiosk`
 
+Security defaults:
+
+- the dashboard/API listens on `127.0.0.1` by default
+- mutating dashboard actions require the internal IINTS control header
+- if you enable token protection, dashboard reads also require auth
+
 ## Day-To-Day Runtime Operations
 
 Check status:
@@ -153,6 +159,44 @@ The dashboard is intentionally lightweight and focuses on:
 - pause, resume, meal, and reset controls
 - quick scenario shortcuts
 
+## API Security Defaults
+
+The safest Raspberry Pi presentation path is still:
+
+- keep the API on `127.0.0.1`
+- open the dashboard locally on the Pi
+- use Raspberry Pi Connect to share that local browser window
+
+That means you usually do **not** need a remotely reachable dashboard port at all.
+
+If you do need another machine to talk directly to the dashboard API, opt in explicitly:
+
+```bash
+export IINTS_PATIENT_API_TOKEN="replace-this-with-a-random-secret"
+
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x \
+  --api-host 0.0.0.0 \
+  --allow-remote-api \
+  --api-token-env IINTS_PATIENT_API_TOKEN
+```
+
+When token protection is enabled:
+
+- the browser can use `http://<host>:8765/dashboard?token=<your-token>`
+- scripts and tools should use `Authorization: Bearer <token>`
+- `/dashboard`, `/kiosk`, `/status`, `/glucose/latest`, and `/glucose/history` are protected too
+- the control endpoints still require the extra `X-IINTS-Control: 1` header, which the built-in dashboard sends automatically
+
+Recommendation:
+
+- use token-backed remote access only when you truly need it
+- for booth demos, classrooms, and Raspberry Pi Connect, prefer loopback-only mode
+
 ## Scenario Profiles
 
 Built-in profiles:
@@ -186,6 +230,8 @@ A simple remote presentation flow is:
 5. Use the dashboard controls or CLI commands during the session.
 
 This keeps the actual runtime on the Pi while the laptop or workstation acts only as the remote presenter.
+
+This is also the security-friendly route because it avoids opening the dashboard API to the LAN in the first place.
 
 ## systemd Auto-Start
 

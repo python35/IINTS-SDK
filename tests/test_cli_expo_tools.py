@@ -251,7 +251,15 @@ def test_run_eucys_study_builds_scientific_bundle(monkeypatch, tmp_path) -> None
     assert (output_dir / "EUCYS_SUMMARY.md").is_file()
     assert (output_dir / "EUCYS_RESULTS_TABLE.csv").is_file()
     assert (output_dir / "EUCYS_FIGURE_MANIFEST.json").is_file()
+    assert (output_dir / "EUCYS_ABSTRACT_FILLED.md").is_file()
+    assert (output_dir / "EUCYS_MAIN_FIGURE.png").is_file()
     assert (output_dir / "EUCYS_LIMITATIONS.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_REPRODUCIBILITY_BUNDLE.json").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_ABSTRACT_DRAFT.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_ABSTRACT_FILLED.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_POSTER_OUTLINE.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_JURY_QA.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_MAIN_FIGURE.png").is_file()
 
 
 def test_run_study_builds_generic_scientific_bundle(monkeypatch, tmp_path) -> None:
@@ -331,3 +339,86 @@ def test_run_study_builds_generic_scientific_bundle(monkeypatch, tmp_path) -> No
     assert (output_dir / "study_corrupted" / "study_summary.json").is_file()
     assert (output_dir / "study_supervisor_off" / "study_summary.json").is_file()
     assert (output_dir / "comparisons" / "clean_vs_supervisor_off.json").is_file()
+
+
+def test_cli_eucys_results_packages_existing_bundle(tmp_path) -> None:
+    output_dir = tmp_path / "eucys_study"
+    protocol_dir = output_dir / "protocol"
+    protocol_dir.mkdir(parents=True)
+    (protocol_dir / "STUDY_PROTOCOL.md").write_text("# protocol", encoding="utf-8")
+    (protocol_dir / "study_matrix.csv").write_text("arm,seed\nclean,1\n", encoding="utf-8")
+    (protocol_dir / "algorithms.json").write_text("[]", encoding="utf-8")
+    (protocol_dir / "study_design.json").write_text(
+        json.dumps(
+            {
+                "matrix_rows": [1],
+                "profiles": [{"id": 1}],
+                "scenarios": [{"id": 1}],
+                "algorithms": [{"id": 1}, {"id": 2}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (output_dir / "study_summary.json").write_text(json.dumps({"run_count": 3}), encoding="utf-8")
+
+    summary_payload = {
+        "run_count": 1,
+        "aggregate": {
+            "mean_tir_70_180": 82.0,
+            "mean_tir_below_70": 2.0,
+            "mean_tir_above_180": 18.0,
+            "mean_glucose": 145.0,
+            "mean_supervisor_interventions": 3.0,
+        },
+        "safety_summary": {
+            "severe_hypo_run_count": 0,
+            "terminated_early_run_count": 0,
+        },
+        "by_algorithm": {
+            "CandidateAlgo": {
+                "aggregate": {
+                    "mean_tir_70_180": 82.0,
+                    "mean_tir_below_70": 2.0,
+                    "mean_tir_above_180": 18.0,
+                    "mean_glucose": 145.0,
+                    "mean_supervisor_interventions": 3.0,
+                }
+            },
+            "PID Controller": {
+                "aggregate": {
+                    "mean_tir_70_180": 78.0,
+                    "mean_tir_below_70": 2.5,
+                    "mean_tir_above_180": 22.0,
+                    "mean_glucose": 151.0,
+                    "mean_supervisor_interventions": 4.0,
+                }
+            },
+        },
+        "pairwise_baseline_deltas": {
+            "candidate_algorithm": "CandidateAlgo",
+            "baselines": {
+                "PID Controller": {
+                    "mean_deltas": {
+                        "tir_70_180": 4.0,
+                    }
+                }
+            },
+        },
+    }
+    for folder_name in ("study_clean", "study_corrupted", "study_supervisor_off"):
+        arm_dir = output_dir / folder_name
+        arm_dir.mkdir(parents=True)
+        (arm_dir / "study_summary.json").write_text(json.dumps(summary_payload), encoding="utf-8")
+        (arm_dir / "study_poster.png").write_text("png", encoding="utf-8")
+
+    comparisons_dir = output_dir / "comparisons"
+    comparisons_dir.mkdir(parents=True)
+    (comparisons_dir / "clean_vs_corrupted.json").write_text("{}", encoding="utf-8")
+
+    result = runner.invoke(app, ["eucys-results", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_REPRODUCIBILITY_BUNDLE.json").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_LIMITATIONS.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_ABSTRACT_FILLED.md").is_file()
+    assert (output_dir / "EUCYS_RESULTS" / "EUCYS_MAIN_FIGURE.png").is_file()
