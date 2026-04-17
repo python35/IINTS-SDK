@@ -90,6 +90,8 @@ def test_makerfaire_up_starts_pi_runtime_and_prints_kiosk(monkeypatch, tmp_path)
     algo.write_text("class Placeholder: pass\n", encoding="utf-8")
     (project_dir / "start_makerfaire_patient.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     (project_dir / "MAKERFAIRE_START.md").write_text("# guide\n", encoding="utf-8")
+    (project_dir / "install_makerfaire_autostart.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_AUTOSTART.md").write_text("# autostart\n", encoding="utf-8")
     (workspace / "iints-digital-patient.service").write_text("[Unit]\n", encoding="utf-8")
 
     cfg = PatientRuntimeConfig(
@@ -145,6 +147,7 @@ def test_makerfaire_up_starts_pi_runtime_and_prints_kiosk(monkeypatch, tmp_path)
     assert "IINTS Maker Faire Pi" in result.stdout
     assert "expo_hot_start" in result.stdout
     assert "start_makerfaire_patient.sh" in result.stdout
+    assert "install_makerfaire_autostart.sh" in result.stdout
 
 
 def test_makerfaire_up_resets_existing_runtime_without_restart(monkeypatch, tmp_path) -> None:
@@ -202,6 +205,45 @@ def test_makerfaire_up_resets_existing_runtime_without_restart(monkeypatch, tmp_
     assert reset_calls == [{"scenario_profile": "bad_carb_count", "seed": 777, "workspace": workspace}]
     assert kiosk_calls == [workspace]
     assert "bad_carb_count" in result.stdout
+
+
+def test_makerfaire_autostart_prints_generated_paths(tmp_path) -> None:
+    project_dir = tmp_path / "pi_demo"
+    workspace = project_dir / "patient_runtime"
+    workspace.mkdir(parents=True, exist_ok=True)
+    algo = project_dir / "algorithms" / "example_algorithm.py"
+    algo.parent.mkdir(parents=True, exist_ok=True)
+    algo.write_text("class Placeholder: pass\n", encoding="utf-8")
+
+    cfg = PatientRuntimeConfig(
+        workspace=str(workspace),
+        algo_path=str(algo),
+        patient_config="default_patient",
+        patient_model_type="auto",
+        scenario_profile="expo_hot_start",
+        mode="demo-time",
+        speed=60.0,
+        api_host="127.0.0.1",
+        api_port=8765,
+        seed=1101,
+    )
+    cfg.config_path.write_text(json.dumps(cfg.to_json(), indent=2), encoding="utf-8")
+
+    (project_dir / "start_makerfaire_patient.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_START.md").write_text("# guide\n", encoding="utf-8")
+    (project_dir / "open_makerfaire_kiosk.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "iints-makerfaire-kiosk.desktop").write_text("[Desktop Entry]\n", encoding="utf-8")
+    (project_dir / "install_makerfaire_autostart.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_AUTOSTART.md").write_text("# autostart\n", encoding="utf-8")
+    (workspace / "iints-digital-patient.service").write_text("[Unit]\n", encoding="utf-8")
+    (workspace / "iints-digital-patient.INSTALL.txt").write_text("sudo systemctl enable\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["makerfaire", "autostart", "--project-dir", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "IINTS Maker Faire Autostart" in result.stdout
+    assert "install_makerfaire_autostart.sh" in result.stdout
+    assert "Desktop Autologin" in result.stdout
 
 
 def test_edge_bridge_commands_and_doctor(monkeypatch, tmp_path) -> None:

@@ -6495,6 +6495,10 @@ def edge_setup(
         "kiosk_script",
         "makerfaire_script",
         "makerfaire_guide",
+        "makerfaire_kiosk_script",
+        "makerfaire_desktop_entry",
+        "makerfaire_autostart_script",
+        "makerfaire_autostart_guide",
         "update_script",
         "service_file",
         "service_notes",
@@ -6511,6 +6515,7 @@ def edge_setup(
                     f"Board profile: {normalized_board}",
                     f"CLI start: iints edge up --project-dir {outputs['root']}",
                     f"Maker Faire start: iints makerfaire up --project-dir {outputs['root']}",
+                    f"Maker Faire autostart: iints makerfaire autostart --project-dir {outputs['root']}",
                     f"CLI kiosk: iints edge kiosk --project-dir {outputs['root']}",
                     f"Setup guide: {outputs['setup_guide']}",
                 ]
@@ -6804,19 +6809,34 @@ def makerfaire_up(
 
     makerfaire_script = root / "start_makerfaire_patient.sh"
     makerfaire_guide = root / "MAKERFAIRE_START.md"
+    makerfaire_autostart_script = root / "install_makerfaire_autostart.sh"
+    makerfaire_autostart_guide = root / "MAKERFAIRE_AUTOSTART.md"
     if makerfaire_script.is_file():
         table.add_row("makerfaire_script", str(makerfaire_script))
     if makerfaire_guide.is_file():
         table.add_row("makerfaire_guide", str(makerfaire_guide))
+    if makerfaire_autostart_script.is_file():
+        table.add_row("makerfaire_autostart_script", str(makerfaire_autostart_script))
+    if makerfaire_autostart_guide.is_file():
+        table.add_row("makerfaire_autostart_guide", str(makerfaire_autostart_guide))
     service_files = sorted(workspace.glob("*.service"))
     if service_files:
         table.add_row("service_file", str(service_files[0]))
     console.print(table)
+    if makerfaire_script.is_file():
+        console.print(f"Maker Faire start script: {makerfaire_script.name}")
+    if makerfaire_guide.is_file():
+        console.print(f"Maker Faire quick guide: {makerfaire_guide.name}")
+    if makerfaire_autostart_script.is_file():
+        console.print(f"Maker Faire autostart installer: {makerfaire_autostart_script.name}")
+    if makerfaire_autostart_guide.is_file():
+        console.print(f"Maker Faire autostart guide: {makerfaire_autostart_guide.name}")
 
     next_steps = [
         f"Reset between visitors: iints edge reset --project-dir {root}",
         f"Check runtime status: iints edge status --project-dir {root}",
         f"Stop after the booth: iints edge stop --project-dir {root}",
+        f"Booth autostart guide: iints makerfaire autostart --project-dir {root}",
     ]
     if board == "uno_q":
         next_steps.append(f"Optional bridge terminal: iints edge bridge-run --project-dir {root} --port /dev/ttyACM0")
@@ -6824,6 +6844,72 @@ def makerfaire_up(
         Panel(
             "\n".join(next_steps),
             title="Maker Faire Next Steps",
+            border_style="green",
+        )
+    )
+
+
+@makerfaire_app.command("autostart")
+def makerfaire_autostart(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+) -> None:
+    """Show the generated Raspberry Pi autostart files and install steps."""
+    console = Console()
+    root = _resolve_edge_project_dir(project_dir)
+    cfg = _load_edge_project_config(root, workspace_name=workspace_name)
+    workspace = Path(cfg.workspace).expanduser().resolve()
+    service_files = sorted(workspace.glob("*.service"))
+    install_files = sorted(workspace.glob("*.INSTALL.txt"))
+
+    artifacts = {
+        "service_file": service_files[0] if service_files else workspace / "iints-digital-patient.service",
+        "service_notes": install_files[0] if install_files else workspace / "iints-digital-patient.INSTALL.txt",
+        "makerfaire_script": root / "start_makerfaire_patient.sh",
+        "makerfaire_guide": root / "MAKERFAIRE_START.md",
+        "makerfaire_kiosk_script": root / "open_makerfaire_kiosk.sh",
+        "makerfaire_desktop_entry": root / "iints-makerfaire-kiosk.desktop",
+        "makerfaire_autostart_script": root / "install_makerfaire_autostart.sh",
+        "makerfaire_autostart_guide": root / "MAKERFAIRE_AUTOSTART.md",
+    }
+
+    missing = [name for name, path in artifacts.items() if not path.is_file()]
+    if missing:
+        console.print(
+            "[bold red]This project is missing some Maker Faire autostart artifacts.[/bold red] "
+            "Regenerate it with `iints edge setup` or run the command inside a fresh edge project."
+        )
+        for name in missing:
+            console.print(f"- missing: {artifacts[name]}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Maker Faire Autostart")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for name, path in artifacts.items():
+        table.add_row(name, str(path))
+    console.print(table)
+    console.print(f"Autostart installer: {artifacts['makerfaire_autostart_script'].name}")
+    console.print(f"Desktop entry: {artifacts['makerfaire_desktop_entry'].name}")
+    console.print(f"Kiosk opener: {artifacts['makerfaire_kiosk_script'].name}")
+
+    kiosk_url = f"http://{cfg.api_host}:{cfg.api_port}/kiosk"
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "1. Test the normal booth flow first:",
+                    f"   ./start_makerfaire_patient.sh",
+                    "2. Install booth autostart on the Pi:",
+                    "   ./install_makerfaire_autostart.sh",
+                    "3. Enable Desktop Autologin in Raspberry Pi Configuration so the kiosk browser can open after login.",
+                    "4. Reboot and verify both pieces:",
+                    "   - the digital patient daemon starts automatically",
+                    f"   - the kiosk browser opens to {kiosk_url}",
+                    f"5. Between visitors, keep using: iints edge reset --project-dir {root}",
+                ]
+            ),
+            title="Maker Faire Autostart Steps",
             border_style="green",
         )
     )

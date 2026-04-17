@@ -82,6 +82,10 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert Path(outputs["kiosk_script"]).is_file()
     assert Path(outputs["makerfaire_script"]).is_file()
     assert Path(outputs["makerfaire_guide"]).is_file()
+    assert Path(outputs["makerfaire_kiosk_script"]).is_file()
+    assert Path(outputs["makerfaire_desktop_entry"]).is_file()
+    assert Path(outputs["makerfaire_autostart_script"]).is_file()
+    assert Path(outputs["makerfaire_autostart_guide"]).is_file()
     assert Path(outputs["service_file"]).is_file()
     assert Path(outputs["setup_guide"]).is_file()
     assert Path(outputs["uno_q_bridge"]).is_dir()
@@ -90,3 +94,7 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert "iints edge bridge-run --project-dir . --port /dev/ttyACM0" in guide_text
     makerfaire_text = Path(outputs["makerfaire_guide"]).read_text(encoding="utf-8")
     assert "iints makerfaire up --project-dir ." in makerfaire_text
+    autostart_text = Path(outputs["makerfaire_autostart_guide"]).read_text(encoding="utf-8")
+    assert "./install_makerfaire_autostart.sh" in autostart_text
+    desktop_entry_text = Path(outputs["makerfaire_desktop_entry"]).read_text(encoding="utf-8")
+    assert "open_makerfaire_kiosk.sh" in desktop_entry_text

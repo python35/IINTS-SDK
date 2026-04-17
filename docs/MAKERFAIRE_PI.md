@@ -37,6 +37,10 @@ That command:
 
 - `start_makerfaire_patient.sh`
 - `MAKERFAIRE_START.md`
+- `open_makerfaire_kiosk.sh`
+- `iints-makerfaire-kiosk.desktop`
+- `install_makerfaire_autostart.sh`
+- `MAKERFAIRE_AUTOSTART.md`
 
 So you can also use:
 
@@ -116,13 +120,37 @@ That keeps the physical UNO Q layer synced with the Pi runtime.
 If you want the Pi to come up straight into the virtual patient after power-on:
 
 1. first confirm the normal command-line path works
-2. then install the generated service file from `patient_runtime/`
+2. inspect the generated autostart files:
 
-You can regenerate service instructions with:
+```bash
+iints makerfaire autostart --project-dir .
+```
+
+3. install the generated booth autostart bundle:
+
+```bash
+./install_makerfaire_autostart.sh
+```
+
+4. enable **Desktop Autologin** in Raspberry Pi Configuration so the kiosk browser can open after login
+5. reboot and verify that:
+
+- the digital patient starts automatically
+- the kiosk opens automatically
+- `iints edge reset --project-dir .` still works between visitors
+
+You can still regenerate the plain systemd service with:
 
 ```bash
 iints edge service --project-dir .
 ```
+
+The generated autostart stack is split on purpose:
+
+- `patient_runtime/*.service` starts the digital patient daemon on boot
+- `iints-makerfaire-kiosk.desktop` opens the kiosk after the Pi desktop session logs in
+
+That split is more reliable on Raspberry Pi OS than trying to force the browser open from a root-level boot service.
 
 ## Practical Advice
 

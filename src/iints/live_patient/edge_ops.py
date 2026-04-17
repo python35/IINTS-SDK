@@ -15,7 +15,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
     from importlib_metadata import PackageNotFoundError, version  # type: ignore
 
 from .runtime import PatientRuntimeConfig, get_runtime_scenario_profile, is_process_alive, load_runtime_status
-from .service_export import write_service_artifacts
+from .service_export import write_makerfaire_autostart_artifacts, write_service_artifacts
 from .uno_q import export_uno_q_bridge
 
 
@@ -342,6 +342,12 @@ def export_edge_setup(
         service_name=service_name,
         user_name=user_name,
     )
+    makerfaire_autostart = write_makerfaire_autostart_artifacts(
+        config,
+        project_root=root,
+        service_path=Path(service_paths["service_file"]),
+        service_name=service_name,
+    )
 
     if board == "uno_q":
         guide_lines = [
@@ -538,6 +544,7 @@ def export_edge_setup(
                 "## Useful commands",
                 "",
                 "- `iints makerfaire up --project-dir .`",
+                "- `iints makerfaire autostart --project-dir .`",
                 "- `iints edge status --project-dir .`",
                 "- `iints edge kiosk --project-dir .`",
                 "- `iints edge reset --project-dir .`",
@@ -554,8 +561,12 @@ def export_edge_setup(
                 "## Autostart option",
                 "",
                 f"Service file: `{service_paths['service_file']}`",
+                f"Autostart guide: `{makerfaire_autostart['guide']}`",
+                f"Autostart installer: `{makerfaire_autostart['install_script']}`",
+                f"Kiosk desktop entry: `{makerfaire_autostart['desktop_entry']}`",
                 "",
-                "If you want the Pi to come up directly into the digital patient, install the generated service after you have tested the normal command-line flow.",
+                "If you want the Pi to come up directly into the digital patient, use the generated autostart installer after you have tested the normal command-line flow.",
+                "On Raspberry Pi OS, also enable Desktop Autologin so the kiosk browser can launch after login.",
                 "",
             ]
         )
@@ -572,6 +583,10 @@ def export_edge_setup(
         "kiosk_script": str(kiosk_script),
         "makerfaire_script": str(makerfaire_script),
         "makerfaire_guide": str(makerfaire_guide),
+        "makerfaire_kiosk_script": makerfaire_autostart["kiosk_script"],
+        "makerfaire_desktop_entry": makerfaire_autostart["desktop_entry"],
+        "makerfaire_autostart_script": makerfaire_autostart["install_script"],
+        "makerfaire_autostart_guide": makerfaire_autostart["guide"],
         "update_script": str(update_script),
         "service_file": service_paths["service_file"],
         "service_notes": service_paths["install_notes"],
