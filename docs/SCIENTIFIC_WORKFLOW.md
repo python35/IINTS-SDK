@@ -22,11 +22,6 @@ The scientific workflow now centers on five commands:
 - `iints compare-study`
 - `iints poster-study`
 
-For competition packaging, there is now a sixth useful command:
-- `iints eucys-results`
-
-`iints run-eucys-study` still exists, but it is now the fixed shortcut for the EUCYS-oriented preset rather than the only research workflow.
-
 ## Recommended Flow
 
 ### 1. Write The Protocol Bundle
@@ -35,7 +30,7 @@ Start by freezing the benchmark design:
 
 ```bash
 iints study-protocol \
-  --preset eucys \
+  --preset default \
   --profile-set clinic_safe_core \
   --output-dir results/study_protocol
 ```
@@ -96,60 +91,7 @@ and carries explicit metadata for:
 - `supervisor_enabled`
 - `corruption_modes`
 
-### 3. Use The Fixed EUCYS Shortcut When You Want The Full Competition Matrix
-
-If you want the fixed EUCYS-oriented matrix, use:
-
-```bash
-iints run-eucys-study \
-  --algo algorithms/example_algorithm.py \
-  --output-dir results/eucys_study
-```
-
-This keeps the official study structure:
-- `clean_certified`
-- `corrupted_uncertified`
-- `supervisor_off_ablation`
-
-and uses the fixed scenario families:
-- `baseline_day`
-- `meal_challenge`
-- `exercise_challenge`
-- `supervisor_override`
-
-The EUCYS shortcut also writes:
-- `EUCYS_SUMMARY.md`
-- `EUCYS_RESULTS_TABLE.csv`
-- `EUCYS_FIGURE_MANIFEST.json`
-- `EUCYS_ABSTRACT_FILLED.md`
-- `EUCYS_MAIN_FIGURE.png`
-- `EUCYS_LIMITATIONS.md`
-- `EUCYS_RESULTS/` with a packaged competition folder
-
-### 3b. Freeze A Competition-Ready Results Folder
-
-If you already have a completed study bundle and want the EUCYS-facing package in one place:
-
-```bash
-iints eucys-results results/eucys_study
-```
-
-That writes a deterministic `EUCYS_RESULTS/` folder containing:
-
-- copied protocol files
-- per-arm summaries
-- copied comparison files
-- `EUCYS_RESULTS_TABLE.csv`
-- `EUCYS_REPRODUCIBILITY_BUNDLE.json`
-- `EUCYS_ABSTRACT_DRAFT.md`
-- `EUCYS_ABSTRACT_FILLED.md`
-- `EUCYS_MAIN_FIGURE.png`
-- `EUCYS_MAIN_FIGURE.csv`
-- `EUCYS_POSTER_OUTLINE.md`
-- `EUCYS_JURY_QA.md`
-- `EUCYS_LIMITATIONS.md`
-
-### 4. Re-Analyze A Study Folder On Demand
+### 3. Re-Analyze A Study Folder On Demand
 
 If you already have a bundle or want to re-run the analysis with new options:
 
@@ -161,7 +103,7 @@ iints analyze results/study_bundle/study_clean \
   --output-evidence-markdown results/study_bundle/study_clean/evidence_table.md
 ```
 
-### 5. Compare Two Study Arms
+### 4. Compare Two Study Arms
 
 For example, compare clean certified data against corrupted uncertified data:
 
@@ -173,7 +115,7 @@ iints compare-study \
   --output-markdown results/study_bundle/comparisons/clean_vs_corrupted.md
 ```
 
-### 6. Generate A Poster Summary
+### 5. Generate A Poster Summary
 
 ```bash
 iints poster-study \
@@ -284,25 +226,24 @@ A strong SDK study now includes:
 - optional calibration and uncertainty reporting
 - optional external plausibility checks
 
-## Fastest EUCYS Path
+## Fastest Public Path
 
-If you want the shortest end-to-end competition workflow:
+If you want the shortest end-to-end public workflow:
 
 ```bash
-iints run-eucys-study \
+iints run-study \
   --algo algorithms/example_algorithm.py \
-  --output-dir results/eucys_study
+  --output-dir results/study_bundle
 ```
 
 Then inspect:
-- `results/eucys_study/EUCYS_SUMMARY.md`
-- `results/eucys_study/EUCYS_RESULTS_TABLE.csv`
-- `results/eucys_study/study_clean/study_poster.png`
-- `results/eucys_study/comparisons/clean_vs_corrupted.json`
+- `results/study_bundle/protocol/STUDY_PROTOCOL.md`
+- `results/study_bundle/study_clean/study_summary.json`
+- `results/study_bundle/study_clean/study_poster.png`
+- `results/study_bundle/comparisons/clean_vs_corrupted.json`
 
 That gives you one deterministic package for:
 - protocol review
 - benchmark evidence
 - safety comparison
 - poster figures
-- EUCYS-ready summary artifacts

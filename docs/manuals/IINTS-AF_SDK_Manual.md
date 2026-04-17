@@ -2029,8 +2029,8 @@ SafetyConfig(
 Use this flow when you want a real experimental protocol instead of a one-off demo:
 
 ```bash
-iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack
-iints study-protocol --preset eucys --output-dir results/study_protocol
+iints scenarios export-study-pack --output-dir scenarios/study_pack
+iints study-protocol --output-dir results/study_protocol
 iints data corrupt-for-study data/demo/diabetes_cgm.csv \
   --output-csv data/demo/diabetes_cgm_corrupted.csv \
   --mode timestamp_shift --mode missing_block --mode glucose_spikes
@@ -2042,13 +2042,12 @@ iints analyze results/study \
 iints compare-study results/study_clean results/study_corrupted \
   --output-json results/study_comparison.json
 iints poster-study results/study_summary.json --output-path results/study_poster.png
-iints run-eucys-study --algo algorithms/example_algorithm.py --output-dir results/eucys_study
+iints run-study --algo algorithms/example_algorithm.py --output-dir results/study_bundle
 ```
 
 This gives you:
 
 - a written protocol with hypotheses and a study matrix
-- a fixed fair-ready matrix when you use the `eucys` preset
 - controlled corruption operators for certified-vs-uncertified experiments
 - descriptive statistics and confidence intervals
 - failure analysis for severe hypo, early terminations, and worst runs

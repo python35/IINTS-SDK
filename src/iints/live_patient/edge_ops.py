@@ -317,6 +317,24 @@ def export_edge_setup(
     )
     kiosk_script.chmod(kiosk_script.stat().st_mode | stat.S_IXUSR)
 
+    makerfaire_script = root / "start_makerfaire_patient.sh"
+    makerfaire_script.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                'cd "$(dirname "$0")"',
+                "iints makerfaire up \\",
+                "  --project-dir . \\",
+                "  --scenario-profile expo_hot_start \\",
+                '  "$@"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    makerfaire_script.chmod(makerfaire_script.stat().st_mode | stat.S_IXUSR)
+
     update_script = write_edge_update_script(root / "update_edge_runtime.sh", profile="edge")
     service_paths = write_service_artifacts(
         config,
@@ -481,6 +499,70 @@ def export_edge_setup(
     setup_guide = root / "EDGE_SETUP.md"
     setup_guide.write_text("\n".join(guide_lines) + "\n", encoding="utf-8")
 
+    makerfaire_guide = root / "MAKERFAIRE_START.md"
+    makerfaire_guide.write_text(
+        "\n".join(
+            [
+                "# Maker Faire Startup",
+                "",
+                "Use this path when the Raspberry Pi is acting as your show-ready virtual patient.",
+                "",
+                "## One-command startup",
+                "",
+                "```bash",
+                "./start_makerfaire_patient.sh",
+                "```",
+                "",
+                "That script runs:",
+                "",
+                "```bash",
+                "iints makerfaire up --project-dir . --scenario-profile expo_hot_start",
+                "```",
+                "",
+                "## What it does",
+                "",
+                "- loads the generated edge runtime config",
+                "- starts the persistent digital patient if it is not already running",
+                "- resets the patient into a booth-safe profile by default",
+                "- prints the kiosk URL you should show on the Pi display",
+                "- tells you which commands to use for status, reset, and stop",
+                "",
+                "## Daily booth routine",
+                "",
+                "1. Power on the Pi",
+                "2. Open a terminal in this project folder",
+                "3. Run `./start_makerfaire_patient.sh`",
+                "4. Open the kiosk URL on the Pi screen",
+                "5. Use `iints edge reset --project-dir .` between visitor sessions if needed",
+                "",
+                "## Useful commands",
+                "",
+                "- `iints makerfaire up --project-dir .`",
+                "- `iints edge status --project-dir .`",
+                "- `iints edge kiosk --project-dir .`",
+                "- `iints edge reset --project-dir .`",
+                "- `iints edge stop --project-dir .`",
+                "",
+                "## If you are also using an Arduino UNO Q",
+                "",
+                "Run the Linux-side patient first, then start the bridge in a second terminal:",
+                "",
+                "```bash",
+                "iints edge bridge-run --project-dir . --port /dev/ttyACM0",
+                "```",
+                "",
+                "## Autostart option",
+                "",
+                f"Service file: `{service_paths['service_file']}`",
+                "",
+                "If you want the Pi to come up directly into the digital patient, install the generated service after you have tested the normal command-line flow.",
+                "",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
     outputs = {
         "root": str(root),
         "algorithm": str(algo_path),
@@ -488,6 +570,8 @@ def export_edge_setup(
         "config": str(config.config_path),
         "run_script": str(run_script),
         "kiosk_script": str(kiosk_script),
+        "makerfaire_script": str(makerfaire_script),
+        "makerfaire_guide": str(makerfaire_guide),
         "update_script": str(update_script),
         "service_file": service_paths["service_file"],
         "service_notes": service_paths["install_notes"],

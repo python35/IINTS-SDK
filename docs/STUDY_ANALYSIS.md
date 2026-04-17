@@ -62,14 +62,6 @@ Build the full expo bundle:
 iints demo-expo --output-dir results/expo_demo
 ```
 
-Run the full EUCYS matrix automatically:
-
-```bash
-iints run-eucys-study \
-  --algo algorithms/example_algorithm.py \
-  --output-dir results/eucys_study
-```
-
 Write a reproducible study protocol before you start:
 
 ```bash
@@ -113,7 +105,6 @@ Export the built-in public study pack:
 
 ```bash
 iints scenarios export-study-pack --output-dir scenarios/study_pack
-iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack
 ```
 
 That writes:
@@ -121,7 +112,6 @@ That writes:
 - reusable scenario JSON files
 - `study_pack_manifest.json` with the recommended seed list
 - a small README with the batch-loop pattern
-- for `--preset eucys`, also `eucys_study_matrix.csv` with a fixed clean/corrupted/supervisor-off matrix
 
 ## Why This Matters
 

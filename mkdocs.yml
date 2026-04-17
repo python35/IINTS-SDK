@@ -49,14 +49,10 @@ nav:
       - Study Analysis: STUDY_ANALYSIS.md
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
       - Booth Demo & Presentation Flow: BOOTH_DEMO.md
-  - EUCYS & Competition:
-      - Abstract Draft: eucys/ABSTRACT.md
-      - Poster Outline: eucys/POSTER_OUTLINE.md
-      - Jury Q&A: eucys/JURY_QA.md
-      - Limitations & Ethics: eucys/LIMITATIONS_AND_ETHICS.md
   - Edge & Deployment:
       - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
+      - Maker Faire Pi Mode: MAKERFAIRE_PI.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md

@@ -81,6 +81,129 @@ def test_edge_up_uses_generated_project_config(monkeypatch, tmp_path) -> None:
     assert captured["speed"] == "60x"
 
 
+def test_makerfaire_up_starts_pi_runtime_and_prints_kiosk(monkeypatch, tmp_path) -> None:
+    project_dir = tmp_path / "pi_demo"
+    workspace = project_dir / "patient_runtime"
+    workspace.mkdir(parents=True, exist_ok=True)
+    algo = project_dir / "algorithms" / "example_algorithm.py"
+    algo.parent.mkdir(parents=True, exist_ok=True)
+    algo.write_text("class Placeholder: pass\n", encoding="utf-8")
+    (project_dir / "start_makerfaire_patient.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_START.md").write_text("# guide\n", encoding="utf-8")
+    (workspace / "iints-digital-patient.service").write_text("[Unit]\n", encoding="utf-8")
+
+    cfg = PatientRuntimeConfig(
+        workspace=str(workspace),
+        algo_path=str(algo),
+        patient_config="default_patient",
+        patient_model_type="auto",
+        scenario_profile="normal_day",
+        mode="demo-time",
+        speed=60.0,
+        api_host="127.0.0.1",
+        api_port=8765,
+        seed=1101,
+    )
+    cfg.config_path.write_text(json.dumps(cfg.to_json(), indent=2), encoding="utf-8")
+
+    start_calls: list[dict[str, object]] = []
+    kiosk_calls: list[Path] = []
+    summary_calls = {"count": 0}
+
+    def _fake_start(**kwargs):
+        start_calls.append(kwargs)
+
+    def _fake_kiosk(*, workspace):
+        kiosk_calls.append(workspace)
+
+    def _fake_summary(workspace_path):
+        summary_calls["count"] += 1
+        if summary_calls["count"] == 1:
+            return {}
+        return {
+            "pid_alive": True,
+            "daemon_status": "running",
+            "scenario_profile": "expo_hot_start",
+            "active_seed": 1101,
+            "algorithm_name": "EdgeDemoAlgorithm",
+            "dashboard_url": "http://127.0.0.1:8765/dashboard",
+            "kiosk_url": "http://127.0.0.1:8765/kiosk",
+        }
+
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.start", _fake_start)
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.kiosk", _fake_kiosk)
+    monkeypatch.setattr("iints.cli.cli.summarize_edge_workspace", _fake_summary)
+
+    result = runner.invoke(app, ["makerfaire", "up", "--project-dir", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert len(start_calls) == 1
+    assert start_calls[0]["workspace"] == workspace
+    assert start_calls[0]["scenario_profile"] == "expo_hot_start"
+    assert start_calls[0]["speed"] == "60x"
+    assert kiosk_calls == [workspace]
+    assert "IINTS Maker Faire Pi" in result.stdout
+    assert "expo_hot_start" in result.stdout
+    assert "start_makerfaire_patient.sh" in result.stdout
+
+
+def test_makerfaire_up_resets_existing_runtime_without_restart(monkeypatch, tmp_path) -> None:
+    project_dir = tmp_path / "pi_demo"
+    workspace = project_dir / "patient_runtime"
+    workspace.mkdir(parents=True, exist_ok=True)
+    algo = project_dir / "algorithms" / "example_algorithm.py"
+    algo.parent.mkdir(parents=True, exist_ok=True)
+    algo.write_text("class Placeholder: pass\n", encoding="utf-8")
+
+    cfg = PatientRuntimeConfig(
+        workspace=str(workspace),
+        algo_path=str(algo),
+        patient_config="default_patient",
+        patient_model_type="auto",
+        scenario_profile="normal_day",
+        mode="demo-time",
+        speed=60.0,
+        api_host="127.0.0.1",
+        api_port=8765,
+        seed=1101,
+    )
+    cfg.config_path.write_text(json.dumps(cfg.to_json(), indent=2), encoding="utf-8")
+
+    reset_calls: list[dict[str, object]] = []
+    kiosk_calls: list[Path] = []
+
+    monkeypatch.setattr(
+        "iints.cli.cli.summarize_edge_workspace",
+        lambda workspace_path: {
+            "pid_alive": True,
+            "daemon_status": "running",
+            "scenario_profile": "normal_day",
+            "active_seed": 1101,
+            "algorithm_name": "EdgeDemoAlgorithm",
+            "dashboard_url": "http://127.0.0.1:8765/dashboard",
+            "kiosk_url": "http://127.0.0.1:8765/kiosk",
+        },
+    )
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.start", lambda **kwargs: (_ for _ in ()).throw(AssertionError("start should not run")))
+    monkeypatch.setattr(
+        "iints.cli.cli.patient_cli_module.expo_reset",
+        lambda *, scenario_profile, seed, workspace: reset_calls.append(
+            {"scenario_profile": scenario_profile, "seed": seed, "workspace": workspace}
+        ),
+    )
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.kiosk", lambda *, workspace: kiosk_calls.append(workspace))
+
+    result = runner.invoke(
+        app,
+        ["makerfaire", "up", "--project-dir", str(project_dir), "--scenario-profile", "bad_carb_count", "--seed", "777"],
+    )
+
+    assert result.exit_code == 0
+    assert reset_calls == [{"scenario_profile": "bad_carb_count", "seed": 777, "workspace": workspace}]
+    assert kiosk_calls == [workspace]
+    assert "bad_carb_count" in result.stdout
+
+
 def test_edge_bridge_commands_and_doctor(monkeypatch, tmp_path) -> None:
     project_dir = tmp_path / "uno_q_demo"
     workspace = project_dir / "patient_runtime"

@@ -512,8 +512,8 @@ iints data corrupt-for-study data/my_cgm.csv \
 
 ### Scientific Study Workflow
 ```bash
-iints study-protocol --preset eucys --output-dir results/study_protocol
-iints scenarios export-study-pack --preset eucys --output-dir scenarios/eucys_pack
+iints study-protocol --output-dir results/study_protocol
+iints scenarios export-study-pack --output-dir scenarios/study_pack
 
 iints analyze results/study \
   --output-json results/study_summary.json \
@@ -529,9 +529,9 @@ iints compare-study results/study_clean results/study_corrupted \
 iints poster-study results/study_summary.json \
   --output-path results/study_poster.png
 
-iints run-eucys-study \
+iints run-study \
   --algo algorithms/example_algorithm.py \
-  --output-dir results/eucys_study
+  --output-dir results/study_bundle
 ```
 
 This workflow is designed for:

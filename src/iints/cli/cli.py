@@ -175,6 +175,7 @@ mdmp_app = typer.Typer(help="Legacy MDMP namespace kept for backwards compatibil
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
+makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
@@ -184,6 +185,7 @@ app.add_typer(ai_app, name="ai")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
 app.add_typer(edge_app, name="edge")
+app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
@@ -6416,6 +6418,32 @@ def _detect_edge_board(project_dir: Path) -> str:
     return "uno_q" if (root / "uno_q_bridge").is_dir() else "raspberry_pi"
 
 
+def _makerfaire_runtime_snapshot(
+    *,
+    cfg: PatientRuntimeConfig,
+    scenario_profile: str,
+    seed: int | None,
+) -> dict[str, Any]:
+    workspace = Path(cfg.workspace).expanduser().resolve()
+    summary = summarize_edge_workspace(workspace)
+    if summary:
+        payload = dict(summary)
+        payload["scenario_profile"] = scenario_profile
+        payload["active_seed"] = seed if seed is not None else payload.get("active_seed", cfg.seed)
+        return payload
+    return {
+        "daemon_status": "starting",
+        "workspace": str(workspace),
+        "api_host": cfg.api_host,
+        "api_port": cfg.api_port,
+        "dashboard_url": cfg.dashboard_url,
+        "kiosk_url": f"http://{cfg.api_host}:{cfg.api_port}/kiosk",
+        "scenario_profile": scenario_profile,
+        "active_seed": seed if seed is not None else cfg.seed,
+        "algorithm_name": Path(cfg.algo_path).stem,
+    }
+
+
 @edge_app.command("setup")
 def edge_setup(
     output_dir: Annotated[Path, typer.Option(help="Directory where the edge-ready project scaffold should be written.")] = Path("iints_edge_demo"),
@@ -6465,6 +6493,8 @@ def edge_setup(
         "config",
         "run_script",
         "kiosk_script",
+        "makerfaire_script",
+        "makerfaire_guide",
         "update_script",
         "service_file",
         "service_notes",
@@ -6480,6 +6510,7 @@ def edge_setup(
                 [
                     f"Board profile: {normalized_board}",
                     f"CLI start: iints edge up --project-dir {outputs['root']}",
+                    f"Maker Faire start: iints makerfaire up --project-dir {outputs['root']}",
                     f"CLI kiosk: iints edge kiosk --project-dir {outputs['root']}",
                     f"Setup guide: {outputs['setup_guide']}",
                 ]
@@ -6704,6 +6735,97 @@ def edge_up(
         foreground=foreground,
         max_steps=max_steps,
         reset=reset,
+    )
+
+
+@makerfaire_app.command("up")
+def makerfaire_up(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    scenario_profile: Annotated[str, typer.Option(help="Booth-ready scenario profile. Defaults to expo_hot_start.")] = "expo_hot_start",
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override for the booth reset/start.")] = None,
+    reset: Annotated[bool, typer.Option(help="Reset into the booth profile when the runtime is already running.")] = True,
+    foreground: Annotated[bool, typer.Option(help="Run in the foreground instead of using the background daemon.")] = False,
+    show_kiosk: Annotated[bool, typer.Option(help="Print the kiosk panel after startup so you can copy the Pi display URL quickly.")] = True,
+) -> None:
+    """Start the Raspberry Pi virtual patient in a Maker Faire-friendly way."""
+    console = Console()
+    root = _resolve_edge_project_dir(project_dir)
+    cfg = _load_edge_project_config(root, workspace_name=workspace_name)
+    workspace = Path(cfg.workspace).expanduser().resolve()
+    board = _detect_edge_board(root)
+    existing = summarize_edge_workspace(workspace)
+    already_running = bool(existing and existing.get("pid_alive"))
+    effective_seed = seed if seed is not None else cfg.seed
+
+    if already_running:
+        if reset:
+            patient_cli_module.expo_reset(
+                scenario_profile=scenario_profile,
+                seed=seed,
+                workspace=workspace,
+            )
+    else:
+        patient_cli_module.start(
+            algo=Path(cfg.algo_path),
+            patient_config=cfg.patient_config,
+            patient_model=cfg.patient_model_type,
+            scenario_profile=scenario_profile,
+            workspace=workspace,
+            mode=cfg.mode,
+            speed=f"{cfg.speed:g}x",
+            api_host=cfg.api_host,
+            api_port=cfg.api_port,
+            foreground=foreground,
+            seed=effective_seed,
+            reset=reset,
+        )
+
+    if show_kiosk and not foreground:
+        patient_cli_module.kiosk(workspace=workspace)
+
+    snapshot = _makerfaire_runtime_snapshot(
+        cfg=cfg,
+        scenario_profile=scenario_profile,
+        seed=effective_seed,
+    )
+    table = Table(title="IINTS Maker Faire Pi")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("project_dir", str(root))
+    table.add_row("board", board)
+    table.add_row("workspace", str(workspace))
+    table.add_row("daemon_status", str(snapshot.get("daemon_status", "-")))
+    table.add_row("scenario_profile", str(snapshot.get("scenario_profile", scenario_profile)))
+    table.add_row("active_seed", str(snapshot.get("active_seed", effective_seed)))
+    table.add_row("algorithm", str(snapshot.get("algorithm_name", Path(cfg.algo_path).stem)))
+    table.add_row("dashboard_url", str(snapshot.get("dashboard_url", cfg.dashboard_url)))
+    table.add_row("kiosk_url", str(snapshot.get("kiosk_url", f"http://{cfg.api_host}:{cfg.api_port}/kiosk")))
+
+    makerfaire_script = root / "start_makerfaire_patient.sh"
+    makerfaire_guide = root / "MAKERFAIRE_START.md"
+    if makerfaire_script.is_file():
+        table.add_row("makerfaire_script", str(makerfaire_script))
+    if makerfaire_guide.is_file():
+        table.add_row("makerfaire_guide", str(makerfaire_guide))
+    service_files = sorted(workspace.glob("*.service"))
+    if service_files:
+        table.add_row("service_file", str(service_files[0]))
+    console.print(table)
+
+    next_steps = [
+        f"Reset between visitors: iints edge reset --project-dir {root}",
+        f"Check runtime status: iints edge status --project-dir {root}",
+        f"Stop after the booth: iints edge stop --project-dir {root}",
+    ]
+    if board == "uno_q":
+        next_steps.append(f"Optional bridge terminal: iints edge bridge-run --project-dir {root} --port /dev/ttyACM0")
+    console.print(
+        Panel(
+            "\n".join(next_steps),
+            title="Maker Faire Next Steps",
+            border_style="green",
+        )
     )
 
 

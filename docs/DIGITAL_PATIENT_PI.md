@@ -9,6 +9,8 @@ The Raspberry Pi digital-patient workflow gives you:
 - exportable run bundles for later workstation-side analysis
 - optional auto-start through `systemd`
 
+If your main goal is a booth-ready startup routine, jump to [Maker Faire Pi Mode](MAKERFAIRE_PI.md).
+
 ## Recommended Hardware
 
 Recommended starting setup:
@@ -40,6 +42,7 @@ iints edge stop
 iints edge service
 iints edge bundle
 iints edge update
+iints makerfaire up
 iints patient inject-meal
 iints patient pause
 iints patient resume
