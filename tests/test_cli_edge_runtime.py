@@ -92,6 +92,9 @@ def test_makerfaire_up_starts_pi_runtime_and_prints_kiosk(monkeypatch, tmp_path)
     (project_dir / "MAKERFAIRE_START.md").write_text("# guide\n", encoding="utf-8")
     (project_dir / "install_makerfaire_autostart.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     (project_dir / "MAKERFAIRE_AUTOSTART.md").write_text("# autostart\n", encoding="utf-8")
+    (project_dir / "run_makerfaire_watchdog.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_CHECKLIST.md").write_text("# checklist\n", encoding="utf-8")
+    (project_dir / "iints-digital-patient-watchdog.timer").write_text("[Timer]\n", encoding="utf-8")
     (workspace / "iints-digital-patient.service").write_text("[Unit]\n", encoding="utf-8")
 
     cfg = PatientRuntimeConfig(
@@ -148,6 +151,8 @@ def test_makerfaire_up_starts_pi_runtime_and_prints_kiosk(monkeypatch, tmp_path)
     assert "expo_hot_start" in result.stdout
     assert "start_makerfaire_patient.sh" in result.stdout
     assert "install_makerfaire_autostart.sh" in result.stdout
+    assert "run_makerfaire_watchdog.sh" in result.stdout
+    assert "MAKERFAIRE_CHECKLIST.md" in result.stdout
 
 
 def test_makerfaire_up_resets_existing_runtime_without_restart(monkeypatch, tmp_path) -> None:
@@ -235,6 +240,10 @@ def test_makerfaire_autostart_prints_generated_paths(tmp_path) -> None:
     (project_dir / "iints-makerfaire-kiosk.desktop").write_text("[Desktop Entry]\n", encoding="utf-8")
     (project_dir / "install_makerfaire_autostart.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
     (project_dir / "MAKERFAIRE_AUTOSTART.md").write_text("# autostart\n", encoding="utf-8")
+    (project_dir / "run_makerfaire_watchdog.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    (project_dir / "MAKERFAIRE_CHECKLIST.md").write_text("# checklist\n", encoding="utf-8")
+    (project_dir / "iints-digital-patient-watchdog.service").write_text("[Unit]\n", encoding="utf-8")
+    (project_dir / "iints-digital-patient-watchdog.timer").write_text("[Timer]\n", encoding="utf-8")
     (workspace / "iints-digital-patient.service").write_text("[Unit]\n", encoding="utf-8")
     (workspace / "iints-digital-patient.INSTALL.txt").write_text("sudo systemctl enable\n", encoding="utf-8")
 
@@ -244,6 +253,61 @@ def test_makerfaire_autostart_prints_generated_paths(tmp_path) -> None:
     assert "IINTS Maker Faire Autostart" in result.stdout
     assert "install_makerfaire_autostart.sh" in result.stdout
     assert "Desktop Autologin" in result.stdout
+    assert "run_makerfaire_watchdog.sh" in result.stdout
+
+
+def test_makerfaire_watchdog_restarts_missing_runtime(monkeypatch, tmp_path) -> None:
+    project_dir = tmp_path / "pi_demo"
+    workspace = project_dir / "patient_runtime"
+    workspace.mkdir(parents=True, exist_ok=True)
+    algo = project_dir / "algorithms" / "example_algorithm.py"
+    algo.parent.mkdir(parents=True, exist_ok=True)
+    algo.write_text("class Placeholder: pass\n", encoding="utf-8")
+
+    cfg = PatientRuntimeConfig(
+        workspace=str(workspace),
+        algo_path=str(algo),
+        patient_config="default_patient",
+        patient_model_type="auto",
+        scenario_profile="expo_hot_start",
+        mode="demo-time",
+        speed=60.0,
+        api_host="127.0.0.1",
+        api_port=8765,
+        seed=1101,
+    )
+    cfg.config_path.write_text(json.dumps(cfg.to_json(), indent=2), encoding="utf-8")
+
+    start_calls: list[dict[str, object]] = []
+    summary_calls = {"count": 0}
+
+    def _fake_start(**kwargs):
+        start_calls.append(kwargs)
+
+    def _fake_summary(workspace_path):
+        summary_calls["count"] += 1
+        if summary_calls["count"] == 1:
+            return {"daemon_status": "stopped", "pid_alive": False}
+        return {
+            "pid_alive": True,
+            "daemon_status": "running",
+            "scenario_profile": "expo_hot_start",
+            "active_seed": 1101,
+            "dashboard_url": "http://127.0.0.1:8765/dashboard",
+            "kiosk_url": "http://127.0.0.1:8765/kiosk",
+        }
+
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.start", _fake_start)
+    monkeypatch.setattr("iints.cli.cli.summarize_edge_workspace", _fake_summary)
+
+    result = runner.invoke(app, ["makerfaire", "watchdog", "--project-dir", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert len(start_calls) == 1
+    assert start_calls[0]["scenario_profile"] == "expo_hot_start"
+    assert start_calls[0]["reset"] is True
+    assert "IINTS Maker Faire Watchdog" in result.stdout
+    assert "restarted" in result.stdout
 
 
 def test_edge_bridge_commands_and_doctor(monkeypatch, tmp_path) -> None:

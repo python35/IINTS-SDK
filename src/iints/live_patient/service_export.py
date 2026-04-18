@@ -95,6 +95,88 @@ def makerfaire_desktop_entry_text(project_root: Path) -> str:
     )
 
 
+def _cli_path_from_python(python_path: str | Path) -> str:
+    candidate = Path(python_path).expanduser().resolve().with_name("iints")
+    if candidate.is_file():
+        return str(candidate)
+    return "iints"
+
+
+def makerfaire_watchdog_name(service_name: str) -> str:
+    return f"{service_name}-watchdog"
+
+
+def makerfaire_watchdog_script_text(
+    *,
+    cli_path: str,
+    scenario_profile: str,
+    seed: int | None,
+) -> str:
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'cd "$(dirname "$0")"',
+        f'CLI="{cli_path}"',
+        "",
+        '"$CLI" makerfaire watchdog \\',
+        "  --project-dir . \\",
+        f"  --scenario-profile {scenario_profile} \\",
+    ]
+    if seed is not None:
+        lines.append(f"  --seed {seed} \\")
+    lines.extend(
+        [
+            "  --quiet",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def makerfaire_watchdog_service_text(
+    *,
+    project_root: Path,
+    watchdog_name: str,
+    user_name: str,
+) -> str:
+    return "\n".join(
+        [
+            "[Unit]",
+            f"Description=IINTS Maker Faire Watchdog ({watchdog_name})",
+            "After=network-online.target",
+            "Wants=network-online.target",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            f"User={user_name}",
+            f"WorkingDirectory={project_root}",
+            "ExecStart=/bin/bash -lc ./run_makerfaire_watchdog.sh",
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target",
+            "",
+        ]
+    )
+
+
+def makerfaire_watchdog_timer_text(*, watchdog_name: str, interval_seconds: int = 30) -> str:
+    return "\n".join(
+        [
+            "[Unit]",
+            f"Description=IINTS Maker Faire Watchdog Timer ({watchdog_name})",
+            "",
+            "[Timer]",
+            "OnBootSec=45",
+            f"OnUnitActiveSec={interval_seconds}",
+            f"Unit={watchdog_name}.service",
+            "",
+            "[Install]",
+            "WantedBy=timers.target",
+            "",
+        ]
+    )
+
+
 def makerfaire_install_script_text(*, service_name: str) -> str:
     return "\n".join(
         [
@@ -102,12 +184,23 @@ def makerfaire_install_script_text(*, service_name: str) -> str:
             "set -euo pipefail",
             'ROOT="$(cd "$(dirname "$0")" && pwd)"',
             f'SERVICE_NAME="{service_name}"',
+            'WATCHDOG_NAME="${SERVICE_NAME}-watchdog"',
             'SERVICE_SRC="$ROOT/patient_runtime/${SERVICE_NAME}.service"',
+            'WATCHDOG_SERVICE_SRC="$ROOT/${WATCHDOG_NAME}.service"',
+            'WATCHDOG_TIMER_SRC="$ROOT/${WATCHDOG_NAME}.timer"',
             'DESKTOP_SRC="$ROOT/iints-makerfaire-kiosk.desktop"',
             'AUTOSTART_DIR="$HOME/.config/autostart"',
             "",
             'if [ ! -f "$SERVICE_SRC" ]; then',
             '  echo "Missing service file: $SERVICE_SRC" >&2',
+            "  exit 1",
+            "fi",
+            'if [ ! -f "$WATCHDOG_SERVICE_SRC" ]; then',
+            '  echo "Missing watchdog service: $WATCHDOG_SERVICE_SRC" >&2',
+            "  exit 1",
+            "fi",
+            'if [ ! -f "$WATCHDOG_TIMER_SRC" ]; then',
+            '  echo "Missing watchdog timer: $WATCHDOG_TIMER_SRC" >&2',
             "  exit 1",
             "fi",
             'if [ ! -f "$DESKTOP_SRC" ]; then',
@@ -117,15 +210,20 @@ def makerfaire_install_script_text(*, service_name: str) -> str:
             "",
             'echo "Installing systemd service..."',
             'sudo cp "$SERVICE_SRC" "/etc/systemd/system/${SERVICE_NAME}.service"',
+            'sudo cp "$WATCHDOG_SERVICE_SRC" "/etc/systemd/system/${WATCHDOG_NAME}.service"',
+            'sudo cp "$WATCHDOG_TIMER_SRC" "/etc/systemd/system/${WATCHDOG_NAME}.timer"',
             "sudo systemctl daemon-reload",
             'sudo systemctl enable "${SERVICE_NAME}.service"',
             'sudo systemctl restart "${SERVICE_NAME}.service"',
+            'sudo systemctl enable "${WATCHDOG_NAME}.timer"',
+            'sudo systemctl restart "${WATCHDOG_NAME}.timer"',
             "",
             'echo "Installing desktop autostart entry..."',
             'mkdir -p "$AUTOSTART_DIR"',
             'cp "$DESKTOP_SRC" "$AUTOSTART_DIR/iints-makerfaire-kiosk.desktop"',
             "",
             'echo "Done. Reboot the Pi and confirm the kiosk opens automatically."',
+            'echo "The watchdog timer will now re-check the booth runtime in the background."',
             'echo "If the browser does not open after reboot, enable Desktop Autologin in Raspberry Pi Configuration and try again."',
             "",
         ]
@@ -139,8 +237,12 @@ def makerfaire_autostart_instructions_text(
     desktop_entry_path: Path,
     kiosk_script_path: Path,
     install_script_path: Path,
+    watchdog_script_path: Path,
+    watchdog_service_path: Path,
+    watchdog_timer_path: Path,
     service_name: str,
 ) -> str:
+    watchdog_name = makerfaire_watchdog_name(service_name)
     return "\n".join(
         [
             "# Maker Faire Autostart",
@@ -152,6 +254,9 @@ def makerfaire_autostart_instructions_text(
             f"- systemd service: `{service_path}`",
             f"- kiosk opener script: `{kiosk_script_path}`",
             f"- desktop autostart entry: `{desktop_entry_path}`",
+            f"- watchdog script: `{watchdog_script_path}`",
+            f"- watchdog service: `{watchdog_service_path}`",
+            f"- watchdog timer: `{watchdog_timer_path}`",
             "",
             "## Recommended path",
             "",
@@ -172,6 +277,7 @@ def makerfaire_autostart_instructions_text(
             "4. Reboot and confirm:",
             "",
             f"- `{service_name}.service` is active",
+            f"- `{watchdog_name}.timer` is active",
             "- the kiosk browser opens by itself after login",
             "- `iints edge reset --project-dir .` still works between visitors",
             "",
@@ -179,9 +285,13 @@ def makerfaire_autostart_instructions_text(
             "",
             "```bash",
             f"sudo cp {service_path} /etc/systemd/system/{service_name}.service",
+            f"sudo cp {watchdog_service_path} /etc/systemd/system/{watchdog_name}.service",
+            f"sudo cp {watchdog_timer_path} /etc/systemd/system/{watchdog_name}.timer",
             "sudo systemctl daemon-reload",
             f"sudo systemctl enable {service_name}.service",
             f"sudo systemctl restart {service_name}.service",
+            f"sudo systemctl enable {watchdog_name}.timer",
+            f"sudo systemctl restart {watchdog_name}.timer",
             "mkdir -p ~/.config/autostart",
             f"cp {desktop_entry_path} ~/.config/autostart/iints-makerfaire-kiosk.desktop",
             "```",
@@ -232,9 +342,14 @@ def write_makerfaire_autostart_artifacts(
     project_root: Path,
     service_path: Path,
     service_name: str = "iints-digital-patient",
+    user_name: str | None = None,
+    cli_path: str | Path | None = None,
 ) -> dict[str, str]:
     root = project_root.expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
+    resolved_user = user_name or os.getenv("USER") or "pi"
+    resolved_cli = _cli_path_from_python(cli_path or Path(sys.executable))
+    watchdog_name = makerfaire_watchdog_name(service_name)
 
     kiosk_script_path = root / "open_makerfaire_kiosk.sh"
     kiosk_script_path.write_text(makerfaire_kiosk_script_text(config), encoding="utf-8")
@@ -250,6 +365,33 @@ def write_makerfaire_autostart_artifacts(
     )
     install_script_path.chmod(install_script_path.stat().st_mode | 0o100)
 
+    watchdog_script_path = root / "run_makerfaire_watchdog.sh"
+    watchdog_script_path.write_text(
+        makerfaire_watchdog_script_text(
+            cli_path=resolved_cli,
+            scenario_profile=config.scenario_profile,
+            seed=config.seed,
+        ),
+        encoding="utf-8",
+    )
+    watchdog_script_path.chmod(watchdog_script_path.stat().st_mode | 0o100)
+
+    watchdog_service_path = root / f"{watchdog_name}.service"
+    watchdog_service_path.write_text(
+        makerfaire_watchdog_service_text(
+            project_root=root,
+            watchdog_name=watchdog_name,
+            user_name=resolved_user,
+        ),
+        encoding="utf-8",
+    )
+
+    watchdog_timer_path = root / f"{watchdog_name}.timer"
+    watchdog_timer_path.write_text(
+        makerfaire_watchdog_timer_text(watchdog_name=watchdog_name),
+        encoding="utf-8",
+    )
+
     guide_path = root / "MAKERFAIRE_AUTOSTART.md"
     guide_path.write_text(
         makerfaire_autostart_instructions_text(
@@ -258,6 +400,9 @@ def write_makerfaire_autostart_artifacts(
             desktop_entry_path=desktop_entry_path,
             kiosk_script_path=kiosk_script_path,
             install_script_path=install_script_path,
+            watchdog_script_path=watchdog_script_path,
+            watchdog_service_path=watchdog_service_path,
+            watchdog_timer_path=watchdog_timer_path,
             service_name=service_name,
         )
         + "\n",
@@ -268,5 +413,8 @@ def write_makerfaire_autostart_artifacts(
         "kiosk_script": str(kiosk_script_path),
         "desktop_entry": str(desktop_entry_path),
         "install_script": str(install_script_path),
+        "watchdog_script": str(watchdog_script_path),
+        "watchdog_service": str(watchdog_service_path),
+        "watchdog_timer": str(watchdog_timer_path),
         "guide": str(guide_path),
     }

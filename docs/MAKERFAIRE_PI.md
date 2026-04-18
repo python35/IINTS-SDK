@@ -41,6 +41,9 @@ That command:
 - `iints-makerfaire-kiosk.desktop`
 - `install_makerfaire_autostart.sh`
 - `MAKERFAIRE_AUTOSTART.md`
+- `run_makerfaire_watchdog.sh`
+- `iints-digital-patient-watchdog.timer`
+- `MAKERFAIRE_CHECKLIST.md`
 
 So you can also use:
 
@@ -94,6 +97,14 @@ iints edge reset --project-dir .
 iints edge status --project-dir .
 ```
 
+### 4b. Let the booth watchdog repair a dead runtime
+
+```bash
+iints makerfaire watchdog --project-dir .
+```
+
+That command is safe to run manually. It checks whether the booth patient is still alive, and if not, it restarts it with the booth-safe profile.
+
 ### 5. Stop cleanly after the event
 
 ```bash
@@ -136,6 +147,7 @@ iints makerfaire autostart --project-dir .
 5. reboot and verify that:
 
 - the digital patient starts automatically
+- the watchdog timer is active
 - the kiosk opens automatically
 - `iints edge reset --project-dir .` still works between visitors
 
@@ -149,8 +161,15 @@ The generated autostart stack is split on purpose:
 
 - `patient_runtime/*.service` starts the digital patient daemon on boot
 - `iints-makerfaire-kiosk.desktop` opens the kiosk after the Pi desktop session logs in
+- `iints-digital-patient-watchdog.timer` re-checks the booth runtime in the background and restarts it if the patient went down
 
 That split is more reliable on Raspberry Pi OS than trying to force the browser open from a root-level boot service.
+
+## Real Event Checklist
+
+Use the full live checklist here:
+
+- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
 
 ## Practical Advice
 

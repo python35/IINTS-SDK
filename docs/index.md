@@ -30,6 +30,7 @@ If you are new to the SDK, read these pages in order:
 | Run on Raspberry Pi or another SBC | [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md) | Hardware guidance, edge install profile, and deployment choices |
 | Operate a persistent digital patient | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) | Runtime control, kiosk view, export, and service setup |
 | Bring a Pi to Maker Faire | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | One-command startup, reset routine, kiosk flow, and booth-safe recovery |
+| Run the real event without stress | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) | Day-before checks, venue setup, recovery commands, and end-of-day shutdown |
 | Build reproducible experiments | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, corruption modes, study comparisons, and summaries |
 | Explore the full CLI surface | [CLI & Advanced Reference](TECHNICAL_README.md) | Command reference and advanced workflows |
 

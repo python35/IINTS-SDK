@@ -6499,6 +6499,10 @@ def edge_setup(
         "makerfaire_desktop_entry",
         "makerfaire_autostart_script",
         "makerfaire_autostart_guide",
+        "makerfaire_watchdog_script",
+        "makerfaire_watchdog_service",
+        "makerfaire_watchdog_timer",
+        "makerfaire_checklist",
         "update_script",
         "service_file",
         "service_notes",
@@ -6516,6 +6520,7 @@ def edge_setup(
                     f"CLI start: iints edge up --project-dir {outputs['root']}",
                     f"Maker Faire start: iints makerfaire up --project-dir {outputs['root']}",
                     f"Maker Faire autostart: iints makerfaire autostart --project-dir {outputs['root']}",
+                    f"Maker Faire watchdog: iints makerfaire watchdog --project-dir {outputs['root']}",
                     f"CLI kiosk: iints edge kiosk --project-dir {outputs['root']}",
                     f"Setup guide: {outputs['setup_guide']}",
                 ]
@@ -6811,6 +6816,9 @@ def makerfaire_up(
     makerfaire_guide = root / "MAKERFAIRE_START.md"
     makerfaire_autostart_script = root / "install_makerfaire_autostart.sh"
     makerfaire_autostart_guide = root / "MAKERFAIRE_AUTOSTART.md"
+    makerfaire_watchdog_script = root / "run_makerfaire_watchdog.sh"
+    makerfaire_watchdog_timer = sorted(root.glob("*-watchdog.timer"))
+    makerfaire_checklist = root / "MAKERFAIRE_CHECKLIST.md"
     if makerfaire_script.is_file():
         table.add_row("makerfaire_script", str(makerfaire_script))
     if makerfaire_guide.is_file():
@@ -6819,6 +6827,12 @@ def makerfaire_up(
         table.add_row("makerfaire_autostart_script", str(makerfaire_autostart_script))
     if makerfaire_autostart_guide.is_file():
         table.add_row("makerfaire_autostart_guide", str(makerfaire_autostart_guide))
+    if makerfaire_watchdog_script.is_file():
+        table.add_row("makerfaire_watchdog_script", str(makerfaire_watchdog_script))
+    if makerfaire_watchdog_timer:
+        table.add_row("makerfaire_watchdog_timer", str(makerfaire_watchdog_timer[0]))
+    if makerfaire_checklist.is_file():
+        table.add_row("makerfaire_checklist", str(makerfaire_checklist))
     service_files = sorted(workspace.glob("*.service"))
     if service_files:
         table.add_row("service_file", str(service_files[0]))
@@ -6831,10 +6845,15 @@ def makerfaire_up(
         console.print(f"Maker Faire autostart installer: {makerfaire_autostart_script.name}")
     if makerfaire_autostart_guide.is_file():
         console.print(f"Maker Faire autostart guide: {makerfaire_autostart_guide.name}")
+    if makerfaire_watchdog_script.is_file():
+        console.print(f"Maker Faire watchdog script: {makerfaire_watchdog_script.name}")
+    if makerfaire_checklist.is_file():
+        console.print(f"Maker Faire checklist: {makerfaire_checklist.name}")
 
     next_steps = [
         f"Reset between visitors: iints edge reset --project-dir {root}",
         f"Check runtime status: iints edge status --project-dir {root}",
+        f"Run booth watchdog: iints makerfaire watchdog --project-dir {root}",
         f"Stop after the booth: iints edge stop --project-dir {root}",
         f"Booth autostart guide: iints makerfaire autostart --project-dir {root}",
     ]
@@ -6871,7 +6890,15 @@ def makerfaire_autostart(
         "makerfaire_desktop_entry": root / "iints-makerfaire-kiosk.desktop",
         "makerfaire_autostart_script": root / "install_makerfaire_autostart.sh",
         "makerfaire_autostart_guide": root / "MAKERFAIRE_AUTOSTART.md",
+        "makerfaire_watchdog_script": root / "run_makerfaire_watchdog.sh",
+        "makerfaire_checklist": root / "MAKERFAIRE_CHECKLIST.md",
     }
+    watchdog_services = sorted(root.glob("*-watchdog.service"))
+    watchdog_timers = sorted(root.glob("*-watchdog.timer"))
+    if watchdog_services:
+        artifacts["makerfaire_watchdog_service"] = watchdog_services[0]
+    if watchdog_timers:
+        artifacts["makerfaire_watchdog_timer"] = watchdog_timers[0]
 
     missing = [name for name, path in artifacts.items() if not path.is_file()]
     if missing:
@@ -6892,6 +6919,8 @@ def makerfaire_autostart(
     console.print(f"Autostart installer: {artifacts['makerfaire_autostart_script'].name}")
     console.print(f"Desktop entry: {artifacts['makerfaire_desktop_entry'].name}")
     console.print(f"Kiosk opener: {artifacts['makerfaire_kiosk_script'].name}")
+    console.print(f"Watchdog script: {artifacts['makerfaire_watchdog_script'].name}")
+    console.print(f"Event checklist: {artifacts['makerfaire_checklist'].name}")
 
     kiosk_url = f"http://{cfg.api_host}:{cfg.api_port}/kiosk"
     console.print(
@@ -6903,14 +6932,94 @@ def makerfaire_autostart(
                     "2. Install booth autostart on the Pi:",
                     "   ./install_makerfaire_autostart.sh",
                     "3. Enable Desktop Autologin in Raspberry Pi Configuration so the kiosk browser can open after login.",
-                    "4. Reboot and verify both pieces:",
+                    "4. Let the generated watchdog timer protect the booth runtime in the background.",
+                    "5. Reboot and verify all three pieces:",
                     "   - the digital patient daemon starts automatically",
+                    "   - the watchdog timer is active",
                     f"   - the kiosk browser opens to {kiosk_url}",
-                    f"5. Between visitors, keep using: iints edge reset --project-dir {root}",
+                    f"6. Between visitors, keep using: iints edge reset --project-dir {root}",
                 ]
             ),
             title="Maker Faire Autostart Steps",
             border_style="green",
+        )
+    )
+
+
+@makerfaire_app.command("watchdog")
+def makerfaire_watchdog(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
+    scenario_profile: Annotated[str, typer.Option(help="Booth-safe scenario profile to restore if the runtime must be restarted.")] = "expo_hot_start",
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override used when the watchdog has to restart the runtime.")] = None,
+    quiet: Annotated[bool, typer.Option(help="Print only minimal output. Useful for watchdog scripts and timers.")] = False,
+) -> None:
+    """Check the Maker Faire runtime and restart it if the booth patient is down."""
+    console = Console()
+    root = _resolve_edge_project_dir(project_dir)
+    cfg = _load_edge_project_config(root, workspace_name=workspace_name)
+    workspace = Path(cfg.workspace).expanduser().resolve()
+    effective_seed = seed if seed is not None else cfg.seed
+    summary = summarize_edge_workspace(workspace)
+
+    daemon_status = str(summary.get("daemon_status", "unknown"))
+    pid_alive = bool(summary.get("pid_alive"))
+    action = "healthy"
+
+    if not pid_alive or daemon_status in {"error", "stopped"}:
+        patient_cli_module.start(
+            algo=Path(cfg.algo_path),
+            patient_config=cfg.patient_config,
+            patient_model=cfg.patient_model_type,
+            scenario_profile=scenario_profile,
+            workspace=workspace,
+            mode=cfg.mode,
+            speed=f"{cfg.speed:g}x",
+            api_host=cfg.api_host,
+            api_port=cfg.api_port,
+            foreground=False,
+            seed=effective_seed,
+            reset=True,
+        )
+        summary = _makerfaire_runtime_snapshot(
+            cfg=cfg,
+            scenario_profile=scenario_profile,
+            seed=effective_seed,
+        )
+        action = "restarted"
+    elif summary.get("scenario_profile") != scenario_profile:
+        action = "running"
+
+    if quiet:
+        if action == "restarted":
+            console.print(f"restarted {workspace}")
+        else:
+            console.print(f"ok {workspace}")
+        return
+
+    table = Table(title="IINTS Maker Faire Watchdog")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("project_dir", str(root))
+    table.add_row("workspace", str(workspace))
+    table.add_row("action", action)
+    table.add_row("daemon_status", str(summary.get("daemon_status", daemon_status)))
+    table.add_row("scenario_profile", str(summary.get("scenario_profile", scenario_profile)))
+    table.add_row("active_seed", str(summary.get("active_seed", effective_seed)))
+    table.add_row("dashboard_url", str(summary.get("dashboard_url", cfg.dashboard_url)))
+    table.add_row("kiosk_url", str(summary.get("kiosk_url", f"http://{cfg.api_host}:{cfg.api_port}/kiosk")))
+    console.print(table)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "Use this command when the booth patient looks frozen or vanished.",
+                    "If the runtime was down, the watchdog has already restarted it in the background.",
+                    f"Manual reset command: iints edge reset --project-dir {root}",
+                ]
+            ),
+            title="Watchdog Result",
+            border_style="green" if action != "restarted" else "yellow",
         )
     )
 

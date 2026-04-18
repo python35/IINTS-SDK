@@ -86,6 +86,10 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert Path(outputs["makerfaire_desktop_entry"]).is_file()
     assert Path(outputs["makerfaire_autostart_script"]).is_file()
     assert Path(outputs["makerfaire_autostart_guide"]).is_file()
+    assert Path(outputs["makerfaire_watchdog_script"]).is_file()
+    assert Path(outputs["makerfaire_watchdog_service"]).is_file()
+    assert Path(outputs["makerfaire_watchdog_timer"]).is_file()
+    assert Path(outputs["makerfaire_checklist"]).is_file()
     assert Path(outputs["service_file"]).is_file()
     assert Path(outputs["setup_guide"]).is_file()
     assert Path(outputs["uno_q_bridge"]).is_dir()
@@ -96,5 +100,10 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert "iints makerfaire up --project-dir ." in makerfaire_text
     autostart_text = Path(outputs["makerfaire_autostart_guide"]).read_text(encoding="utf-8")
     assert "./install_makerfaire_autostart.sh" in autostart_text
+    assert "watchdog timer" in autostart_text.lower()
     desktop_entry_text = Path(outputs["makerfaire_desktop_entry"]).read_text(encoding="utf-8")
     assert "open_makerfaire_kiosk.sh" in desktop_entry_text
+    watchdog_script_text = Path(outputs["makerfaire_watchdog_script"]).read_text(encoding="utf-8")
+    assert "makerfaire watchdog" in watchdog_script_text
+    checklist_text = Path(outputs["makerfaire_checklist"]).read_text(encoding="utf-8")
+    assert "Day Before The Event" in checklist_text

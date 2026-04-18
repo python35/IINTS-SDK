@@ -53,6 +53,7 @@ nav:
       - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
+      - Maker Faire Pi Checklist: MAKERFAIRE_PI_CHECKLIST.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
   - Data Quality (MDMP):
       - MDMP Quickstart: MDMP_QUICKSTART.md
