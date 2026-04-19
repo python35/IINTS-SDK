@@ -24,7 +24,7 @@ If you update the SDK, always rerun the full booth flow once before packing the 
 Check:
 
 - the runtime starts
-- the kiosk URL opens
+- the kiosk opens full-screen
 - the screen shows the digital patient
 
 ### 3. Confirm resets still work
@@ -57,7 +57,7 @@ Then reboot and confirm:
 
 - the patient service starts
 - the watchdog timer is active
-- the kiosk browser opens after desktop login
+- the kiosk browser opens after desktop login in full-screen mode
 
 ### 6. Pack the boring but important things
 
@@ -121,6 +121,12 @@ Make sure you are back in the default booth state before the next person starts 
 
 ```bash
 iints edge kiosk --project-dir .
+```
+
+If you want the hardened full-screen kiosk path again, use:
+
+```bash
+./open_makerfaire_kiosk.sh
 ```
 
 ### The patient looks frozen or dead

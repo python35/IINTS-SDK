@@ -532,6 +532,7 @@ def export_edge_setup(
                 "- loads the generated edge runtime config",
                 "- starts the persistent digital patient if it is not already running",
                 "- resets the patient into a booth-safe profile by default",
+                "- opens the kiosk in hardened full-screen mode when Chromium is available",
                 "- prints the kiosk URL you should show on the Pi display",
                 "- tells you which commands to use for status, reset, and stop",
                 "",

@@ -101,8 +101,13 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     autostart_text = Path(outputs["makerfaire_autostart_guide"]).read_text(encoding="utf-8")
     assert "./install_makerfaire_autostart.sh" in autostart_text
     assert "watchdog timer" in autostart_text.lower()
+    kiosk_script_text = Path(outputs["makerfaire_kiosk_script"]).read_text(encoding="utf-8")
+    assert "--kiosk" in kiosk_script_text
+    assert "chromium-browser" in kiosk_script_text
+    assert "xset -dpms" in kiosk_script_text
     desktop_entry_text = Path(outputs["makerfaire_desktop_entry"]).read_text(encoding="utf-8")
     assert "open_makerfaire_kiosk.sh" in desktop_entry_text
+    assert "X-GNOME-Autostart-Delay=15" in desktop_entry_text
     watchdog_script_text = Path(outputs["makerfaire_watchdog_script"]).read_text(encoding="utf-8")
     assert "makerfaire watchdog" in watchdog_script_text
     checklist_text = Path(outputs["makerfaire_checklist"]).read_text(encoding="utf-8")

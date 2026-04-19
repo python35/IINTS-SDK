@@ -5,7 +5,7 @@ Use this page when the Raspberry Pi is your show-ready virtual patient for Maker
 The goal is simple:
 
 - one Pi runs the digital patient
-- the kiosk URL is easy to open on the booth screen
+- the kiosk opens full-screen on the booth screen
 - the patient can be reset quickly between visitors
 - the flow stays simple enough that you can recover fast during the event
 
@@ -50,6 +50,14 @@ So you can also use:
 ```bash
 ./start_makerfaire_patient.sh
 ```
+
+The generated kiosk launcher now tries a hardened full-screen browser path first:
+
+- Chromium / Chrome in kiosk mode if available
+- Firefox kiosk mode as fallback
+- plain `xdg-open` only as the last fallback
+
+It also tries to disable screen blanking and DPMS on Raspberry Pi OS when a desktop session is present.
 
 ## What To Expect
 
@@ -148,7 +156,7 @@ iints makerfaire autostart --project-dir .
 
 - the digital patient starts automatically
 - the watchdog timer is active
-- the kiosk opens automatically
+- the kiosk opens automatically in full-screen mode
 - `iints edge reset --project-dir .` still works between visitors
 
 You can still regenerate the plain systemd service with:
@@ -174,6 +182,7 @@ Use the full live checklist here:
 ## Practical Advice
 
 - Use `expo_hot_start` as the default booth profile.
+- Install Chromium on the Pi if you want the strongest full-screen kiosk behavior.
 - Keep one terminal open only for runtime control.
 - Do not rely on editing configs during the event.
 - Test the full flow on the exact Pi you will bring.
