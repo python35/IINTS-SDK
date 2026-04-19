@@ -94,3 +94,19 @@ def test_live_patient_api_requires_bearer_token_when_configured(tmp_path) -> Non
 
     visible_status = client.get("/status", headers={"Authorization": "Bearer secret-token"})
     assert visible_status.status_code == 200
+
+
+def test_live_patient_api_sets_security_headers(tmp_path) -> None:
+    workspace = tmp_path / "patient"
+    store = PatientRuntimeStore(workspace / "patient_state.db")
+    store.update_status(daemon_status="running", paused=0, workspace=str(workspace))
+
+    client = TestClient(create_patient_app(workspace))
+    response = client.get("/dashboard")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store, max-age=0"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]

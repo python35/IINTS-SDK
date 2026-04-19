@@ -105,6 +105,8 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert "--kiosk" in kiosk_script_text
     assert "chromium-browser" in kiosk_script_text
     assert "xset -dpms" in kiosk_script_text
+    assert "--disable-background-networking" in kiosk_script_text
+    assert "--disable-session-crashed-bubble" in kiosk_script_text
     desktop_entry_text = Path(outputs["makerfaire_desktop_entry"]).read_text(encoding="utf-8")
     assert "open_makerfaire_kiosk.sh" in desktop_entry_text
     assert "X-GNOME-Autostart-Delay=15" in desktop_entry_text

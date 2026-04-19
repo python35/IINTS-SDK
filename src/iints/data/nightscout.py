@@ -7,6 +7,7 @@ import asyncio
 import pandas as pd
 
 from iints.data.importer import ImportResult, import_cgm_dataframe, scenario_from_dataframe
+from iints.utils.url_safety import validate_service_base_url
 
 
 @dataclass
@@ -17,6 +18,9 @@ class NightscoutConfig:
     start: Optional[str] = None  # ISO string or date-like
     end: Optional[str] = None
     limit: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        self.url = validate_service_base_url(self.url, label="Nightscout URL")
 
 
 def _require_nightscout():

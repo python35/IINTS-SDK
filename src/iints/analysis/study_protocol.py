@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from iints.utils.csv_safety import sanitize_csv_mapping
+
 from iints.analysis.study_engine import (
     DEFAULT_BASELINE_ALGORITHMS,
     DEFAULT_HYPOTHESES,
@@ -256,10 +258,12 @@ def write_study_protocol_bundle(
         writer.writeheader()
         for row in payload.get("matrix_rows", []):
             writer.writerow(
+                sanitize_csv_mapping(
                 {
                     **row,
                     "corruption_modes": ",".join(row.get("corruption_modes", [])),
                 }
+                )
             )
 
     return {

@@ -21,6 +21,14 @@ class ScenarioResetRequest(BaseModel):
 
 CONTROL_HEADER_NAME = "X-IINTS-Control"
 CONTROL_HEADER_VALUE = "1"
+SECURITY_RESPONSE_HEADERS = {
+    "Cache-Control": "no-store, max-age=0",
+    "Pragma": "no-cache",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+}
 
 
 def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None) -> str:
@@ -285,6 +293,13 @@ def create_patient_app(workspace: str | Path, api_token: str | None = None) -> F
     workspace_path = Path(workspace).expanduser().resolve()
     store = PatientRuntimeStore(workspace_path / "patient_state.db")
     app = FastAPI(title="IINTS Digital Patient")
+
+    @app.middleware("http")
+    async def add_security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+        response = await call_next(request)
+        for header_name, header_value in SECURITY_RESPONSE_HEADERS.items():
+            response.headers.setdefault(header_name, header_value)
+        return response
 
     def _request_token(request: Request) -> str | None:
         authorization = request.headers.get("Authorization", "")

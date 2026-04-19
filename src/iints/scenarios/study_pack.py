@@ -6,6 +6,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from iints.utils.csv_safety import sanitize_csv_mapping
+
 
 def _official_scenarios() -> list[dict[str, Any]]:
     return [
@@ -254,11 +256,13 @@ def export_eucys_study_pack(output_dir: str | Path, *, seeds: list[int] | None =
         writer.writeheader()
         for row in pack["matrix_rows"]:
             writer.writerow(
+                sanitize_csv_mapping(
                 {
                     **row,
                     "corruption_modes": ",".join(row["corruption_modes"]),
                     "seeds": ",".join(str(seed) for seed in row["seeds"]),
                 }
+                )
             )
 
     readme_path = resolved / "README.md"

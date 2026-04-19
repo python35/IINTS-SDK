@@ -101,6 +101,7 @@ from iints.utils.run_io import (
     resolve_seed,
     write_json,
 )
+from iints.utils.csv_safety import sanitize_csv_dataframe
 from iints.validation import (
     apply_contract_to_config,
     build_stress_events,
@@ -1199,7 +1200,7 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
 
 def _write_evidence_table_csv(payload: Dict[str, Any], output_path: Path) -> None:
     rows = payload.get("evidence_rows", [])
-    pd.DataFrame(rows).to_csv(output_path, index=False)
+    sanitize_csv_dataframe(pd.DataFrame(rows)).to_csv(output_path, index=False)
 
 
 def _write_evidence_table_markdown(payload: Dict[str, Any], output_path: Path) -> None:
@@ -5831,7 +5832,7 @@ def import_demo(
 
 @app.command("import-nightscout")
 def import_nightscout_cmd(
-    url: Annotated[str, typer.Option(help="Nightscout base URL")],
+    url: Annotated[str, typer.Option(help="Nightscout base URL. Use https for non-local hosts.")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/nightscout_import"),
     api_secret: Annotated[Optional[str], typer.Option(help="API secret (if required)")] = None,
     api_secret_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Nightscout API secret.")] = None,
@@ -5888,7 +5889,7 @@ def import_nightscout_cmd(
 
 @app.command("import-tidepool")
 def import_tidepool_cmd(
-    base_url: Annotated[str, typer.Option(help="Tidepool API base URL")] = "https://api.tidepool.org",
+    base_url: Annotated[str, typer.Option(help="Tidepool API base URL. Use https for non-local hosts.")] = "https://api.tidepool.org",
     token: Annotated[Optional[str], typer.Option(help="Bearer token")] = None,
     token_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Tidepool bearer token.")] = None,
     token_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Tidepool bearer token.")] = None,

@@ -58,6 +58,7 @@ The generated kiosk launcher now tries a hardened full-screen browser path first
 - plain `xdg-open` only as the last fallback
 
 It also tries to disable screen blanking and DPMS on Raspberry Pi OS when a desktop session is present.
+For Chromium-based browsers it also disables first-run prompts, restore bubbles, background networking, sync, and common booth-unfriendly popups.
 
 ## What To Expect
 

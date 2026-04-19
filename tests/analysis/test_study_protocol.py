@@ -40,6 +40,19 @@ def test_write_study_protocol_bundle_supports_eucys_preset(tmp_path) -> None:
     assert len(design["seed_policy"]["seeds"]) == 10
 
 
+def test_write_study_protocol_bundle_sanitizes_csv_formula_cells(tmp_path) -> None:
+    write_study_protocol_bundle(
+        tmp_path / "protocol",
+        algorithms=["=CandidateAlgo"],
+        extra_algorithms=["@AltAlgo"],
+    )
+
+    csv_text = (tmp_path / "protocol" / "study_matrix.csv").read_text(encoding="utf-8")
+
+    assert "'=CandidateAlgo" in csv_text
+    assert "'@AltAlgo" in csv_text
+
+
 def test_cli_study_protocol_writes_bundle(tmp_path) -> None:
     result = runner.invoke(
         app,

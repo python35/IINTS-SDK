@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 import json
 import urllib.request
 
+from iints.utils.url_safety import validate_service_base_url
+
 
 @dataclass
 class TidepoolClient:
@@ -15,6 +17,9 @@ class TidepoolClient:
     """
     base_url: str = "https://api.tidepool.org"
     token: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        self.base_url = validate_service_base_url(self.base_url, label="Tidepool API base URL")
 
     def _headers(self) -> Dict[str, str]:
         headers = {"Accept": "application/json"}

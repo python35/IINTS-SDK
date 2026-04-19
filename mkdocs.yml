@@ -72,7 +72,7 @@ nav:
       - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Release Notes:
-      - Latest (v1.5.2): releases/v1.5.2.md
+      - Latest (v1.5.3): releases/v1.5.3.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
           - v1.5.1: releases/v1.5.1.md

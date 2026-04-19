@@ -12,6 +12,7 @@ from iints.core.algorithms.pid_controller import PIDController
 from iints.core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 from iints.core.patient.models import PatientModel
 from iints.core.simulator import Simulator
+from iints.utils.csv_safety import sanitize_csv_dataframe
 from iints.validation import build_stress_events
 
 
@@ -88,5 +89,5 @@ def write_baseline_comparison(comparison: Dict[str, Any], output_dir: Path) -> D
     json_path = output_dir / "baseline_comparison.json"
     csv_path = output_dir / "baseline_comparison.csv"
     json_path.write_text(json.dumps(comparison, indent=2))
-    pd.DataFrame(comparison.get("rows", [])).to_csv(csv_path, index=False)
+    sanitize_csv_dataframe(pd.DataFrame(comparison.get("rows", []))).to_csv(csv_path, index=False)
     return {"json": str(json_path), "csv": str(csv_path)}

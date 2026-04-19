@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 
+from iints.utils.csv_safety import sanitize_csv_dataframe
 
 EUCYS_ARM_LAYOUT = {
     "clean_certified": "study_clean",
@@ -298,7 +299,7 @@ def generate_eucys_main_figure(
     if csv_output_path is not None:
         csv_path = Path(csv_output_path).expanduser().resolve()
         csv_path.parent.mkdir(parents=True, exist_ok=True)
-        figure_df.to_csv(csv_path, index=False)
+        sanitize_csv_dataframe(figure_df).to_csv(csv_path, index=False)
     else:
         csv_path = None
 
@@ -425,7 +426,7 @@ def generate_eucys_results_bundle(
     root_summary_copy = _copy_if_exists(root_summary_json, bundle_root / "study_summary.json")
     study_design_payload = _read_json(study_design_json) if study_design_json.is_file() else {}
     table_path = bundle_root / "EUCYS_RESULTS_TABLE.csv"
-    pd.DataFrame(table_rows).to_csv(table_path, index=False)
+    sanitize_csv_dataframe(pd.DataFrame(table_rows)).to_csv(table_path, index=False)
 
     summary_lines = [
         "# EUCYS Results Bundle",
