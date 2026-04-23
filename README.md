@@ -6,7 +6,7 @@
 > "Code shouldn't be a secret when it's managing a life."
 
 Insulin pumps make hundreds of autonomous decisions about drug delivery every day.  
-The algorithms behind those decisions are proprietary, unauditable, and difficult to inspect or improve -- even by the patients whose lives depend on them.
+The algorithms behind those decisions are proprietary, unauditable, and difficult to inspect or improve, even by the patients whose lives depend on them.
 
 IINTS-AF is an open-source research platform that changes that.
 
@@ -18,11 +18,11 @@ IINTS-AF is an open-source research platform that changes that.
 
 ## What It Does
 
-**Simulate** -- Run virtual patients through thousands of scenarios before any algorithm reaches a real device. A deterministic safety supervisor audits every AI decision. The AI may suggest. The supervisor decides.
+**Simulate:** Run virtual patients through thousands of scenarios before any algorithm reaches a real device. A deterministic safety supervisor audits every AI decision. The AI may suggest. The supervisor decides.
 
-**Certify** -- Every dataset is fingerprinted and graded before it touches a study workflow. The goal is to keep benchmark inputs traceable, reviewable, and reproducible.
+**Certify:** Every dataset is fingerprinted and graded before it touches a study workflow. The goal is to keep benchmark inputs traceable, reviewable, and reproducible.
 
-**Understand** -- Generate audit-ready reports, visual posters, and local AI summaries from the same study bundle. IINTS-AF can use local models such as Ministral for explanation workflows on your own hardware.
+**Understand:** Generate audit-ready reports, visual posters, and local AI summaries from the same study bundle. IINTS-AF can use local models such as Ministral for explanation workflows on your own hardware.
 
 ---
 
@@ -107,7 +107,7 @@ iints patient start \
   --mode demo-time --speed 60x
 ```
 
-Open `http://127.0.0.1:8765/dashboard` -- a virtual patient running continuously, reacting to meals, exercise, and sleep in real time.
+Open `http://127.0.0.1:8765/dashboard`. You will see a virtual patient running continuously, reacting to meals, exercise, and sleep in real time.
 
 ---
 
@@ -115,16 +115,16 @@ Open `http://127.0.0.1:8765/dashboard` -- a virtual patient running continuously
 
 | | |
 |---|---|
-| Getting started | [python35.github.io/IINTS-SDK/GETTING_STARTED/](https://python35.github.io/IINTS-SDK/GETTING_STARTED/) |
-| Edge hardware | [python35.github.io/IINTS-SDK/EDGE_HARDWARE/](https://python35.github.io/IINTS-SDK/EDGE_HARDWARE/) |
-| Raspberry Pi setup | [python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/](https://python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/) |
-| Data certification | [python35.github.io/IINTS-SDK/MDMP_QUICKSTART/](https://python35.github.io/IINTS-SDK/MDMP_QUICKSTART/) |
-| Full manual | [python35.github.io/IINTS-SDK/manuals/IINTS-AF_SDK_Manual.pdf](https://python35.github.io/IINTS-SDK/manuals/IINTS-AF_SDK_Manual.pdf) |
-| Research report | [research/EUCYS_REPORT.md](research/EUCYS_REPORT.md) |
+| Getting started | [Open guide](https://python35.github.io/IINTS-SDK/GETTING_STARTED/) |
+| Edge hardware | [Open guide](https://python35.github.io/IINTS-SDK/EDGE_HARDWARE/) |
+| Raspberry Pi setup | [Open guide](https://python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/) |
+| Data certification | [Open guide](https://python35.github.io/IINTS-SDK/MDMP_QUICKSTART/) |
+| Full manual | [Open PDF manual](https://python35.github.io/IINTS-SDK/manuals/IINTS-AF_SDK_Manual.pdf) |
+| Research report | [Open report source](research/EUCYS_REPORT.md) |
 
 ---
 
 > IINTS-AF is research software. Not a medical device.  
 > No clinical dosing advice.  
 >  
-> MIT Licensed -- built by a 17-year-old with type 1 diabetes who wanted to understand the device managing his life.
+> MIT Licensed. Built by a 17-year-old with type 1 diabetes who wanted to understand the device managing his life.

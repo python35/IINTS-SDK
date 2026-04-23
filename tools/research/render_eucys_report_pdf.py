@@ -280,7 +280,8 @@ def render_markdown(input_path: Path, output_path: Path) -> None:
             continue
 
         if re.match(r"^[-*]\s+", stripped):
-            add_paragraph(pdf, f"- {re.sub(r'^[-*]\s+', '', stripped)}", indent=3)
+            bullet_text = re.sub(r"^[-*]\s+", "", stripped)
+            add_paragraph(pdf, f"- {bullet_text}", indent=3)
             i += 1
             continue
 
