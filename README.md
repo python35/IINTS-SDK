@@ -1,4 +1,5 @@
 # IINTS-AF SDK
+[![EUCYS 2026](https://img.shields.io/badge/EUCYS-2026%20Selected-gold?style=flat)](https://eucys.eu)
 [![PyPI version](https://badge.fury.io/py/iints-sdk-python35.svg)](https://badge.fury.io/py/iints-sdk-python35)
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 [![Docs](https://img.shields.io/badge/docs-IINTS--AF-0a66c2?style=flat&logo=firefox-browser&logoColor=white)](https://python35.github.io/IINTS-SDK/)
@@ -125,6 +126,9 @@ Open `http://127.0.0.1:8765/dashboard`. You will see a virtual patient running c
 ---
 
 > IINTS-AF is research software. Not a medical device.  
-> No clinical dosing advice.  
->  
-> MIT Licensed. Built by a 17-year-old with type 1 diabetes who wanted to understand the device managing his life.
+> No clinical dosing advice. MIT Licensed.
+
+---
+
+*Built by a 17-year-old with type 1 diabetes who wanted to 
+understand the device managing his life.*
