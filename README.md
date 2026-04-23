@@ -3,55 +3,128 @@
 [![Python Package CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 [![Docs](https://img.shields.io/badge/docs-IINTS--AF-0a66c2?style=flat&logo=firefox-browser&logoColor=white)](https://python35.github.io/IINTS-SDK/)
 
-One platform for insulin-algorithm research.
+> "Code shouldn't be a secret when it's managing a life."
 
-IINTS-AF combines three layers in one SDK:
-- **Simulate** insulin algorithms on virtual patients
-- **Certify** the data and outputs with built-in trust grading
-- **Understand** results with reports, posters, and local AI review
+Insulin pumps make hundreds of autonomous decisions about drug delivery every day.  
+The algorithms behind those decisions are proprietary, unauditable, and difficult to inspect or improve -- even by the patients whose lives depend on them.
 
-Docs: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
+IINTS-AF is an open-source research platform that changes that.
+
+## Core Research Question
+
+**Can open-source simulation and deterministic safety supervision make insulin delivery algorithm development safer and more transparent for researchers and patients?**
+
+---
+
+## What It Does
+
+**Simulate** -- Run virtual patients through thousands of scenarios before any algorithm reaches a real device. A deterministic safety supervisor audits every AI decision. The AI may suggest. The supervisor decides.
+
+**Certify** -- Every dataset is fingerprinted and graded before it touches a study workflow. The goal is to keep benchmark inputs traceable, reviewable, and reproducible.
+
+**Understand** -- Generate audit-ready reports, visual posters, and local AI summaries from the same study bundle. IINTS-AF can use local models such as Ministral for explanation workflows on your own hardware.
+
+---
+
+## Research Results
+
+Final locked benchmark: `3600` simulation runs, `6` profiles, `4` scenario families, `5` algorithms, `10` fixed seeds.
+
+| Metric | ExampleAlgorithm | PID Baseline | Delta |
+|---|---:|---:|---:|
+| Time in Range | 87.16% | 83.72% | +3.44% |
+| Time < 70 mg/dL | 1.28% | 5.25% | -3.97% |
+| Supervisor interventions | 99 | 177 | -78 |
+
+Additional benchmark result:
+- clean certified conditions showed `+17.64` Time-in-Range points versus corrupted uncertified conditions
+
+For the full scientific write-up, see:
+- `research/EUCYS_REPORT.md`
+- `research/EUCYS_REPORT.pdf`
+- `results/eucys_2026/EUCYS_RESULTS/EUCYS_SUMMARY.md`
+
+---
 
 ## Install
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[full,mdmp]"
-```
 
-For Raspberry Pi or UNO Q edge rigs, use `iints-sdk-python35[edge,mdmp]` and follow `docs/EDGE_HARDWARE.md`.
-
-Edge workflow:
 ```bash
-iints edge setup --output-dir iints_edge_demo --board raspberry_pi
-iints edge status --workspace iints_edge_demo/patient_runtime
-iints edge bundle --workspace iints_edge_demo/patient_runtime --output results/edge_runtime_bundle.zip
-```
-
-Sanity check:
-```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -U "iints-sdk-python35[full,mdmp]"
 iints doctor --smoke-run
 ```
 
-## Quick Flow
+**Edge devices (Raspberry Pi 5, Arduino UNO Q):**
+
 ```bash
-iints quickstart --project-name iints_quickstart
-cd iints_quickstart
+pip install -U "iints-sdk-python35[edge,mdmp]"
+```
+
+---
+
+## Quick Start
+
+```bash
+iints quickstart --project-name my_study
+cd my_study
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
-iints data certify contracts/clinical_mdmp_contract.yaml results/<run_id>/results.csv --output-json results/<run_id>/certification.json
+iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv --output-json audit/certification.json
 iints ai report results/<run_id>
 ```
 
-## Read Next
-- Start here: `docs/GETTING_STARTED.md`
-- Installation and paths: `docs/INSTALLATION.md`
-- Edge hardware profiles: `docs/EDGE_HARDWARE.md`
-- Raspberry Pi digital patient: `docs/DIGITAL_PATIENT_PI.md`
-- Study analysis: `docs/STUDY_ANALYSIS.md`
-- AI assistant: `docs/AI_ASSISTANT.md`
-- Data certification: `docs/MDMP_QUICKSTART.md`
-- Full manual: `docs/manuals/IINTS-AF_SDK_Manual.md`
+---
 
-## Important
-IINTS-AF is research software. It is not a medical device and does not provide clinical treatment advice.
+## Final Benchmark Workflow
+
+```bash
+tools/research/run_eucys_final.sh \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/eucys_2026 \
+  --seeds 1,2,3,4,5,6,7,8,9,10
+```
+
+Then render the report:
+
+```bash
+tools/research/render_eucys_report_pdf.sh
+```
+
+Main final artifacts:
+- `results/eucys_2026/`
+- `results/eucys_2026/EUCYS_RESULTS/EUCYS_MAIN_FIGURE.png`
+- `results/eucys_2026/EUCYS_RESULTS/EUCYS_RESULTS_TABLE.csv`
+- `research/EUCYS_REPORT.md`
+- `research/EUCYS_REPORT.pdf`
+
+---
+
+## Live Digital Patient (Raspberry Pi)
+
+```bash
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --scenario-profile expo_hot_start \
+  --mode demo-time --speed 60x
+```
+
+Open `http://127.0.0.1:8765/dashboard` -- a virtual patient running continuously, reacting to meals, exercise, and sleep in real time.
+
+---
+
+## Documentation
+
+| | |
+|---|---|
+| Getting started | `docs/GETTING_STARTED.md` |
+| Edge hardware | `docs/EDGE_HARDWARE.md` |
+| Raspberry Pi setup | `docs/DIGITAL_PATIENT_PI.md` |
+| Data certification | `docs/MDMP_QUICKSTART.md` |
+| Full manual | `docs/manuals/IINTS-AF_SDK_Manual.md` |
+| Research report | `research/EUCYS_REPORT.md` |
+
+---
+
+> IINTS-AF is research software. Not a medical device.  
+> No clinical dosing advice.  
+>  
+> MIT Licensed -- built by a 17-year-old with type 1 diabetes who wanted to understand the device managing his life.
