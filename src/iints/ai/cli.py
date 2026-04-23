@@ -160,7 +160,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
         console.print("[bold red]Ollama is too old for the open Ministral 3 runtime.[/bold red]")
 
 
-@app.command("models")
+@app.command(name="models")
 def models() -> None:
     console = Console()
     table = Table(title="IINTS AI Local Mistral Model Guide")
@@ -189,7 +189,7 @@ def models() -> None:
     )
 
 
-@app.command("prepare")
+@app.command(name="prepare")
 def prepare(
     run_dir: Annotated[Path, typer.Argument(help="Run output directory containing results.csv and run_metadata.json.")],
     create_dev_mdmp_cert: Annotated[
@@ -254,7 +254,7 @@ def _build_assistant(
     )
 
 
-@app.command("local-check")
+@app.command(name="local-check")
 def local_check(
     model: Annotated[str, typer.Option(help="Ollama model name to validate locally.")] = DEFAULT_MINISTRAL_MODEL,
     ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
@@ -294,7 +294,7 @@ def local_check(
         raise typer.Exit(code=1)
 
 
-@app.command("explain")
+@app.command(name="explain")
 def explain(
     input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with a single simulation step or decision context.")],
     mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
@@ -335,7 +335,7 @@ def explain(
         raise typer.Exit(code=1)
 
 
-@app.command("trends")
+@app.command(name="trends")
 def trends(
     input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with glucose trace data or a run payload.")],
     mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
@@ -376,7 +376,7 @@ def trends(
         raise typer.Exit(code=1)
 
 
-@app.command("anomalies")
+@app.command(name="anomalies")
 def anomalies(
     input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with simulation results or run summary.")],
     mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
@@ -417,7 +417,7 @@ def anomalies(
         raise typer.Exit(code=1)
 
 
-@app.command("report")
+@app.command(name="report")
 def report(
     input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with run-level simulation outputs.")],
     mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
@@ -458,7 +458,7 @@ def report(
         raise typer.Exit(code=1)
 
 
-@app.command("review")
+@app.command(name="review")
 def review(
     input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with run-level simulation outputs.")],
     mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,

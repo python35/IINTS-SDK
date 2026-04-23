@@ -115,12 +115,12 @@ Open `http://127.0.0.1:8765/dashboard` -- a virtual patient running continuously
 
 | | |
 |---|---|
-| Getting started | `docs/GETTING_STARTED.md` |
-| Edge hardware | `docs/EDGE_HARDWARE.md` |
-| Raspberry Pi setup | `docs/DIGITAL_PATIENT_PI.md` |
-| Data certification | `docs/MDMP_QUICKSTART.md` |
-| Full manual | `docs/manuals/IINTS-AF_SDK_Manual.md` |
-| Research report | `research/EUCYS_REPORT.md` |
+| Getting started | [python35.github.io/IINTS-SDK/GETTING_STARTED/](https://python35.github.io/IINTS-SDK/GETTING_STARTED/) |
+| Edge hardware | [python35.github.io/IINTS-SDK/EDGE_HARDWARE/](https://python35.github.io/IINTS-SDK/EDGE_HARDWARE/) |
+| Raspberry Pi setup | [python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/](https://python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/) |
+| Data certification | [python35.github.io/IINTS-SDK/MDMP_QUICKSTART/](https://python35.github.io/IINTS-SDK/MDMP_QUICKSTART/) |
+| Full manual | [python35.github.io/IINTS-SDK/manuals/IINTS-AF_SDK_Manual.pdf](https://python35.github.io/IINTS-SDK/manuals/IINTS-AF_SDK_Manual.pdf) |
+| Research report | [research/EUCYS_REPORT.md](research/EUCYS_REPORT.md) |
 
 ---
 

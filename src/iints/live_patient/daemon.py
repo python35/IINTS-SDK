@@ -22,8 +22,9 @@ def _configure_logging(log_path: str) -> None:
 
 def _resolve_api_token(config: PatientRuntimeConfig) -> str | None:
     if config.api_token_env:
-        token = os.getenv(config.api_token_env, "").strip()
-        if not token:
+        raw_token = os.getenv(config.api_token_env)
+        token = raw_token.strip() if raw_token is not None else ""
+        if raw_token is None or not token:
             raise RuntimeError(
                 f"API token environment variable '{config.api_token_env}' is not set or is empty."
             )

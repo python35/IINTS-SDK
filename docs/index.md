@@ -11,30 +11,21 @@ It combines three core workflows:
     Run SDK commands from an active Python virtual environment such as `.venv`.
     This avoids package conflicts and missing dependency issues.
 
-## Start Here
+## Decide What You Need
 
-If you are new to the SDK, read these pages in order:
-
-1. [Overview In Plain Language](PLAIN_LANGUAGE_GUIDE.md)
-2. [Quick Start](GETTING_STARTED.md)
-3. [Installation](INSTALLATION.md)
-4. [CLI & Advanced Reference](TECHNICAL_README.md)
-
-## Choose Your Path
-
-| Goal | Best page | What you get |
+| I want to... | Start here | Why |
 |---|---|---|
-| Understand the scope and terminology | [Overview In Plain Language](PLAIN_LANGUAGE_GUIDE.md) | A simple explanation of what the SDK does and does not do |
-| Install and complete a first run | [Quick Start](GETTING_STARTED.md) | A reliable first workflow from install to outputs |
-| Pick the right install profile | [Installation](INSTALLATION.md) | Package options, paths, extras, and environment checks |
-| Run on Raspberry Pi or another SBC | [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md) | Hardware guidance, edge install profile, and deployment choices |
-| Operate a persistent digital patient | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) | Runtime control, kiosk view, export, and service setup |
-| Bring a Pi to Maker Faire | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | One-command startup, reset routine, kiosk flow, and booth-safe recovery |
-| Run the real event without stress | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) | Day-before checks, venue setup, recovery commands, and end-of-day shutdown |
-| Build reproducible experiments | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, corruption modes, study comparisons, and summaries |
-| Explore the full CLI surface | [CLI & Advanced Reference](TECHNICAL_README.md) | Command reference and advanced workflows |
+| See something work in a few minutes | [Quickstart](QUICKSTART.md) | Fastest route to a successful first run |
+| Let the CLI guide me | `iints guide` | Interactive beginner path |
+| Run a zero-config example | `iints demo` | No custom files required |
+| Build my own simulation command | `iints run --wizard` | Guided custom run builder |
+| Install or repair the environment | [Installation](INSTALLATION.md) | Dependency and environment setup |
+| Fix a failing command | [Troubleshooting](TROUBLESHOOTING.md) | Common errors and exact fixes |
+| Browse the CLI surface | [Command Reference](COMMAND_REFERENCE.md) | Short command map without deep internals |
+| Run reproducible studies | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, study bundles, comparisons |
+| Bring a Pi to Maker Faire | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | Show-ready Raspberry Pi flow |
 
-## 10-Minute Quick Start
+## 5-Minute First Run
 
 ```bash
 python3 -m venv .venv
@@ -42,52 +33,42 @@ source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
-iints doctor --smoke-run
-iints quickstart --project-name iints_quickstart
-cd iints_quickstart
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
-iints data certify contracts/clinical_mdmp_contract.yaml results/<run_id>/results.csv --output-json results/<run_id>/certification.json
-iints ai report results/<run_id>
+iints doctor --suggest
+iints demo
 ```
 
-Typical outputs:
-- `results.csv`
-- `clinical_report.pdf`
-- `audit/`
-- `run_manifest.json`
-- `certification.json`
+If you want to inspect the plan before running anything:
 
-If you are unsure which directory to use, start with [Installation](INSTALLATION.md).
+```bash
+iints demo --dry-run
+```
 
-## Common Workflows
+## Friendly CLI Entry Points
 
-### Simulation + Certification + AI Review
+- `iints guide`: asks what you want to do and points you to the right flow
+- `iints demo`: zero-config first run
+- `iints run --wizard`: guided custom run
+- `iints doctor --full --suggest`: diagnostics plus concrete next commands
 
-Use this when you want a complete baseline workflow:
+## Choose Your Path
 
-1. `iints presets run`
-2. `iints data certify`
-3. `iints ai report`
+### New Users
+1. [Quickstart](QUICKSTART.md)
+2. [Installation](INSTALLATION.md)
+3. [Troubleshooting](TROUBLESHOOTING.md)
+4. [Command Reference](COMMAND_REFERENCE.md)
 
-### Study And Evidence Workflows
-
-Use these pages when you want reproducible multi-run comparisons:
-
-- [Study Analysis](STUDY_ANALYSIS.md)
+### Researchers
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+- [Study Analysis](STUDY_ANALYSIS.md)
 - [Evidence Base](EVIDENCE_BASE.md)
 
-### Edge And SBC Workflows
-
-Use these pages when the SDK needs to stay running on a device:
-
+### Edge / Maker Faire Users
 - [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
 - [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
-
-Core edge commands:
-- `iints edge setup`
-- `iints edge status`
-- `iints edge bundle`
+- [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
+- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
+- [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
 
 ## Scope
 

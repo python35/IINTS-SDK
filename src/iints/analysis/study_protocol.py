@@ -15,6 +15,10 @@ from iints.analysis.study_engine import (
     StudyDesignPayload,
     build_study_design_payload,
 )
+from iints.analysis.study_experiment import (
+    build_study_experiment_template,
+    render_study_experiment_yaml,
+)
 
 DEFAULT_SCENARIOS = [
     "baseline_day",
@@ -231,10 +235,38 @@ def write_study_protocol_bundle(
     design_json = target / "study_design.json"
     matrix_csv = target / "study_matrix.csv"
     algorithms_json = target / "algorithms.json"
+    experiment_yaml = target / "study_experiment.yaml"
 
     markdown_path.write_text(render_study_protocol_markdown(payload), encoding="utf-8")
     design_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     algorithms_json.write_text(json.dumps(payload.get("algorithms", []), indent=2), encoding="utf-8")
+    candidate_entry = next(
+        (
+            entry
+            for entry in payload.get("algorithms", [])
+            if isinstance(entry, dict) and entry.get("role") == "candidate"
+        ),
+        {},
+    )
+    extra_algorithm_labels = [
+        str(entry.get("display_name"))
+        for entry in payload.get("algorithms", [])
+        if isinstance(entry, dict)
+        and entry.get("role") != "candidate"
+        and str(entry.get("display_name")) not in DEFAULT_BASELINE_ALGORITHMS
+    ]
+    experiment_payload = build_study_experiment_template(
+        preset=str(payload.get("preset", preset)),
+        title=str(payload.get("title", title)),
+        profile_set=str(payload.get("profile_set", profile_set)),
+        seeds=list(payload.get("seed_policy", {}).get("seeds", [])),
+        candidate_algorithm=str(candidate_entry.get("source_ref") or candidate_entry.get("display_name") or "algorithms/example_algorithm.py"),
+        scenarios=[str(item.get("slug")) for item in payload.get("scenarios", []) if isinstance(item, dict) and item.get("slug")],
+        include_default_baselines=include_default_baselines,
+        extra_algorithms=extra_algorithm_labels,
+        external_reference_label=str(payload.get("external_validation", {}).get("reference_label", external_reference_label)),
+    )
+    experiment_yaml.write_text(render_study_experiment_yaml(experiment_payload), encoding="utf-8")
 
     with matrix_csv.open("w", encoding="utf-8", newline="") as handle:
         fieldnames = [
@@ -271,4 +303,5 @@ def write_study_protocol_bundle(
         "study_design_json": str(design_json),
         "study_matrix_csv": str(matrix_csv),
         "algorithms_json": str(algorithms_json),
+        "study_experiment_yaml": str(experiment_yaml),
     }

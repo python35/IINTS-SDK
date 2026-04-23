@@ -9,6 +9,7 @@ from iints.scenarios.study_pack import build_eucys_study_pack
 
 DEFAULT_PROFILE_SET = "clinic_safe_core"
 DEFAULT_BASELINE_ALGORITHMS = [
+    "Clinical Baseline",
     "PID Controller",
     "Standard Pump",
     "Correction Bolus",

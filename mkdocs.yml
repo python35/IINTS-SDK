@@ -41,8 +41,10 @@ nav:
   - Home: index.md
   - Start Here:
       - Overview In Plain Language: PLAIN_LANGUAGE_GUIDE.md
-      - Quick Start: GETTING_STARTED.md
+      - 5-Minute Quickstart: QUICKSTART.md
+      - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md
+      - Troubleshooting: TROUBLESHOOTING.md
       - Updating An Existing Install: UPDATING.md
   - User Guides:
       - AI Assistant: AI_ASSISTANT.md
@@ -60,6 +62,7 @@ nav:
       - MDMP Guide: MDMP_FULL_GUIDE.md
       - MDMP Specification (Draft): MDMP.md
   - Reference:
+      - Command Reference: COMMAND_REFERENCE.md
       - CLI & Advanced Reference: TECHNICAL_README.md
       - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
       - Emulation Notes: emulation_references.md

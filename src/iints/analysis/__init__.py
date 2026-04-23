@@ -15,6 +15,12 @@ from .study_protocol import (
     render_study_protocol_markdown,
     write_study_protocol_bundle,
 )
+from .study_experiment import (
+    StudyExperimentConfig,
+    build_study_experiment_template,
+    load_study_experiment_config,
+    render_study_experiment_yaml,
+)
 from .study_analysis import (
     analyze_run_directory,
     analyze_study_directory,
@@ -112,8 +118,11 @@ __all__ = [
     "build_algorithm_registry",
     "build_study_design_payload",
     "build_study_protocol_payload",
+    "build_study_experiment_template",
     "render_study_protocol_markdown",
+    "render_study_experiment_yaml",
     "write_study_protocol_bundle",
+    "load_study_experiment_config",
     "load_study_summary",
     "quality_badges_for_metrics",
     "run_baseline_comparison",
@@ -121,6 +130,7 @@ __all__ = [
     "StudyArmSpec",
     "StudyComparison",
     "StudyDesignPayload",
+    "StudyExperimentConfig",
     "StudyMatrixRow",
     "StudyProfileSpec",
     "StudyRunSummary",

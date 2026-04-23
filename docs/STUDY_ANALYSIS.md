@@ -68,6 +68,12 @@ Write a reproducible study protocol before you start:
 iints study-protocol --output-dir results/study_protocol
 ```
 
+Then run the exact same plan from the generated experiment file:
+
+```bash
+iints run-study --experiment results/study_protocol/study_experiment.yaml
+```
+
 Generate a controlled corrupted dataset for the uncertified arm:
 
 ```bash
@@ -120,6 +126,7 @@ This is the command that turns “we ran the simulator” into evidence you can 
 - average performance over many runs
 - safety behavior across scenarios
 - comparison against baseline algorithms
+- clinician-style `Clinical Baseline` comparison in the default protocol bundle
 - comparison between certified and uncertified data when both are present
 - a written protocol that explains the hypothesis and study matrix
 - a deliberate corruption workflow instead of vague “bad data”

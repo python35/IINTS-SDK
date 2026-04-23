@@ -132,7 +132,7 @@ def _resolve_review_inputs(workspace: Path, mdmp_cert: Path | None) -> tuple[Pat
     return payload_path, resolved_cert, public_key
 
 
-@app.command("scenarios")
+@app.command(name="scenarios")
 def scenarios() -> None:
     console = Console()
     table = Table(title="Digital Patient Scenario Profiles")
@@ -146,7 +146,7 @@ def scenarios() -> None:
     console.print(table)
 
 
-@app.command("start")
+@app.command(name="start")
 def start(
     algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file.")],
     patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
@@ -274,7 +274,7 @@ def start(
     console.print(Panel(details, title="Digital Patient Started", border_style="green"))
 
 
-@app.command("status")
+@app.command(name="status")
 def status(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
 ) -> None:
@@ -323,7 +323,7 @@ def status(
     console.print(table)
 
 
-@app.command("inject-meal")
+@app.command(name="inject-meal")
 def inject_meal(
     carbs: Annotated[float, typer.Option(help="Carbohydrate amount to inject immediately into the live patient.")],
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
@@ -336,7 +336,7 @@ def inject_meal(
     console.print(f"[green]Meal queued:[/green] {carbs:.0f} g carbs")
 
 
-@app.command("pause")
+@app.command(name="pause")
 def pause(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
 ) -> None:
@@ -348,7 +348,7 @@ def pause(
     console.print("[green]Digital patient paused.[/green]")
 
 
-@app.command("resume")
+@app.command(name="resume")
 def resume(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
 ) -> None:
@@ -360,7 +360,7 @@ def resume(
     console.print("[green]Digital patient resumed.[/green]")
 
 
-@app.command("expo-reset")
+@app.command(name="expo-reset")
 def expo_reset(
     scenario_profile: Annotated[Optional[str], typer.Option(help="Optional profile to load after reset. Defaults to expo_hot_start.")] = None,
     seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override for the reset profile.")] = None,
@@ -382,7 +382,7 @@ def expo_reset(
     )
 
 
-@app.command("stop")
+@app.command(name="stop")
 def stop(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
 ) -> None:
@@ -402,7 +402,7 @@ def stop(
     console.print("[yellow]Stop request acknowledged, but the daemon is still shutting down.[/yellow]")
 
 
-@app.command("export-service")
+@app.command(name="export-service")
 def export_service(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
     output: Annotated[Optional[Path], typer.Option(help="Optional output service file path.")] = None,
@@ -436,7 +436,7 @@ def export_service(
     console.print(f"[green]Install notes:[/green] {outputs['install_notes']}")
 
 
-@app.command("export-uno-bridge")
+@app.command(name="export-uno-bridge")
 def export_uno_bridge(
     output_dir: Annotated[Path, typer.Option(help="Directory where the UNO Q bridge scaffold should be written.")] = Path("./uno_q_bridge"),
 ) -> None:
@@ -451,7 +451,7 @@ def export_uno_bridge(
     console.print(table)
 
 
-@app.command("hardware-bridge")
+@app.command(name="hardware-bridge")
 def hardware_bridge(
     board: Annotated[str, typer.Option(help="Hardware bridge target. Currently supported: uno_q.")] = "uno_q",
     output_dir: Annotated[Path, typer.Option(help="Directory where the hardware bridge scaffold should be written.")] = Path("./uno_q_bridge"),
@@ -478,7 +478,7 @@ def hardware_bridge(
     )
 
 
-@app.command("kiosk")
+@app.command(name="kiosk")
 def kiosk(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
 ) -> None:
@@ -501,7 +501,7 @@ def kiosk(
     console.print(Panel(details, title="Digital Patient Kiosk", border_style="green"))
 
 
-@app.command("review")
+@app.command(name="review")
 def review(
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
     model: Annotated[str, typer.Option(help="Local Ollama model used for the realism review.")] = DEFAULT_MINISTRAL_MODEL,

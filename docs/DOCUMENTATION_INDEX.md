@@ -1,45 +1,57 @@
 # Documentation By Role
 
-Use this page when you want a quick route to the right part of the documentation site.
+Use this page when you want the shortest route to the right documentation.
 
-## New Users
+## If You Are New
 
-Read in this order:
+Start in this order:
 
-1. `PLAIN_LANGUAGE_GUIDE.md` - SDK scope and terminology in simple language
-2. `GETTING_STARTED.md` - first successful workflow from install to outputs
-3. `INSTALLATION.md` - package extras, paths, and environment guidance
-4. `TECHNICAL_README.md` - full CLI and advanced command reference
+1. [Quickstart](QUICKSTART.md)
+2. [Installation](INSTALLATION.md)
+3. [Troubleshooting](TROUBLESHOOTING.md)
+4. [Command Reference](COMMAND_REFERENCE.md)
 
-## Researchers
+Beginner-friendly CLI entry points:
+- `iints guide`
+- `iints demo`
+- `iints run --wizard`
+- `iints doctor --full --suggest`
 
-Start here when you are building reproducible experiments:
-- study execution: `SCIENTIFIC_WORKFLOW.md`
-- run aggregation and summaries: `STUDY_ANALYSIS.md`
-- data quality and contracts: `MDMP_QUICKSTART.md` and `MDMP.md`
-- evidence and source grounding: `EVIDENCE_BASE.md`
-- full manual: `manuals/IINTS-AF_SDK_Manual.md`
+## If You Are A Research User
 
-## Edge And Deployment Users
+Go here first:
+- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+- [Study Analysis](STUDY_ANALYSIS.md)
+- [MDMP Quickstart](MDMP_QUICKSTART.md)
+- [Evidence Base](EVIDENCE_BASE.md)
+- [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md)
 
-Start here when the SDK needs to stay running on a device:
-- board selection and install profile: `EDGE_HARDWARE.md`
-- Raspberry Pi runtime operations: `DIGITAL_PATIENT_PI.md`
-- installation details: `INSTALLATION.md`
-- advanced command reference: `TECHNICAL_README.md`
+## If You Are Working On Edge Hardware
 
-## Developers And Integrators
+Start here:
+- [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
+- [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
+- [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
+- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
+- [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
 
-Use these pages when you are extending or embedding the SDK:
-- CLI and automation flows: `TECHNICAL_README.md`
-- architecture and module map: `COMPREHENSIVE_GUIDE.md`
-- device emulation notes: `emulation_references.md`
-- manual overview: `OFFICIAL_MANUAL.md`
+## If You Need A Fast CLI Map
 
-## Reviewers And Maintainers
+Read:
+- [Command Reference](COMMAND_REFERENCE.md)
+- [CLI & Advanced Reference](TECHNICAL_README.md)
 
-Use these pages when you are auditing the documentation set or preparing releases:
-- documentation coverage: `PUBLIC_DOCUMENTATION.md`
-- release checklist: `PUBLIC_RELEASE_CHECKLIST.md`
-- release history: `releases/INDEX.md`
-- MDMP packaging notes: `DUAL_REPO_WORKFLOW.md`
+## If Something Broke
+
+Start here:
+- [Troubleshooting](TROUBLESHOOTING.md)
+- [Installation](INSTALLATION.md)
+- `iints doctor --full --suggest`
+
+## If You Maintain The SDK
+
+Use:
+- [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
+- [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
+- [Release Archive](releases/INDEX.md)
+- [MDMP Packaging Workflow](DUAL_REPO_WORKFLOW.md)

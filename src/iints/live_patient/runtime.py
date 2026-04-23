@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import logging
 import os
 import signal
 import sqlite3
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
@@ -38,18 +40,27 @@ def _load_algorithm_instance_silent(algo: Path) -> InsulinAlgorithm:
 
     if not algo.is_file():
         raise FileNotFoundError(f"Algorithm file '{algo}' not found.")
-    module_name = f"iints_live_patient_{algo.stem}"
-    spec = importlib.util.spec_from_file_location(module_name, algo)
+    resolved = algo.expanduser().resolve()
+    module_hash = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:12]
+    module_name = f"_iints_live_patient_{resolved.stem}_{module_hash}_{time.monotonic_ns()}"
+    spec = importlib.util.spec_from_file_location(module_name, resolved)
     if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load module spec for {algo}")
+        raise ImportError(f"Could not load module spec for {resolved}")
     module = importlib.util.module_from_spec(spec)
-    module.iints = iints_sdk  # type: ignore[attr-defined]
+    module.__dict__.setdefault("iints", iints_sdk)
+    previous_module = sys.modules.get(module_name)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous_module is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous_module
     for _, obj in module.__dict__.items():
         if isinstance(obj, type) and issubclass(obj, InsulinAlgorithm) and obj is not InsulinAlgorithm:
             return obj()
-    raise ImportError(f"No subclass of InsulinAlgorithm found in {algo}")
+    raise ImportError(f"No subclass of InsulinAlgorithm found in {resolved}")
 
 
 @dataclass(frozen=True)
@@ -238,18 +249,29 @@ class PatientRuntimeConfig:
 
 
 class PatientRuntimeStore:
+    _lock_registry: dict[str, threading.RLock] = {}
+    _lock_registry_guard = threading.Lock()
+
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = self._shared_lock_for(self.db_path)
         self._initialize()
+
+    @classmethod
+    def _shared_lock_for(cls, db_path: Path) -> threading.RLock:
+        key = str(db_path.expanduser().resolve())
+        with cls._lock_registry_guard:
+            return cls._lock_registry.setdefault(key, threading.RLock())
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path, timeout=30.0)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 30000")
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
@@ -364,18 +386,18 @@ class PatientRuntimeStore:
             "last_event_summary": "UPDATE runtime_status SET last_event_summary = ? WHERE id = 1",
             "message": "UPDATE runtime_status SET message = ? WHERE id = 1",
         }
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             for key, value in updates.items():
                 conn.execute(query_map[key], (value,))
             conn.commit()
 
     def read_status(self) -> dict[str, Any]:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             row = conn.execute("SELECT * FROM runtime_status WHERE id = 1").fetchone()
         return dict(row) if row is not None else {}
 
     def append_reading(self, payload: dict[str, Any], *, event_summary: str = "") -> None:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             conn.execute(
                 """
                 INSERT INTO readings (
@@ -401,7 +423,7 @@ class PatientRuntimeStore:
             conn.commit()
 
     def get_recent_readings(self, limit: int = 288) -> list[dict[str, Any]]:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             rows = conn.execute(
                 "SELECT * FROM readings ORDER BY id DESC LIMIT ?",
                 (max(1, int(limit)),),
@@ -409,12 +431,12 @@ class PatientRuntimeStore:
         return [dict(row) for row in reversed(rows)]
 
     def get_latest_reading(self) -> dict[str, Any] | None:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             row = conn.execute("SELECT * FROM readings ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row is not None else None
 
     def enqueue_command(self, command: str, payload: dict[str, Any] | None = None) -> int:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             cursor = conn.execute(
                 "INSERT INTO commands (command, payload_json, status, created_at_utc) VALUES (?, ?, 'pending', ?)",
                 (command, json.dumps(payload or {}, sort_keys=True), _now_utc()),
@@ -424,18 +446,26 @@ class PatientRuntimeStore:
             return int(lastrowid) if lastrowid is not None else 0
 
     def fetch_pending_commands(self) -> list[dict[str, Any]]:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 "SELECT * FROM commands WHERE status = 'pending' ORDER BY id ASC"
             ).fetchall()
+            command_ids = [int(row["id"]) for row in rows]
+            if command_ids:
+                conn.executemany(
+                    "UPDATE commands SET status = 'processing' WHERE id = ? AND status = 'pending'",
+                    [(command_id,) for command_id in command_ids],
+                )
+            conn.commit()
         commands: list[dict[str, Any]] = []
         for row in rows:
             payload = json.loads(row["payload_json"] or "{}")
-            commands.append({**dict(row), "payload": payload})
+            commands.append({**dict(row), "status": "processing", "payload": payload})
         return commands
 
     def complete_command(self, command_id: int, *, status: str, result: dict[str, Any] | None = None) -> None:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             conn.execute(
                 "UPDATE commands SET status = ?, processed_at_utc = ?, result_json = ? WHERE id = ?",
                 (status, _now_utc(), json.dumps(result or {}, sort_keys=True), int(command_id)),
@@ -445,11 +475,11 @@ class PatientRuntimeStore:
     def await_command(self, command_id: int, timeout_seconds: float = 5.0) -> dict[str, Any] | None:
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
-            with self._connect() as conn:
+            with self._lock, self._connect() as conn:
                 row = conn.execute("SELECT * FROM commands WHERE id = ?", (int(command_id),)).fetchone()
             if row is None:
                 return None
-            if row["status"] != "pending":
+            if row["status"] in {"done", "failed"}:
                 payload = dict(row)
                 payload["result"] = json.loads(row["result_json"] or "{}")
                 return payload
@@ -457,13 +487,13 @@ class PatientRuntimeStore:
         return None
 
     def clear_runtime_data(self) -> None:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             conn.execute("DELETE FROM readings")
             conn.execute("DELETE FROM commands WHERE status != 'pending'")
             conn.commit()
 
     def build_audit_summary(self) -> dict[str, Any]:
-        with self._connect() as conn:
+        with self._lock, self._connect() as conn:
             total_steps = int(conn.execute("SELECT COUNT(*) FROM readings").fetchone()[0])
             total_overrides = int(conn.execute("SELECT COUNT(*) FROM readings WHERE safety_triggered = 1").fetchone()[0])
             reasons_rows = conn.execute(
@@ -749,8 +779,20 @@ class LivePatientDaemon:
         recent_records: list[tuple[dict[str, Any], str]] = []
         recent_override_seen = False
         last_record: dict[str, Any] | None = None
+        last_progress_minutes: int | None = None
+        stagnant_iterations = 0
+        max_iterations = max(1000, (max_minutes // max(self.config.time_step_minutes, 1)) * 20)
+        iterations = 0
 
         while True:
+            iterations += 1
+            if iterations > max_iterations:
+                raise SimulationLimitError(
+                    f"Warm-start exceeded {max_iterations} iterations without reaching the requested profile state.",
+                    float(last_progress_minutes or 0),
+                    float(last_record.get("glucose_actual_mgdl", 0.0) if last_record is not None else 0.0),
+                    float(max_minutes),
+                )
             simulated_clock = self._schedule_day()
             record = next(self.generator)
             record["simulated_clock"] = simulated_clock
@@ -763,6 +805,18 @@ class LivePatientDaemon:
             self._latest_event_summary = ""
 
             current_minutes = int(record.get("time_minutes", 0))
+            if last_progress_minutes is not None and current_minutes <= last_progress_minutes:
+                stagnant_iterations += 1
+                if stagnant_iterations >= 25:
+                    raise SimulationLimitError(
+                        "Warm-start generator stopped advancing simulated time; aborting to avoid a CPU spin.",
+                        float(current_minutes),
+                        float(record.get("glucose_actual_mgdl", 0.0) or 0.0),
+                        float(max_minutes),
+                    )
+            else:
+                stagnant_iterations = 0
+            last_progress_minutes = current_minutes
             if current_minutes < target_minutes:
                 continue
             if self.profile.require_recent_override and not recent_override_seen and current_minutes < max_minutes:

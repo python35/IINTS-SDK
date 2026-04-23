@@ -10,6 +10,24 @@ that plugs into the IINTS-AF safety workflow.
 
 If this is your first time, read `docs/PLAIN_LANGUAGE_GUIDE.md` before this file.
 
+If you are preparing a competition or formal research submission, start with:
+- `research/EUCYS_FINAL_WORKFLOW.md`
+- `research/EUCYS_REPORT.md`
+- `research/EUCYS_SUBMISSION_CHECKLIST.md`
+
+Shortest final-submission path:
+
+```bash
+tools/research/run_eucys_final.sh \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/eucys_2026 \
+  --seeds 1,2,3,4,5,6,7,8,9,10
+
+# update research/EUCYS_REPORT.md with the final numbers
+
+tools/research/render_eucys_report_pdf.sh
+```
+
 ## Goals
 - Train a **prediction model** (not a controller) that forecasts BG 30–120 minutes ahead.
 - Use synthetic simulator data for bootstrapping, then fine-tune on real-world datasets.

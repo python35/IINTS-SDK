@@ -5,7 +5,9 @@ from typing import Dict, Any, Union, List, Tuple, Optional, cast
 from dataclasses import asdict
 from typing_extensions import Annotated
 from pydantic import ValidationError
+import difflib
 import os
+import hashlib
 import importlib.util
 import importlib
 import sys
@@ -16,11 +18,14 @@ import shutil
 import yaml # Added for Virtual Patient Registry
 import pandas as pd # Added for DataFrame in benchmark results
 import numpy as np
+import click
 from typer.core import TyperGroup
+from click.core import ParameterSource
 
 from rich.console import Console  # type: ignore # For pretty printing
 from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn  # type: ignore
 
 import iints # Import the top-level SDK package
 from iints.ai import prepare_ai_ready_artifacts
@@ -31,10 +36,12 @@ from iints.analysis import build_booth_demo, build_carelink_workbench, generate_
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.eucys_results import generate_eucys_results_bundle
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
+from iints.analysis.study_experiment import load_study_experiment_config
 from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
 from iints.analysis.study_protocol import write_study_protocol_bundle
 from iints.api.registry import list_algorithm_plugins
 from iints.core.patient.profile import PatientProfile
+from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.core.safety import SafetyConfig
 from iints.scenarios import (
     ScenarioGeneratorConfig,
@@ -190,54 +197,44 @@ app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
-    if not algo.is_file():
-        console.print(f"[bold red]Error: Algorithm file '{algo}' not found.[/bold red]")
-        raise typer.Exit(code=1)
-
-    module_name = algo.stem
-    spec = importlib.util.spec_from_file_location(module_name, algo)
-    if spec is None:
-        console.print(f"[bold red]Error: Could not load module spec for {algo}[/bold red]")
-        raise typer.Exit(code=1)
-
-    module = importlib.util.module_from_spec(spec)
-    module.iints = iints # type: ignore
-    sys.modules[module_name] = module
     try:
-        if spec.loader:
-            spec.loader.exec_module(module)
-        else:
-            raise ImportError(f"Could not load module loader for {algo}")
+        return _load_algorithm_instance_silent(algo)
+    except FileNotFoundError:
+        console.print(f"[bold red]{_algorithm_not_found_message(algo)}[/bold red]")
+        raise typer.Exit(code=1)
     except Exception as e:
         console.print(f"[bold red]Error loading algorithm module {algo}: {e}[/bold red]")
         raise typer.Exit(code=1)
 
+def _load_algorithm_class_silent(algo: Path) -> type[iints.InsulinAlgorithm]:
+    if not algo.is_file():
+        raise FileNotFoundError(f"Algorithm file '{algo}' not found.")
+    resolved = algo.expanduser().resolve()
+    module_hash = hashlib.sha256(str(resolved).encode("utf-8")).hexdigest()[:12]
+    module_name = f"_iints_user_algo_{resolved.stem}_{module_hash}_{time.monotonic_ns()}"
+    spec = importlib.util.spec_from_file_location(module_name, resolved)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module spec for {resolved}")
+    module = importlib.util.module_from_spec(spec)
+    module.__dict__.setdefault("iints", iints)
+    previous_module = sys.modules.get(module_name)
+    sys.modules[module_name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        if previous_module is None:
+            sys.modules.pop(module_name, None)
+        else:
+            sys.modules[module_name] = previous_module
     for _, obj in module.__dict__.items():
         if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
-            return obj()
-
-    console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo}[/bold red]")
-    raise typer.Exit(code=1)
+            return obj
+    raise ImportError(f"No subclass of InsulinAlgorithm found in {resolved}")
 
 
 def _load_algorithm_instance_silent(algo: Path) -> iints.InsulinAlgorithm:
-    if not algo.is_file():
-        raise FileNotFoundError(f"Algorithm file '{algo}' not found.")
-    module_name = algo.stem
-    spec = importlib.util.spec_from_file_location(module_name, algo)
-    if spec is None:
-        raise ImportError(f"Could not load module spec for {algo}")
-    module = importlib.util.module_from_spec(spec)
-    module.iints = iints  # type: ignore
-    sys.modules[module_name] = module
-    if spec.loader:
-        spec.loader.exec_module(module)
-    else:
-        raise ImportError(f"Could not load module loader for {algo}")
-    for _, obj in module.__dict__.items():
-        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
-            return obj()
-    raise ImportError(f"No subclass of InsulinAlgorithm found in {algo}")
+    algorithm_class = _load_algorithm_class_silent(algo)
+    return algorithm_class()
 
 def _load_presets() -> List[Dict[str, Any]]:
     if sys.version_info >= (3, 9):
@@ -366,6 +363,177 @@ def _get_preset(name: str) -> Dict[str, Any]:
         if preset.get("name") == name:
             return preset
     raise KeyError(name)
+
+
+def _read_template_text(package: str, resource_name: str) -> str:
+    if sys.version_info >= (3, 9):
+        from importlib.resources import files
+
+        return files(package).joinpath(resource_name).read_text(encoding="utf-8")
+    from importlib import resources
+
+    return resources.read_text(package, resource_name, encoding="utf-8")
+
+
+def _write_default_algorithm_template(output_path: Path, *, algo_name: str, author_name: str) -> Path:
+    content = _read_template_text("iints.templates", "default_algorithm.py")
+    content = content.replace("{{ALGO_NAME}}", algo_name)
+    content = content.replace("{{AUTHOR_NAME}}", author_name)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(content, encoding="utf-8")
+    return output_path
+
+
+def _find_close_path_match(target: Path, candidates: List[Path]) -> Optional[Path]:
+    if not candidates:
+        return None
+    target_name = target.name
+    by_name = {candidate.name: candidate for candidate in candidates}
+    matches = difflib.get_close_matches(target_name, list(by_name.keys()), n=1, cutoff=0.45)
+    if matches:
+        return by_name[matches[0]]
+    target_str = str(target)
+    by_path = {str(candidate): candidate for candidate in candidates}
+    matches = difflib.get_close_matches(target_str, list(by_path.keys()), n=1, cutoff=0.45)
+    if matches:
+        return by_path[matches[0]]
+    return None
+
+
+def _suggest_path_message(target: Path, *, glob_pattern: str, include_common_roots: bool = True) -> Optional[str]:
+    candidates: List[Path] = []
+    if include_common_roots:
+        for root in (Path.cwd(), Path.cwd() / "algorithms", Path.cwd() / "scenarios", Path.cwd() / "results"):
+            if root.exists():
+                candidates.extend(root.glob(glob_pattern))
+    else:
+        candidates.extend(Path.cwd().glob(glob_pattern))
+    suggestion = _find_close_path_match(target, candidates)
+    if suggestion is None:
+        return None
+    try:
+        suggestion_display = suggestion.relative_to(Path.cwd())
+    except ValueError:
+        suggestion_display = suggestion
+    return f"Did you mean '{suggestion_display}'?"
+
+
+def _algorithm_not_found_message(target: Path) -> str:
+    suggestion = _suggest_path_message(target, glob_pattern="**/*.py")
+    detail = f"Algorithm file not found: {target}"
+    if suggestion:
+        detail = f"{detail}. {suggestion}"
+    else:
+        detail = f"{detail}. Tip: run `iints demo` or `iints quickstart` if you want a working example first."
+    return detail
+
+
+def _scenario_not_found_message(target: Path) -> str:
+    suggestion = _suggest_path_message(target, glob_pattern="**/*.json")
+    detail = f"Scenario file not found: {target}"
+    if suggestion:
+        detail = f"{detail}. {suggestion}"
+    else:
+        detail = f"{detail}. Tip: leave --scenario blank, use `--preset baseline_t1d`, or create one with `iints scenarios generate`."
+    return detail
+
+
+def _patient_config_not_found_message(target: Path) -> str:
+    suggestion = _suggest_path_message(target, glob_pattern="**/*.yaml")
+    detail = f"Patient config file not found: {target}"
+    if suggestion:
+        detail = f"{detail}. {suggestion}"
+    else:
+        detail = f"{detail}. Tip: use `--preset baseline_t1d` or create one with `iints profiles create`."
+    return detail
+
+
+def _run_progress(console: Console) -> Progress:
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(bar_width=28),
+        TextColumn("{task.completed}/{task.total}"),
+        TimeElapsedColumn(),
+        console=console,
+        transient=True,
+    )
+
+
+def _print_run_summary(
+    console: Console,
+    *,
+    algorithm_name: str,
+    output_dir: Path,
+    metrics: Dict[str, float],
+    duration_minutes: int,
+    seed: int,
+    wall_seconds: float,
+    preset_name: Optional[str] = None,
+) -> None:
+    lines = [
+        f"Algorithm: [green]{algorithm_name}[/green]",
+        f"Preset: [cyan]{preset_name}[/cyan]" if preset_name else "Preset: [dim]custom[/dim]",
+        f"Duration: {duration_minutes} min",
+        f"Seed: {seed}",
+        f"Wall time: {wall_seconds:.1f}s",
+        "",
+        f"TIR 70-180: [bold]{metrics.get('tir_70_180', float('nan')):.1f}%[/bold]",
+        f"Below 70: {metrics.get('tir_below_70', float('nan')):.1f}%",
+        f"Above 180: {metrics.get('tir_above_180', float('nan')):.1f}%",
+        f"Mean glucose: {metrics.get('mean_glucose', float('nan')):.1f} mg/dL",
+        f"Safety interventions: {metrics.get('supervisor_interventions', 0.0):.0f}",
+        "",
+        f"Results: {output_dir / 'results.csv'}",
+        f"Report: {output_dir / 'report.pdf'}",
+        f"Manifest: {output_dir / 'run_manifest.json'}",
+    ]
+    console.print(Panel("\n".join(lines), title="Run Complete", border_style="green"))
+
+
+def _print_dry_run_plan(
+    console: Console,
+    *,
+    algorithm_label: str,
+    algorithm_source: str,
+    patient_label: str,
+    scenario_label: str,
+    duration: int,
+    time_step: int,
+    output_dir: Path,
+    compare_baselines: bool,
+    seed: int,
+    preset_name: Optional[str] = None,
+) -> None:
+    table = Table(title="Dry Run Plan", show_lines=False)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Preset", preset_name or "custom")
+    table.add_row("Algorithm", algorithm_label)
+    table.add_row("Algorithm source", algorithm_source)
+    table.add_row("Patient", patient_label)
+    table.add_row("Scenario", scenario_label)
+    table.add_row("Duration", f"{duration} min")
+    table.add_row("Time step", f"{time_step} min")
+    table.add_row("Seed", str(seed))
+    table.add_row("Compare baselines", "yes" if compare_baselines else "no")
+    table.add_row("Output dir", str(output_dir))
+    console.print(table)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "Nothing was executed.",
+                    "Expected outputs:",
+                    f"- {output_dir / 'results.csv'}",
+                    f"- {output_dir / 'report.pdf'}",
+                    f"- {output_dir / 'run_manifest.json'}",
+                ]
+            ),
+            title="Next",
+            border_style="blue",
+        )
+    )
 
 
 def _parse_column_mapping(items: List[str], console: Console) -> Dict[str, str]:
@@ -615,21 +783,31 @@ def evaluate(
     console.print(f"  - population_report.pdf")
 
 
-@app.command("doctor")
+@app.command(name="doctor")
 def doctor(
     smoke_run: Annotated[bool, typer.Option(help="Run a short deterministic smoke simulation")] = False,
     smoke_duration: Annotated[int, typer.Option(help="Smoke simulation duration in minutes")] = 30,
+    full: Annotated[bool, typer.Option("--full", help="Run extra environment checks that help beginners debug setup issues")] = False,
+    suggest: Annotated[bool, typer.Option("--suggest", help="Print concrete next commands based on what doctor finds")] = False,
 ):
     """
-    Environment and installation health-check for developers.
+    Environment and installation health-check.
+
+    Examples:
+      iints doctor
+      iints doctor --smoke-run --suggest
+      iints doctor --full
     """
     console = Console()
     required_checks: List[Tuple[str, bool, str]] = []
+    suggestions: List[str] = []
 
     py_ok = sys.version_info >= (3, 10)
     required_checks.append(
         ("Python >= 3.10", py_ok, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     )
+    if not py_ok:
+        suggestions.append("Install Python 3.10 or newer, recreate your virtual environment, then rerun `iints doctor`.")
 
     package_checks = [
         ("pandas", True, "core"),
@@ -658,6 +836,14 @@ def doctor(
         table.add_row(f"Module: {module_name}", status, extra)
         if required:
             required_checks.append((f"Module: {module_name}", available, extra))
+            if not available:
+                suggestions.append(
+                    "Install the main SDK stack with `python -m pip install -U \"iints-sdk-python35[full,mdmp]\"`."
+                )
+        elif full and not available:
+            suggestions.append(
+                f"Optional package `{module_name}` is missing. Add it later if you need the {category} workflow."
+            )
 
     try:
         presets = _load_presets()
@@ -667,6 +853,7 @@ def doctor(
     except Exception as exc:
         table.add_row("Preset bundle", "[red]FAIL[/red]", str(exc))
         required_checks.append(("Preset bundle", False, str(exc)))
+        suggestions.append("Reinstall the package from a clean virtual environment so the bundled presets are restored.")
 
     try:
         profiles = load_validation_profiles()
@@ -680,6 +867,37 @@ def doctor(
     except Exception as exc:
         table.add_row("Validation profiles", "[red]FAIL[/red]", str(exc))
         required_checks.append(("Validation profiles", False, str(exc)))
+        suggestions.append("Reinstall or update the SDK so the validation profile bundle is available again.")
+
+    if full:
+        demo_df_ok = False
+        try:
+            demo_df_ok = not load_demo_dataframe().empty
+        except Exception as exc:
+            table.add_row("Bundled demo data", "[red]FAIL[/red]", str(exc))
+            required_checks.append(("Bundled demo data", False, str(exc)))
+            suggestions.append("Use `iints demo` once the package install is clean; it relies on the bundled demo assets.")
+        else:
+            table.add_row("Bundled demo data", "[green]OK[/green]" if demo_df_ok else "[red]FAIL[/red]", "embedded sample pack")
+            required_checks.append(("Bundled demo data", demo_df_ok, "embedded sample pack"))
+
+        cwd_writable = os.access(Path.cwd(), os.W_OK)
+        table.add_row("Current folder writable", "[green]OK[/green]" if cwd_writable else "[red]FAIL[/red]", str(Path.cwd()))
+        required_checks.append(("Current folder writable", cwd_writable, str(Path.cwd())))
+        if not cwd_writable:
+            suggestions.append("Switch to a writable project folder before running `iints demo` or `iints quickstart`.")
+
+        dataset_registry_ok = True
+        dataset_detail = "public registry loaded"
+        try:
+            dataset_registry_ok = len(load_dataset_registry()) > 0
+            dataset_detail = f"{len(load_dataset_registry())} public packs"
+        except Exception as exc:
+            dataset_registry_ok = False
+            dataset_detail = str(exc)
+            suggestions.append("If data packs fail to load, reinstall the SDK or inspect `src/iints/data/datasets.json` in a source checkout.")
+        table.add_row("Dataset registry", "[green]OK[/green]" if dataset_registry_ok else "[red]FAIL[/red]", dataset_detail)
+        required_checks.append(("Dataset registry", dataset_registry_ok, dataset_detail))
 
     if smoke_run:
         try:
@@ -698,16 +916,35 @@ def doctor(
                 detail = f"results: {results_path}" if smoke_ok else "simulation output missing"
                 table.add_row("Smoke simulation", "[green]OK[/green]" if smoke_ok else "[red]FAIL[/red]", detail)
                 required_checks.append(("Smoke simulation", smoke_ok, detail))
+                if not smoke_ok:
+                    suggestions.append("Run `iints demo --dry-run` to confirm the SDK can at least resolve a complete run plan.")
         except Exception as exc:
             table.add_row("Smoke simulation", "[red]FAIL[/red]", str(exc))
             required_checks.append(("Smoke simulation", False, str(exc)))
+            suggestions.append("Run `iints doctor --smoke-run --suggest` inside your active virtual environment for a fuller diagnosis.")
 
     console.print(table)
+    if suggest:
+        deduped: List[str] = []
+        for item in suggestions:
+            if item not in deduped:
+                deduped.append(item)
+        if deduped:
+            escaped = [item.replace("[", "\\[").replace("]", "\\]") for item in deduped]
+            console.print(
+                Panel(
+                    "\n".join(f"{idx}. {item}" for idx, item in enumerate(escaped, start=1)),
+                    title="Suggested Next Steps",
+                    border_style="blue",
+                )
+            )
+        else:
+            console.print(Panel("Everything essential looks healthy. A good next command is `iints demo`.", title="Suggested Next Steps", border_style="green"))
     if not all(passed for _, passed, _ in required_checks):
         raise typer.Exit(code=1)
 
 
-@app.command("validation-profiles")
+@app.command(name="validation-profiles")
 def validation_profiles(
     profiles_path: Annotated[Optional[Path], typer.Option(help="Optional custom profiles YAML")] = None,
 ):
@@ -734,7 +971,7 @@ def validation_profiles(
     console.print(table)
 
 
-@app.command("replay-check")
+@app.command(name="replay-check")
 def replay_check(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
@@ -801,7 +1038,7 @@ def replay_check(
         raise typer.Exit(code=1)
 
 
-@app.command("golden-benchmark")
+@app.command(name="golden-benchmark")
 def golden_benchmark(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt)")] = None,
@@ -922,7 +1159,7 @@ def golden_benchmark(
         raise typer.Exit(code=1)
 
 
-@app.command("validate-run")
+@app.command(name="validate-run")
 def validate_run(
     results_csv: Annotated[Path, typer.Option(help="Path to simulation results CSV")],
     profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
@@ -1379,6 +1616,7 @@ def _load_algorithm_plugin_instance(display_name: str) -> iints.InsulinAlgorithm
             algorithm_class = getattr(module, class_name)
         else:
             fallback_registry = {
+                "Clinical Baseline": ("iints.core.algorithms.clinical_baseline", "ClinicalBaselineAlgorithm"),
                 "PID Controller": ("iints.core.algorithms.pid_controller", "PIDController"),
                 "Standard Pump": ("iints.core.algorithms.standard_pump_algo", "StandardPumpAlgorithm"),
                 "Correction Bolus": ("iints.core.algorithms.correction_bolus", "CorrectionBolus"),
@@ -1392,6 +1630,13 @@ def _load_algorithm_plugin_instance(display_name: str) -> iints.InsulinAlgorithm
         _PLUGIN_ALGORITHM_CLASS_CACHE[display_name] = algorithm_class
     algorithm_class = _PLUGIN_ALGORITHM_CLASS_CACHE[display_name]
     return algorithm_class()
+
+
+def _option_was_set(ctx: typer.Context, name: str) -> bool:
+    try:
+        return ctx.get_parameter_source(name) == ParameterSource.COMMANDLINE
+    except Exception:
+        return False
 
 
 def _arm_output_dir_name(arm_id: str) -> str:
@@ -1601,6 +1846,7 @@ def _run_study_bundle(
     algo: Path,
     output_dir: Path,
     preset: str,
+    scenarios: Optional[List[str]],
     seeds: List[int],
     duration: Optional[int],
     time_step: int,
@@ -1609,6 +1855,8 @@ def _run_study_bundle(
     reference_csv: Optional[Path],
     profile_set: str,
     include_default_baselines: bool,
+    extra_algorithms: Optional[List[str]],
+    external_reference_label: str,
     gate_profile: Optional[str],
     gate_profiles_path: Optional[Path],
     fail_on_gate: bool,
@@ -1620,10 +1868,13 @@ def _run_study_bundle(
     candidate_label = _algorithm_display_name(candidate_instance, algo.stem)
     design = build_study_design_payload(
         preset=preset,
+        scenarios=scenarios,
         seeds=seeds,
         candidate_algorithm=candidate_label,
         include_default_baselines=include_default_baselines,
+        extra_algorithms=extra_algorithms,
         profile_set=profile_set,
+        external_reference_label=external_reference_label,
         candidate_source_type="path",
         candidate_source_ref=str(algo),
     )
@@ -1637,10 +1888,13 @@ def _run_study_bundle(
         target_root / "protocol",
         preset=preset,
         title="IINTS EUCYS Scientific Validation Protocol" if preset == "eucys" else "IINTS Scientific Validation Protocol",
+        scenarios=scenarios,
         seeds=seeds,
         algorithms=[candidate_label],
         profile_set=profile_set,
         include_default_baselines=include_default_baselines,
+        extra_algorithms=extra_algorithms,
+        external_reference_label=external_reference_label,
     )
     if reference_csv is not None and reference_csv.is_file():
         write_corrupted_study_csv(
@@ -1740,7 +1994,7 @@ def _run_study_bundle(
     }
 
 
-@app.command("analyze")
+@app.command(name="analyze")
 def analyze(
     study_dir: Annotated[Path, typer.Argument(help="Directory containing one or more run folders.")],
     output_json: Annotated[Path, typer.Option(help="Write aggregated study summary JSON")] = Path("results/study_summary.json"),
@@ -1849,7 +2103,7 @@ def analyze(
         console.print(f"[green]Evidence table markdown written:[/green] {output_evidence_markdown}")
 
 
-@app.command("compare-study")
+@app.command(name="compare-study")
 def compare_study(
     left: Annotated[Path, typer.Argument(help="Left study directory or study summary JSON")],
     right: Annotated[Path, typer.Argument(help="Right study directory or study summary JSON")],
@@ -1902,7 +2156,7 @@ def compare_study(
         console.print(f"[green]Study comparison markdown written:[/green] {output_markdown}")
 
 
-@app.command("poster-study")
+@app.command(name="poster-study")
 def poster_study(
     study_input: Annotated[Path, typer.Argument(help="Study directory or study summary JSON")],
     output_path: Annotated[Path, typer.Option(help="Output PNG path")] = Path("results/study_poster.png"),
@@ -1920,7 +2174,7 @@ def poster_study(
     console.print(f"[green]Poster summary JSON written:[/green] {outputs['poster_summary_json']}")
 
 
-@app.command("demo-expo")
+@app.command(name="demo-expo")
 def demo_expo(
     output_dir: Annotated[Path, typer.Option(help="Directory for the expo demo bundle")] = Path("results/expo_demo"),
     patient_config: Annotated[str, typer.Option(help="Patient profile name or path-like identifier")] = "default_patient",
@@ -1975,12 +2229,15 @@ def demo_expo(
     console.print(table)
 
 
-@app.command("run-study")
+@app.command(name="run-study")
 def run_study(
-    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    ctx: typer.Context,
+    algo: Annotated[Optional[Path], typer.Option(help="Path to the algorithm Python file")] = None,
+    experiment: Annotated[Optional[Path], typer.Option(help="Optional study experiment YAML file")] = None,
     output_dir: Annotated[Path, typer.Option(help="Root directory for the study bundle")] = Path("results/study_bundle"),
     preset: Annotated[str, typer.Option(help="Study preset: default or eucys")] = "default",
     profile_set: Annotated[str, typer.Option(help="Patient profile set to evaluate")] = DEFAULT_PROFILE_SET,
+    scenarios: Annotated[str, typer.Option(help="Optional comma-separated scenario slugs to run")] = "",
     seeds: Annotated[str, typer.Option(help="Comma-separated seed list")] = "1,2,3,4,5",
     duration: Annotated[Optional[int], typer.Option(help="Override scenario duration in minutes")] = None,
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
@@ -1997,36 +2254,87 @@ def run_study(
         bool,
         typer.Option("--include-default-baselines/--no-include-default-baselines", help="Include the default baseline registry in the study matrix"),
     ] = True,
+    extra_algorithms: Annotated[str, typer.Option(help="Comma-separated additional comparison algorithm labels")] = "",
+    external_reference_label: Annotated[str, typer.Option(help="Label for the plausibility reference lane")] = "CareLink personal workbench metrics",
     gate_profile: Annotated[Optional[str], typer.Option(help="Optional calibration gate profile id")] = None,
     gate_profiles_path: Annotated[Optional[Path], typer.Option(help="Optional calibration gate profiles YAML path")] = None,
     fail_on_gate: Annotated[bool, typer.Option(help="Exit with code 1 when any run fails the calibration gate")] = False,
 ) -> None:
     """Run the generic benchmark study engine with protocol, subgroup summaries, and posters."""
     console = Console()
-    parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
+    experiment_config = load_study_experiment_config(experiment) if experiment is not None else None
+
+    algo_path = algo if _option_was_set(ctx, "algo") else (experiment_config.candidate_algorithm if experiment_config is not None else algo)
+    output_dir_value = output_dir if _option_was_set(ctx, "output_dir") else (experiment_config.output_dir if experiment_config is not None and experiment_config.output_dir is not None else output_dir)
+    preset_value = preset if _option_was_set(ctx, "preset") else (experiment_config.preset if experiment_config is not None else preset)
+    profile_set_value = profile_set if _option_was_set(ctx, "profile_set") else (experiment_config.profile_set if experiment_config is not None else profile_set)
+    scenario_values = (
+        [item.strip() for item in scenarios.split(",") if item.strip()]
+        if _option_was_set(ctx, "scenarios")
+        else (experiment_config.scenarios if experiment_config is not None else [])
+    )
+    parsed_seeds = (
+        [int(item.strip()) for item in seeds.split(",") if item.strip()]
+        if _option_was_set(ctx, "seeds")
+        else (experiment_config.seeds if experiment_config is not None else [int(item.strip()) for item in seeds.split(",") if item.strip()])
+    )
+    duration_value = duration if _option_was_set(ctx, "duration") else (experiment_config.duration_minutes if experiment_config is not None else duration)
+    time_step_value = time_step if _option_was_set(ctx, "time_step") else (experiment_config.time_step if experiment_config is not None else time_step)
+    carelink_metrics_value = carelink_metrics if _option_was_set(ctx, "carelink_metrics") else (experiment_config.carelink_metrics if experiment_config is not None else carelink_metrics)
+    prepare_ai_value = prepare_ai if _option_was_set(ctx, "prepare_ai") else (experiment_config.prepare_ai if experiment_config is not None else prepare_ai)
+    reference_csv_value = reference_csv if _option_was_set(ctx, "reference_csv") else (experiment_config.reference_csv if experiment_config is not None else reference_csv)
+    include_default_baselines_value = (
+        include_default_baselines
+        if _option_was_set(ctx, "include_default_baselines")
+        else (experiment_config.include_default_baselines if experiment_config is not None else include_default_baselines)
+    )
+    extra_algorithm_values = (
+        [item.strip() for item in extra_algorithms.split(",") if item.strip()]
+        if _option_was_set(ctx, "extra_algorithms")
+        else (experiment_config.extra_algorithms if experiment_config is not None else [])
+    )
+    external_reference_label_value = (
+        external_reference_label
+        if _option_was_set(ctx, "external_reference_label")
+        else (experiment_config.external_reference_label if experiment_config is not None else external_reference_label)
+    )
+    gate_profile_value = gate_profile if _option_was_set(ctx, "gate_profile") else (experiment_config.gate_profile if experiment_config is not None else gate_profile)
+    gate_profiles_path_value = (
+        gate_profiles_path
+        if _option_was_set(ctx, "gate_profiles_path")
+        else (experiment_config.gate_profiles_path if experiment_config is not None else gate_profiles_path)
+    )
+    fail_on_gate_value = fail_on_gate if _option_was_set(ctx, "fail_on_gate") else (experiment_config.fail_on_gate if experiment_config is not None else fail_on_gate)
+
+    if algo_path is None:
+        console.print("[bold red]Please provide --algo or an --experiment file with algorithm.candidate.[/bold red]")
+        raise typer.Exit(code=1)
     if not parsed_seeds:
         console.print("[bold red]Please provide at least one seed.[/bold red]")
         raise typer.Exit(code=1)
 
     try:
         outputs = _run_study_bundle(
-            algo=algo,
-            output_dir=output_dir,
-            preset=preset.strip().lower(),
+            algo=algo_path,
+            output_dir=output_dir_value,
+            preset=preset_value.strip().lower(),
+            scenarios=scenario_values or None,
             seeds=parsed_seeds,
-            duration=duration,
-            time_step=time_step,
-            carelink_metrics=carelink_metrics,
-            prepare_ai=prepare_ai,
-            reference_csv=reference_csv,
-            profile_set=profile_set,
-            include_default_baselines=include_default_baselines,
-            gate_profile=gate_profile,
-            gate_profiles_path=gate_profiles_path,
-            fail_on_gate=fail_on_gate,
+            duration=duration_value,
+            time_step=time_step_value,
+            carelink_metrics=carelink_metrics_value,
+            prepare_ai=prepare_ai_value,
+            reference_csv=reference_csv_value,
+            profile_set=profile_set_value,
+            include_default_baselines=include_default_baselines_value,
+            extra_algorithms=extra_algorithm_values or None,
+            external_reference_label=external_reference_label_value,
+            gate_profile=gate_profile_value,
+            gate_profiles_path=gate_profiles_path_value,
+            fail_on_gate=fail_on_gate_value,
         )
         eucys_outputs = None
-        if preset.strip().lower() == "eucys":
+        if preset_value.strip().lower() == "eucys":
             eucys_outputs = _write_eucys_result_package(
                 root_dir=outputs["target_root"],
                 protocol_outputs=outputs["protocol_outputs"],
@@ -2044,6 +2352,7 @@ def run_study(
     table.add_row("Protocol markdown", outputs["protocol_outputs"]["protocol_markdown"])
     table.add_row("Protocol matrix", outputs["protocol_outputs"]["study_matrix_csv"])
     table.add_row("Algorithm registry", outputs["protocol_outputs"]["algorithms_json"])
+    table.add_row("Experiment YAML", outputs["protocol_outputs"]["study_experiment_yaml"])
     table.add_row("Bundle summary", str(outputs["root_summary_json"]))
     clean_summary = outputs["per_arm_outputs"].get("clean_certified", {}).get("summary_json")
     corrupted_summary = outputs["per_arm_outputs"].get("corrupted_uncertified", {}).get("summary_json")
@@ -2066,7 +2375,7 @@ def run_study(
     console.print(table)
 
 
-@app.command("run-eucys-study")
+@app.command(name="run-eucys-study")
 def run_eucys_study(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     patient_config_name: Annotated[str, typer.Option(help="Legacy option kept for compatibility; the EUCYS preset now uses the fixed clinic_safe_core profile set")] = "default_patient",
@@ -2109,6 +2418,7 @@ def run_eucys_study(
             algo=algo,
             output_dir=output_dir,
             preset="eucys",
+            scenarios=None,
             seeds=parsed_seeds,
             duration=duration,
             time_step=time_step,
@@ -2117,6 +2427,8 @@ def run_eucys_study(
             reference_csv=reference_csv,
             profile_set=DEFAULT_PROFILE_SET,
             include_default_baselines=include_default_baselines,
+            extra_algorithms=None,
+            external_reference_label="CareLink personal workbench metrics",
             gate_profile=gate_profile,
             gate_profiles_path=gate_profiles_path,
             fail_on_gate=fail_on_gate,
@@ -2154,7 +2466,7 @@ def run_eucys_study(
     console.print(table)
 
 
-@app.command("eucys-results")
+@app.command(name="eucys-results")
 def eucys_results(
     study_dir: Annotated[Path, typer.Argument(help="Root directory of a completed EUCYS or run-study bundle.")],
     output_dir: Annotated[
@@ -2187,9 +2499,11 @@ def eucys_results(
     console.print(table)
 
 
-@app.command("study-protocol")
+@app.command(name="study-protocol")
 def study_protocol(
+    ctx: typer.Context,
     output_dir: Annotated[Path, typer.Option(help="Directory where the protocol bundle should be written")] = Path("results/study_protocol"),
+    experiment: Annotated[Optional[Path], typer.Option(help="Optional study experiment YAML file to seed the protocol bundle")] = None,
     preset: Annotated[str, typer.Option(help="Protocol preset: default or eucys")] = "default",
     title: Annotated[str, typer.Option(help="Protocol title")] = "IINTS Scientific Validation Protocol",
     primary_hypothesis: Annotated[
@@ -2213,20 +2527,53 @@ def study_protocol(
 ) -> None:
     """Write a reproducible study protocol bundle for scientific benchmarking."""
     console = Console()
+    experiment_config = load_study_experiment_config(experiment) if experiment is not None else None
+    output_dir_value = output_dir if _option_was_set(ctx, "output_dir") else output_dir
+    preset_value = preset if _option_was_set(ctx, "preset") else (experiment_config.preset if experiment_config is not None else preset)
+    title_value = title if _option_was_set(ctx, "title") else (experiment_config.title if experiment_config is not None else title)
+    parsed_seed_values = (
+        [int(item.strip()) for item in seeds.split(",") if item.strip()]
+        if _option_was_set(ctx, "seeds")
+        else (experiment_config.seeds if experiment_config is not None else [int(item.strip()) for item in seeds.split(",") if item.strip()])
+    )
+    scenario_values = (
+        [item.strip() for item in scenarios.split(",") if item.strip()]
+        if _option_was_set(ctx, "scenarios")
+        else (experiment_config.scenarios if experiment_config is not None else [item.strip() for item in scenarios.split(",") if item.strip()])
+    )
+    profile_set_value = profile_set if _option_was_set(ctx, "profile_set") else (experiment_config.profile_set if experiment_config is not None else profile_set)
+    include_default_baselines_value = (
+        include_default_baselines
+        if _option_was_set(ctx, "include_default_baselines")
+        else (experiment_config.include_default_baselines if experiment_config is not None else include_default_baselines)
+    )
+    extra_algorithm_values = (
+        [item.strip() for item in extra_algorithms.split(",") if item.strip()]
+        if _option_was_set(ctx, "extra_algorithms")
+        else (experiment_config.extra_algorithms if experiment_config is not None else [item.strip() for item in extra_algorithms.split(",") if item.strip()])
+    )
+    external_reference_label_value = (
+        external_reference_label
+        if _option_was_set(ctx, "external_reference_label")
+        else (experiment_config.external_reference_label if experiment_config is not None else external_reference_label)
+    )
+    algorithm_values = [item.strip() for item in algorithms.split(",") if item.strip()]
+    if experiment_config is not None and not _option_was_set(ctx, "algorithms"):
+        algorithm_values = [str(experiment_config.candidate_algorithm)] + list(experiment_config.extra_algorithms)
     try:
         outputs = write_study_protocol_bundle(
-            output_dir,
-            preset=preset,
-            title=title,
+            output_dir_value,
+            preset=preset_value,
+            title=title_value,
             primary_hypothesis=primary_hypothesis,
-            seeds=[int(item.strip()) for item in seeds.split(",") if item.strip()],
-            algorithms=[item.strip() for item in algorithms.split(",") if item.strip()],
-            scenarios=[item.strip() for item in scenarios.split(",") if item.strip()],
+            seeds=parsed_seed_values,
+            algorithms=algorithm_values,
+            scenarios=scenario_values,
             corruption_modes=[item.strip() for item in corruption_modes.split(",") if item.strip()],
-            external_reference_label=external_reference_label,
-            profile_set=profile_set,
-            include_default_baselines=include_default_baselines,
-            extra_algorithms=[item.strip() for item in extra_algorithms.split(",") if item.strip()],
+            external_reference_label=external_reference_label_value,
+            profile_set=profile_set_value,
+            include_default_baselines=include_default_baselines_value,
+            extra_algorithms=extra_algorithm_values,
         )
     except Exception as exc:
         console.print(f"[bold red]Could not write study protocol bundle: {exc}[/bold red]")
@@ -2239,10 +2586,11 @@ def study_protocol(
     table.add_row("Study design JSON", outputs["study_design_json"])
     table.add_row("Study matrix CSV", outputs["study_matrix_csv"])
     table.add_row("Algorithm registry", outputs["algorithms_json"])
+    table.add_row("Experiment YAML", outputs["study_experiment_yaml"])
     console.print(table)
 
 
-@app.command("contract-verify")
+@app.command(name="contract-verify")
 def contract_verify(
     contract_path: Annotated[Optional[Path], typer.Option(help="Optional YAML safety-contract file")] = None,
     glucose_min: Annotated[float, typer.Option(help="Minimum glucose to test (mg/dL)")] = 50.0,
@@ -2335,7 +2683,7 @@ def contract_verify(
         raise typer.Exit(code=1)
 
 
-@app.command("certify-run")
+@app.command(name="certify-run")
 def certify_run(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
@@ -2431,7 +2779,7 @@ def certify_run(
         raise typer.Exit(code=1)
 
 
-@app.command("study-ready")
+@app.command(name="study-ready")
 def study_ready(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     scenario_path: Annotated[Optional[Path], typer.Option(help="Path to scenario JSON")] = None,
@@ -2738,6 +3086,174 @@ iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.
         "  iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py\n"
         "  iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv --output-json audit/certification.json"
     )
+
+
+@app.command(name="demo")
+def demo(
+    output_dir: Annotated[Path, typer.Option(help="Directory where the zero-config demo outputs should be written")] = Path("results/demo"),
+    mode: Annotated[str, typer.Option("--mode", help="Demo mode: quick or full")] = "quick",
+    quick_mode: Annotated[bool, typer.Option("--quick", help="Shortcut for --mode quick")] = False,
+    full_mode: Annotated[bool, typer.Option("--full", help="Shortcut for --mode full")] = False,
+    preset: Annotated[Optional[str], typer.Option(help="Optional preset override. Defaults to baseline_t1d for quick and stress_test_meal for full.")] = None,
+    seed: Annotated[int, typer.Option(help="Deterministic seed for the bundled demo")] = 42,
+    compare_baselines: Annotated[bool, typer.Option(help="Include built-in baselines in the demo output")] = True,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the plan without running the demo")] = False,
+):
+    """
+    Zero-config demo run for first-time users.
+
+    Examples:
+      iints demo
+      iints demo --mode full
+      iints demo --dry-run
+    """
+    console = Console()
+    if quick_mode and full_mode:
+        console.print("[bold red]Use either --quick or --full, not both.[/bold red]")
+        raise typer.Exit(code=1)
+
+    normalized_mode = mode.strip().lower()
+    if quick_mode:
+        normalized_mode = "quick"
+    if full_mode:
+        normalized_mode = "full"
+    if normalized_mode not in {"quick", "full"}:
+        console.print("[bold red]Demo mode must be 'quick' or 'full'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    resolved_preset = preset or ("baseline_t1d" if normalized_mode == "quick" else "stress_test_meal")
+    duration = 180 if normalized_mode == "quick" else 720
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Mode: {normalized_mode}",
+                    f"Preset: {resolved_preset}",
+                    "Algorithm: built-in Clinical Baseline",
+                    f"Output: {output_dir}",
+                ]
+            ),
+            title="IINTS Demo",
+            border_style="green",
+        )
+    )
+
+    run(
+        algo=None,
+        preset=resolved_preset,
+        predictor_path=None,
+        patient_config_name="default_patient",
+        patient_config_path=None,
+        scenario_path=None,
+        duration=duration,
+        time_step=5,
+        output_dir=output_dir,
+        compare_baselines=compare_baselines,
+        seed=seed,
+        patient_model_type="auto",
+        sensor_noise_std=None,
+        sensor_lag_minutes=None,
+        sensor_dropout_prob=None,
+        sensor_bias=None,
+        safety_min_glucose=None,
+        safety_max_glucose=None,
+        safety_max_glucose_delta_per_5_min=None,
+        safety_hypoglycemia_threshold=None,
+        safety_severe_hypoglycemia_threshold=None,
+        safety_hyperglycemia_threshold=None,
+        safety_max_insulin_per_bolus=None,
+        safety_glucose_rate_alarm=None,
+        safety_max_insulin_per_hour=None,
+        safety_max_iob=None,
+        safety_trend_stop=None,
+        safety_hypo_cutoff=None,
+        safety_critical_glucose_threshold=None,
+        safety_critical_glucose_duration_minutes=None,
+        safety_predictor_uncertainty_gate_enabled=None,
+        safety_predictor_uncertainty_max_std_mgdl=None,
+        safety_predictor_ood_gate_enabled=None,
+        safety_predictor_ood_zscore_threshold=None,
+        safety_predictor_ood_max_feature_fraction=None,
+        wizard=False,
+        dry_run=dry_run,
+    )
+
+    if dry_run:
+        return
+
+    demo_algo_path = _write_default_algorithm_template(
+        output_dir / "demo_assets" / "example_algorithm.py",
+        algo_name="DemoAlgorithm",
+        author_name="IINTS Demo",
+    )
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Editable example algorithm: {demo_algo_path}",
+                    "Next steps:",
+                    f"1. Rerun with your own file: iints run --algo {demo_algo_path} --preset {resolved_preset}",
+                    "2. Use `iints run --wizard` if you want to tweak the patient or scenario interactively.",
+                ]
+            ),
+            title="What To Do Next",
+            border_style="blue",
+        )
+    )
+
+
+@app.command(name="guide")
+def guide():
+    """Friendly entry point that helps beginners choose the right first command."""
+    console = Console()
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "1. Quick demo (recommended first run)",
+                    "2. Build a custom run interactively",
+                    "3. Scaffold a project folder",
+                    "4. Raspberry Pi / Maker Faire path",
+                ]
+            ),
+            title="IINTS Guide",
+            border_style="blue",
+        )
+    )
+    choice = typer.prompt("Choose 1, 2, 3, or 4", default="1").strip()
+    if choice == "1":
+        demo()
+        return
+    if choice == "2":
+        run_wizard()
+        return
+    if choice == "3":
+        project_name = typer.prompt("Project folder name", default="iints_quickstart").strip() or "iints_quickstart"
+        quickstart(project_name=project_name)
+        return
+    if choice == "4":
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        "Pi-only booth flow:",
+                        "1. iints edge doctor --board raspberry_pi",
+                        "2. iints edge setup --output-dir iints_pi_demo --board raspberry_pi --scenario-profile expo_hot_start",
+                        "3. cd iints_pi_demo",
+                        "4. iints makerfaire up --project-dir .",
+                        "",
+                        f"Docs: {Path.cwd() / 'docs' / 'MAKERFAIRE_PI.md'}",
+                    ]
+                ),
+                title="Maker Faire Path",
+                border_style="green",
+            )
+        )
+        return
+    console.print("[bold red]Unknown choice. Please rerun `iints guide` and choose 1, 2, 3, or 4.[/bold red]")
+    raise typer.Exit(code=1)
+
+
 @app.command()
 def new_algo(
     name: Annotated[str, typer.Option(help="Name of the new algorithm")],
@@ -2783,7 +3299,7 @@ def new_algo(
     typer.echo(f"Successfully created new algorithm template: {output_file}")
 
 
-@presets_app.command("list")
+@presets_app.command(name="list")
 def presets_list():
     """List clinic-safe presets."""
     console = Console()
@@ -2803,7 +3319,7 @@ def presets_list():
     console.print(table)
 
 
-@presets_app.command("show")
+@presets_app.command(name="show")
 def presets_show(
     name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
 ):
@@ -2817,7 +3333,7 @@ def presets_show(
     console.print_json(json.dumps(preset, indent=2))
 
 
-@presets_app.command("run")
+@presets_app.command(name="run")
 def presets_run(
     name: Annotated[str, typer.Option(help="Preset name (e.g., baseline_t1d)")],
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
@@ -3036,7 +3552,7 @@ def presets_run(
     _maybe_prepare_ai_artifacts(output_dir, console)
 
 
-@presets_app.command("create")
+@presets_app.command(name="create")
 def presets_create(
     name: Annotated[str, typer.Option(help="Preset name (snake_case)")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for preset files")] = Path("./presets"),
@@ -3096,30 +3612,26 @@ def presets_create(
     console.print_json(json.dumps(preset_snippet, indent=2))
 
 
-@app.command("run-wizard")
+@app.command(name="run-wizard")
 def run_wizard():
-    """Interactive wizard to run a preset quickly."""
-    console = Console()
-    presets = _load_presets()
-    preset_names = [preset.get("name", "") for preset in presets if preset.get("name")]
-    if not preset_names:
-        console.print("[bold red]No presets available.[/bold red]")
-        raise typer.Exit(code=1)
-
-    preset_choice = typer.prompt("Preset name", default=preset_names[0])
-    algo_path = Path(typer.prompt("Algorithm path", default="algorithms/example_algorithm.py"))
-    seed_input = typer.prompt("Seed (blank for auto)", default="", show_default=False)
-    seed = int(seed_input) if seed_input.strip() else None
-    output_dir_input = typer.prompt("Output directory (blank for default)", default="", show_default=False)
-    output_dir = Path(output_dir_input) if output_dir_input.strip() else None
-
-    presets_run(
-        name=preset_choice,
-        algo=algo_path,
+    """Interactive wizard that forwards to `iints run --wizard`."""
+    run(
+        algo=None,
+        preset=None,
         predictor_path=None,
-        output_dir=output_dir,
+        patient_config_name="default_patient",
+        patient_config_path=None,
+        scenario_path=None,
+        duration=720,
+        time_step=5,
+        output_dir=None,
         compare_baselines=True,
-        seed=seed,
+        seed=None,
+        patient_model_type="auto",
+        sensor_noise_std=None,
+        sensor_lag_minutes=None,
+        sensor_dropout_prob=None,
+        sensor_bias=None,
         safety_min_glucose=None,
         safety_max_glucose=None,
         safety_max_glucose_delta_per_5_min=None,
@@ -3134,10 +3646,17 @@ def run_wizard():
         safety_hypo_cutoff=None,
         safety_critical_glucose_threshold=None,
         safety_critical_glucose_duration_minutes=None,
+        safety_predictor_uncertainty_gate_enabled=None,
+        safety_predictor_uncertainty_max_std_mgdl=None,
+        safety_predictor_ood_gate_enabled=None,
+        safety_predictor_ood_zscore_threshold=None,
+        safety_predictor_ood_max_feature_fraction=None,
+        wizard=True,
+        dry_run=False,
     )
 
 
-@profiles_app.command("create")
+@profiles_app.command(name="create")
 def profiles_create(
     name: Annotated[str, typer.Option(help="Profile name (file stem)")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for the profile YAML")] = Path("./patient_profiles"),
@@ -3171,7 +3690,7 @@ def profiles_create(
     console.print(f"  iints run --algo algorithms/example_algorithm.py --patient-config-path {output_path}")
 
 
-@scenarios_app.command("generate")
+@scenarios_app.command(name="generate")
 def scenarios_generate(
     name: Annotated[str, typer.Option(help="Scenario name")] = "Generated Scenario",
     output_path: Annotated[Path, typer.Option(help="Output JSON path")] = Path("./scenarios/generated_scenario.json"),
@@ -3200,7 +3719,7 @@ def scenarios_generate(
     typer.echo(f"Scenario saved: {output_path}")
 
 
-@scenarios_app.command("wizard")
+@scenarios_app.command(name="wizard")
 def scenarios_wizard():
     """Interactive scenario generator."""
     name = typer.prompt("Scenario name", default="Generated Scenario")
@@ -3227,7 +3746,7 @@ def scenarios_wizard():
     typer.echo(f"Scenario saved: {output_path}")
 
 
-@scenarios_app.command("migrate")
+@scenarios_app.command(name="migrate")
 def scenarios_migrate(
     input_path: Annotated[Path, typer.Argument(help="Scenario JSON to migrate")],
     output_path: Annotated[Optional[Path], typer.Option(help="Output path (default: overwrite input)")] = None,
@@ -3248,7 +3767,7 @@ def scenarios_migrate(
     console.print(f"[green]Migrated scenario saved to {target}[/green]")
 
 
-@scenarios_app.command("export-study-pack")
+@scenarios_app.command(name="export-study-pack")
 def scenarios_export_study_pack(
     output_dir: Annotated[Path, typer.Option(help="Directory to write the official study pack")] = Path("scenarios/study_pack"),
     seeds: Annotated[str, typer.Option(help="Comma-separated seed list to include in the pack manifest")] = "1,2,3,4,5,6,7,8,9,10",
@@ -3275,22 +3794,23 @@ def scenarios_export_study_pack(
 
 @app.command()
 def run(
-    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
+    algo: Annotated[Optional[Path], typer.Option(help="Path to the algorithm Python file. Leave blank to use the built-in Clinical Baseline.")] = None,
+    preset: Annotated[Optional[str], typer.Option(help="Optional built-in preset such as baseline_t1d. This fills the patient profile and scenario unless you override them.")] = None,
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
-    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (e.g., 'default_patient' or 'patient_559_config')")] = "default_patient",
+    patient_config_name: Annotated[str, typer.Option(help="Name of the patient configuration (for example 'default_patient' or 'clinic_safe_baseline')")] = "default_patient",
     patient_config_path: Annotated[Optional[Path], typer.Option(help="Path to a patient config YAML (overrides --patient-config-name)")] = None,
     scenario_path: Annotated[
         Optional[Path],
         typer.Option(
             "--scenario",
             "--scenario-path",
-            help="Path to the scenario JSON file (e.g., scenarios/example_scenario.json)",
+            help="Path to the scenario JSON file (for example scenarios/example_scenario.json)",
         ),
     ] = None,
-    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720, # 12 hours
+    duration: Annotated[int, typer.Option(help="Simulation duration in minutes")] = 720,
     time_step: Annotated[int, typer.Option(help="Simulation time step in minutes")] = 5,
     output_dir: Annotated[Optional[Path], typer.Option(help="Directory to save simulation results")] = None,
-    compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
+    compare_baselines: Annotated[bool, typer.Option(help="Run built-in baselines in the background for comparison")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
     patient_model_type: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
     sensor_noise_std: Annotated[Optional[float], typer.Option("--sensor-noise-std", help="CGM noise std (mg/dL)")] = None,
@@ -3316,118 +3836,190 @@ def run(
     safety_predictor_ood_gate_enabled: Annotated[Optional[bool], typer.Option("--safety-predictor-ood-gate", help="Enable predictor OOD gate")] = None,
     safety_predictor_ood_zscore_threshold: Annotated[Optional[float], typer.Option("--safety-predictor-ood-z", help="Predictor OOD z-score threshold")] = None,
     safety_predictor_ood_max_feature_fraction: Annotated[Optional[float], typer.Option("--safety-predictor-ood-feature-fraction", help="Max fraction of features allowed OOD")] = None,
+    wizard: Annotated[bool, typer.Option("--wizard", help="Ask a few questions and build the run interactively")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Validate the setup and print the run plan without executing the simulation")] = False,
 ):
     """
-    Run an IINTS-AF simulation using a specified algorithm and patient configuration.
+    Run an IINTS-AF simulation.
+
+    Examples:
+      iints run --preset baseline_t1d
+      iints run --wizard
+      iints run --algo algorithms/example_algorithm.py --scenario scenarios/example_scenario.json --dry-run
     """
-    console = Console() # Define console locally for each command to prevent Rich issues
-    console.print(f"[bold blue]Starting IINTS-AF simulation with algorithm: {algo.name}[/bold blue]")
-    console.print(f"Patient configuration: {patient_config_name}")
-    console.print(f"Simulation duration: {duration} minutes, time step: {time_step} minutes")
+    console = Console()
+    wall_start = time.perf_counter()
 
-    # 1. Load Algorithm
-    if not algo.is_file():
-        console.print(f"[bold red]Error: Algorithm file '{algo}' not found.[/bold red]")
-        raise typer.Exit(code=1)
-    
-    module_name = algo.stem
-    # Use importlib.util to load the module directly from the file path
-    spec = importlib.util.spec_from_file_location(module_name, algo)
-    if spec is None:
-        console.print(f"[bold red]Error: Could not load module spec for {algo}[/bold red]")
-        raise typer.Exit(code=1)
-    
-    module = importlib.util.module_from_spec(spec)
-    
-    # Manually inject 'iints' package into the loaded module's global namespace
-    # This ensures 'from iints import ...' works within the algorithm file
-    module.iints = iints # type: ignore
-    
-    sys.modules[module_name] = module
     try:
-        if spec.loader: # Ensure loader is not None
-            spec.loader.exec_module(module)
+        ctx = click.get_current_context(silent=True)
+    except RuntimeError:
+        ctx = None
+
+    def _uses_default(name: str) -> bool:
+        if ctx is None:
+            return False
+        source = ctx.get_parameter_source(name)
+        return source in (None, ParameterSource.DEFAULT)
+
+    if wizard:
+        console.print(Panel("We bouwen samen een runplan. Laat velden leeg wanneer je de veilige standaard wilt gebruiken.", title="Run Wizard", border_style="blue"))
+        available_presets = [item.get("name", "") for item in _load_presets() if item.get("name")]
+        preset_default = preset or ("baseline_t1d" if available_presets else "")
+        preset_input = typer.prompt("Preset (blank = custom)", default=preset_default, show_default=bool(preset_default))
+        preset = preset_input.strip() or None
+        algo_default = str(algo) if algo else ""
+        algo_input = typer.prompt(
+            "Algorithm path (blank = built-in Clinical Baseline)",
+            default=algo_default,
+            show_default=bool(algo_default),
+        )
+        algo = Path(algo_input) if algo_input.strip() else None
+        if preset is None and patient_config_path is None:
+            patient_config_name = typer.prompt("Patient config name", default=patient_config_name)
+            scenario_default = str(scenario_path) if scenario_path else ""
+            scenario_input = typer.prompt("Scenario JSON (blank = none)", default=scenario_default, show_default=bool(scenario_default))
+            scenario_path = Path(scenario_input) if scenario_input.strip() else None
+        duration = int(typer.prompt("Duration in minutes", default=str(duration)))
+        time_step = int(typer.prompt("Time step in minutes", default=str(time_step)))
+        compare_baselines = typer.confirm("Compare against built-in baselines?", default=compare_baselines)
+        output_default = str(output_dir) if output_dir else ""
+        output_input = typer.prompt("Output directory (blank = auto)", default=output_default, show_default=bool(output_default))
+        output_dir = Path(output_input) if output_input.strip() else None
+        seed_default = str(seed) if seed is not None else ""
+        seed_input = typer.prompt("Seed (blank = auto)", default=seed_default, show_default=bool(seed_default))
+        seed = int(seed_input) if seed_input.strip() else None
+
+    preset_payload: Optional[Dict[str, Any]] = None
+    if preset:
+        try:
+            preset_payload = _get_preset(preset)
+        except KeyError:
+            preset_names = [item.get("name", "") for item in _load_presets() if item.get("name")]
+            matches = difflib.get_close_matches(preset, preset_names, n=1, cutoff=0.45)
+            detail = f"Unknown preset '{preset}'."
+            if matches:
+                detail = f"{detail} Did you mean '{matches[0]}'?"
+            console.print(f"[bold red]{detail}[/bold red]")
+            raise typer.Exit(code=1)
+
+        if patient_config_path is None and _uses_default("patient_config_name"):
+            patient_config_name = str(preset_payload.get("patient_config", patient_config_name))
+        if scenario_path is None and preset_payload.get("scenario") is not None:
+            scenario_payload = cast(Dict[str, Any], preset_payload.get("scenario") or {})
         else:
-            raise ImportError(f"Could not load module loader for {algo}")
-    except Exception as e:
-        console.print(f"[bold red]Error loading algorithm module {algo}: {e}[/bold red]")
-        raise typer.Exit(code=1)
+            scenario_payload = None
+        if _uses_default("duration"):
+            duration = int(preset_payload.get("duration_minutes", duration))
+        if _uses_default("time_step"):
+            time_step = int(preset_payload.get("time_step_minutes", time_step))
+    else:
+        scenario_payload = None
 
-    algorithm_instance = None
-    for name_in_module, obj in module.__dict__.items(): # Renamed 'name' to 'name_in_module' to avoid conflict
-        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
-            algorithm_instance = obj() # Instantiate the algorithm
-            console.print(f"Loaded algorithm: [green]{algorithm_instance.get_algorithm_metadata().name}[/green]")
-            break
-    
-    if algorithm_instance is None:
-        console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo}[/bold red]")
-        raise typer.Exit(code=1)
-    predictor = _load_predictor_service_from_path(predictor_path, console)
-    
-    # 2. Get Device
-    device_manager = iints.DeviceManager()
-    device = device_manager.get_device()
-    console.print(f"Using compute device: [blue]{device}[/blue]")
+    resolved_seed = resolve_seed(seed)
+    run_id = generate_run_id(resolved_seed)
+    if output_dir is None:
+        predicted_output_dir = (Path.cwd() / "results" / run_id).resolve()
+    else:
+        predicted_output_dir = Path(output_dir).expanduser()
+        if not predicted_output_dir.is_absolute():
+            predicted_output_dir = (Path.cwd() / predicted_output_dir).resolve()
+        else:
+            predicted_output_dir = predicted_output_dir.resolve()
 
-    # 3. Instantiate Patient Model
+    if algo is None:
+        algorithm_instance = ClinicalBaselineAlgorithm()
+        algorithm_label = algorithm_instance.get_algorithm_metadata().name
+        algorithm_source = "built-in Clinical Baseline"
+    else:
+        algorithm_instance = _load_algorithm_instance(algo, console)
+        algorithm_label = algorithm_instance.get_algorithm_metadata().name
+        algorithm_source = str(algo)
+
+    predictor = None
+    if predictor_path is not None and not predictor_path.is_file():
+        console.print(f"[bold red]Predictor checkpoint not found: {predictor_path}[/bold red]")
+        raise typer.Exit(code=1)
+    if not dry_run:
+        predictor = _load_predictor_service_from_path(predictor_path, console)
+
+    validated_patient_params: Dict[str, Any]
+    patient_label: str
     try:
         if patient_config_path:
             if not patient_config_path.is_file():
-                console.print(f"[bold red]Error: Patient config file '{patient_config_path}' not found.[/bold red]")
+                console.print(f"[bold red]{_patient_config_not_found_message(patient_config_path)}[/bold red]")
                 raise typer.Exit(code=1)
             validated_patient_params = load_patient_config(patient_config_path).model_dump()
             patient_label = patient_config_path.stem
         else:
             validated_patient_params = load_patient_config_by_name(patient_config_name).model_dump()
             patient_label = patient_config_name
-
-        patient_model = iints.PatientFactory.create_patient(patient_type=patient_model_type, **validated_patient_params)
-        console.print(
-            f"Using patient model: {patient_model.__class__.__name__} "
-            f"({patient_model_type}) with config [cyan]{patient_label}[/cyan]"
-        )
     except ValidationError as e:
         console.print("[bold red]Patient config validation failed:[/bold red]")
         for line in format_validation_error(e):
             console.print(f"- {line}")
         raise typer.Exit(code=1)
-    except TypeError as e:
-        console.print(f"[bold red]Error instantiating PatientModel with parameters from {patient_config_name}: {e}[/bold red]")
-        console.print("[bold red]Please check that patient configuration keys match PatientModel constructor arguments.[/bold red]")
-        raise typer.Exit(code=1)
+    except typer.Exit:
+        raise
     except Exception as e:
-        console.print(f"[bold red]Error loading patient config {patient_config_name}: {e}[/bold red]")
+        console.print(f"[bold red]Could not load patient config '{patient_config_name}': {e}[/bold red]")
         raise typer.Exit(code=1)
 
-
-    # 4. Load Scenario Data (if provided)
     stress_events = []
     stress_event_payloads: List[Dict[str, Any]] = []
     scenario_model = None
-    scenario_payload: Optional[Dict[str, Any]] = None
     if scenario_path:
         if not scenario_path.is_file():
-            console.print(f"[bold red]Error: Scenario file '{scenario_path}' not found.[/bold red]")
+            console.print(f"[bold red]{_scenario_not_found_message(scenario_path)}[/bold red]")
             raise typer.Exit(code=1)
-        
         try:
             scenario_model = load_scenario(scenario_path)
-            scenario_payload = scenario_model.model_dump()
-            stress_event_payloads = scenario_to_payloads(scenario_model)
-            stress_events = build_stress_events(stress_event_payloads)
-            console.print(
-                f"Loaded {len(stress_events)} stress events from scenario: [magenta]{scenario_path.name}[/magenta]"
-            )
-            for warning in scenario_warnings(scenario_model):
-                console.print(f"[yellow]Warning:[/yellow] {warning}")
         except ValidationError as e:
             console.print("[bold red]Scenario validation failed:[/bold red]")
             for line in format_validation_error(e):
                 console.print(f"- {line}")
             raise typer.Exit(code=1)
-    
-    # 5. Run Simulation
+        stress_event_payloads = scenario_to_payloads(scenario_model)
+        stress_events = build_stress_events(stress_event_payloads)
+        for warning in scenario_warnings(scenario_model):
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+        scenario_display = str(scenario_path)
+    elif scenario_payload:
+        try:
+            scenario_model = validate_scenario_dict(scenario_payload)
+        except ValidationError as e:
+            console.print("[bold red]Preset scenario validation failed:[/bold red]")
+            for line in format_validation_error(e):
+                console.print(f"- {line}")
+            raise typer.Exit(code=1)
+        stress_event_payloads = scenario_to_payloads(scenario_model)
+        stress_events = build_stress_events(stress_event_payloads)
+        for warning in scenario_warnings(scenario_model):
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+        scenario_display = f"preset:{preset}"
+    else:
+        scenario_display = "none"
+
+    if dry_run:
+        _print_dry_run_plan(
+            console,
+            algorithm_label=algorithm_label,
+            algorithm_source=algorithm_source,
+            patient_label=patient_label,
+            scenario_label=scenario_display,
+            duration=duration,
+            time_step=time_step,
+            output_dir=predicted_output_dir,
+            compare_baselines=compare_baselines,
+            seed=resolved_seed,
+            preset_name=preset,
+        )
+        return
+
+    console.print(f"[bold blue]Starting IINTS-AF simulation[/bold blue] - {algorithm_label}")
+    console.print(f"Patient: [cyan]{patient_label}[/cyan]")
+    console.print(f"Scenario: [magenta]{scenario_display}[/magenta]")
+
     safety_config = _build_safety_config_from_options(
         min_glucose=safety_min_glucose,
         max_glucose=safety_max_glucose,
@@ -3450,116 +4042,156 @@ def run(
         predictor_ood_max_feature_fraction=safety_predictor_ood_max_feature_fraction,
     )
 
-    resolved_seed = resolve_seed(seed)
-    run_id = generate_run_id(resolved_seed)
+    effective_safety_config = safety_config or SafetyConfig()
+    if safety_config is None and preset_payload is not None:
+        if "critical_glucose_threshold" in preset_payload:
+            effective_safety_config.critical_glucose_threshold = float(preset_payload["critical_glucose_threshold"])
+        if "critical_glucose_duration_minutes" in preset_payload:
+            effective_safety_config.critical_glucose_duration_minutes = int(preset_payload["critical_glucose_duration_minutes"])
+
     output_dir = resolve_output_dir(output_dir, run_id)
 
-    effective_safety_config = safety_config or SafetyConfig()
-    sensor_model = None
-    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
-        sensor_model = iints.SensorModel(
-            noise_std=float(sensor_noise_std or 0.0),
-            lag_minutes=int(sensor_lag_minutes or 0),
-            dropout_prob=float(sensor_dropout_prob or 0.0),
-            bias=float(sensor_bias or 0.0),
-            seed=resolved_seed,
-        )
-    elif patient_model_type == "auto":
-        sensor_model = iints.SensorModel(
-            noise_std=7.0,
-            lag_minutes=10,
-            dropout_prob=0.0,
-            bias=0.0,
-            seed=resolved_seed,
-        )
+    with _run_progress(console) as progress:
+        total_steps = 6 + (1 if compare_baselines else 0)
+        task = progress.add_task("Preparing run", total=total_steps)
 
-    simulator = iints.Simulator(
-        patient_model=patient_model,
-        algorithm=algorithm_instance,
-        time_step=time_step,
-        seed=resolved_seed,
-        safety_config=effective_safety_config,
-        sensor_model=sensor_model,
-        predictor=predictor,
-    )
-    
-    for event in stress_events:
-        simulator.add_stress_event(event)
+        device_manager = iints.DeviceManager()
+        device = device_manager.get_device()
+        progress.advance(task, 1)
+        progress.update(task, description="Building patient model")
 
-    simulation_results_df, safety_report = simulator.run_batch(duration)
-    
-    # 6. Output Results
-    config_payload: Dict[str, Any] = {
-        "run_type": "single",
-        "algorithm": {
-            "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
-            "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
-        },
-        "patient_config": validated_patient_params,
-        "scenario": scenario_payload,
-        "duration_minutes": duration,
-        "time_step_minutes": time_step,
-        "seed": resolved_seed,
-        "compare_baselines": compare_baselines,
-        "export_audit": False,
-        "generate_report": True,
-        "safety_config": asdict(effective_safety_config),
-        "predictor_path": str(predictor_path) if predictor_path else None,
-    }
-    config_path = output_dir / "config.json"
-    write_json(config_path, config_payload)
-    run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_dir)
-    run_metadata_path = output_dir / "run_metadata.json"
-    write_json(run_metadata_path, run_metadata)
+        try:
+            patient_model = iints.PatientFactory.create_patient(patient_type=patient_model_type, **validated_patient_params)
+        except ValidationError as e:
+            console.print("[bold red]Patient config validation failed during model creation:[/bold red]")
+            for line in format_validation_error(e):
+                console.print(f"- {line}")
+            raise typer.Exit(code=1)
+        except TypeError as e:
+            console.print(f"[bold red]Patient model creation failed:[/bold red] {e}")
+            raise typer.Exit(code=1)
+        progress.advance(task, 1)
+        progress.update(task, description="Configuring sensor model")
 
-    results_file = output_dir / "results.csv"
-    
-    simulation_results_df.to_csv(results_file, index=False)
-    
-    console.print(f"\nSimulation completed. Results saved to: {results_file}")
-    console.print(f"Run metadata: {run_metadata_path}")
-    console.print("\n--- Safety Report ---")
-    for key, value in safety_report.items():
-        console.print(f"{key}: {value}")
-    
-    console.print("\nDisplaying head of simulation results:")
-    console.print(Panel(str(simulation_results_df.head()))) # Use Panel for rich output
+        sensor_model = None
+        if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
+            sensor_model = iints.SensorModel(
+                noise_std=float(sensor_noise_std or 0.0),
+                lag_minutes=int(sensor_lag_minutes or 0),
+                dropout_prob=float(sensor_dropout_prob or 0.0),
+                bias=float(sensor_bias or 0.0),
+                seed=resolved_seed,
+            )
+        elif patient_model_type == "auto":
+            sensor_model = iints.SensorModel(
+                noise_std=7.0,
+                lag_minutes=10,
+                dropout_prob=0.0,
+                bias=0.0,
+                seed=resolved_seed,
+            )
+        progress.advance(task, 1)
+        progress.update(task, description="Starting simulator")
 
-    if compare_baselines:
-        comparison = run_baseline_comparison(
-            patient_params=validated_patient_params,
-            stress_event_payloads=stress_event_payloads,
-            duration=duration,
+        simulator = iints.Simulator(
+            patient_model=patient_model,
+            algorithm=algorithm_instance,
             time_step=time_step,
-            primary_label=algorithm_instance.get_algorithm_metadata().name,
-            primary_results=simulation_results_df,
-            primary_safety=safety_report,
             seed=resolved_seed,
+            safety_config=effective_safety_config,
+            sensor_model=sensor_model,
+            predictor=predictor,
         )
-        safety_report["baseline_comparison"] = comparison
-        baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
+        for event in stress_events:
+            simulator.add_stress_event(event)
+        progress.advance(task, 1)
+        progress.update(task, description="Running simulation")
+
+        simulation_results_df, safety_report = simulator.run_batch(duration)
+        progress.advance(task, 1)
+        progress.update(task, description="Writing outputs")
+
+        config_payload: Dict[str, Any] = {
+            "run_type": "single",
+            "preset_name": preset,
+            "algorithm": {
+                "class": f"{algorithm_instance.__class__.__module__}.{algorithm_instance.__class__.__name__}",
+                "metadata": algorithm_instance.get_algorithm_metadata().to_dict(),
+            },
+            "patient_config": validated_patient_params,
+            "scenario": scenario_model.model_dump() if scenario_model else scenario_payload,
+            "duration_minutes": duration,
+            "time_step_minutes": time_step,
+            "seed": resolved_seed,
+            "compare_baselines": compare_baselines,
+            "export_audit": False,
+            "generate_report": True,
+            "safety_config": asdict(effective_safety_config),
+            "predictor_path": str(predictor_path) if predictor_path else None,
+            "algorithm_source": algorithm_source,
+        }
+        config_path = output_dir / "config.json"
+        write_json(config_path, config_payload)
+        run_metadata = build_run_metadata(run_id, resolved_seed, config_payload, output_dir)
+        run_metadata_path = output_dir / "run_metadata.json"
+        write_json(run_metadata_path, run_metadata)
+
+        results_file = output_dir / "results.csv"
+        simulation_results_df.to_csv(results_file, index=False)
+        progress.advance(task, 1)
+
+        baseline_paths = None
+        if compare_baselines:
+            progress.update(task, description="Running baseline comparison")
+            comparison = run_baseline_comparison(
+                patient_params=validated_patient_params,
+                stress_event_payloads=stress_event_payloads,
+                duration=duration,
+                time_step=time_step,
+                primary_label=algorithm_label,
+                primary_results=simulation_results_df,
+                primary_safety=safety_report,
+                seed=resolved_seed,
+            )
+            safety_report["baseline_comparison"] = comparison
+            baseline_paths = write_baseline_comparison(comparison, output_dir / "baseline")
+            progress.advance(task, 1)
+
+        report_output_path = output_dir / "report.pdf"
+        iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
+
+        manifest_files = {
+            "config": config_path,
+            "run_metadata": run_metadata_path,
+            "results_csv": results_file,
+            "report_pdf": report_output_path,
+        }
+        if compare_baselines:
+            manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
+            manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
+        run_manifest = build_run_manifest(output_dir, manifest_files)
+        run_manifest_path = output_dir / "run_manifest.json"
+        write_json(run_manifest_path, run_manifest)
+
+    metrics = compute_run_metrics(simulation_results_df, safety_report=safety_report, duration_minutes=duration)
+    console.print(f"Using compute device: [blue]{device}[/blue]")
+    if baseline_paths is not None:
         console.print(f"Baseline comparison saved to: {baseline_paths}")
-
-    # Generate full report (using the new iints.generate_report function)
-    report_output_path = output_dir / "report.pdf"
-    iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
-
-    manifest_files = {
-        "config": config_path,
-        "run_metadata": run_metadata_path,
-        "results_csv": results_file,
-        "report_pdf": report_output_path,
-    }
-    if compare_baselines:
-        manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
-        manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
-    run_manifest = build_run_manifest(output_dir, manifest_files)
-    run_manifest_path = output_dir / "run_manifest.json"
-    write_json(run_manifest_path, run_manifest)
+    console.print(f"Run metadata: {run_metadata_path}")
     console.print(f"Run manifest: {run_manifest_path}")
+    _print_run_summary(
+        console,
+        algorithm_name=algorithm_label,
+        output_dir=output_dir,
+        metrics=metrics,
+        duration_minutes=duration,
+        seed=resolved_seed,
+        wall_seconds=time.perf_counter() - wall_start,
+        preset_name=preset,
+    )
 
 
-@app.command("run-full")
+@app.command(name="run-full")
 def run_full(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
@@ -3659,7 +4291,7 @@ def run_full(
         _maybe_prepare_ai_artifacts(Path(outputs["output_dir"]), console)
 
 
-@app.command("run-parallel")
+@app.command(name="run-parallel")
 def run_parallel(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional predictor checkpoint (.pt) for dual-guard forecasting")] = None,
@@ -3812,7 +4444,7 @@ def run_parallel(
     console.print(f"[green]Batch summary saved:[/green] {summary_path}")
 
 
-@app.command("scorecard")
+@app.command(name="scorecard")
 def scorecard(
     algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file")],
     profile: Annotated[str, typer.Option(help="Validation profile id")] = "research_default",
@@ -4010,7 +4642,7 @@ def poster(
     )
 
 
-@app.command("demo-booth")
+@app.command(name="demo-booth")
 def demo_booth(
     output_dir: Annotated[
         Path,
@@ -4091,7 +4723,7 @@ def demo_booth(
     )
 
 
-@app.command("demo-export")
+@app.command(name="demo-export")
 def demo_export(
     output_dir: Annotated[
         Path,
@@ -4236,7 +4868,7 @@ def validate(
     console.print("[green]Scenario validation passed.[/green]")
 
 
-@data_app.command("list")
+@data_app.command(name="list")
 def data_list():
     """List official datasets and access requirements."""
     console = Console()
@@ -4256,7 +4888,7 @@ def data_list():
     console.print(table)
 
 
-@data_app.command("info")
+@data_app.command(name="info")
 def data_info(
     dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
 ):
@@ -4280,7 +4912,7 @@ def data_info(
             console.print(bibtex)
 
 
-@data_app.command("cite")
+@data_app.command(name="cite")
 def data_cite(
     dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
 ):
@@ -4303,7 +4935,7 @@ def data_cite(
     console.print("[yellow]No citation available for this dataset.[/yellow]")
 
 
-@data_app.command("fetch")
+@data_app.command(name="fetch")
 def data_fetch(
     dataset_id: Annotated[str, typer.Argument(help="Dataset id (see `iints data list`)")],
     output_dir: Annotated[Optional[Path], typer.Option(help="Output directory (default: data_packs/official/<id>)")] = None,
@@ -4458,7 +5090,7 @@ def _build_mdmp_core_contract_template() -> Dict[str, Any]:
     }
 
 
-@data_app.command("contract-template", hidden=True, deprecated=True)
+@data_app.command(name="contract-template", hidden=True, deprecated=True)
 def data_contract_template(
     output_path: Annotated[Path, typer.Option(help="Where to write the starter contract YAML")] = Path("data_contract.yaml"),
 ):
@@ -4472,7 +5104,7 @@ def data_contract_template(
     console.print(f"[cyan]Template backend:[/cyan] {backend}")
 
 
-@data_app.command("certify-template")
+@data_app.command(name="certify-template")
 def data_certify_template(
     output_path: Annotated[Path, typer.Option(help="Where to write the starter certification contract YAML")] = Path("data_contract.yaml"),
 ):
@@ -4480,7 +5112,7 @@ def data_certify_template(
     data_contract_template(output_path=output_path)
 
 
-@data_app.command("contract-run", hidden=True, deprecated=True)
+@data_app.command(name="contract-run", hidden=True, deprecated=True)
 def data_contract_run(
     contract_path: Annotated[Path, typer.Argument(help="Path to contract YAML")],
     input_csv: Annotated[Path, typer.Argument(help="Path to input CSV")],
@@ -4565,7 +5197,7 @@ def data_contract_run(
         raise typer.Exit(code=1)
 
 
-@data_app.command("certify")
+@data_app.command(name="certify")
 def data_certify(
     contract_path: Annotated[Path, typer.Argument(help="Path to certification contract YAML")],
     input_csv: Annotated[Path, typer.Argument(help="Path to input CSV")],
@@ -4588,7 +5220,7 @@ def data_certify(
     )
 
 
-@data_app.command("mdmp-visualizer", hidden=True, deprecated=True)
+@data_app.command(name="mdmp-visualizer", hidden=True, deprecated=True)
 def data_mdmp_visualizer(
     report_json: Annotated[Path, typer.Argument(help="Path to contract-run JSON report")],
     output_html: Annotated[Path, typer.Option(help="Output HTML path")] = Path("results/mdmp_dashboard.html"),
@@ -4613,7 +5245,7 @@ def data_mdmp_visualizer(
     console.print(f"[green]MDMP dashboard written:[/green] {output_html}")
 
 
-@data_app.command("certify-visualizer")
+@data_app.command(name="certify-visualizer")
 def data_certify_visualizer(
     report_json: Annotated[Path, typer.Argument(help="Path to certification report JSON")],
     output_html: Annotated[Path, typer.Option(help="Output HTML path")] = Path("results/mdmp_dashboard.html"),
@@ -4623,7 +5255,7 @@ def data_certify_visualizer(
     data_mdmp_visualizer(report_json=report_json, output_html=output_html, title=title)
 
 
-@data_app.command("corrupt-for-study")
+@data_app.command(name="corrupt-for-study")
 def data_corrupt_for_study(
     input_csv: Annotated[Path, typer.Argument(help="Source CSV that will be deliberately corrupted for ablation studies")],
     output_csv: Annotated[Path, typer.Option(help="Output CSV path for the corrupted dataset")] = Path("results/corrupted_study.csv"),
@@ -4667,7 +5299,7 @@ def data_corrupt_for_study(
     console.print(table)
 
 
-@data_app.command("synthetic-mirror")
+@data_app.command(name="synthetic-mirror")
 def data_synthetic_mirror(
     input_csv: Annotated[Path, typer.Argument(help="Source CSV (validated real dataset)")],
     contract_path: Annotated[Path, typer.Argument(help="Contract YAML path used as schema/range guard")],
@@ -4741,7 +5373,7 @@ def data_synthetic_mirror(
         raise typer.Exit(code=1)
 
 
-@mdmp_app.command("template")
+@mdmp_app.command(name="template")
 def mdmp_template(
     output_path: Annotated[Path, typer.Option(help="Where to write the MDMP contract YAML")] = Path("mdmp_contract.yaml"),
 ):
@@ -4749,7 +5381,7 @@ def mdmp_template(
     data_contract_template(output_path=output_path)
 
 
-@mdmp_app.command("validate")
+@mdmp_app.command(name="validate")
 def mdmp_validate(
     contract_path: Annotated[Path, typer.Argument(help="Path to MDMP contract YAML")],
     input_csv: Annotated[Path, typer.Argument(help="Path to input CSV")],
@@ -4775,7 +5407,7 @@ def mdmp_validate(
     )
 
 
-@mdmp_app.command("visualizer")
+@mdmp_app.command(name="visualizer")
 def mdmp_visualizer(
     report_json: Annotated[Path, typer.Argument(help="Path to MDMP validation report JSON")],
     output_html: Annotated[Path, typer.Option(help="Output HTML path")] = Path("results/mdmp_dashboard.html"),
@@ -4785,7 +5417,7 @@ def mdmp_visualizer(
     data_mdmp_visualizer(report_json=report_json, output_html=output_html, title=title)
 
 
-@mdmp_app.command("synthetic-mirror")
+@mdmp_app.command(name="synthetic-mirror")
 def mdmp_synthetic_mirror(
     input_csv: Annotated[Path, typer.Argument(help="Source CSV")],
     contract_path: Annotated[Path, typer.Argument(help="MDMP contract YAML")],
@@ -4811,7 +5443,7 @@ def mdmp_synthetic_mirror(
     )
 
 
-@app.command("sources")
+@app.command(name="sources")
 def sources(
     category: Annotated[Optional[str], typer.Option(help="Filter by source category (guideline, trial, model, dataset, ...).")] = None,
     output_json: Annotated[Optional[Path], typer.Option(help="Optional JSON output path.")] = None,
@@ -4878,7 +5510,7 @@ research_app = typer.Typer(help="Research pipeline: dataset preparation and qual
 app.add_typer(research_app, name="research")
 
 
-@research_app.command("prepare-azt1d")
+@research_app.command(name="prepare-azt1d")
 def research_prepare_azt1d(
     input_dir: Annotated[Path, typer.Option(help="Root directory containing AZT1D Subject folders")] = Path("data_packs/public/azt1d/AZT1D 2025/CGM Records"),
     output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/azt1d/processed/azt1d_merged.csv"),
@@ -4954,7 +5586,7 @@ def research_prepare_azt1d(
     console.print(f"[green]Quality report   :[/green] {report}")
 
 
-@research_app.command("prepare-ohio")
+@research_app.command(name="prepare-ohio")
 def research_prepare_ohio(
     input_dir: Annotated[Path, typer.Option(help="Root directory containing OhioT1DM patient_* folders")] = Path("data_packs/public/ohio_t1dm"),
     output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv"),
@@ -5038,7 +5670,7 @@ def research_prepare_ohio(
     console.print(f"[green]Quality report   :[/green] {report}")
 
 
-@research_app.command("prepare-hupa")
+@research_app.command(name="prepare-hupa")
 def research_prepare_hupa(
     input_dir: Annotated[Path, typer.Option(help="Root directory containing HUPA-UCM CSV files")] = Path("data_packs/public/hupa_ucm"),
     output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv"),
@@ -5128,7 +5760,7 @@ def research_prepare_hupa(
     console.print(f"[green]Quality report   :[/green] {report}")
 
 
-@research_app.command("quality")
+@research_app.command(name="quality")
 def research_quality(
     report: Annotated[Path, typer.Option(help="Path to quality_report.json produced by prepare-azt1d")] = Path("data_packs/public/azt1d/quality_report.json"),
 ):
@@ -5193,7 +5825,7 @@ def research_quality(
     console.print(table)
 
 
-@research_app.command("export-onnx")
+@research_app.command(name="export-onnx")
 def research_export_onnx(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),
     out: Annotated[Path, typer.Option(help="Output ONNX file path")] = Path("models/predictor.onnx"),
@@ -5222,7 +5854,7 @@ def research_export_onnx(
     console.print(f"[green]ONNX written to:[/green] {out}")
 
 
-@research_app.command("audit-split")
+@research_app.command(name="audit-split")
 def research_audit_split(
     data: Annotated[Path, typer.Option(help="Prepared dataset path (CSV/Parquet)")],
     history_steps: Annotated[int, typer.Option(help="History window length")] = 48,
@@ -5280,7 +5912,7 @@ def research_audit_split(
         raise typer.Exit(code=1)
 
 
-@research_app.command("evaluate-forecast")
+@research_app.command(name="evaluate-forecast")
 def research_evaluate_forecast(
     input_csv: Annotated[Path, typer.Option(help="CSV with observed/predicted columns")],
     observed_column: Annotated[str, typer.Option(help="Observed glucose column")] = "glucose_actual_mgdl",
@@ -5395,7 +6027,7 @@ def research_evaluate_forecast(
         raise typer.Exit(code=1)
 
 
-@research_app.command("parity-check")
+@research_app.command(name="parity-check")
 def research_parity_check(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")],
     onnx: Annotated[Path, typer.Option(help="Exported ONNX model path")],
@@ -5476,7 +6108,7 @@ def research_parity_check(
         raise typer.Exit(code=1)
 
 
-@research_app.command("registry-list")
+@research_app.command(name="registry-list")
 def research_registry_list(
     registry: Annotated[Path, typer.Option(help="Path to model registry JSON")] = Path("models/registry.json"),
     stage: Annotated[Optional[str], typer.Option(help="Optional stage filter (candidate/validated/production/archived)")] = None,
@@ -5516,7 +6148,7 @@ def research_registry_list(
     console.print(table)
 
 
-@research_app.command("registry-promote")
+@research_app.command(name="registry-promote")
 def research_registry_promote(
     registry: Annotated[Path, typer.Option(help="Path to model registry JSON")] = Path("models/registry.json"),
     run_id: Annotated[str, typer.Option(help="Run ID to promote")]= "",
@@ -5550,7 +6182,7 @@ def research_registry_promote(
         raise typer.Exit(code=1)
 
 
-@app.command("import-data")
+@app.command(name="import-data")
 def import_data(
     input_csv: Annotated[Path, typer.Option(help="Path to CGM CSV file")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + standard CSV")] = Path("./results/imported"),
@@ -5597,7 +6229,7 @@ def import_data(
     console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
 
 
-@app.command("import-carelink")
+@app.command(name="import-carelink")
 def import_carelink(
     input_csv: Annotated[Path, typer.Option(help="Path to a Medtronic CareLink CSV export")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for imported CareLink artifacts")] = Path("./results/imported_carelink"),
@@ -5658,7 +6290,7 @@ def import_carelink(
     console.print(f"[green]Summary JSON saved:[/green] {summary_path}")
 
 
-@app.command("carelink-workbench")
+@app.command(name="carelink-workbench")
 def carelink_workbench(
     input_csv: Annotated[Path, typer.Option(help="Path to a Medtronic CareLink CSV export")],
     output_dir: Annotated[
@@ -5740,7 +6372,7 @@ def carelink_workbench(
         )
 
 
-@app.command("import-wizard")
+@app.command(name="import-wizard")
 def import_wizard():
     """Interactive wizard to import real-world CGM CSVs."""
     console = Console()
@@ -5803,7 +6435,7 @@ def import_wizard():
     console.print(f"Rows: {len(result.dataframe)} | Meal events: {len(result.scenario.get('stress_events', []))}")
 
 
-@app.command("import-demo")
+@app.command(name="import-demo")
 def import_demo(
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/demo_import"),
     scenario_name: Annotated[str, typer.Option(help="Scenario name")] = "Demo CGM Scenario",
@@ -5830,7 +6462,7 @@ def import_demo(
         console.print(f"[green]Raw demo CSV saved:[/green] {output_dir / 'demo_cgm.csv'}")
 
 
-@app.command("import-nightscout")
+@app.command(name="import-nightscout")
 def import_nightscout_cmd(
     url: Annotated[str, typer.Option(help="Nightscout base URL. Use https for non-local hosts.")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for scenario + CSV")] = Path("./results/nightscout_import"),
@@ -5887,7 +6519,7 @@ def import_nightscout_cmd(
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
 
 
-@app.command("import-tidepool")
+@app.command(name="import-tidepool")
 def import_tidepool_cmd(
     base_url: Annotated[str, typer.Option(help="Tidepool API base URL. Use https for non-local hosts.")] = "https://api.tidepool.org",
     token: Annotated[Optional[str], typer.Option(help="Bearer token")] = None,
@@ -5911,7 +6543,7 @@ def import_tidepool_cmd(
         raise typer.Exit(code=1)
     console.print("[yellow]Tidepool client skeleton is initialized. Auth flow and endpoints are TODO.[/yellow]")
 
-@app.command("check-deps")
+@app.command(name="check-deps")
 def check_deps():
     """Check optional dependencies and report readiness."""
     console = Console()
@@ -5939,7 +6571,7 @@ def check_deps():
     console.print(table)
 
 
-@algorithms_app.command("list")
+@algorithms_app.command(name="list")
 def algorithms_list():
     """List available algorithm plugins and built-ins."""
     console = Console()
@@ -5959,7 +6591,7 @@ def algorithms_list():
     console.print(table)
 
 
-@algorithms_app.command("info")
+@algorithms_app.command(name="info")
 def algorithms_info(
     name: Annotated[str, typer.Argument(help="Algorithm display name")],
 ):
@@ -5979,7 +6611,7 @@ def algorithms_info(
         console.print(f"[bold red]Error:[/bold red] {entry.error}")
     if entry.metadata:
         console.print_json(json.dumps(entry.metadata.to_dict(), indent=2))
-@docs_app.command("algo")
+@docs_app.command(name="algo")
 def docs_algo(
     algo_path: Annotated[Path, typer.Option(help="Path to the algorithm Python file to document")],
 ):
@@ -5992,33 +6624,12 @@ def docs_algo(
     if not algo_path.is_file():
         console.print(f"[bold red]Error: Algorithm file '{algo_path}' not found.[/bold red]")
         raise typer.Exit(code=1)
-    
-    # Load Algorithm dynamically
-    algorithm_instance = None
-    module_name = algo_path.stem
-    spec = importlib.util.spec_from_file_location(module_name, algo_path)
-    if spec is None:
-        console.print(f"[bold red]Error: Could not load module spec for {algo_path}[/bold red]")
-        raise typer.Exit(code=1)
-    
-    module = importlib.util.module_from_spec(spec)
-    module.iints = iints # type: ignore # Inject iints package
-    sys.modules[module_name] = module
     try:
-        if spec.loader: # Ensure loader is not None
-            spec.loader.exec_module(module)
-        else:
-            raise ImportError(f"Could not load module loader for {algo_path}")
+        algorithm_class = _load_algorithm_class_silent(algo_path)
+        algorithm_instance = algorithm_class()
     except Exception as e:
         console.print(f"[bold red]Error loading algorithm module {algo_path}: {e}[/bold red]")
         raise typer.Exit(code=1)
-
-    algorithm_class: Optional[type[iints.InsulinAlgorithm]] = None
-    for name_in_module, obj in module.__dict__.items():
-        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
-            algorithm_class = obj
-            algorithm_instance = obj() # Instantiate to get metadata
-            break
     
     if algorithm_instance is None:
         console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo_path}[/bold red]")
@@ -6112,28 +6723,11 @@ def benchmark(
     write_json(run_metadata_path, run_metadata)
 
     # Load AI Algorithm
-    ai_algo_instance = None
-    module_name_ai = algo_to_benchmark.stem
-    spec_ai = importlib.util.spec_from_file_location(module_name_ai, algo_to_benchmark)
-    if spec_ai is None:
-        console.print(f"[bold red]Error: Could not load module spec for AI algorithm {algo_to_benchmark}[/bold red]")
-        raise typer.Exit(code=1)
-    module_ai = importlib.util.module_from_spec(spec_ai)
-    module_ai.iints = iints # type: ignore # Inject iints package
-    sys.modules[module_name_ai] = module_ai
     try:
-        if spec_ai.loader: # Ensure loader is not None
-            spec_ai.loader.exec_module(module_ai)
-        else:
-            raise ImportError(f"Could not load module loader for AI algorithm {algo_to_benchmark}")
+        ai_algo_instance = _load_algorithm_instance_silent(algo_to_benchmark)
     except Exception as e:
         console.print(f"[bold red]Error loading AI algorithm module {algo_to_benchmark}: {e}[/bold red]")
         raise typer.Exit(code=1)
-
-    for name_in_module, obj in module_ai.__dict__.items():
-        if isinstance(obj, type) and issubclass(obj, iints.InsulinAlgorithm) and obj is not iints.InsulinAlgorithm:
-            ai_algo_instance = obj()
-            break
     if ai_algo_instance is None:
         console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in AI algorithm {algo_to_benchmark}[/bold red]")
         raise typer.Exit(code=1)
@@ -6318,7 +6912,7 @@ def benchmark(
         console.print("[yellow]No benchmark results were generated.[/yellow]")
 
 
-@app.command("edge-benchmark")
+@app.command(name="edge-benchmark")
 def edge_benchmark(
     algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file used for the edge benchmark.")],
     output_json: Annotated[Path, typer.Option(help="Output JSON path for the hardware benchmark results.")] = Path("results/edge_benchmark.json"),
@@ -6445,7 +7039,7 @@ def _makerfaire_runtime_snapshot(
     }
 
 
-@edge_app.command("setup")
+@edge_app.command(name="setup")
 def edge_setup(
     output_dir: Annotated[Path, typer.Option(help="Directory where the edge-ready project scaffold should be written.")] = Path("iints_edge_demo"),
     board: Annotated[str, typer.Option(help="Edge board target: raspberry_pi or uno_q.")] = "raspberry_pi",
@@ -6532,7 +7126,7 @@ def edge_setup(
     )
 
 
-@edge_app.command("doctor")
+@edge_app.command(name="doctor")
 def edge_doctor(
     board: Annotated[str, typer.Option(help="Board target to validate: raspberry_pi or uno_q.")] = "raspberry_pi",
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
@@ -6723,7 +7317,7 @@ def edge_doctor(
         raise typer.Exit(code=1)
 
 
-@edge_app.command("up")
+@edge_app.command(name="up")
 def edge_up(
     project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
     workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
@@ -6749,7 +7343,7 @@ def edge_up(
     )
 
 
-@makerfaire_app.command("up")
+@makerfaire_app.command(name="up")
 def makerfaire_up(
     project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
     workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
@@ -6869,7 +7463,7 @@ def makerfaire_up(
     )
 
 
-@makerfaire_app.command("autostart")
+@makerfaire_app.command(name="autostart")
 def makerfaire_autostart(
     project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
     workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
@@ -6947,7 +7541,7 @@ def makerfaire_autostart(
     )
 
 
-@makerfaire_app.command("watchdog")
+@makerfaire_app.command(name="watchdog")
 def makerfaire_watchdog(
     project_dir: Annotated[Path, typer.Option(help="Edge project directory created by `iints edge setup`.")] = Path("."),
     workspace_name: Annotated[str, typer.Option(help="Workspace folder inside the edge project.")] = "patient_runtime",
@@ -7025,7 +7619,7 @@ def makerfaire_watchdog(
     )
 
 
-@edge_app.command("kiosk")
+@edge_app.command(name="kiosk")
 def edge_kiosk(
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
     workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
@@ -7036,7 +7630,7 @@ def edge_kiosk(
     )
 
 
-@edge_app.command("reset")
+@edge_app.command(name="reset")
 def edge_reset(
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
     workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
@@ -7051,7 +7645,7 @@ def edge_reset(
     )
 
 
-@edge_app.command("stop")
+@edge_app.command(name="stop")
 def edge_stop(
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
     workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
@@ -7062,7 +7656,7 @@ def edge_stop(
     )
 
 
-@edge_app.command("service")
+@edge_app.command(name="service")
 def edge_service(
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
     workspace: Annotated[Optional[Path], typer.Option(help="Optional runtime workspace override.")] = None,
@@ -7081,7 +7675,7 @@ def edge_service(
     )
 
 
-@edge_app.command("status")
+@edge_app.command(name="status")
 def edge_status(
     workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
@@ -7121,7 +7715,7 @@ def edge_status(
     console.print(table)
 
 
-@edge_app.command("bundle")
+@edge_app.command(name="bundle")
 def edge_bundle(
     workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
     project_dir: Annotated[Optional[Path], typer.Option(help="Optional edge project directory created by `iints edge setup`.")] = None,
@@ -7155,7 +7749,7 @@ def edge_bundle(
     )
 
 
-@edge_app.command("update")
+@edge_app.command(name="update")
 def edge_update(
     output_script: Annotated[Path, typer.Option(help="Where to write the edge update shell script.")] = Path("update_edge_runtime.sh"),
     profile: Annotated[str, typer.Option(help="Install profile to upgrade: edge or full.")] = "edge",
@@ -7170,7 +7764,7 @@ def edge_update(
     console.print(f"[green]Edge update script written:[/green] {script_path}")
 
 
-@edge_app.command("hardware-bridge")
+@edge_app.command(name="hardware-bridge")
 def edge_hardware_bridge(
     board: Annotated[str, typer.Option(help="Hardware bridge target. Currently supported: uno_q.")] = "uno_q",
     output_dir: Annotated[Path, typer.Option(help="Directory where the hardware bridge scaffold should be written.")] = Path("uno_q_bridge"),
@@ -7190,7 +7784,7 @@ def edge_hardware_bridge(
     console.print(table)
 
 
-@edge_app.command("bridge-test")
+@edge_app.command(name="bridge-test")
 def edge_bridge_test(
     port: Annotated[Optional[str], typer.Option(help="Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.")] = None,
     baudrate: Annotated[int, typer.Option(help="Serial baud rate used by the UNO Q bridge sketch.")] = UNO_Q_BRIDGE_BAUDRATE,
@@ -7216,7 +7810,7 @@ def edge_bridge_test(
     console.print(table)
 
 
-@edge_app.command("bridge-run")
+@edge_app.command(name="bridge-run")
 def edge_bridge_run(
     port: Annotated[Optional[str], typer.Option(help="Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.")] = None,
     workspace: Annotated[Optional[Path], typer.Option(help="Workspace directory for the persistent digital patient state.")] = None,
@@ -7266,7 +7860,7 @@ def edge_bridge_run(
         )
 
 
-@edge_app.command("bridge-flash")
+@edge_app.command(name="bridge-flash")
 def edge_bridge_flash(
     port: Annotated[str, typer.Option(help="Serial port used to upload the UNO Q bridge sketch.")] ,
     fqbn: Annotated[str, typer.Option(help="Arduino CLI FQBN for the UNO Q board package.")] ,
@@ -7304,7 +7898,7 @@ def edge_bridge_flash(
     )
 
 
-@edge_app.command("benchmark")
+@edge_app.command(name="benchmark")
 def edge_benchmark_alias(
     algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file used for the edge benchmark.")],
     output_json: Annotated[Path, typer.Option(help="Output JSON path for the hardware benchmark results.")] = Path("results/edge_benchmark.json"),

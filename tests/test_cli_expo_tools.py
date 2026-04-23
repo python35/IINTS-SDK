@@ -129,11 +129,14 @@ def test_demo_expo_writes_bundle_summary(monkeypatch, tmp_path) -> None:
         matrix.write_text("scenario,algorithm,seed\n", encoding="utf-8")
         algorithms = target / "algorithms.json"
         algorithms.write_text("[]", encoding="utf-8")
+        experiment = target / "study_experiment.yaml"
+        experiment.write_text("experiment: {}\n", encoding="utf-8")
         return {
             "protocol_markdown": str(markdown),
             "study_design_json": str(design),
             "study_matrix_csv": str(matrix),
             "algorithms_json": str(algorithms),
+            "study_experiment_yaml": str(experiment),
         }
 
     monkeypatch.setattr("iints.cli.cli.build_booth_demo", _fake_booth_demo)
@@ -335,10 +338,101 @@ def test_run_study_builds_generic_scientific_bundle(monkeypatch, tmp_path) -> No
 
     assert result.exit_code == 0
     assert (output_dir / "protocol" / "algorithms.json").is_file()
+    assert (output_dir / "protocol" / "study_experiment.yaml").is_file()
     assert (output_dir / "study_clean" / "study_summary.json").is_file()
     assert (output_dir / "study_corrupted" / "study_summary.json").is_file()
     assert (output_dir / "study_supervisor_off" / "study_summary.json").is_file()
     assert (output_dir / "comparisons" / "clean_vs_supervisor_off.json").is_file()
+
+
+def test_run_study_supports_experiment_yaml(monkeypatch, tmp_path) -> None:
+    output_dir = tmp_path / "study_bundle"
+    algo_dir = tmp_path / "algorithms"
+    algo_dir.mkdir(parents=True)
+    algo_path = algo_dir / "candidate.py"
+    algo_path.write_text("class Dummy: pass\n", encoding="utf-8")
+    experiment_path = tmp_path / "study_experiment.yaml"
+    experiment_path.write_text(
+        f"""
+experiment:
+  name: euys_like_pack
+  preset: default
+  profile_set: clinic_safe_core
+  seeds: [11]
+  duration_minutes: 180
+  time_step: 10
+  include_default_baselines: true
+  prepare_ai: false
+study:
+  scenarios:
+    - baseline_day
+    - meal_challenge
+algorithm:
+  candidate: {algo_path.relative_to(tmp_path)}
+  extra_algorithms:
+    - Standard Pump
+paths:
+  output_dir: {output_dir.relative_to(tmp_path)}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    def _fake_load_algorithm_instance_silent(_path):
+        return object()
+
+    def _fake_run_full(*, algorithm, scenario, patient_config, duration_minutes, time_step, seed, output_dir, safety_config=None, **kwargs):
+        target = Path(output_dir)
+        (target / "audit").mkdir(parents=True, exist_ok=True)
+        (target / "baseline").mkdir(parents=True, exist_ok=True)
+        pd.DataFrame(
+            {
+                "time_minutes": [0, 10, 20],
+                "glucose_actual_mgdl": [110.0 + seed, 118.0 + seed, 126.0 + seed],
+                "safety_triggered": [False, False, False],
+            }
+        ).to_csv(target / "results.csv", index=False)
+        payload = {
+            "algorithm": {
+                "class": "algorithms.DemoAlgorithm",
+                "metadata": {"name": "DemoAlgorithm"},
+            },
+            "duration_minutes": duration_minutes,
+            "scenario": scenario,
+        }
+        (target / "run_metadata.json").write_text(
+            json.dumps({"run_id": target.name, "seed": seed, "config": payload}),
+            encoding="utf-8",
+        )
+        (target / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+        (target / "audit" / "audit_summary.json").write_text(
+            json.dumps({"bolus_interventions_count": 2, "terminated_early": False}),
+            encoding="utf-8",
+        )
+        (target / "baseline" / "baseline_comparison.json").write_text(
+            json.dumps(
+                {
+                    "reference": "Clinical Baseline",
+                    "rows": [
+                        {"algorithm": "DemoAlgorithm", "tir_70_180": 83.0, "bolus_interventions": 2},
+                        {"algorithm": "Clinical Baseline", "tir_70_180": 78.0, "bolus_interventions": 3},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return {"output_dir": str(target)}
+
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_instance_silent", _fake_load_algorithm_instance_silent)
+    monkeypatch.setattr("iints.cli.cli._load_algorithm_plugin_instance", lambda _name: object())
+    monkeypatch.setattr("iints.cli.cli._maybe_prepare_ai_artifacts", lambda _output_dir, _console: None)
+    monkeypatch.setattr("iints.cli.cli.iints.run_full", _fake_run_full)
+
+    result = runner.invoke(app, ["run-study", "--experiment", str(experiment_path)])
+
+    assert result.exit_code == 0
+    assert (output_dir / "protocol" / "study_experiment.yaml").is_file()
+    assert (output_dir / "study_clean").is_dir()
+    assert "Experiment YAML" in result.stdout
 
 
 def test_cli_eucys_results_packages_existing_bundle(tmp_path) -> None:

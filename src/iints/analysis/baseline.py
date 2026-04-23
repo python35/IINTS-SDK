@@ -8,6 +8,7 @@ import pandas as pd
 
 from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
 from iints.api.base_algorithm import InsulinAlgorithm
+from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.core.algorithms.pid_controller import PIDController
 from iints.core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 from iints.core.patient.models import PatientModel
@@ -51,7 +52,10 @@ def run_baseline_comparison(
         }
     )
 
-    baselines: List[Tuple[str, InsulinAlgorithm]] = [("Standard PID", PIDController())]
+    baselines: List[Tuple[str, InsulinAlgorithm]] = [
+        ("Clinical Baseline", ClinicalBaselineAlgorithm()),
+        ("Standard PID", PIDController()),
+    ]
     if compare_standard_pump:
         baselines.append(("Standard Pump", StandardPumpAlgorithm()))
 

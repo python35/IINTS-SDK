@@ -40,6 +40,7 @@ This writes:
 - `study_design.json`
 - `study_matrix.csv`
 - `algorithms.json`
+- `study_experiment.yaml`
 
 The protocol bundle records:
 - the research question
@@ -63,6 +64,12 @@ iints run-study \
   --profile-set clinic_safe_core \
   --seeds 1,2,3,4,5 \
   --output-dir results/study_bundle
+```
+
+If you want a single reproducible config file, point `run-study` at the generated experiment YAML:
+
+```bash
+iints run-study --experiment results/study_protocol/study_experiment.yaml
 ```
 
 This automatically creates:
@@ -151,6 +158,7 @@ By default, the `clinic_safe_core` profile set contains:
 - `clinic_safe_midnight`
 
 By default, the baseline registry includes:
+- `Clinical Baseline`
 - `PID Controller`
 - `Standard Pump`
 - `Correction Bolus`
@@ -162,6 +170,30 @@ iints study-protocol \
   --output-dir results/custom_protocol \
   --no-include-default-baselines \
   --extra-algorithms "My Published Baseline,My Legacy Controller"
+```
+
+The generated `study_experiment.yaml` is designed to be edited by hand. A minimal example looks like this:
+
+```yaml
+experiment:
+  name: meal_stress_benchmark
+  preset: default
+  profile_set: clinic_safe_core
+  seeds: [1, 2, 3, 4, 5]
+  time_step: 5
+  include_default_baselines: true
+study:
+  scenarios:
+    - baseline_day
+    - meal_challenge
+algorithm:
+  candidate: algorithms/example_algorithm.py
+  extra_algorithms:
+    - My Legacy Controller
+paths:
+  output_dir: results/study_bundle
+  carelink_metrics: null
+  reference_csv: null
 ```
 
 ## What `analyze` Adds

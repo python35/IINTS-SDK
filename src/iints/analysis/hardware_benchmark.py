@@ -1,10 +1,16 @@
+from __future__ import annotations
+
+import json
+import logging
 import time
 import subprocess
 import threading
 import psutil
-import json
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
+
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class PerformanceMetrics:
@@ -32,7 +38,8 @@ class HardwareBenchmark:
             with open('/proc/device-tree/model', 'r') as f:
                 model = f.read().strip()
                 return 'jetson' in model.lower()
-        except:
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            logger.debug("Jetson detection unavailable: %s", exc)
             return False
     
     def _get_tegrastats_metrics(self) -> Optional[Dict]:
@@ -51,8 +58,11 @@ class HardwareBenchmark:
                     line = lines[-1]  # Get last line
                     # This is a simplified parser - real implementation would be more robust
                     return {"raw_tegrastats": line}
-        except:
-            pass
+            logger.debug("tegrastats exited with non-zero status: %s", result.returncode)
+        except subprocess.TimeoutExpired as exc:
+            logger.debug("tegrastats timed out: %s", exc)
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            logger.debug("tegrastats unavailable: %s", exc)
         return None
     
     def _collect_metrics(self) -> PerformanceMetrics:
@@ -82,8 +92,8 @@ class HardwareBenchmark:
                 with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
                     temp_millicelsius = int(f.read().strip())
                     temperature = temp_millicelsius / 1000.0
-            except:
-                pass
+            except (FileNotFoundError, OSError, ValueError) as exc:
+                logger.debug("temperature probe unavailable: %s", exc)
         
         return PerformanceMetrics(
             timestamp=timestamp,

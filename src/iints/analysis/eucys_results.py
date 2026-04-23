@@ -70,7 +70,7 @@ def build_eucys_abstract_draft_markdown() -> str:
             "",
             "The central research question is whether a transparent, safety-first benchmark can evaluate candidate insulin-decision algorithms more rigorously than isolated demo runs or single-metric comparisons. "
             "The platform combines virtual patient simulation, baseline comparison, safety-layer analysis, protocol bundles, subgroup summaries, and exportable study artifacts. "
-            "Instead of showing one favorable run, IINTS-AF compares a candidate algorithm against classical baselines such as `PID Controller`, `Standard Pump`, and `Correction Bolus` across predefined patient profiles, scenario families, and random seeds.",
+            "Instead of showing one favorable run, IINTS-AF compares a candidate algorithm against classical baselines such as `Clinical Baseline`, `PID Controller`, `Standard Pump`, and `Correction Bolus` across predefined patient profiles, scenario families, and random seeds.",
             "",
             "In the final benchmark bundle, the platform evaluated **[RUN_COUNT]** runs across **[PROFILE_COUNT]** patient profiles, **[SCENARIO_COUNT]** scenario families, and **[ALGORITHM_COUNT]** algorithms. "
             "The candidate algorithm achieved **[CANDIDATE_TIR]%** time in range compared with **[BASELINE_TIR]%** for the strongest baseline, while the safety analysis showed **[SAFETY_RESULT]**. "
@@ -235,7 +235,7 @@ def build_eucys_filled_abstract_markdown(
             "In this project, I developed **IINTS-AF**, a simulation-first benchmark platform for testing insulin-decision algorithms under fixed study protocols.",
             "",
             "The platform combines virtual patient simulation, baseline comparison, safety-layer analysis, protocol bundles, subgroup summaries, and exportable study artifacts. "
-            "Instead of showing a single favorable run, IINTS-AF compares a candidate algorithm against classical baselines such as `PID Controller`, `Standard Pump`, and `Correction Bolus` across predefined profiles, scenario families, and random seeds.",
+            "Instead of showing a single favorable run, IINTS-AF compares a candidate algorithm against classical baselines such as `Clinical Baseline`, `PID Controller`, `Standard Pump`, and `Correction Bolus` across predefined profiles, scenario families, and random seeds.",
             "",
             f"In the current benchmark bundle, the platform evaluated **{run_count}** runs across **{counts['profile_count']}** patient profiles, **{counts['scenario_count']}** scenario families, and **{counts['algorithm_count']}** algorithms. "
             f"In the clean certified arm, **{candidate_name}** achieved **{candidate_tir}** time in range compared with **{baseline_tir}** for **{strongest_baseline}**, while the safety layer recorded **{safety_result}**. "
