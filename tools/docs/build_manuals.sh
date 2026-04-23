@@ -21,7 +21,18 @@ build_pdf () {
     --output "$output"
 }
 
-build_pdf "$MANUAL_DIR/IINTS-AF_SDK_Manual.md" "$MANUAL_DIR/IINTS-AF_SDK_Manual.pdf"
+build_manual_with_fallback () {
+  local input="$1"
+  local output="$2"
+  if build_pdf "$input" "$output"; then
+    return 0
+  fi
+
+  echo "[IINTS] Pandoc/Tectonic build failed; falling back to offline Python renderer..."
+  python3 "$ROOT_DIR/tools/docs/render_manual_pdf.py" --input "$input" --output "$output"
+}
+
+build_manual_with_fallback "$MANUAL_DIR/IINTS-AF_SDK_Manual.md" "$MANUAL_DIR/IINTS-AF_SDK_Manual.pdf"
 
 echo "Manuals built:"
 echo " - $MANUAL_DIR/IINTS-AF_SDK_Manual.pdf"

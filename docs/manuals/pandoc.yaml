@@ -1,7 +1,11 @@
 title: "IINTS-AF SDK Manual"
 subtitle: "Research Use Only — Not for Clinical Care"
 author: "IINTS-AF SDK"
-date: ""
+date: "Version 1.5.3"
+documentclass: article
+fontsize: 11pt
+papersize: a4
+lang: "en-US"
 toc: true
 toc-depth: 2
 numbersections: true

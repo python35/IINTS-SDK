@@ -3926,6 +3926,7 @@ def run(
         else:
             predicted_output_dir = predicted_output_dir.resolve()
 
+    algorithm_instance: iints.InsulinAlgorithm
     if algo is None:
         algorithm_instance = ClinicalBaselineAlgorithm()
         algorithm_label = algorithm_instance.get_algorithm_metadata().name

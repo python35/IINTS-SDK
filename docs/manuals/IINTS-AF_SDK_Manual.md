@@ -1,200 +1,128 @@
-# Full Technical Manual
-Version 1.5.2 | Python SDK
+> "Code shouldn't be a secret when it's managing a life."
 
-**PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
+**Version 1.5.3**  
+**Research use only — not for clinical care**
 
-This SDK is intended for research, simulation, and algorithm validation.
-It has NOT received FDA clearance or CE marking for clinical use.
+IINTS-AF is an open-source research platform for insulin algorithm simulation, deterministic safety supervision, dataset certification, reproducible benchmarking, and edge deployment. It exists for the people who need to inspect, test, and explain dosing logic before it ever touches a real-world device.
 
----
+**Core research question**  
+Can open-source simulation and deterministic safety supervision make insulin delivery algorithm development safer and more transparent for researchers and patients?
 
-## How to Use This Manual (Read First)
+## How To Use This Manual
 
-New users should first read:
-- `docs/PLAIN_LANGUAGE_GUIDE.md`
-- `README.md`
+This manual is the long-form technical guide for the SDK. It is the right place to start when you want more than a quickstart: a clear mental model of the system, a reproducible study workflow, and concrete guidance for local AI, data certification, and Raspberry Pi / Arduino showcase deployments.
 
-In plain words, this SDK lets you:
-- run insulin algorithm simulations,
-- enforce deterministic safety constraints,
-- inspect audit trails and reports.
+## Fastest Paths Through The SDK
 
-It does not provide direct clinical dosing.
+| If you want to... | Start here | Main command |
+|---|---|---|
+| Confirm the SDK works on this machine | Installation Guide | `iints doctor --smoke-run --suggest` |
+| See a zero-config run first | Your First Simulation | `iints demo` |
+| Build your own run interactively | Your First Simulation | `iints run --wizard` |
+| Create a reusable project folder | Your First Simulation | `iints quickstart --project-name my_study` |
+| Build a publication-ready bundle | Reproducible Runs For Publications | `iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready` |
+| Run a benchmark protocol | Scientific Study Workflow | `iints study-protocol` then `iints run-study` |
+| Start a live digital patient on Raspberry Pi | Booth / Jury Demo Bundle | `iints makerfaire up --project-dir .` |
 
-This manual is long. Use this map to find what you need fast:
-- **Full SDK overview:** `docs/COMPREHENSIVE_GUIDE.md`
-- **CLI reference:** `docs/TECHNICAL_README.md`
-- **Research track (predictor training):** `research/README.md`
-- **Notebooks:** `examples/notebooks/README.md`
+## Manual Map
 
-Recommended notebook order (best for new users):
-- `00_Quickstart.ipynb` - run a full simulation
-- `01_Presets_and_Scenarios.ipynb` - scenarios + presets
-- `02_Safety_and_Supervisor.ipynb` - safety checks
-- `03_Audit_Trail_and_Report.ipynb` - audit trail + PDF
-- `04_Baseline_and_Metrics.ipynb` - metrics & baselines
-- `05_Devices_and_HumanInLoop.ipynb` - pumps/sensors + manual override
-- `06_Optional_Torch_LSTM.ipynb` - predictor training
-- `07_Ablation_Supervisor.ipynb` - safety ablation
-- `08_Data_Registry_and_Import.ipynb` - data import + registry
+- **Executive summary:** what the SDK is, who it is for, and why the safety model matters.
+- **Getting started:** install, first run, quick validation, and your first custom algorithm.
+- **Architecture and safety:** how simulation, supervision, and audit output fit together.
+- **Cookbook and examples:** practical CLI and Python patterns you can adapt quickly.
+- **Advanced workflows:** study protocols, reproducibility, datasets, local AI, and jury/demo packaging.
+- **Troubleshooting and quick reference:** the shortest route out of common setup or runtime problems.
 
-Quick task routing:
-- **Run a simulation fast:** Section 2.2
-- **Customize safety limits:** Section 4.2
-- **Generate audit report:** Section 5.4
-- **Train an AI predictor:** Section 8.2 + `research/README.md`
-- **Use the local AI assistant:** Section 8.6 + `docs/AI_ASSISTANT.md`
+## Canonical Workflows
 
-Evidence routing:
-- **Peer-reviewed source mapping:** `docs/EVIDENCE_BASE.md`
-- **CLI source manifest:** `iints sources` or `iints sources --output-json results/source_manifest.json`
+1. **First-run path:** `iints doctor` -> `iints demo` -> `iints quickstart`.
+2. **Algorithm development path:** generate an algorithm template, run clinic-safe presets, inspect audit output, then benchmark against baselines.
+3. **Research path:** write a protocol with `iints study-protocol`, execute with `iints run-study`, analyze with `iints analyze`, compare with `iints compare-study`, and package results with `iints poster-study` or `iints eucys-results`.
+4. **Edge/demo path:** scaffold an SBC project with `iints edge setup`, then run the Pi-only Maker Faire flow with `iints makerfaire up`, `iints makerfaire autostart`, and `iints makerfaire watchdog`.
 
-## Table of Contents
+## Executive Summary
 
-### 1. Executive Summary
-- Overview and key capabilities
-- Intended use and audiences
-- Safety-first philosophy
+The IINTS-AF SDK (Intelligent Insulin Titration System for Artificial Pancreas) is a safety-first simulation and validation platform for insulin delivery research. Instead of treating dosing logic as a black box, it gives researchers, students, and patient-builders a way to inspect how an algorithm behaves, how the deterministic supervisor constrains it, and how the resulting evidence can be packaged for review.
 
-### 2. Getting Started (Step-by-Step)
-2.1 Installation Guide
-2.2 Your First Simulation (60 seconds)
-2.3 Understanding the Output Files
-2.4 Creating Custom Algorithms
-2.5 Adding Stress Tests
-2.6 Benchmarking Against Baselines
-2.7 Using Preset Scenarios
-2.8 Importing Real CGM Data
-2.9 Generating Custom Reports
-2.10 Next Steps
+### Why This Platform Exists
 
-### 3. Architecture Overview
-3.1 System Components
-3.2 Data Flow Diagram
-3.3 Safety Layer Integration
+Commercial insulin-delivery algorithms typically run behind closed interfaces. That makes them difficult to audit, difficult to compare fairly, and difficult for patients or researchers to improve. IINTS-AF addresses that gap by combining:
 
-### 4. Safety Architecture (Critical)
-4.1 Design Philosophy
-4.2 SafetyConfig Configuration
-4.3 9 Safety Checks Explained
-4.4 Safety Levels and Interventions
-4.5 Input Validation Rules
-4.6 Simulation Termination Conditions
-
-### 5. Tutorials and Cookbook
-5.1 24-Hour Simulation Walkthrough
-5.2 Building an ML-Hybrid Algorithm
-5.3 Batch Experiment Execution
-5.4 Audit Trail Analysis
-5.5 Custom Safety Thresholds
-5.6 Pump Emulator Benchmarking
-5.7 Live Streaming Simulation
-5.8 Reproducible Runs for Publications
-
-### 6. API Reference
-6.1 Core Classes and Interfaces
-6.2 Algorithm Development Guide
-6.3 Simulator Configuration
-6.4 Patient Profile Customization
-6.5 Device Models (Sensor/Pump)
-6.6 High-Level API Functions
-
-### 7. Practical Examples
-7.1 Complete Algorithm Example
-7.2 CLI vs Python API Comparison
-7.3 Stress Testing Patterns
-7.4 Human-in-the-Loop Integration
-7.5 Data Import Workflows
-
-### 8. Advanced Topics
-8.1 Commercial Pump Emulators
-8.2 Dataset Registry Usage
-8.3 Reproducibility Techniques
-8.4 Performance Profiling
-8.5 Custom Metrics Calculation
-8.6 Local AI Assistant (Ministral 3 Open-Weight via Ollama)
-
-### 9. Troubleshooting
-9.1 Common Installation Issues
-9.2 Simulation Problems
-9.3 Algorithm Development Tips
-9.4 Data Import Solutions
-9.5 Performance Optimization
-
-### 10. Quick Reference
-10.1 Essential CLI Commands
-10.2 Python Code Snippets
-10.3 Safety Thresholds Cheatsheet
-10.4 Clinical Metrics Targets
-
-### 11. Glossary of Terms
-
----
-
-## 1. Executive Summary
-
-The IINTS-AF SDK (Intelligent Insulin Titration System for Artificial Pancreas) is a **safety-first simulation and validation platform** for insulin dosing algorithms targeting closed-loop insulin delivery research.
+- **Open simulation** for virtual patients, meals, exercise, device noise, and failure modes.
+- **Deterministic safety supervision** that can override unsafe algorithm proposals.
+- **Reproducible study tooling** that turns one-off runs into protocol-driven benchmarks.
+- **Audit-grade outputs** such as manifests, summaries, reports, posters, and evidence tables.
+- **Edge deployment paths** for Raspberry Pi booths, local AI explanations, and hardware-linked demos.
 
 ### Key Capabilities
 
-- **Plug-and-play algorithm architecture** - Implement one method, get full simulation
-- **9-layer Independent Safety Supervisor** - Deterministic override guarantees
-- **Realistic device models** - CGM sensor and insulin pump error simulation
-- **Commercial pump emulators** - Medtronic 780G, Omnipod 5, Tandem Control-IQ
-- **Clinical metrics** - TIR, GMI, CV, LBGI, HBGI per ATTD/ADA guidelines
-- **Complete audit trail** - JSONL + CSV + JSON summary with integrity hashing
-- **PDF clinical reports** - Visual reports with glucose traces and safety summaries
-- **Benchmark mode** - Head-to-head algorithm comparison
-- **Real-world data import** - Dexcom, Libre, Nightscout, AIDE/PEDAP, AZT1D, HUPA-UCM
-- **Optional AI predictor** - Proactive glucose forecasting
-- **Reproducible runs** - Seeded randomness and signable manifests
+- **Algorithm sandbox** — load a custom controller or fall back to the built-in Clinical Baseline.
+- **Deterministic Independent Safety Supervisor** — nine safety checks, bounded actions, and explicit intervention logs.
+- **Study engine** — protocol bundles, matrix generation, baseline registries, and cohort execution.
+- **Clinical and research metrics** — TIR, TBR, TAR, variability, interventions, calibration, and uncertainty summaries.
+- **Traceability** — manifests, hashes, dataset certification, and output bundles for review or publication.
+- **Local-first AI layer** — optional Ministral/Ollama workflows for explanation and review on your own hardware.
+- **Edge operations** — Raspberry Pi patient runtime, kiosk mode, watchdogs, and optional Arduino UNO Q signaling.
+
+### Who This Manual Is For
+
+- **Researchers** who need reproducible benchmark workflows and publication-grade outputs.
+- **Algorithm developers** who want to iterate safely and compare against transparent baselines.
+- **Students and science-fair builders** who need one clear path from demo to evidence.
+- **Patient-builders and data explorers** who want to inspect imports, certification, and audit trails without cloud lock-in.
 
 ### Intended Use
 
 This SDK is intended for:
-- **Pre-clinical algorithm validation**
-- **Academic research**
-- **Educational purposes**
-- **Regulatory submission preparation**
+- pre-clinical algorithm validation
+- academic or student research
+- technical demonstrations and safety reviews
+- educational exploration of insulin-delivery logic
 
-**NOT intended for:**
-- Direct patient care
-- Clinical decision-making
-- Medical device deployment without regulatory review
+It is **not** intended for:
+- direct patient care
+- live dosing advice
+- deployment as a medical device without regulatory review
 
----
+### The Short Version
 
-## 2. Getting Started
+If you only remember four ideas from this manual, make them these:
 
-### 2.1 Installation Guide
+1. The algorithm may suggest, but the deterministic supervisor decides.
+2. One attractive run is not enough; protocol-driven studies matter.
+3. Certified and traceable data matter as much as controller quality.
+4. The SDK is strongest when it is used as a platform to understand algorithms, not just to run them.
 
-#### Option 1: Install from PyPI (Recommended)
+## Getting Started
+
+### Installation Guide
+
+Choose the smallest path that matches what you want to do.
+
+#### Option 1: Install From PyPI (Recommended)
 
 ```bash
-# You can run this from any working folder
 python3 -m venv .venv
 source .venv/bin/activate  # macOS/Linux
 # .venv\Scripts\activate   # Windows
-
-# Install SDK + MDMP support
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
-
-# Verify installation
-iints doctor --smoke-run
-iints --help
+iints doctor --smoke-run --suggest
 ```
 
-#### Option 1b: Edge Install For Raspberry Pi / UNO Q
+Use this when you want the normal CLI, data certification, plotting, and the local AI hooks.
+
+#### Option 2: Edge Install For Raspberry Pi / Arduino UNO Q
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+iints doctor --full --suggest
 ```
 
-Common edge bootstrap:
+Then scaffold an edge project:
 
 ```bash
 iints edge setup --output-dir iints_edge_demo --board raspberry_pi
@@ -202,10 +130,9 @@ cd iints_edge_demo
 ./run_edge_patient.sh
 ```
 
-#### Option 2: Development Install
+#### Option 3: Development Install
 
 ```bash
-# Must be run from the repository root (the folder with pyproject.toml)
 git clone https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
 python3 -m venv .venv
@@ -214,156 +141,115 @@ python -m pip install -U pip
 python -m pip install -U -e ".[full,mdmp]"
 ```
 
-#### Option 3: With Research Extras (AI Predictor)
-
-```bash
-pip install iints-sdk-python35[research]
-```
+Use the development install when you are modifying the SDK itself or running the full test/documentation toolchain.
 
 #### Optional: Add Ollama For Local AI
 
-If you want the local research AI features, the SDK needs a local Ollama server plus a local model.
-
-Default endpoint:
-
-```text
-http://127.0.0.1:11434
-```
-
-Quick setup:
+If you want local research-only explanation and review features, connect a local Ollama runtime:
 
 ```bash
-# Install Ollama (macOS/Linux quick path)
 curl -fsSL https://ollama.com/install.sh | sh
 ollama -v
-
-# Start Ollama if it is not already running as a service
 ollama serve
-
-# Pull a model
 ollama pull ministral-3:8b
-
-# Link it explicitly to the SDK if desired
 export OLLAMA_HOST=http://127.0.0.1:11434
-
-# Verify the full path
 iints ai local-check --model ministral-3:8b
 ```
 
 Practical notes:
-- the SDK auto-uses `http://127.0.0.1:11434` when `OLLAMA_HOST` is not set
-- use `ministral-3:3b` on smaller machines
-- use `--ollama-host ...` if you want to override the endpoint per command
-- remote Ollama hosts are blocked by default unless intentionally enabled
-- full AI guide: `docs/AI_ASSISTANT.md`
+- the SDK defaults to `http://127.0.0.1:11434` when `OLLAMA_HOST` is not set
+- use `ministral-3:3b` on smaller systems
+- remote Ollama hosts are blocked by default unless explicitly enabled
+- for a deeper walkthrough, use the public AI guide on the docs site
 
-**Folder rule**
+### Your First Simulation
 
-- Installed `iints ...` commands can run from any folder.
-- `python -m pip install -e ".[full,mdmp]"` only works from the SDK repository root.
-- After `iints quickstart`, switch into the generated project folder before running `iints presets run ...`.
+The SDK now has three beginner-safe starting points.
 
-For the detailed path guide, see `docs/INSTALLATION.md`.
-
-### 2.2 Your First Simulation (60 seconds)
-
-#### Using CLI (Quickstart)
+#### Fastest possible: zero-config demo
 
 ```bash
-# Create quickstart project
+iints demo
+iints demo --dry-run
+iints demo --full
+```
+
+Use `demo` when you want a working run immediately, without creating files by hand.
+
+#### Guided path: interactive run builder
+
+```bash
+iints run --wizard
+```
+
+This is the best path when you know roughly what you want, but do not want to memorize flags yet.
+
+#### Reusable path: create a project folder
+
+```bash
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
-
-# Run clinic-safe preset
 iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 ```
 
-#### Using Python API
+If you leave `--algo` blank in the generic `iints run` flow, the SDK will use the built-in **Clinical Baseline**.
+
+#### Equivalent Python API example
 
 ```python
 from iints import run_simulation
 from iints.core.algorithms.pid_controller import PIDController
 
-# Run 12-hour simulation
 results = run_simulation(
     algorithm=PIDController(),
     duration_minutes=720,
-    seed=42
+    seed=42,
 )
 
 print(f"Results saved to: {results['results_csv']}")
 print(f"Report generated: {results['clinical_report']}")
 ```
 
-**What this does:**
-- Creates a virtual patient with default parameters
-- Runs PID controller algorithm for 12 hours
-- Generates results CSV, clinical report PDF, and audit trail
-- Compares against baseline algorithms automatically
+### What A Good First Run Should Produce
 
-**Sanity check (first run):**
-- `results/results.csv` exists and grows during the run
-- `results/clinical_reports/` contains a PDF
-- Console shows no safety contract violations
+After a healthy first run, you should have:
 
-**Expected runtime:**
-- Laptop CPU: ~30-90 seconds for the quickstart preset
-- GPU not required
+- a `results.csv` timeline that grows during execution
+- a human-readable PDF report under `results/clinical_reports/`
+- a manifest and metadata bundle that records the run configuration
+- an audit summary that explains when and why the supervisor intervened
 
-### 2.3 Understanding the Output Files
+### Understanding The Output Files
 
-After running a simulation, you'll find these files in the `results/` folder:
+After running a simulation, look for these files inside the run directory:
 
-| File | Description |
-|------|-------------|
-| `results.csv` | Every simulation step with glucose, insulin, IOB, COB, safety events |
-| `clinical_report.pdf` | Visual report with charts and clinical metrics |
-| `config.json` | Exact configuration used (for reproducibility) |
-| `run_metadata.json` | Run ID, seed, platform info, timestamps |
-| `run_manifest.json` | SHA-256 hashes of all files (integrity verification) |
-| `audit/audit_trail.csv` | Detailed per-step audit trail |
-| `audit/safety_summary.json` | Safety interventions summary |
-| `baseline/pid_results.csv` | PID controller baseline comparison |
-| `baseline/standard_pump.csv` | Standard pump baseline comparison |
+| File | Why it matters |
+|---|---|
+| `results.csv` | Step-by-step glucose, insulin, IOB, COB, events, and actions |
+| `clinical_report.pdf` | Human-readable overview for quick review |
+| `config.json` | Exact run configuration for reproducibility |
+| `run_metadata.json` | Run ID, timestamps, platform details |
+| `run_manifest.json` | File hashes and integrity manifest |
+| `audit/audit_trail.csv` | Detailed intervention log |
+| `audit/safety_summary.json` | Supervisor counts and intervention reasons |
+| `baseline/` | Optional baseline comparison outputs |
 
-**Quick interpretation:**
-- Start with `clinical_report.pdf` for a human-readable summary.
-- Use `results.csv` for plotting and deeper analysis.
-- Use `audit/safety_summary.json` to explain *why* the supervisor intervened.
+Quick interpretation:
+- start with the PDF if you need the story fast
+- open `safety_summary.json` if you need to explain a surprising result
+- open `results.csv` when you need full numerical detail or your own plots
 
-**Data consistency checks:**
-- `glucose_actual_mgdl` should be in 40-400 mg/dL range.
-- `patient_iob_units` and `patient_cob_grams` should be >= 0.
-- Large jumps (>60 mg/dL in 5 min) usually indicate data issues.
+### Creating Your First Custom Algorithm
 
-**Example: Loading Results in Python**
-
-```python
-import pandas as pd
-
-# Load main results
-df = pd.read_csv("results/your_run/results.csv")
-print(df.head())
-
-# Load safety summary
-import json
-with open("results/your_run/audit/safety_summary.json") as f:
-    safety = json.load(f)
-print(f"Total interventions: {safety['intervention_count']}")
-```
-
-### 2.4 Creating Your First Custom Algorithm
-
-#### Step 1: Generate Template
+#### Step 1: Generate a template
 
 ```bash
 iints new-algo --name MyAlgorithm --output-dir algorithms/
 ```
 
-#### Step 2: Implement Logic
+#### Step 2: Implement the logic
 
 ```python
-# algorithms/my_algorithm.py
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 
 class MyAlgorithm(InsulinAlgorithm):
@@ -371,222 +257,45 @@ class MyAlgorithm(InsulinAlgorithm):
         return {
             "name": "My Custom Algorithm",
             "version": "0.1.0",
-            "description": "My first insulin dosing algorithm"
+            "description": "My first insulin dosing algorithm",
         }
-    
+
     def predict_insulin(self, data: AlgorithmInput) -> dict:
-        # Simple example: basal rate + correction
-        basal = 0.9  # U/hr
+        basal = 0.9
         correction = 0.0
-        
-        # Add correction if glucose is high
         if data.current_glucose > 180:
-            correction = (data.current_glucose - 180) / 50  # ISF of 50
-        
+            correction = (data.current_glucose - 180) / 50
         return {
             "basal_insulin": basal,
             "bolus_insulin": correction,
-            "reason": f"Basal {basal}U + correction {correction}U for glucose {data.current_glucose}mg/dL"
+            "reason": f"Basal {basal}U + correction {correction}U for glucose {data.current_glucose}mg/dL",
         }
 ```
 
-#### Step 3: Test Your Algorithm
+#### Step 3: Validate without surprises
 
 ```bash
-# Run with your custom algorithm
-iints run --algo algorithms/my_algorithm.py --duration 1440
+iints run --algo algorithms/my_algorithm.py --preset baseline_t1d --dry-run
+iints run --algo algorithms/my_algorithm.py --preset baseline_t1d
 ```
 
-### 2.5 Adding Stress Tests
+If the algorithm path is wrong, the newer CLI will suggest likely paths instead of failing silently.
 
-Add realistic challenges to test algorithm robustness:
+### Adding Stress Tests
 
-```python
-from iints.core.simulator import Simulator, StressEvent
+Use stress scenarios when you want to learn something real about robustness rather than just produce a pretty glucose trace.
 
-sim = Simulator(algorithm=MyAlgorithm(), patient_config="default")
+**Common failure-mode questions**
+- How does the controller handle a large delayed meal?
+- Does sensor noise cause unsafe over-correction?
+- Can the safety layer recover when the controller becomes too aggressive?
+- What happens during exercise or a simulated pump issue?
 
-# Add meal at 8:00 AM (480 minutes)
-sim.add_stress_event(StressEvent(
-    start_time=480,
-    event_type="meal",
-    value=60  # 60g carbs
-))
+The quickest CLI path is to start from a preset such as `baseline_t1d`, `exercise_stress`, or `sensor_noise`. The Python path remains useful when you need custom event timing.
 
-# Add exercise at 6:00 PM (1080 minutes)
-sim.add_stress_event(StressEvent(
-    start_time=1080,
-    event_type="exercise",
-    value=30  # 30 minutes moderate exercise
-))
+## Architecture Overview
 
-# Add sensor noise
-sim.add_stress_event(StressEvent(
-    start_time=300,
-    event_type="sensor_noise",
-    value=15.0  # 15 mg/dL standard deviation
-))
-
-results = sim.run_batch(duration_minutes=1440)
-```
-
-**Available Stress Events:**
-- `meal`: Carbohydrate intake (value = grams)
-- `exercise`: Physical activity (value = minutes)
-- `sensor_noise`: CGM noise (value = std deviation)
-- `sensor_dropout`: CGM signal loss (value = probability)
-- `pump_failure`: Insulin delivery failure (value = probability)
-- `hormonal_change`: Dawn phenomenon simulation
-
-### 2.6 Benchmarking Against Baselines
-
-Compare your algorithm against standard approaches:
-
-```bash
-# CLI benchmark
-iints benchmark \
-  --algo-to-benchmark algorithms/my_algorithm.py \
-  --patient-configs-dir src/iints/data/virtual_patients \
-  --scenarios-dir scenarios \
-  --output-dir results/benchmark
-```
-
-```python
-# Python API benchmark
-from iints.analysis.benchmark import run_benchmark
-
-results = run_benchmark(
-    algorithm_path="algorithms/my_algorithm.py",
-    patient_configs=["default", "adolescent", "insulin_resistant"],
-    scenarios=["baseline", "meal_challenge", "exercise_stress"],
-    duration_minutes=1440
-)
-```
-
-### 2.7 Using Preset Scenarios
-
-Clinic-safe scenarios for reproducible testing:
-
-```bash
-# List available presets
-iints presets list
-
-# Run a specific preset
-iints presets run --name hypo_prone_night --algo algorithms/my_algorithm.py
-```
-
-**Available Presets:**
-- `baseline_t1d`: Standard Type 1 diabetes profile
-- `hypo_prone_night`: Nighttime hypoglycemia risk
-- `hyper_challenge`: Post-meal hyperglycemia
-- `pizza_paradox`: Delayed carb absorption
-- `midnight_crash`: Nocturnal hypoglycemia
-- `exercise_stress`: Physical activity impact
-- `sensor_noise`: CGM accuracy challenges
-
-### 2.8 Importing Real CGM Data
-
-Test against real patient data:
-
-```bash
-# From CSV file
-iints import-data --input-csv my_cgm_export.csv \
-  --data-format dexcom \
-  --output-dir results/imported
-```
-
-```python
-# Python API
-from iints.data.importer import import_cgm_csv
-from iints.core.simulator import Simulator
-
-result = import_cgm_csv(
-    "my_cgm_export.csv",
-    data_format="dexcom",  # or "libre", "generic"
-    scenario_name="Patient A - Week 1",
-)
-
-sim = Simulator(
-    algorithm=MyAlgorithm(),
-    scenario=result.scenario,
-)
-```
-
-**Supported Formats:**
-- Dexcom CSV export
-- Libre CSV export
-- Generic CSV (auto-detects columns)
-
-**Minimum required columns (generic CSV):**
-- Timestamp (ISO or epoch minutes)
-- Glucose (mg/dL)
-
-**Optional but recommended:**
-- Carbs (grams)
-- Insulin (units)
-- Notes/events
-
-**Common import pitfalls:**
-- Mixed timezones or missing timezone offsets
-- Glucose in mmol/L (convert to mg/dL)
-- Duplicate timestamps (keep the latest reading)
-
-**Quick validation:**
-- Plot glucose vs time to confirm it is smooth and within 40-400 mg/dL
-- Ensure meal events align with glucose rises (15-90 minutes after)
-- Nightscout JSON
-- Dataset registry packs (AIDE, PEDAP, AZT1D, HUPA-UCM)
-
-### 2.9 Generating Custom Reports
-
-```python
-from iints.analysis.reporting import ClinicalReportGenerator
-
-generator = ClinicalReportGenerator()
-generator.generate_pdf(
-    results_df,  # Your simulation results DataFrame
-    safety_report,  # Safety summary dict
-    "results/custom_report.pdf",
-    title="My Algorithm Performance Report",
-    include_trend_analysis=True,
-    highlight_safety_events=True
-)
-```
-
-**Report Contents:**
-- Glucose trace chart with target range
-- Insulin delivery chart
-- Clinical metrics table (TIR, GMI, CV, LBGI, HBGI)
-- Safety interventions summary
-- Top intervention reasons
-- Configuration overview
-
-### 2.10 What Next?
-
-**Recommended Next Steps:**
-
-1. - Complete the Getting Started guide
-2. [Metrics] Run benchmark comparisons
-3. [Research] Test with stress scenarios
-4. [Performance] Import real CGM data
-5. [AI] Explore AI predictor integration
-6. [Notes] Generate clinical reports
-7. [Training] Review safety architecture
-8. [Tools] Customize patient profiles
-9. [Package] Package algorithm for distribution
-10. [Announcement] Share results with community
-
-**Need Help?**
-- Check Troubleshooting section (9.0)
-- Review FAQ (17.0)
-- Join community discussions
-- Submit issues on GitHub
-
----
-
-## 3. Architecture Overview
-
-### 3.1 System Components
+### System Components
 
 ```text
 +---------------------------------------------------+
@@ -613,7 +322,7 @@ generator.generate_pdf(
 +---------------------------------------------------+
 ```
 
-### 3.2 Data Flow
+### Data Flow
 
 ```
 1. Algorithm requests insulin dose
@@ -637,22 +346,22 @@ generator.generate_pdf(
 10. Repeat every time step (default: 5 minutes)
 ```
 
-### 3.3 Safety Layer Integration
+### Safety Layer Integration
 
 The Independent Safety Supervisor runs **deterministically** and can:
-- - Override dangerous algorithm requests
-- - Log all interventions with reasons
-- - Enforce hard limits (hypoglycemia protection)
-- - Apply dynamic limits (IOB clamping)
-- - Validate all inputs/outputs
+- Override dangerous algorithm requests
+- Log all interventions with reasons
+- Enforce hard limits (hypoglycemia protection)
+- Apply dynamic limits (IOB clamping)
+- Validate all inputs/outputs
 
 **Key Principle:** Safety layer is **always active** and cannot be disabled.
 
 ---
 
-## 4. Safety Architecture (Critical Section)
+## Safety Architecture (Critical Section)
 
-### 4.1 Design Philosophy
+### Design Philosophy
 
 **Safety-First Principles:**
 
@@ -668,7 +377,7 @@ The Independent Safety Supervisor runs **deterministically** and can:
 - All interventions are logged and explainable
 - Configuration is validated before simulation starts
 
-### 4.2 SafetyConfig Configuration
+### SafetyConfig Configuration
 
 ```python
 from iints.core.safety import SafetyConfig
@@ -712,7 +421,7 @@ config = SafetyConfig(
 
 **Audit note:** All SafetyConfig values are written to `run_metadata.json` and `audit/safety_summary.json`.
 
-### 4.3 9 Safety Checks Explained
+### 9 Safety Checks Explained
 
 The IndependentSupervisor applies these checks **in order**:
 
@@ -763,7 +472,7 @@ The IndependentSupervisor applies these checks **in order**:
    - Rationale: Hourly limit enforcement
 ```
 
-### 4.4 Safety Levels
+### Safety Levels
 
 | Level | Severity | Action |
 |-------|----------|--------|
@@ -772,7 +481,7 @@ The IndependentSupervisor applies these checks **in order**:
 | CRITICAL | Serious risk | Significant dose reduction |
 | EMERGENCY | Immediate danger | Suspend insulin completely |
 
-### 4.5 Input Validation
+### Input Validation
 
 The InputValidator checks:
 
@@ -790,7 +499,7 @@ if timestep < 1 or timestep > 15:
     raise InvalidTimestepError(f"Timestep {timestep} invalid")
 ```
 
-### 4.6 Simulation Termination
+### Simulation Termination
 
 Automatic termination occurs when:
 
@@ -807,9 +516,9 @@ Automatic termination occurs when:
 
 ---
 
-## 5. Tutorials and Cookbook
+## Tutorials and Cookbook
 
-### 5.1 24-Hour Simulation Walkthrough
+### 24-Hour Simulation Walkthrough
 
 Complete example from setup to analysis:
 
@@ -863,7 +572,7 @@ iints.generate_clinical_report(
 )
 ```
 
-### 5.2 Building an ML-Hybrid Algorithm
+### Building an ML-Hybrid Algorithm
 
 Combine ML prediction with rule-based safety:
 
@@ -901,7 +610,7 @@ class MLHybridAlgorithm(InsulinAlgorithm):
         }
 ```
 
-### 5.3 Running Batch Experiments
+### Running Batch Experiments
 
 Test multiple configurations efficiently:
 
@@ -927,7 +636,7 @@ comparison_df = results.compare_metrics()
 print(comparison_df[['algorithm', 'patient', 'TIR', 'GMI', 'interventions']])
 ```
 
-### 5.4 Audit Trail Analysis
+### Audit Trail Analysis
 
 Every run produces a structured audit trail that explains why the safety layer intervened.
 
@@ -945,7 +654,7 @@ print(audit['action'].value_counts())
 - If `action` is `suspend` or `cap`, the supervisor overrode the algorithm.
 - If `reason` repeats often, your algorithm is too aggressive for that patient profile.
 
-### 5.5 Custom Safety Thresholds
+### Custom Safety Thresholds
 
 Use SafetyConfig to tighten or relax constraints for research experiments.
 
@@ -962,7 +671,7 @@ safe_config = SafetyConfig(
 sim = Simulator(algorithm=MyAlgorithm(), safety_config=safe_config)
 ```
 
-### 5.6 Pump Emulator Benchmarking
+### Pump Emulator Benchmarking
 
 Benchmark alternative pump behaviors or commercial-emulator presets.
 
@@ -973,7 +682,7 @@ bench = benchmark_pump_emulators(duration_minutes=120)
 print(bench[['model', 'avg_step_ms', 'max_step_ms']])
 ```
 
-### 5.7 Live Streaming Simulation
+### Live Streaming Simulation
 
 Stream real-time values for dashboards or demos.
 
@@ -985,27 +694,46 @@ for state in sim.run_stream(duration_minutes=120):
     print(state['timestamp'], state['glucose_actual_mgdl'])
 ```
 
-### 5.8 Reproducible Runs for Publications
+### Reproducible Runs For Publications
 
-To make results reproducible:
-- Fix `seed`
-- Persist `config.json`
-- Record dataset hash and commit SHA
+When you want evidence instead of a one-off run, move from ad hoc simulations to a documented study workflow.
 
-```python
-results = iints.run_simulation(
-    algorithm=MyAlgorithm(),
-    duration_minutes=720,
-    seed=123,
-)
-print(results['run_manifest'])
+**Minimum reproducibility checklist**
+- fix seeds
+- save the run config and manifest
+- record dataset provenance and certification status
+- keep the exact algorithm file that was executed
+- preserve comparison outputs, not just the best trace
+
+**Single-bundle path**
+
+```bash
+iints study-ready \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_ready
 ```
+
+**Protocol-driven study path**
+
+```bash
+iints study-protocol --output-dir results/study_protocol
+iints run-study --experiment results/study_protocol/study_experiment.yaml
+iints analyze \
+  results/study_bundle \
+  --output-json results/study_summary.json
+iints compare-study \
+  results/study_clean \
+  results/study_corrupted \
+  --output-json results/study_comparison.json
+```
+
+Use the single-bundle path when you want one traceable result package. Use the protocol path when you are doing real benchmarking, ablations, or science-fair / paper workflows.
 
 ---
 
-## 6. API Reference
+## API Reference
 
-### 6.1 Core Classes
+### Core Classes
 
 #### InsulinAlgorithm (Abstract Base Class)
 
@@ -1076,9 +804,9 @@ class AlgorithmInput:
 
 ---
 
-## 7. Practical Examples
+## Practical Examples
 
-### 7.1 Complete Algorithm Example
+### Complete Algorithm Example
 
 Full working algorithm with comprehensive logic:
 
@@ -1148,7 +876,7 @@ class ComprehensiveAlgorithm(InsulinAlgorithm):
         self.history = []
 ```
 
-### 7.2 CLI vs Python API Comparison
+### CLI vs Python API Comparison
 
 **Same Task: Run Simulation with Custom Algorithm**
 
@@ -1195,7 +923,7 @@ results = run_simulation(
 - Custom analysis pipelines
 - Jupyter notebook exploration
 
-### 7.3 Stress Testing Patterns
+### Stress Testing Patterns
 
 **Pattern 1: Meal Challenge Test**
 ```python
@@ -1237,7 +965,7 @@ sim.add_stress_event(StressEvent(1020, "meal", 80))  # 5:00 PM dinner
 sim.add_stress_event(StressEvent(1200, "sensor_noise", 15.0))  # 8:00 PM sensor issues
 ```
 
-### 7.4 Human-in-the-Loop Integration
+### Human-in-the-Loop Integration
 
 Add manual interventions during simulation:
 
@@ -1278,7 +1006,7 @@ sim = Simulator(
 )
 ```
 
-### 7.5 Data Import Workflows
+### Data Import Workflows
 
 **Workflow 1: Dexcom CSV Import**
 ```bash
@@ -1323,9 +1051,9 @@ iints run \
 
 ---
 
-## 8. Advanced Topics
+## Advanced Topics
 
-### 8.1 Commercial Pump Emulators
+### Commercial Pump Emulators
 
 Test against real pump behavior:
 
@@ -1352,7 +1080,7 @@ for name, pump_algo in pumps:
 compare_metrics(results)
 ```
 
-### 8.2 Dataset Registry Usage
+### Dataset Registry Usage
 
 Access real-world datasets:
 
@@ -1392,7 +1120,7 @@ data_packs/
       processed/...
 ```
 
-### 8.3 Reproducibility Techniques
+### Reproducibility Techniques
 
 Ensure identical results across runs:
 
@@ -1420,7 +1148,7 @@ if verify_manifest("results/run_001/run_manifest.json"):
     print("Results verified - not tampered with")
 ```
 
-### 8.4 Performance Profiling
+### Performance Profiling
 
 Measure algorithm performance:
 
@@ -1441,7 +1169,7 @@ print(f"Total steps: {profiling['total_steps']}")
 print(f"Total time: {profiling['total_time_s']:.2f}s")
 ```
 
-### 8.5 Custom Metrics Calculation
+### Custom Metrics Calculation
 
 Define your own performance metrics:
 
@@ -1479,7 +1207,7 @@ metrics = calculate_custom_metric(results_df)
 print(f"Custom Score: {metrics['composite_score']:.1f}")
 ```
 
-### 8.6 Local AI Assistant (Ministral 3 Open-Weight via Ollama)
+### Local AI Assistant (Ministral 3 Open-Weight via Ollama)
 
 The SDK includes a research-only local AI assistant for simulation explanation and summary generation.
 
@@ -1654,7 +1382,7 @@ If you want the packaged machine-readable subset from the installed SDK:
 iints sources --output-json results/source_manifest.json
 ```
 
-## 11. Poster-Ready Results for Jury Demos
+## Poster-Ready Results for Jury Demos
 
 The SDK can now turn one to three completed run bundles into a single poster-style PNG.
 This is ideal for science fairs, thesis defenses, pitch decks, and jury presentations where you want three scenarios side by side.
@@ -1690,7 +1418,7 @@ iints poster \
 
 If you omit `--run-dir`, the SDK auto-discovers the latest run bundles under `./results`.
 
-## 12. Booth / Jury Demo Bundle
+## Booth / Jury Demo Bundle
 
 If you need a live demo for a science fair, jury room, or expo booth, the SDK now includes a one-command flow that builds the whole story for you.
 
@@ -1763,9 +1491,9 @@ python 07_live_stage_demo.py
 
 ---
 
-## 9. Troubleshooting
+## Troubleshooting
 
-### 9.1 Installation Issues
+### Installation Issues
 
 **Issue: ModuleNotFoundError after installation**
 
@@ -1814,7 +1542,7 @@ hash -r
 
 For the full upgrade walkthrough, see `docs/UPDATING.md`. By default, the upgrade commands in that guide track the latest release. Only pin an exact version when you need reproducible packaging for a demo, paper, or audit.
 
-### 9.2 Simulation Issues
+### Simulation Issues
 
 **Issue: Simulation runs very slowly**
 
@@ -1847,7 +1575,7 @@ from iints.core.safety import SafetyConfig
 config = SafetyConfig(critical_hypo_cutoff=35.0)  # Lower threshold
 ```
 
-### 9.3 Algorithm Development Issues
+### Algorithm Development Issues
 
 **Issue: Algorithm not appearing in CLI**
 
@@ -1882,7 +1610,7 @@ config = SafetyConfig(
 )
 ```
 
-### 9.4 Data Import Issues
+### Data Import Issues
 
 **Issue: CSV import fails**
 
@@ -1905,7 +1633,7 @@ data = import_cgm_csv(
 )
 ```
 
-### 9.5 Performance Issues
+### Performance Issues
 
 **Issue: High memory usage**
 
@@ -1925,62 +1653,65 @@ for i in range(10):
 
 ---
 
-## 10. Quick Reference
+## Quick Reference
 
-### 10.1 Essential CLI Commands
+### Essential CLI Commands
 
 ```bash
-# Initialize project
-iints init --project-name my_project
+# Confirm the environment works
+iints doctor --smoke-run --suggest
+iints doctor --full --suggest
 
-# Quickstart
-iints quickstart --project-name demo
+# Fastest first run
+iints demo
+iints demo --dry-run
+iints guide
+iints run --wizard
 
-# Run simulation
-iints run --algo algorithms/my_algo.py --duration 1440
+# Create a reusable project
+iints quickstart --project-name my_project
+cd my_project
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 
-# Run with preset
-iints presets run --name baseline_t1d --algo algorithms/my_algo.py
+# Generic run flow
+iints run --preset baseline_t1d
+iints run --algo algorithms/my_algo.py --scenario scenarios/example_scenario.json --dry-run
 
-# Benchmark
-iints benchmark --algo-to-benchmark algorithms/my_algo.py
+# Build a study-ready bundle
+iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
 
-# Import data
-iints import-data --input-csv my_cgm.csv --data-format dexcom
+# Protocol-driven benchmark path
+iints study-protocol --output-dir results/study_protocol
+iints run-study --experiment results/study_protocol/study_experiment.yaml
 
-# List presets
-iints presets list
-
-# Generate scenario
-iints scenarios generate --name "Stress Test"
-
-# Validate files
-iints validate --scenario-path scenarios/my_scenario.json
-
-# Check local Ministral backend
-iints ai local-check --model ministral
-
-# Prepare a finished run for AI
+# Data and AI
+iints data list
+iints data fetch aide_t1d --output-dir data_packs/public/aide_t1d --no-verify
+iints ai local-check --model ministral-3:8b
 iints ai prepare results/<run_id>
+iints ai report results/<run_id>
 
-# Generate AI explanation
-iints ai explain results/<run_id>
+# Edge and booth operations
+iints edge setup --output-dir iints_pi_demo --board raspberry_pi
+iints makerfaire up --project-dir .
+iints makerfaire autostart --project-dir .
+iints makerfaire watchdog --project-dir .
 ```
 
-### 10.2 Python Code Snippets
+### Python Code Snippets
 
-**Minimal Simulation:**
+**Minimal simulation**
 ```python
 from iints import run_simulation
 from iints.core.algorithms.pid_controller import PIDController
 
 results = run_simulation(
     algorithm=PIDController(),
-    duration_minutes=720
+    duration_minutes=720,
 )
 ```
 
-**Custom Algorithm:**
+**Custom algorithm skeleton**
 ```python
 from iints.api.base_algorithm import InsulinAlgorithm
 
@@ -1989,33 +1720,34 @@ class MyAlgorithm(InsulinAlgorithm):
         return {"basal_insulin": 0.9, "bolus_insulin": 0.0}
 ```
 
-**Load Results:**
+**Load results quickly**
 ```python
 import pandas as pd
+
 df = pd.read_csv(results['results_csv'])
 print(df[['timestamp', 'glucose_actual_mgdl', 'insulin_delivered']].head())
 ```
 
-### 10.3 Safety Thresholds (Defaults)
+### Safety Thresholds (Defaults)
 
 ```python
 SafetyConfig(
-    hypo_cutoff=70.0,          # Start reducing insulin
-    severe_hypo_cutoff=54.0,   # Emergency suspension
-    critical_hypo_cutoff=40.0, # Terminate simulation
-    hyper_cutoff=300.0,        # Maximum glucose
-    max_basal_rate=2.0,        # U/hr
-    max_bolus=5.0,             # U per bolus
-    max_iob=10.0,              # U total active insulin
-    max_insulin_per_hour=15.0, # U/hr rolling window
-    max_insulin_per_day=80.0   # U/day absolute limit
+    hypo_cutoff=70.0,
+    severe_hypo_cutoff=54.0,
+    critical_hypo_cutoff=40.0,
+    hyper_cutoff=300.0,
+    max_basal_rate=2.0,
+    max_bolus=5.0,
+    max_iob=10.0,
+    max_insulin_per_hour=15.0,
+    max_insulin_per_day=80.0,
 )
 ```
 
-### 10.4 Clinical Metrics Targets (ATTD/ADA)
+### Clinical Metrics Targets (ATTD/ADA)
 
 | Metric | Target Range |
-|--------|--------------|
+|---|---|
 | TIR (70-180 mg/dL) | >70% |
 | TBR (<70 mg/dL) | <4% |
 | TBR (<54 mg/dL) | <1% |
@@ -2024,38 +1756,34 @@ SafetyConfig(
 | LBGI | <1.1 |
 | HBGI | <5.0 |
 
-### 10.5 Scientific Study Workflow
+### Scientific Study Workflow
 
 Use this flow when you want a real experimental protocol instead of a one-off demo:
 
 ```bash
-iints scenarios export-study-pack --output-dir scenarios/study_pack
 iints study-protocol --output-dir results/study_protocol
-iints data corrupt-for-study data/demo/diabetes_cgm.csv \
-  --output-csv data/demo/diabetes_cgm_corrupted.csv \
-  --mode timestamp_shift --mode missing_block --mode glucose_spikes
-iints analyze results/study \
+iints run-study \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_bundle
+iints analyze \
+  results/study_bundle \
   --output-json results/study_summary.json \
-  --output-markdown results/study_summary.md \
-  --output-csv results/evidence_table.csv \
-  --output-evidence-markdown results/evidence_table.md
-iints compare-study results/study_clean results/study_corrupted \
+  --output-markdown results/study_summary.md
+iints compare-study \
+  results/study_clean \
+  results/study_corrupted \
   --output-json results/study_comparison.json
 iints poster-study results/study_summary.json --output-path results/study_poster.png
-iints run-study --algo algorithms/example_algorithm.py --output-dir results/study_bundle
 ```
 
 This gives you:
-
 - a written protocol with hypotheses and a study matrix
-- controlled corruption operators for certified-vs-uncertified experiments
+- baseline comparisons including the built-in Clinical Baseline
 - descriptive statistics and confidence intervals
-- failure analysis for severe hypo, early terminations, and worst runs
-- optional external plausibility checks against imported CareLink metrics
+- safety summaries, failure analysis, and subgroup views
+- poster-ready outputs for reports or jury sessions
 
----
-
-## 11. Glossary
+## Glossary
 
 **Algorithm**: Code that calculates insulin doses based on current and historical data
 
@@ -2093,33 +1821,22 @@ This gives you:
 
 ## Need More Help?
 
-**Documentation:**
-- Comprehensive Guide: `docs/COMPREHENSIVE_GUIDE.md`
-- Technical README: `docs/TECHNICAL_README.md`
-- API Stability: `API_STABILITY.md`
+**Best next documents**
+- Getting Started: [docs site](https://python35.github.io/IINTS-SDK/GETTING_STARTED/)
+- Quickstart: [docs site](https://python35.github.io/IINTS-SDK/QUICKSTART/)
+- Command reference: [docs site](https://python35.github.io/IINTS-SDK/COMMAND_REFERENCE/)
+- Scientific workflow: [docs site](https://python35.github.io/IINTS-SDK/SCIENTIFIC_WORKFLOW/)
+- Maker Faire Pi guide: [docs site](https://python35.github.io/IINTS-SDK/MAKERFAIRE_PI/)
 
-**Community:**
-- GitHub Issues: https://github.com/python35/IINTS-SDK/issues
-- Discussion Forum: [Link]
-- Email Support: support@iints.org
+**Project support routes**
+- GitHub repository: https://github.com/python35/IINTS-SDK
+- Issue tracker: https://github.com/python35/IINTS-SDK/issues
+- Research report: `research/EUCYS_REPORT.md`
 
-**Citing IINTS-AF:**
-```bibtex
-@software{IINTS_AF_SDK,
-  author = {Bobbaers, Rune},
-  title = {IINTS-AF: Intelligent Insulin Titration System for Artificial Pancreas},
-  year = {2026},
-  version = {0.1.22},
-  url = {https://github.com/python35/IINTS-SDK},
-  note = {Pre-clinical research software for insulin dosing algorithm validation}
-}
+If you are stuck, the fastest recovery commands are usually:
+
+```bash
+iints doctor --full --suggest
+iints demo --dry-run
+iints run --wizard
 ```
-
----
-
-**PRE-CLINICAL USE ONLY - NOT FOR PATIENT CARE**
-
-This document is provided for research and educational purposes only.
-The IINTS-AF SDK is not a medical device and should not be used for clinical decision-making.
-
-(C) 2026 IINTS-AF Project. Distributed under Apache License 2.0.
