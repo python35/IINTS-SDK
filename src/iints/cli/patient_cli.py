@@ -151,7 +151,7 @@ def start(
     algo: Annotated[Path, typer.Option(help="Path to the insulin algorithm Python file.")],
     patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
     patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type: auto, bergman, custom, simglucose.")] = "auto",
-    scenario_profile: Annotated[str, typer.Option(help="Live day profile: normal_day, sport_day, bad_carb_count, night_hypo_risk, expo_hot_start.")] = "normal_day",
+    scenario_profile: Annotated[str, typer.Option(help="Live day profile: school_day, normal_day, sport_day, bad_carb_count, night_hypo_risk, relaxed_day, expo_hot_start.")] = "normal_day",
     workspace: Annotated[Path, typer.Option(help="Workspace directory for the persistent digital patient state.")] = Path("./digital_patient_runtime"),
     mode: Annotated[str, typer.Option(help="Clock mode: real-time or demo-time.")] = "demo-time",
     speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts values like 60 or 60x.")] = "60x",

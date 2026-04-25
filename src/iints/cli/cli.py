@@ -12,6 +12,7 @@ import importlib.util
 import importlib
 import sys
 import json
+import platform
 import tempfile
 import time
 import shutil
@@ -76,10 +77,20 @@ from iints.data.synthetic_mirror import generate_synthetic_mirror
 from iints.demo_assets import export_live_stage_demo
 from iints.live_patient.edge_benchmark import run_edge_benchmark
 from iints.live_patient.edge_ops import (
+    build_edge_offline_bundle,
     create_edge_bundle,
+    deploy_edge_project,
     export_edge_setup,
+    run_remote_edge_command,
     summarize_edge_workspace,
     write_edge_update_script,
+)
+from iints.live_patient.long_study import (
+    EdgeLongStudyExecutionError,
+    LongStudyConfigError,
+    create_edge_study_snapshot,
+    export_edge_study_archive,
+    run_edge_long_study,
 )
 from iints.live_patient.runtime import PatientRuntimeConfig
 from iints.live_patient.uno_q import (
@@ -7055,6 +7066,8 @@ def edge_setup(
     seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
     service_name: Annotated[str, typer.Option(help="systemd service name without the .service suffix.")] = "iints-digital-patient",
     user_name: Annotated[Optional[str], typer.Option(help="Linux user that should own the generated systemd service.")] = None,
+    uno_bridge_port: Annotated[Optional[str], typer.Option(help="Optional UNO Q serial port to bake into a generated bridge systemd service.")] = None,
+    uno_bridge_service_name: Annotated[str, typer.Option(help="UNO Q bridge systemd service name without the .service suffix.")] = "iints-uno-q-bridge",
 ) -> None:
     console = Console()
     normalized_board = board.strip().lower()
@@ -7076,7 +7089,9 @@ def edge_setup(
         seed=seed,
         service_name=service_name,
         user_name=user_name,
-        include_uno_bridge=normalized_board == "uno_q",
+        include_uno_bridge=normalized_board == "uno_q" or uno_bridge_port is not None,
+        uno_bridge_port=uno_bridge_port,
+        uno_bridge_service_name=uno_bridge_service_name,
     )
 
     table = Table(title="IINTS Edge Setup")
@@ -7099,6 +7114,8 @@ def edge_setup(
         "makerfaire_watchdog_service",
         "makerfaire_watchdog_timer",
         "makerfaire_checklist",
+        "remote_access_guide",
+        "long_study_template",
         "update_script",
         "service_file",
         "service_notes",
@@ -7107,6 +7124,10 @@ def edge_setup(
         table.add_row(key, outputs[key])
     if "uno_q_bridge" in outputs:
         table.add_row("uno_q_bridge", outputs["uno_q_bridge"])
+    if "uno_bridge_service" in outputs:
+        table.add_row("uno_bridge_service", outputs["uno_bridge_service"])
+    if "uno_bridge_service_notes" in outputs:
+        table.add_row("uno_bridge_service_notes", outputs["uno_bridge_service_notes"])
     console.print(table)
     console.print(
         Panel(
@@ -7119,12 +7140,386 @@ def edge_setup(
                     f"Maker Faire watchdog: iints makerfaire watchdog --project-dir {outputs['root']}",
                     f"CLI kiosk: iints edge kiosk --project-dir {outputs['root']}",
                     f"Setup guide: {outputs['setup_guide']}",
+                    f"Remote guide: {outputs['remote_access_guide']}",
+                    f"Long study config: {outputs['long_study_template']}",
                 ]
             ),
             title="Edge Setup Ready",
             border_style="green",
         )
     )
+
+
+@edge_app.command(name="deploy")
+def edge_deploy(
+    host: Annotated[str, typer.Option(help="Remote Raspberry Pi hostname or IP address.")],
+    user_name: Annotated[Optional[str], typer.Option("--user", help="Optional remote SSH username.")] = None,
+    ssh_port: Annotated[int, typer.Option(help="SSH port used for the remote Raspberry Pi.")] = 22,
+    remote_dir: Annotated[str, typer.Option(help="Target project directory on the Raspberry Pi.")] = "~/iints_pi_demo",
+    local_output_dir: Annotated[Path, typer.Option(help="Local scaffold directory that will also be synced to the Pi.")] = Path("iints_pi_demo"),
+    board: Annotated[str, typer.Option(help="Edge board target: raspberry_pi or uno_q.")] = "raspberry_pi",
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder name used for the persistent patient runtime.")] = "patient_runtime",
+    scenario_profile: Annotated[str, typer.Option(help="Initial live scenario profile deployed to the Pi.")] = "expo_hot_start",
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    mode: Annotated[str, typer.Option(help="Clock mode for the generated edge project.")] = "demo-time",
+    speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts 60 or 60x.")] = "60x",
+    api_host: Annotated[str, typer.Option(help="Dashboard host to bake into the generated runtime config. Keep 127.0.0.1 when using Raspberry Pi Connect.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Dashboard port to bake into the generated runtime config.")] = 8765,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+    service_name: Annotated[str, typer.Option(help="systemd service name without the .service suffix.")] = "iints-digital-patient",
+    install_autostart: Annotated[bool, typer.Option(help="Install the generated systemd service, watchdog timer, and desktop autostart on the Pi.")] = True,
+    start_runtime: Annotated[bool, typer.Option(help="Start the Maker Faire runtime after deployment.")] = True,
+    enable_connect_linger: Annotated[bool, typer.Option(help="Run `loginctl enable-linger` on the Pi so Raspberry Pi Connect remote shell keeps working after reboots.")] = True,
+    ssh_timeout_seconds: Annotated[float, typer.Option(help="Timeout per remote SSH step in seconds.")] = 300.0,
+    ssh_retries: Annotated[int, typer.Option(help="How many times to retry a failing SSH step before giving up.")] = 1,
+    uno_bridge_port: Annotated[Optional[str], typer.Option(help="Optional UNO Q serial port on the Pi, for example /dev/ttyACM0. Generates and installs a bridge service.")] = None,
+    uno_bridge_service_name: Annotated[str, typer.Option(help="UNO Q bridge systemd service name without the .service suffix.")] = "iints-uno-q-bridge",
+    flash_uno_bridge: Annotated[bool, typer.Option(help="Flash the UNO Q bridge sketch remotely after syncing the project. Requires --uno-bridge-port and --uno-fqbn.")] = False,
+    uno_fqbn: Annotated[Optional[str], typer.Option(help="Arduino CLI FQBN used when --flash-uno-bridge is enabled.")] = None,
+    arduino_cli: Annotated[str, typer.Option(help="Arduino CLI executable name or path on the Raspberry Pi.")] = "arduino-cli",
+    dry_run: Annotated[bool, typer.Option(help="Show the remote deployment plan without executing SSH commands.")] = False,
+    verbose: Annotated[bool, typer.Option(help="Print the raw remote SSH command and deploy stdout for debugging.")] = False,
+) -> None:
+    console = Console()
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+    if flash_uno_bridge and (not uno_bridge_port or not uno_fqbn):
+        console.print("[bold red]Remote UNO Q flashing needs both --uno-bridge-port and --uno-fqbn.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        payload = deploy_edge_project(
+            host=host,
+            user_name=user_name,
+            ssh_port=ssh_port,
+            remote_dir=remote_dir,
+            local_output_dir=local_output_dir,
+            board=normalized_board,
+            workspace_name=workspace_name,
+            scenario_profile=scenario_profile,
+            patient_config=patient_config,
+            patient_model_type=patient_model,
+            mode=mode,
+            speed=_parse_edge_speed(speed),
+            api_host=api_host,
+            api_port=api_port,
+            seed=seed,
+            service_name=service_name,
+            include_uno_bridge=normalized_board == "uno_q",
+            uno_bridge_port=uno_bridge_port,
+            uno_bridge_service_name=uno_bridge_service_name,
+            install_autostart=install_autostart,
+            start_runtime=start_runtime,
+            enable_connect_linger=enable_connect_linger,
+            flash_uno_bridge=flash_uno_bridge,
+            uno_fqbn=uno_fqbn,
+            arduino_cli=arduino_cli,
+            dry_run=dry_run,
+            ssh_timeout_seconds=ssh_timeout_seconds,
+            ssh_retries=ssh_retries,
+            progress_callback=lambda message: console.print(f"[cyan]→[/cyan] {message}"),
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Edge deployment failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    artifacts = payload["artifacts"]
+    table = Table(title="IINTS Edge Remote Deploy")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    rows = [
+        ("remote_target", payload["destination"]),
+        ("remote_project", payload["remote_dir"]),
+        ("local_scaffold", payload["local_output_dir"]),
+        ("board", payload["board"]),
+        ("scenario_profile", payload["scenario_profile"]),
+        ("mode", "dry-run only" if payload["dry_run"] else "live deploy"),
+        ("remote_access", "Raspberry Pi Connect recommended"),
+        ("remote_guide", artifacts["remote_access_guide"]),
+        ("setup_guide", artifacts["setup_guide"]),
+    ]
+    if "uno_bridge_service" in artifacts:
+        rows.append(("uno_bridge_service", artifacts["uno_bridge_service"]))
+    for field, value in rows:
+        table.add_row(str(field), str(value))
+    console.print(table)
+
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    (
+                        "Dry run complete. Nothing was changed on the Raspberry Pi."
+                        if payload["dry_run"]
+                        else "The Pi project has been scaffolded, provisioned, and started."
+                    ),
+                    "For safe remote presentation, keep the dashboard on loopback and use Raspberry Pi Connect for screen sharing or remote shell.",
+                    f"Remote status: {payload['remote_commands']['status']}",
+                    f"Remote reset: {payload['remote_commands']['reset']}",
+                    f"Remote stop: {payload['remote_commands']['stop']}",
+                ]
+            ),
+            title="Remote Edge Deploy Ready" if not payload["dry_run"] else "Remote Edge Deploy Plan",
+            border_style="green" if not payload["dry_run"] else "cyan",
+        )
+    )
+    if verbose:
+        console.print(f"[dim]SSH command:[/dim] {payload['deploy_command']}")
+        if payload["deploy_stdout"]:
+            console.print(
+                Panel(
+                    payload["deploy_stdout"],
+                    title="Remote Deploy Output",
+                    border_style="blue",
+                )
+            )
+
+
+@edge_app.command(name="offline-bundle")
+def edge_offline_bundle(
+    output: Annotated[Path, typer.Option(help="Tarball written for offline USB-stick installs.")] = Path("iints_offline.tar.gz"),
+    board: Annotated[str, typer.Option(help="Edge board target baked into the scaffold: raspberry_pi or uno_q.")] = "raspberry_pi",
+    workspace_name: Annotated[str, typer.Option(help="Workspace folder name used for the persistent patient runtime.")] = "patient_runtime",
+    scenario_profile: Annotated[str, typer.Option(help="Initial live scenario profile baked into the scaffold.")] = "expo_hot_start",
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    mode: Annotated[str, typer.Option(help="Clock mode baked into the generated edge project.")] = "demo-time",
+    speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts 60 or 60x.")] = "60x",
+    api_host: Annotated[str, typer.Option(help="Dashboard host baked into the runtime config. Keep 127.0.0.1 for Pi Connect setups.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Dashboard port baked into the runtime config.")] = 8765,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+) -> None:
+    console = Console()
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+    try:
+        outputs = build_edge_offline_bundle(
+            output,
+            board=normalized_board,
+            workspace_name=workspace_name,
+            scenario_profile=scenario_profile,
+            patient_config=patient_config,
+            patient_model_type=patient_model,
+            mode=mode,
+            speed=_parse_edge_speed(speed),
+            api_host=api_host,
+            api_port=api_port,
+            seed=seed,
+            include_uno_bridge=normalized_board == "uno_q",
+            progress_callback=lambda message: console.print(f"[cyan]→[/cyan] {message}"),
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Offline bundle generation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Offline Edge Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Archive", outputs["archive"])
+    table.add_row("Install script", outputs["install_script"])
+    table.add_row("Install guide", outputs["install_guide"])
+    table.add_row("Package spec", outputs["package_spec"])
+    console.print(table)
+    console.print(f"Offline package: {outputs['package_spec']}", markup=False)
+
+
+@edge_app.command(name="study")
+def edge_study(
+    algo: Annotated[Path, typer.Option(help="Path to the algorithm Python file.")],
+    output_dir: Annotated[Path, typer.Option(help="Root directory for the Pi-generated study bundle.")] = Path("results/pi_study"),
+    preset: Annotated[str, typer.Option(help="Study preset: default or eucys.")] = "default",
+    profile_set: Annotated[str, typer.Option(help="Patient profile set to evaluate on the Pi.")] = DEFAULT_PROFILE_SET,
+    scenarios: Annotated[str, typer.Option(help="Optional comma-separated scenario slugs to run.")] = "",
+    seeds: Annotated[str, typer.Option(help="Comma-separated seed list.")] = "1,2,3,4,5",
+    duration: Annotated[Optional[int], typer.Option(help="Override scenario duration in minutes.")] = None,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes.")] = 5,
+    include_default_baselines: Annotated[
+        bool,
+        typer.Option("--include-default-baselines/--no-include-default-baselines", help="Include the default baseline registry in the Pi study matrix."),
+    ] = True,
+    extra_algorithms: Annotated[str, typer.Option(help="Comma-separated additional comparison algorithm labels.")] = "",
+    prepare_ai: Annotated[bool, typer.Option(help="Generate AI-ready artifacts for non-corrupted study arms.")] = False,
+) -> None:
+    console = Console()
+    parsed_seeds = [int(item.strip()) for item in seeds.split(",") if item.strip()]
+    if not parsed_seeds:
+        console.print("[bold red]Please provide at least one seed.[/bold red]")
+        raise typer.Exit(code=1)
+    started_at = time.time()
+    scenario_values = [item.strip() for item in scenarios.split(",") if item.strip()] or None
+    extra_algorithm_values = [item.strip() for item in extra_algorithms.split(",") if item.strip()] or None
+    try:
+        outputs = _run_study_bundle(
+            algo=algo,
+            output_dir=output_dir,
+            preset=preset.strip().lower(),
+            scenarios=scenario_values,
+            seeds=parsed_seeds,
+            duration=duration,
+            time_step=time_step,
+            carelink_metrics=None,
+            prepare_ai=prepare_ai,
+            reference_csv=None,
+            profile_set=profile_set,
+            include_default_baselines=include_default_baselines,
+            extra_algorithms=extra_algorithm_values,
+            external_reference_label="Edge-local study run",
+            gate_profile=None,
+            gate_profiles_path=None,
+            fail_on_gate=False,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Edge study failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    elapsed_seconds = round(time.time() - started_at, 3)
+    metadata = {
+        "kind": "edge_study",
+        "generated_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+        "python": sys.version,
+        "processor": platform.processor(),
+        "seed_count": len(parsed_seeds),
+        "seeds": parsed_seeds,
+        "preset": preset.strip().lower(),
+        "profile_set": profile_set,
+        "elapsed_seconds": elapsed_seconds,
+        "output_dir": str(Path(outputs["target_root"]).resolve()),
+    }
+    metadata_path = Path(outputs["target_root"]) / "edge_study_metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+    table = Table(title="IINTS Edge Study")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("Study root", str(outputs["target_root"]))
+    table.add_row("Protocol markdown", outputs["protocol_outputs"]["protocol_markdown"])
+    table.add_row("Study matrix", outputs["protocol_outputs"]["study_matrix_csv"])
+    table.add_row("Study summary", str(outputs["root_summary_json"]))
+    table.add_row("Edge metadata", str(metadata_path))
+    console.print(table)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Seeds: {', '.join(str(seed_value) for seed_value in parsed_seeds)}",
+                    f"Preset: {preset.strip().lower()}",
+                    f"Elapsed time: {elapsed_seconds:.3f}s",
+                    "This study bundle was generated directly on the current machine, which is useful for edge-hardware reproducibility claims.",
+                ]
+            ),
+            title="Edge Study Complete",
+            border_style="green",
+        )
+    )
+
+
+@edge_app.command(name="long-study")
+def edge_long_study(
+    config: Annotated[Path, typer.Option(help="YAML config describing the multi-day edge study.")],
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory that contains the algorithms folder and runtime scaffold.")] = Path("."),
+    resume: Annotated[bool, typer.Option(help="Resume from the next incomplete day by inspecting long_study_index.csv.")] = False,
+) -> None:
+    console = Console()
+    try:
+        outputs = run_edge_long_study(
+            config_path=config,
+            project_dir=project_dir,
+            resume=resume,
+            progress_callback=lambda message: console.print(f"[cyan]→[/cyan] {message}"),
+        )
+    except (LongStudyConfigError, FileNotFoundError, EdgeLongStudyExecutionError) as exc:
+        console.print(f"[bold red]Edge long study failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Edge Long Study")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path / Value", overflow="fold")
+    table.add_row("Project dir", outputs["project_dir"])
+    table.add_row("Study root", outputs["output_dir"])
+    table.add_row("Scratch dir", outputs["scratch_dir"])
+    table.add_row("Index CSV", outputs["index_csv"])
+    table.add_row("Summary JSON", outputs["summary_json"])
+    table.add_row("Progress JSON", outputs["progress_json"])
+    table.add_row("Export guide", outputs["export_readme"])
+    table.add_row("Completed runs", str(outputs["completed_runs"]))
+    table.add_row("Skipped existing", str(outputs["skipped_runs"]))
+    table.add_row("Resume start day", str(outputs["resume_start_day"]))
+    table.add_row("Elapsed time", f"{outputs['elapsed_seconds']:.3f}s")
+    console.print(table)
+
+    snapshots = outputs.get("snapshots", [])
+    snapshot_line = snapshots[-1]["archive"] if snapshots else "No snapshots were created."
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "The long-horizon study is stored as normal folders plus CSV/JSON manifests, so you can copy it off the Pi without touching the live runtime database.",
+                    f"Scratch-first writes: {outputs['scratch_dir']}",
+                    f"Latest snapshot: {snapshot_line}",
+                    f"Export command: iints edge study-export --project-dir {Path(project_dir).expanduser().resolve()} --input-dir {outputs['output_dir']} --output {Path(outputs['output_dir']) / 'long_study_export.zip'}",
+                ]
+            ),
+            title="Edge Long Study Complete",
+            border_style="green",
+        )
+    )
+
+
+@edge_app.command(name="study-snapshot")
+def edge_study_snapshot(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory used to resolve relative study paths.")] = Path("."),
+    input_dir: Annotated[Path, typer.Option(help="Long-study directory to snapshot.")] = Path("results/long_study"),
+    output: Annotated[Path, typer.Option(help="Output directory or .tar.gz path for the snapshot archive.")] = Path("snapshots"),
+) -> None:
+    console = Console()
+    project_root = project_dir.expanduser().resolve()
+    resolved_input = input_dir if input_dir.is_absolute() else (project_root / input_dir)
+    resolved_output = output if output.is_absolute() else (project_root / output)
+    try:
+        snapshot = create_edge_study_snapshot(resolved_input, output=resolved_output)
+    except (FileNotFoundError, OSError) as exc:
+        console.print(f"[bold red]Study snapshot failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Edge Study Snapshot")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Study input", snapshot.input_dir)
+    table.add_row("Snapshot archive", snapshot.archive)
+    table.add_row("Generated at", snapshot.generated_at_utc)
+    console.print(table)
+
+
+@edge_app.command(name="study-export")
+def edge_study_export(
+    project_dir: Annotated[Path, typer.Option(help="Edge project directory used to resolve relative study paths.")] = Path("."),
+    input_dir: Annotated[Path, typer.Option(help="Long-study directory to export.")] = Path("results/long_study"),
+    output: Annotated[Path, typer.Option(help="Zip archive written for transfer to another device.")] = Path("results/long_study_export.zip"),
+) -> None:
+    console = Console()
+    project_root = project_dir.expanduser().resolve()
+    resolved_input = input_dir if input_dir.is_absolute() else (project_root / input_dir)
+    resolved_output = output if output.is_absolute() else (project_root / output)
+    try:
+        exported = export_edge_study_archive(resolved_input, output=resolved_output)
+    except (FileNotFoundError, OSError) as exc:
+        console.print(f"[bold red]Study export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Edge Study Export")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("Study input", exported["input_dir"])
+    table.add_row("Export archive", exported["archive"])
+    table.add_row("Manifest", exported["manifest"])
+    console.print(table)
 
 
 @edge_app.command(name="doctor")
@@ -7316,6 +7711,88 @@ def edge_doctor(
 
     if failures:
         raise typer.Exit(code=1)
+
+
+@edge_app.command(name="remote-status")
+def edge_remote_status(
+    host: Annotated[str, typer.Option(help="Remote Raspberry Pi hostname or IP address.")],
+    user_name: Annotated[Optional[str], typer.Option("--user", help="Optional remote SSH username.")] = None,
+    ssh_port: Annotated[int, typer.Option(help="SSH port used for the remote Raspberry Pi.")] = 22,
+    remote_dir: Annotated[str, typer.Option(help="Target project directory on the Raspberry Pi.")] = "~/iints_pi_demo",
+    ssh_timeout_seconds: Annotated[float, typer.Option(help="Timeout per remote SSH step in seconds.")] = 60.0,
+    ssh_retries: Annotated[int, typer.Option(help="How many times to retry a failing SSH step before giving up.")] = 0,
+) -> None:
+    console = Console()
+    try:
+        payload = run_remote_edge_command(
+            host=host,
+            user_name=user_name,
+            ssh_port=ssh_port,
+            remote_dir=remote_dir,
+            action="status",
+            timeout_seconds=ssh_timeout_seconds,
+            retries=ssh_retries,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Remote status failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print(payload["stdout"])
+
+
+@edge_app.command(name="remote-reset")
+def edge_remote_reset(
+    host: Annotated[str, typer.Option(help="Remote Raspberry Pi hostname or IP address.")],
+    user_name: Annotated[Optional[str], typer.Option("--user", help="Optional remote SSH username.")] = None,
+    ssh_port: Annotated[int, typer.Option(help="SSH port used for the remote Raspberry Pi.")] = 22,
+    remote_dir: Annotated[str, typer.Option(help="Target project directory on the Raspberry Pi.")] = "~/iints_pi_demo",
+    scenario_profile: Annotated[Optional[str], typer.Option(help="Optional profile to load after reset.")] = None,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override for the reset profile.")] = None,
+    ssh_timeout_seconds: Annotated[float, typer.Option(help="Timeout per remote SSH step in seconds.")] = 60.0,
+    ssh_retries: Annotated[int, typer.Option(help="How many times to retry a failing SSH step before giving up.")] = 0,
+) -> None:
+    console = Console()
+    try:
+        payload = run_remote_edge_command(
+            host=host,
+            user_name=user_name,
+            ssh_port=ssh_port,
+            remote_dir=remote_dir,
+            action="reset",
+            scenario_profile=scenario_profile,
+            seed=seed,
+            timeout_seconds=ssh_timeout_seconds,
+            retries=ssh_retries,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Remote reset failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print(payload["stdout"] or "[green]Remote reset command sent.[/green]")
+
+
+@edge_app.command(name="remote-stop")
+def edge_remote_stop(
+    host: Annotated[str, typer.Option(help="Remote Raspberry Pi hostname or IP address.")],
+    user_name: Annotated[Optional[str], typer.Option("--user", help="Optional remote SSH username.")] = None,
+    ssh_port: Annotated[int, typer.Option(help="SSH port used for the remote Raspberry Pi.")] = 22,
+    remote_dir: Annotated[str, typer.Option(help="Target project directory on the Raspberry Pi.")] = "~/iints_pi_demo",
+    ssh_timeout_seconds: Annotated[float, typer.Option(help="Timeout per remote SSH step in seconds.")] = 60.0,
+    ssh_retries: Annotated[int, typer.Option(help="How many times to retry a failing SSH step before giving up.")] = 0,
+) -> None:
+    console = Console()
+    try:
+        payload = run_remote_edge_command(
+            host=host,
+            user_name=user_name,
+            ssh_port=ssh_port,
+            remote_dir=remote_dir,
+            action="stop",
+            timeout_seconds=ssh_timeout_seconds,
+            retries=ssh_retries,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Remote stop failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print(payload["stdout"] or "[green]Remote stop command sent.[/green]")
 
 
 @edge_app.command(name="up")

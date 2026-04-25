@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import sys
 from pathlib import Path
 
@@ -240,6 +241,7 @@ def makerfaire_install_script_text(*, service_name: str) -> str:
             'WATCHDOG_SERVICE_SRC="$ROOT/${WATCHDOG_NAME}.service"',
             'WATCHDOG_TIMER_SRC="$ROOT/${WATCHDOG_NAME}.timer"',
             'DESKTOP_SRC="$ROOT/iints-makerfaire-kiosk.desktop"',
+            'BRIDGE_SERVICE_SRC="$ROOT/iints-uno-q-bridge.service"',
             'AUTOSTART_DIR="$HOME/.config/autostart"',
             "",
             'if [ ! -f "$SERVICE_SRC" ]; then',
@@ -268,6 +270,15 @@ def makerfaire_install_script_text(*, service_name: str) -> str:
             'sudo systemctl restart "${SERVICE_NAME}.service"',
             'sudo systemctl enable "${WATCHDOG_NAME}.timer"',
             'sudo systemctl restart "${WATCHDOG_NAME}.timer"',
+            "",
+            'if [ -f "$BRIDGE_SERVICE_SRC" ]; then',
+            '  echo "Installing optional UNO Q bridge service..."',
+            '  BRIDGE_SERVICE_NAME="$(basename "$BRIDGE_SERVICE_SRC")"',
+            '  sudo cp "$BRIDGE_SERVICE_SRC" "/etc/systemd/system/${BRIDGE_SERVICE_NAME}"',
+            "  sudo systemctl daemon-reload",
+            '  sudo systemctl enable "${BRIDGE_SERVICE_NAME}"',
+            '  sudo systemctl restart "${BRIDGE_SERVICE_NAME}"',
+            "fi",
             "",
             'echo "Installing desktop autostart entry..."',
             'mkdir -p "$AUTOSTART_DIR"',
@@ -468,4 +479,100 @@ def write_makerfaire_autostart_artifacts(
         "watchdog_service": str(watchdog_service_path),
         "watchdog_timer": str(watchdog_timer_path),
         "guide": str(guide_path),
+    }
+
+
+def uno_q_bridge_service_text(
+    *,
+    project_root: Path,
+    user_name: str,
+    cli_path: str,
+    port: str,
+    baudrate: int,
+    workspace_name: str = "patient_runtime",
+    service_name: str = "iints-uno-q-bridge",
+    patient_service_name: str = "iints-digital-patient",
+) -> str:
+    quoted_root = shlex.quote(str(project_root))
+    quoted_cli = shlex.quote(cli_path)
+    quoted_port = shlex.quote(port)
+    return "\n".join(
+        [
+            "[Unit]",
+            f"Description=IINTS UNO Q Bridge ({service_name})",
+            f"After={patient_service_name}.service",
+            f"Requires={patient_service_name}.service",
+            "",
+            "[Service]",
+            "Type=simple",
+            f"User={user_name}",
+            f"WorkingDirectory={project_root}",
+            "Environment=PYTHONUNBUFFERED=1",
+            "ExecStart=/bin/bash -lc "
+            + f"\"cd {quoted_root} && {quoted_cli} edge bridge-run --project-dir . --workspace-name {workspace_name} --port {quoted_port} --baudrate {baudrate}\"",
+            "Restart=always",
+            "RestartSec=2",
+            "KillSignal=SIGINT",
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target",
+            "",
+        ]
+    )
+
+
+def uno_q_bridge_service_instructions_text(service_path: Path, service_name: str) -> str:
+    return "\n".join(
+        [
+            "Copy this UNO Q bridge service onto the device systemd path:",
+            f"  sudo cp {service_path} /etc/systemd/system/{service_name}.service",
+            "Reload, enable, and start it:",
+            "  sudo systemctl daemon-reload",
+            f"  sudo systemctl enable {service_name}.service",
+            f"  sudo systemctl start {service_name}.service",
+            "Check status:",
+            f"  systemctl status {service_name}.service",
+        ]
+    )
+
+
+def write_uno_q_bridge_service_artifact(
+    *,
+    project_root: Path,
+    output_path: Path,
+    user_name: str,
+    cli_path: str | Path,
+    port: str,
+    baudrate: int,
+    workspace_name: str = "patient_runtime",
+    service_name: str = "iints-uno-q-bridge",
+    patient_service_name: str = "iints-digital-patient",
+) -> dict[str, str]:
+    target_path = output_path.expanduser().resolve()
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_root = project_root.expanduser().resolve()
+    resolved_cli = str(Path(cli_path).expanduser().resolve()) if str(cli_path) != "iints" else "iints"
+    target_path.write_text(
+        uno_q_bridge_service_text(
+            project_root=resolved_root,
+            user_name=user_name,
+            cli_path=resolved_cli,
+            port=port,
+            baudrate=baudrate,
+            workspace_name=workspace_name,
+            service_name=service_name,
+            patient_service_name=patient_service_name,
+        ),
+        encoding="utf-8",
+    )
+    instructions_path = target_path.with_suffix(".INSTALL.txt")
+    instructions_path.write_text(
+        uno_q_bridge_service_instructions_text(target_path, service_name),
+        encoding="utf-8",
+    )
+    return {
+        "service_file": str(target_path),
+        "install_notes": str(instructions_path),
+        "service_name": service_name,
+        "port": port,
     }

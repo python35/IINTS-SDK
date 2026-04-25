@@ -92,6 +92,18 @@ class RuntimeScenarioProfile:
 
 def _scenario_profiles() -> dict[str, RuntimeScenarioProfile]:
     return {
+        "school_day": RuntimeScenarioProfile(
+            name="school_day",
+            description="Structured weekday rhythm with breakfast, lunch, and dinner around a typical school schedule.",
+            default_seed=1001,
+            templates=(
+                DailyEventTemplate(minute_of_day=435, event_type="meal", value=46.0, label="Early breakfast"),
+                DailyEventTemplate(minute_of_day=720, event_type="meal", value=68.0, label="School lunch"),
+                DailyEventTemplate(minute_of_day=1095, event_type="meal", value=78.0, label="Family dinner"),
+                DailyEventTemplate(minute_of_day=1285, event_type="meal", value=14.0, label="Homework snack"),
+            ),
+            reset_note="School-day reset complete.",
+        ),
         "normal_day": RuntimeScenarioProfile(
             name="normal_day",
             description="Balanced school-day profile with breakfast, lunch walk, dinner, and a stable daytime rhythm.",
@@ -167,6 +179,18 @@ def _scenario_profiles() -> dict[str, RuntimeScenarioProfile]:
             warmup_history_limit=96,
             require_recent_override=True,
             reset_note="Expo reset complete. The patient was warm-started mid-challenge.",
+        ),
+        "relaxed_day": RuntimeScenarioProfile(
+            name="relaxed_day",
+            description="Softer weekend schedule with a later breakfast, lighter daytime pace, and a calmer evening profile.",
+            default_seed=6606,
+            templates=(
+                DailyEventTemplate(minute_of_day=540, event_type="meal", value=44.0, label="Late breakfast"),
+                DailyEventTemplate(minute_of_day=825, event_type="meal", value=58.0, label="Weekend lunch"),
+                DailyEventTemplate(minute_of_day=1110, event_type="meal", value=70.0, label="Relaxed dinner"),
+                DailyEventTemplate(minute_of_day=1230, event_type="exercise", value=0.20, duration=25, label="Easy evening walk"),
+            ),
+            reset_note="Relaxed-day reset complete.",
         ),
     }
 

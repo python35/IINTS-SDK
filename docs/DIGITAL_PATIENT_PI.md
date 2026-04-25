@@ -10,6 +10,7 @@ The Raspberry Pi digital-patient workflow gives you:
 - optional auto-start through `systemd`
 
 If your main goal is a booth-ready startup routine, jump to [Maker Faire Pi Mode](MAKERFAIRE_PI.md).
+If your main goal is preparing a Pi remotely from your laptop, jump to [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md).
 
 ## Recommended Hardware
 
@@ -34,6 +35,12 @@ Common commands:
 ```bash
 iints edge doctor --board raspberry_pi
 iints edge setup --board raspberry_pi
+iints edge deploy --host raspberrypi.local --user pi
+iints edge offline-bundle --output iints_offline.tar.gz
+iints edge study --algo algorithms/example_algorithm.py --seeds 1,2,3,4,5
+iints edge long-study --config edge_long_study.yaml --project-dir .
+iints edge study-snapshot --project-dir . --input-dir results/long_study
+iints edge study-export --project-dir . --input-dir results/long_study --output results/long_study_export.zip
 iints edge up
 iints edge status
 iints edge kiosk
@@ -76,6 +83,114 @@ That starts:
 - the local dashboard API
 - a run-like bundle under `patient_runtime/live_bundle/`
 - a fullscreen-friendly kiosk view at `/kiosk`
+
+## Offline Install Bundle
+
+If the venue Wi-Fi is unreliable, create a USB-friendly offline bundle ahead of time:
+
+```bash
+iints edge offline-bundle --output iints_offline.tar.gz
+```
+
+That bundle contains:
+
+- a wheelhouse with the edge SDK and dependency wheels
+- an `install_offline_edge.sh` installer
+- a ready-to-run edge project scaffold
+
+Generate it on a machine with internet access first, then move the tarball to the Pi over USB.
+
+## Multi-Seed Study On The Pi
+
+You can now generate a reproducible study bundle directly on the Pi itself:
+
+```bash
+iints edge study \
+  --algo algorithms/example_algorithm.py \
+  --seeds 1,2,3,4,5 \
+  --output-dir results/pi_study
+```
+
+That writes:
+
+- a full study bundle
+- a protocol matrix
+- aggregated study summaries
+- `edge_study_metadata.json` describing the machine that generated the results
+
+## Multi-Week Long Study On The Pi
+
+If you want the Pi to act as an autonomous research rig for days or weeks, use the generated YAML config from `iints edge setup`:
+
+```bash
+iints edge long-study \
+  --project-dir . \
+  --config edge_long_study.yaml
+```
+
+If the Pi reboots in the middle of the study, resume from the next incomplete day:
+
+```bash
+iints edge long-study \
+  --project-dir . \
+  --config edge_long_study.yaml \
+  --resume
+```
+
+That flow gives you:
+
+- rolling weekday/weekend scenario profiles across multiple days
+- nested file-based outputs under `results/long_study/`
+- local snapshots under `results/long_study/snapshots/`
+- export-friendly CSV and JSON artifacts instead of locking the study into a single database file
+- scratch-first writes under `/tmp` before the day is synced to the final output location
+
+For the safest long studies, keep the OS on the Pi SD card but point the study output itself at a USB SSD:
+
+```yaml
+output_dir: /media/pi/usb_ssd/results/long_study
+scratch_dir: /tmp/iints_edge_long_study
+```
+
+Typical generated layout:
+
+```text
+results/long_study/
+  protocol/
+  days/
+  snapshots/
+  algorithms/<algorithm>/seed_<seed>/day_<nn>_<profile>/
+  long_study_index.csv
+  study_summary.json
+```
+
+The default template includes realistic weekly variation such as:
+
+- `school_day`
+- `sport_day`
+- `bad_carb_count`
+- `relaxed_day`
+
+Create an extra snapshot whenever you want:
+
+```bash
+iints edge study-snapshot --project-dir . --input-dir results/long_study
+```
+
+Package the whole study for another device:
+
+```bash
+iints edge study-export \
+  --project-dir . \
+  --input-dir results/long_study \
+  --output results/long_study_export.zip
+```
+
+Analyze the copied study later on your laptop:
+
+```bash
+iints analyze results/long_study
+```
 
 Security defaults:
 
@@ -204,9 +319,11 @@ Recommendation:
 
 Built-in profiles:
 - `normal_day`
+- `school_day`
 - `sport_day`
 - `bad_carb_count`
 - `night_hypo_risk`
+- `relaxed_day`
 - `expo_hot_start`
 
 The first four represent general study or demo days.

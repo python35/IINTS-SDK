@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import json
+import tarfile
 import zipfile
 from pathlib import Path
 
-from iints.live_patient.edge_ops import create_edge_bundle, export_edge_setup, summarize_edge_workspace
+from iints.live_patient.edge_ops import (
+    build_edge_offline_bundle,
+    create_edge_bundle,
+    deploy_edge_project,
+    export_edge_setup,
+    summarize_edge_workspace,
+)
 from iints.live_patient.runtime import PatientRuntimeStore
 
 
@@ -75,7 +82,7 @@ def test_create_edge_bundle_writes_zip_with_summary(tmp_path) -> None:
 
 def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     output_dir = tmp_path / "edge_demo"
-    outputs = export_edge_setup(output_dir, board="uno_q", include_uno_bridge=True)
+    outputs = export_edge_setup(output_dir, board="uno_q", include_uno_bridge=True, uno_bridge_port="/dev/ttyACM0")
 
     assert Path(outputs["algorithm"]).is_file()
     assert Path(outputs["run_script"]).is_file()
@@ -90,9 +97,13 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert Path(outputs["makerfaire_watchdog_service"]).is_file()
     assert Path(outputs["makerfaire_watchdog_timer"]).is_file()
     assert Path(outputs["makerfaire_checklist"]).is_file()
+    assert Path(outputs["remote_access_guide"]).is_file()
+    assert Path(outputs["long_study_template"]).is_file()
     assert Path(outputs["service_file"]).is_file()
     assert Path(outputs["setup_guide"]).is_file()
     assert Path(outputs["uno_q_bridge"]).is_dir()
+    assert Path(outputs["uno_bridge_service"]).is_file()
+    assert Path(outputs["uno_bridge_service_notes"]).is_file()
     guide_text = Path(outputs["setup_guide"]).read_text(encoding="utf-8")
     assert "iints edge up --project-dir ." in guide_text
     assert "iints edge bridge-run --project-dir . --port /dev/ttyACM0" in guide_text
@@ -114,3 +125,66 @@ def test_export_edge_setup_scaffolds_project(tmp_path) -> None:
     assert "makerfaire watchdog" in watchdog_script_text
     checklist_text = Path(outputs["makerfaire_checklist"]).read_text(encoding="utf-8")
     assert "Day Before The Event" in checklist_text
+    remote_text = Path(outputs["remote_access_guide"]).read_text(encoding="utf-8")
+    assert "Raspberry Pi Connect" in remote_text
+    long_study_text = Path(outputs["long_study_template"]).read_text(encoding="utf-8")
+    assert "duration_days: 14" in long_study_text
+    assert "relaxed_day" in long_study_text
+    assert "output_dir: /media/pi/usb_ssd/results/long_study" in long_study_text
+    assert "scratch_dir: /tmp/iints_edge_long_study" in long_study_text
+    bridge_service_text = Path(outputs["uno_bridge_service"]).read_text(encoding="utf-8")
+    assert "edge bridge-run" in bridge_service_text
+    assert "/dev/ttyACM0" in bridge_service_text
+
+
+def test_deploy_edge_project_runs_expected_remote_steps(monkeypatch, tmp_path) -> None:
+    calls: list[dict[str, object]] = []
+
+    def _fake_run_process(command: list[str], *, step: str, timeout_seconds: float = 300.0, retries: int = 0) -> str:
+        calls.append({"command": command, "step": step, "timeout_seconds": timeout_seconds, "retries": retries})
+        return "ok"
+
+    monkeypatch.setattr("iints.live_patient.edge_ops._run_process", _fake_run_process)
+
+    payload = deploy_edge_project(
+        host="pi.local",
+        user_name="pi",
+        ssh_port=2222,
+        remote_dir="~/booth_demo",
+        local_output_dir=tmp_path / "edge_demo",
+        board="uno_q",
+        scenario_profile="expo_hot_start",
+        uno_bridge_port="/dev/ttyACM0",
+        install_autostart=True,
+        start_runtime=True,
+    )
+
+    assert payload["destination"] == "pi@pi.local"
+    assert payload["remote_dir"] == "~/booth_demo"
+    assert "uno_bridge_service" in payload["artifacts"]
+    joined_commands = [" ".join(str(part) for part in call["command"]) for call in calls]
+    assert any(command.startswith("ssh -p 2222 pi@pi.local") for command in joined_commands)
+    assert any("iints edge setup --output-dir \"$REMOTE_DIR\" --board uno_q" in command for command in joined_commands)
+    assert any("./install_makerfaire_autostart.sh" in command for command in joined_commands)
+    assert any("iints makerfaire up --project-dir . --scenario-profile expo_hot_start" in command for command in joined_commands)
+    assert any(call["retries"] == 1 for call in calls)
+
+
+def test_build_edge_offline_bundle_writes_tarball(monkeypatch, tmp_path) -> None:
+    def _fake_run_process(command: list[str], *, step: str, timeout_seconds: float = 300.0, retries: int = 0, cwd: Path | None = None) -> str:
+        wheel_dir = Path(command[command.index("--wheel-dir") + 1])
+        wheel_dir.mkdir(parents=True, exist_ok=True)
+        (wheel_dir / "iints_sdk_python35-1.5.3-py3-none-any.whl").write_text("wheel", encoding="utf-8")
+        return "ok"
+
+    monkeypatch.setattr("iints.live_patient.edge_ops._run_process", _fake_run_process)
+
+    bundle_path = tmp_path / "iints_offline.tar.gz"
+    outputs = build_edge_offline_bundle(bundle_path, board="raspberry_pi")
+
+    assert Path(outputs["archive"]).is_file()
+    with tarfile.open(bundle_path, "r:gz") as archive:
+        names = set(archive.getnames())
+        assert "iints_offline/install_offline_edge.sh" in names
+        assert "iints_offline/OFFLINE_INSTALL.md" in names
+        assert "iints_offline/edge_project/EDGE_SETUP.md" in names

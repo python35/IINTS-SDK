@@ -54,6 +54,7 @@ nav:
   - Edge & Deployment:
       - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
+      - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
       - Maker Faire Pi Checklist: MAKERFAIRE_PI_CHECKLIST.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
@@ -75,9 +76,10 @@ nav:
       - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Release Notes:
-      - Latest (v1.5.3): releases/v1.5.3.md
+      - Latest (v1.5.4): releases/v1.5.4.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.3: releases/v1.5.3.md
           - v1.5.1: releases/v1.5.1.md
           - v1.5.0: releases/v1.5.0.md
           - v1.4.0: releases/v1.4.0.md

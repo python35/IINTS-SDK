@@ -139,10 +139,12 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None,
       </div>
       <div class="section-title">Scenario shortcuts</div>
       <div class="controls">
+        <button data-scenario="school_day">School day</button>
         <button data-scenario="normal_day">Normal day</button>
         <button data-scenario="sport_day">Sport day</button>
         <button data-scenario="bad_carb_count">Bad carb count</button>
         <button data-scenario="night_hypo_risk">Night hypo risk</button>
+        <button data-scenario="relaxed_day">Relaxed day</button>
         <button class="warn" data-scenario="expo_hot_start">Expo hot start</button>
       </div>
       <div class="status-note" id="status-note"></div>

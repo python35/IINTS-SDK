@@ -18,6 +18,18 @@ iints edge setup --output-dir iints_pi_demo --board raspberry_pi --scenario-prof
 cd iints_pi_demo
 ```
 
+If you are preparing the Pi from another machine, you can now do the scaffold + sync + install in one command:
+
+```bash
+iints edge deploy \
+  --host raspberrypi.local \
+  --user pi \
+  --local-output-dir iints_pi_demo \
+  --remote-dir ~/iints_pi_demo \
+  --board raspberry_pi \
+  --scenario-profile expo_hot_start
+```
+
 Then use the Maker Faire startup command:
 
 ```bash

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import json
+import shlex
 import shutil
 import stat
+import subprocess
+import sys
+import tarfile
+import tempfile
 import zipfile
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 try:
     from importlib.metadata import PackageNotFoundError, version
@@ -15,15 +20,26 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
     from importlib_metadata import PackageNotFoundError, version  # type: ignore
 
 from .runtime import PatientRuntimeConfig, get_runtime_scenario_profile, is_process_alive, load_runtime_status
-from .service_export import write_makerfaire_autostart_artifacts, write_service_artifacts
-from .uno_q import export_uno_q_bridge
+from .service_export import (
+    write_makerfaire_autostart_artifacts,
+    write_service_artifacts,
+    write_uno_q_bridge_service_artifact,
+)
+from .long_study import render_edge_long_study_config_template
+from .uno_q import UNO_Q_BRIDGE_BAUDRATE, export_uno_q_bridge
 
 
 def _sdk_version() -> str:
     try:
         return version("iints-sdk-python35")
     except PackageNotFoundError:  # pragma: no cover - source tree fallback
-        return "source"
+        import iints as iints_sdk
+
+        return getattr(iints_sdk, "__version__", "source")
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
 
 
 def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
@@ -230,6 +246,170 @@ def write_edge_update_script(
     return path
 
 
+def _shell_join(parts: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in parts)
+
+
+def _ssh_destination(host: str, user_name: str | None = None) -> str:
+    return f"{user_name}@{host}" if user_name else host
+
+
+def _ssh_command(destination: str, *, port: int, remote_command: str) -> list[str]:
+    command = ["ssh"]
+    if port != 22:
+        command.extend(["-p", str(port)])
+    command.extend([destination, "bash", "-lc", remote_command])
+    return command
+
+
+def _remote_path_expr(path: str) -> str:
+    stripped = path.strip()
+    if stripped == "~":
+        return "$HOME"
+    if stripped.startswith("~/"):
+        return "$HOME/" + stripped[2:]
+    return shlex.quote(stripped)
+
+
+def _run_process(
+    command: list[str],
+    *,
+    step: str,
+    timeout_seconds: float = 300.0,
+    retries: int = 0,
+    cwd: Path | None = None,
+) -> str:
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            result = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+                cwd=str(cwd) if cwd is not None else None,
+            )
+            return (result.stdout or "").strip()
+        except FileNotFoundError as exc:
+            raise RuntimeError(f"{step} failed because `{command[0]}` is not installed or not on PATH.") from exc
+        except subprocess.TimeoutExpired as exc:
+            if attempt <= retries + 1:
+                if attempt <= retries:
+                    continue
+            raise RuntimeError(
+                f"{step} timed out after {timeout_seconds:.0f}s. "
+                "Check the hostname, SSH reachability, and whether the Pi is still online."
+            ) from exc
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "").strip()
+            stdout = (exc.stdout or "").strip()
+            detail = stderr or stdout or f"exit code {exc.returncode}"
+            if attempt <= retries:
+                continue
+            raise RuntimeError(f"{step} failed: {detail}") from exc
+
+
+def _raspberry_pi_connect_notes(project_root: Path) -> str:
+    return "\n".join(
+        [
+            "# Remote Access",
+            "",
+            "The safest remote presentation path for Raspberry Pi is Raspberry Pi Connect.",
+            "",
+            "## Recommended remote workflow",
+            "",
+            "1. Keep the IINTS dashboard bound to `127.0.0.1` on the Pi.",
+            "2. Use Raspberry Pi Connect screen sharing for the kiosk or desktop.",
+            "3. Use Raspberry Pi Connect remote shell or SSH for maintenance commands.",
+            "4. Only expose the dashboard API to the network if another machine truly must call it directly.",
+            "",
+            "## Raspberry Pi Connect checklist",
+            "",
+            "- `rpi-connect status`",
+            "- `rpi-connect shell on`",
+            "- `rpi-connect vnc on`",
+            "- `loginctl enable-linger`",
+            "",
+            "If screen sharing is unavailable after reboot, enable Desktop Autologin in Raspberry Pi OS.",
+            "",
+            "## Remote project root",
+            "",
+            f"`{project_root}`",
+            "",
+            "## One-command booth start on the Pi",
+            "",
+            "```bash",
+            "./start_makerfaire_patient.sh",
+            "```",
+            "",
+            "## Optional remote maintenance",
+            "",
+            "- `iints edge status --project-dir .`",
+            "- `iints edge reset --project-dir .`",
+            "- `iints edge stop --project-dir .`",
+            "- `iints makerfaire watchdog --project-dir .`",
+            "",
+        ]
+    )
+
+
+def _render_edge_offline_install_script(*, package_spec: str) -> str:
+    return "\n".join(
+        [
+            "#!/usr/bin/env bash",
+            "set -euo pipefail",
+            'ROOT="$(cd "$(dirname "$0")" && pwd)"',
+            'cd "$ROOT"',
+            'python3 -m venv .venv',
+            'source .venv/bin/activate',
+            'python -m pip install -U pip',
+            f'python -m pip install --no-index --find-links "$ROOT/wheelhouse" "{package_spec}"',
+            "",
+            'echo ""',
+            'echo "[IINTS] Offline edge environment is ready."',
+            'echo "[IINTS] Project scaffold: $ROOT/edge_project"',
+            'echo "[IINTS] Next step: cd $ROOT/edge_project"',
+            'echo "[IINTS] Then run: iints makerfaire up --project-dir ."',
+            "",
+        ]
+    )
+
+
+def _render_edge_offline_install_guide(*, bundle_root_name: str, package_spec: str, board: str) -> str:
+    return "\n".join(
+        [
+            "# Offline Edge Install",
+            "",
+            "Use this bundle when the venue Wi-Fi is unreliable and you need a USB-stick install path.",
+            "",
+            "## What is inside",
+            "",
+            "- `wheelhouse/` with the SDK wheel and dependency wheels",
+            f"- `{bundle_root_name}/edge_project/` with a ready-to-run project scaffold",
+            "- `install_offline_edge.sh` to create a virtual environment and install the SDK without internet",
+            "",
+            "## Install on the Raspberry Pi",
+            "",
+            "```bash",
+            "tar -xzf iints_offline.tar.gz",
+            f"cd {bundle_root_name}",
+            "./install_offline_edge.sh",
+            "source .venv/bin/activate",
+            "cd edge_project",
+            "iints makerfaire up --project-dir .",
+            "```",
+            "",
+            f"Offline package spec: `{package_spec}`",
+            f"Board profile baked into the scaffold: `{board}`",
+            "",
+            "If you are using Raspberry Pi Connect, keep the dashboard on `127.0.0.1` and present it through screen sharing instead of opening the API to the LAN.",
+            "",
+        ]
+    )
+
+
 def _render_default_algorithm(algo_name: str, author_name: str) -> str:
     template = files("iints.templates").joinpath("default_algorithm.py").read_text(encoding="utf-8")
     return template.replace("{{ALGO_NAME}}", algo_name).replace("{{AUTHOR_NAME}}", author_name)
@@ -251,6 +431,9 @@ def export_edge_setup(
     service_name: str = "iints-digital-patient",
     user_name: str | None = None,
     include_uno_bridge: bool = False,
+    uno_bridge_port: str | None = None,
+    uno_bridge_baudrate: int = UNO_Q_BRIDGE_BAUDRATE,
+    uno_bridge_service_name: str = "iints-uno-q-bridge",
 ) -> dict[str, str]:
     root = Path(output_dir).expanduser().resolve()
     algorithms_dir = root / "algorithms"
@@ -350,6 +533,7 @@ def export_edge_setup(
         user_name=service_paths["user_name"],
         cli_path=Path(service_paths["python_path"]).with_name("iints"),
     )
+    bridge_service_outputs: dict[str, str] | None = None
 
     if board == "uno_q":
         guide_lines = [
@@ -446,6 +630,13 @@ def export_edge_setup(
             "",
             f"- Service file: `{service_paths['service_file']}`",
             f"- Install notes: `{service_paths['install_notes']}`",
+            *(
+                [
+                    f"- UNO Q bridge service: `./{uno_bridge_service_name}.service`",
+                ]
+                if uno_bridge_port
+                else []
+            ),
             "",
             "## Update edge runtime",
             "",
@@ -460,6 +651,8 @@ def export_edge_setup(
             "- `iints edge reset --project-dir .`",
             "- `iints edge stop --project-dir .`",
             "- `iints edge bundle --project-dir . --output edge_bundle.zip`",
+            "- `iints edge long-study --project-dir . --config edge_long_study.yaml`",
+            "- `iints edge study-export --project-dir . --input-dir results/long_study --output results/long_study_export.zip`",
             "",
         ]
     else:
@@ -501,8 +694,21 @@ def export_edge_setup(
             "- `iints edge stop --project-dir .`",
             "- `iints edge service --project-dir .`",
             "- `iints edge bundle --project-dir . --output edge_bundle.zip`",
+            "- `iints edge long-study --project-dir . --config edge_long_study.yaml`",
+            "- `iints edge study-export --project-dir . --input-dir results/long_study --output results/long_study_export.zip`",
             "",
         ]
+        if uno_bridge_port:
+            guide_lines.extend(
+                [
+                    "## Optional UNO Q bridge",
+                    "",
+                    f"- generated service: `./{uno_bridge_service_name}.service`",
+                    f"- fixed serial port: `{uno_bridge_port}`",
+                    "- install it through `./install_makerfaire_autostart.sh` after you confirm the board is connected on the Pi",
+                    "",
+                ]
+            )
 
     setup_guide = root / "EDGE_SETUP.md"
     setup_guide.write_text("\n".join(guide_lines) + "\n", encoding="utf-8")
@@ -636,6 +842,15 @@ def export_edge_setup(
         encoding="utf-8",
     )
 
+    remote_access_guide = root / "EDGE_REMOTE_ACCESS.md"
+    remote_access_guide.write_text(_raspberry_pi_connect_notes(root) + "\n", encoding="utf-8")
+
+    long_study_template = root / "edge_long_study.yaml"
+    long_study_template.write_text(
+        render_edge_long_study_config_template(),
+        encoding="utf-8",
+    )
+
     outputs = {
         "root": str(root),
         "algorithm": str(algo_path),
@@ -653,6 +868,8 @@ def export_edge_setup(
         "makerfaire_watchdog_service": makerfaire_autostart["watchdog_service"],
         "makerfaire_watchdog_timer": makerfaire_autostart["watchdog_timer"],
         "makerfaire_checklist": str(makerfaire_checklist),
+        "remote_access_guide": str(remote_access_guide),
+        "long_study_template": str(long_study_template),
         "update_script": str(update_script),
         "service_file": service_paths["service_file"],
         "service_notes": service_paths["install_notes"],
@@ -662,5 +879,343 @@ def export_edge_setup(
     if board == "uno_q" or include_uno_bridge:
         bridge = export_uno_q_bridge(root / "uno_q_bridge")
         outputs["uno_q_bridge"] = bridge["output_dir"]
+        if uno_bridge_port:
+            bridge_service_outputs = write_uno_q_bridge_service_artifact(
+                project_root=root,
+                output_path=root / f"{uno_bridge_service_name}.service",
+                user_name=service_paths["user_name"],
+                cli_path=Path(service_paths["python_path"]).with_name("iints"),
+                port=uno_bridge_port,
+                baudrate=uno_bridge_baudrate,
+                workspace_name=workspace_name,
+                service_name=uno_bridge_service_name,
+                patient_service_name=service_name,
+            )
+            outputs["uno_bridge_service"] = bridge_service_outputs["service_file"]
+            outputs["uno_bridge_service_notes"] = bridge_service_outputs["install_notes"]
 
     return outputs
+
+
+def deploy_edge_project(
+    *,
+    host: str,
+    user_name: str | None = None,
+    ssh_port: int = 22,
+    remote_dir: str = "~/iints_pi_demo",
+    local_output_dir: str | Path = "iints_pi_demo",
+    board: str = "raspberry_pi",
+    workspace_name: str = "patient_runtime",
+    scenario_profile: str = "expo_hot_start",
+    patient_config: str = "default_patient",
+    patient_model_type: str = "auto",
+    mode: str = "demo-time",
+    speed: float = 60.0,
+    api_host: str = "127.0.0.1",
+    api_port: int = 8765,
+    seed: int | None = None,
+    service_name: str = "iints-digital-patient",
+    include_uno_bridge: bool = False,
+    uno_bridge_port: str | None = None,
+    uno_bridge_baudrate: int = UNO_Q_BRIDGE_BAUDRATE,
+    uno_bridge_service_name: str = "iints-uno-q-bridge",
+    install_autostart: bool = True,
+    start_runtime: bool = True,
+    enable_connect_linger: bool = True,
+    flash_uno_bridge: bool = False,
+    uno_fqbn: str | None = None,
+    arduino_cli: str = "arduino-cli",
+    dry_run: bool = False,
+    ssh_timeout_seconds: float = 300.0,
+    ssh_retries: int = 1,
+    progress_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    if progress_callback is not None:
+        progress_callback("Writing local edge scaffold")
+    local_root = Path(local_output_dir).expanduser().resolve()
+    outputs = export_edge_setup(
+        local_root,
+        board=board,
+        workspace_name=workspace_name,
+        scenario_profile=scenario_profile,
+        patient_config=patient_config,
+        patient_model_type=patient_model_type,
+        mode=mode,
+        speed=speed,
+        api_host=api_host,
+        api_port=api_port,
+        seed=seed,
+        service_name=service_name,
+        user_name=user_name,
+        include_uno_bridge=include_uno_bridge or board == "uno_q" or uno_bridge_port is not None,
+        uno_bridge_port=uno_bridge_port,
+        uno_bridge_baudrate=uno_bridge_baudrate,
+        uno_bridge_service_name=uno_bridge_service_name,
+    )
+
+    destination = _ssh_destination(host, user_name)
+    remote_project_dir = remote_dir.rstrip("/")
+    remote_dir_expr = _remote_path_expr(remote_project_dir)
+
+    setup_parts = [
+        "iints",
+        "edge",
+        "setup",
+        "--output-dir",
+        "__REMOTE_DIR__",
+        "--board",
+        board,
+        "--workspace-name",
+        workspace_name,
+        "--scenario-profile",
+        scenario_profile,
+        "--patient-config",
+        patient_config,
+        "--patient-model",
+        patient_model_type,
+        "--mode",
+        mode,
+        "--speed",
+        f"{speed:g}x",
+        "--api-host",
+        api_host,
+        "--api-port",
+        str(api_port),
+        "--service-name",
+        service_name,
+    ]
+    if seed is not None:
+        setup_parts.extend(["--seed", str(seed)])
+    if user_name:
+        setup_parts.extend(["--user-name", user_name])
+    if uno_bridge_port:
+        setup_parts.extend(["--uno-bridge-port", uno_bridge_port])
+        setup_parts.extend(["--uno-bridge-service-name", uno_bridge_service_name])
+    setup_command = _shell_join(setup_parts).replace("__REMOTE_DIR__", '"$REMOTE_DIR"')
+
+    remote_lines = [
+        "set -euo pipefail",
+        f"REMOTE_DIR={remote_dir_expr}",
+        "python3 -m pip install -U pip",
+        'python3 -m pip install -U "iints-sdk-python35[edge,mdmp]"',
+        "hash -r || true",
+        "mkdir -p \"$REMOTE_DIR\"",
+        setup_command,
+    ]
+    remote_lines = [
+        *remote_lines,
+        "cd \"$REMOTE_DIR\"",
+        "chmod +x ./update_edge_runtime.sh ./start_makerfaire_patient.sh ./install_makerfaire_autostart.sh ./run_makerfaire_watchdog.sh || true",
+    ]
+    if enable_connect_linger:
+        remote_lines.append("loginctl enable-linger \"$USER\" >/dev/null 2>&1 || true")
+    if install_autostart:
+        remote_lines.append("./install_makerfaire_autostart.sh")
+    if flash_uno_bridge:
+        if not uno_bridge_port or not uno_fqbn:
+            raise ValueError("Remote UNO Q flashing requires both `uno_bridge_port` and `uno_fqbn`.")
+        remote_lines.append(
+            _shell_join(
+                [
+                    "iints",
+                    "edge",
+                    "bridge-flash",
+                    "--project-dir",
+                    ".",
+                    "--port",
+                    uno_bridge_port,
+                    "--fqbn",
+                    uno_fqbn,
+                    "--arduino-cli",
+                    arduino_cli,
+                ]
+            )
+        )
+    if start_runtime:
+        remote_lines.append(_shell_join(["iints", "makerfaire", "up", "--project-dir", ".", "--scenario-profile", scenario_profile]))
+    remote_lines.append("iints edge status --project-dir .")
+
+    ssh_command = _ssh_command(destination, port=ssh_port, remote_command="\n".join(remote_lines))
+    if dry_run:
+        remote_stdout = ""
+    else:
+        if progress_callback is not None:
+            progress_callback(f"Provisioning {destination} over SSH")
+        remote_stdout = _run_process(
+            ssh_command,
+            step=f"Remote deploy to {destination}",
+            timeout_seconds=ssh_timeout_seconds,
+            retries=ssh_retries,
+        )
+    if progress_callback is not None:
+        progress_callback("Preparing remote maintenance commands")
+
+    return {
+        "host": host,
+        "destination": destination,
+        "ssh_port": ssh_port,
+        "remote_dir": remote_project_dir,
+        "local_output_dir": str(local_root),
+        "board": board,
+        "scenario_profile": scenario_profile,
+        "uno_bridge_enabled": bool(uno_bridge_port),
+        "deploy_stdout": remote_stdout,
+        "artifacts": outputs,
+        "dry_run": dry_run,
+        "deploy_command": _shell_join(ssh_command),
+        "remote_commands": {
+            "status": _shell_join(["ssh", *(["-p", str(ssh_port)] if ssh_port != 22 else []), destination, "bash", "-lc", f"REMOTE_DIR={remote_dir_expr}\ncd \"$REMOTE_DIR\" && iints edge status --project-dir ."]),
+            "reset": _shell_join(["ssh", *(["-p", str(ssh_port)] if ssh_port != 22 else []), destination, "bash", "-lc", f"REMOTE_DIR={remote_dir_expr}\ncd \"$REMOTE_DIR\" && iints edge reset --project-dir ."]),
+            "stop": _shell_join(["ssh", *(["-p", str(ssh_port)] if ssh_port != 22 else []), destination, "bash", "-lc", f"REMOTE_DIR={remote_dir_expr}\ncd \"$REMOTE_DIR\" && iints edge stop --project-dir ."]),
+        },
+    }
+
+
+def build_edge_offline_bundle(
+    output_path: str | Path,
+    *,
+    board: str = "raspberry_pi",
+    workspace_name: str = "patient_runtime",
+    scenario_profile: str = "expo_hot_start",
+    patient_config: str = "default_patient",
+    patient_model_type: str = "auto",
+    mode: str = "demo-time",
+    speed: float = 60.0,
+    api_host: str = "127.0.0.1",
+    api_port: int = 8765,
+    seed: int | None = None,
+    service_name: str = "iints-digital-patient",
+    user_name: str | None = None,
+    include_uno_bridge: bool = False,
+    progress_callback: Callable[[str], None] | None = None,
+) -> dict[str, str]:
+    bundle_output = Path(output_path).expanduser().resolve()
+    bundle_output.parent.mkdir(parents=True, exist_ok=True)
+    bundle_root_name = bundle_output.stem.replace(".tar", "") or "iints_offline"
+    package_spec = f'iints-sdk-python35[edge,mdmp]=={_sdk_version()}'
+
+    with tempfile.TemporaryDirectory(prefix="iints-edge-offline-") as temp_dir:
+        staging_root = Path(temp_dir) / bundle_root_name
+        wheelhouse = staging_root / "wheelhouse"
+        project_root = staging_root / "edge_project"
+        wheelhouse.mkdir(parents=True, exist_ok=True)
+        if progress_callback is not None:
+            progress_callback("Scaffolding offline edge project")
+        export_edge_setup(
+            project_root,
+            board=board,
+            workspace_name=workspace_name,
+            scenario_profile=scenario_profile,
+            patient_config=patient_config,
+            patient_model_type=patient_model_type,
+            mode=mode,
+            speed=speed,
+            api_host=api_host,
+            api_port=api_port,
+            seed=seed,
+            service_name=service_name,
+            user_name=user_name,
+            include_uno_bridge=include_uno_bridge or board == "uno_q",
+        )
+        if progress_callback is not None:
+            progress_callback("Building offline wheelhouse")
+        _run_process(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "wheel",
+                "--wheel-dir",
+                str(wheelhouse),
+                ".[edge,mdmp]",
+            ],
+            step="Build offline wheelhouse",
+            timeout_seconds=900.0,
+            cwd=_repo_root(),
+        )
+        wheel_files = sorted(wheelhouse.glob("*.whl"))
+        if not wheel_files:
+            raise RuntimeError(
+                "Offline wheelhouse build did not produce any wheels. "
+                "Run the command on a machine with internet access once so pip can resolve the dependencies."
+            )
+
+        install_script = staging_root / "install_offline_edge.sh"
+        install_script.write_text(
+            _render_edge_offline_install_script(package_spec=package_spec),
+            encoding="utf-8",
+        )
+        install_script.chmod(install_script.stat().st_mode | stat.S_IXUSR)
+
+        install_guide = staging_root / "OFFLINE_INSTALL.md"
+        install_guide.write_text(
+            _render_edge_offline_install_guide(
+                bundle_root_name=bundle_root_name,
+                package_spec=package_spec,
+                board=board,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        if progress_callback is not None:
+            progress_callback("Packing offline bundle")
+        with tarfile.open(bundle_output, "w:gz") as archive:
+            archive.add(staging_root, arcname=bundle_root_name)
+
+    return {
+        "archive": str(bundle_output),
+        "bundle_root_name": bundle_root_name,
+        "install_script": f"{bundle_root_name}/install_offline_edge.sh",
+        "install_guide": f"{bundle_root_name}/OFFLINE_INSTALL.md",
+        "package_spec": package_spec,
+    }
+
+
+def run_remote_edge_command(
+    *,
+    host: str,
+    user_name: str | None = None,
+    ssh_port: int = 22,
+    remote_dir: str = "~/iints_pi_demo",
+    action: str = "status",
+    scenario_profile: str | None = None,
+    seed: int | None = None,
+    timeout_seconds: float = 60.0,
+    retries: int = 0,
+) -> dict[str, str]:
+    destination = _ssh_destination(host, user_name)
+    remote_dir_expr = _remote_path_expr(remote_dir)
+    normalized = action.strip().lower()
+    if normalized == "status":
+        command = 'cd "$REMOTE_DIR" && iints edge status --project-dir .'
+    elif normalized == "stop":
+        command = 'cd "$REMOTE_DIR" && iints edge stop --project-dir .'
+    elif normalized == "reset":
+        reset_parts = ["iints", "edge", "reset", "--project-dir", "."]
+        if scenario_profile:
+            reset_parts.extend(["--scenario-profile", scenario_profile])
+        if seed is not None:
+            reset_parts.extend(["--seed", str(seed)])
+        command = f'cd "$REMOTE_DIR" && {_shell_join(reset_parts)}'
+    else:
+        raise ValueError(f"Unsupported remote edge action: {action}")
+
+    remote_script = "\n".join(
+        [
+            "set -euo pipefail",
+            f"REMOTE_DIR={remote_dir_expr}",
+            command,
+        ]
+    )
+    stdout = _run_process(
+        _ssh_command(destination, port=ssh_port, remote_command=remote_script),
+        step=f"Remote edge {normalized} on {destination}",
+        timeout_seconds=timeout_seconds,
+        retries=retries,
+    )
+    return {
+        "destination": destination,
+        "action": normalized,
+        "stdout": stdout,
+    }

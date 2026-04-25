@@ -4,6 +4,13 @@ from typing import Any
 
 from .api import create_patient_app
 from .edge_ops import create_edge_bundle, export_edge_setup, summarize_edge_workspace, write_edge_update_script
+from .long_study import (
+    create_edge_study_snapshot,
+    export_edge_study_archive,
+    load_edge_long_study_config,
+    render_edge_long_study_config_template,
+    run_edge_long_study,
+)
 from .runtime import (
     LivePatientDaemon,
     PatientRuntimeConfig,
@@ -27,6 +34,11 @@ __all__ = [
     "export_edge_setup",
     "summarize_edge_workspace",
     "write_edge_update_script",
+    "render_edge_long_study_config_template",
+    "load_edge_long_study_config",
+    "run_edge_long_study",
+    "create_edge_study_snapshot",
+    "export_edge_study_archive",
     "create_patient_app",
     "run_edge_benchmark",
     "export_uno_q_bridge",
