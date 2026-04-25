@@ -2,6 +2,10 @@
 
 **This page is for:** people who want a quick map of the CLI without reading the full technical manual.
 
+**Before this page:** [User Guide Map](USER_GUIDE_MAP.md) if you are not sure which command family you need.
+
+**After this page:** [Technical Reference](TECHNICAL_README.md) for deeper integration details.
+
 ## Beginner-Friendly Entry Points
 
 ### `iints guide`
@@ -146,6 +150,7 @@ iints doctor --smoke-run
 ## Full Details
 
 For every option and advanced workflow, continue to:
+- [User Guide Map](USER_GUIDE_MAP.md)
 - [CLI & Advanced Reference](TECHNICAL_README.md)
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Study Analysis](STUDY_ANALYSIS.md)

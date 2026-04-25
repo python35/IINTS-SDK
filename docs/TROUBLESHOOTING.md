@@ -2,6 +2,10 @@
 
 **This page is for:** when a command failed and you want the shortest path to a fix.
 
+**Before this page:** [Installation](INSTALLATION.md) if the SDK may not be installed correctly.
+
+**After this page:** [Command Reference](COMMAND_REFERENCE.md) if you need to confirm the right command shape.
+
 ## First Recovery Commands
 
 ```bash
@@ -118,3 +122,13 @@ And include:
 - the exact command you ran
 - the full error text
 - your OS and Python version
+
+## Where To Go Next
+
+| If the issue is fixed and you want to... | Continue with |
+|---|---|
+| run the first demo | [Quickstart](QUICKSTART.md) |
+| continue the full workflow | [Getting Started](GETTING_STARTED.md) |
+| check command syntax | [Command Reference](COMMAND_REFERENCE.md) |
+| troubleshoot edge hardware | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| understand docs routes again | [User Guide Map](USER_GUIDE_MAP.md) |

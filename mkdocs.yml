@@ -40,6 +40,7 @@ extra_css:
 nav:
   - Home: index.md
   - Start Here:
+      - User Guide Map: USER_GUIDE_MAP.md
       - Overview In Plain Language: PLAIN_LANGUAGE_GUIDE.md
       - 5-Minute Quickstart: QUICKSTART.md
       - Getting Started: GETTING_STARTED.md
@@ -81,6 +82,7 @@ nav:
       - Release Archive: releases/INDEX.md
       - Older Releases:
           - v1.5.3: releases/v1.5.3.md
+          - v1.5.2: releases/v1.5.2.md
           - v1.5.1: releases/v1.5.1.md
           - v1.5.0: releases/v1.5.0.md
           - v1.4.0: releases/v1.4.0.md

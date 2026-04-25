@@ -6,10 +6,12 @@ Use this page when you want the shortest route to the right documentation.
 
 Start in this order:
 
-1. [Quickstart](QUICKSTART.md)
-2. [Installation](INSTALLATION.md)
-3. [Troubleshooting](TROUBLESHOOTING.md)
-4. [Command Reference](COMMAND_REFERENCE.md)
+1. [User Guide Map](USER_GUIDE_MAP.md)
+2. [Quickstart](QUICKSTART.md)
+3. [Getting Started](GETTING_STARTED.md)
+4. [Installation](INSTALLATION.md)
+5. [Troubleshooting](TROUBLESHOOTING.md)
+6. [Command Reference](COMMAND_REFERENCE.md)
 
 Beginner-friendly CLI entry points:
 - `iints start`
@@ -57,3 +59,7 @@ Use:
 - [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
 - [Release Archive](releases/INDEX.md)
 - [MDMP Packaging Workflow](DUAL_REPO_WORKFLOW.md)
+
+## If You Want The Whole Map
+
+Read [User Guide Map](USER_GUIDE_MAP.md). It connects the public docs into a single route for external users, researchers, edge users, and maintainers.

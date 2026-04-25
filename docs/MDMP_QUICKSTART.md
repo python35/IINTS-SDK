@@ -2,6 +2,10 @@
 
 Data certification is the IINTS trust layer for validating data quality before modeling or evaluation.
 
+**Before this page:** [Getting Started](GETTING_STARTED.md) if you have not produced a run or dataset yet.
+
+**After this page:** [MDMP Guide](MDMP_FULL_GUIDE.md) for deeper certification details, or [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) to use certified data in studies.
+
 !!! important "Use a Virtual Environment"
     Run all commands from an active `.venv`:
     `python3 -m venv .venv && source .venv/bin/activate`
@@ -76,3 +80,13 @@ This blocks or warns if input data does not meet required quality.
 ## Important Scope
 
 MDMP improves data quality and traceability. It does not provide clinical approval.
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| run a benchmark with certified data | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| learn the full MDMP model | [MDMP Guide](MDMP_FULL_GUIDE.md) |
+| import real-world data first | [Getting Started](GETTING_STARTED.md) |
+| diagnose data command errors | [Troubleshooting](TROUBLESHOOTING.md) |
+| find related commands | [Command Reference](COMMAND_REFERENCE.md) |

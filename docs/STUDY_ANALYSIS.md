@@ -2,6 +2,10 @@
 
 Use `iints analyze` when you have multiple run folders and want one summary for posters, demos, or review.
 
+**Before this page:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) if you have not created a study bundle yet.
+
+**After this page:** [Evidence Base](EVIDENCE_BASE.md) if you need to explain what your metrics and sources mean.
+
 ## What It Does
 
 `iints analyze` scans a study directory for run folders containing `results.csv` and aggregates:
@@ -130,3 +134,13 @@ This is the command that turns “we ran the simulator” into evidence you can 
 - comparison between certified and uncertified data when both are present
 - a written protocol that explains the hypothesis and study matrix
 - a deliberate corruption workflow instead of vague “bad data”
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| build the study from scratch | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| certify or corrupt data deliberately | [MDMP Quickstart](MDMP_QUICKSTART.md) |
+| create poster-ready assets | [Booth Demo & Presentation Flow](BOOTH_DEMO.md) |
+| understand source claims | [Evidence Base](EVIDENCE_BASE.md) |
+| browse every analysis command | [Command Reference](COMMAND_REFERENCE.md) |

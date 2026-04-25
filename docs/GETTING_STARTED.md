@@ -2,6 +2,10 @@
 
 Use this page for the fastest reliable path from installation to a first complete SDK run.
 
+**Before this page:** [Quickstart](QUICKSTART.md) if you have not run `iints demo` yet.
+
+**After this page:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md), [MDMP Quickstart](MDMP_QUICKSTART.md), or [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md), depending on your goal.
+
 The core workflow is:
 
 1. run a simulation
@@ -231,6 +235,8 @@ That edge flow gives you:
 
 ## Related Guides
 
+- [User Guide Map](USER_GUIDE_MAP.md)
+- [Quickstart](QUICKSTART.md)
 - [Updating An Existing Install](UPDATING.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
@@ -238,6 +244,16 @@ That edge flow gives you:
 - [Evidence Base](EVIDENCE_BASE.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
 - [CLI & Advanced Reference](TECHNICAL_README.md)
+
+## Where To Go Next
+
+| If you finished this page and want to... | Continue with |
+|---|---|
+| turn one run into a formal benchmark | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| aggregate several runs | [Study Analysis](STUDY_ANALYSIS.md) |
+| certify datasets and outputs | [MDMP Quickstart](MDMP_QUICKSTART.md) |
+| use local AI reporting | [AI Assistant](AI_ASSISTANT.md) |
+| deploy to Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
 
 ## Safety Scope
 

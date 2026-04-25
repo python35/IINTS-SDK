@@ -2,6 +2,10 @@
 
 Use this guide when you want to prepare a Raspberry Pi from your laptop in one command, while keeping the live dashboard local to the Pi.
 
+**Before this page:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) for the runtime model.
+
+**After this page:** [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for booth startup, or [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before an event.
+
 ## Recommended Remote Pattern
 
 The safest default is:
@@ -142,3 +146,13 @@ For most demos and Maker Faire setups:
 - use `Raspberry Pi Connect` for remote viewing and shell access
 - keep `api_host=127.0.0.1`
 - avoid `--allow-remote-api` unless another machine really must talk to the dashboard directly
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| start the booth runtime | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) |
+| check event readiness | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) |
+| understand long studies on the Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| add UNO Q output | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| fix SSH or install problems | [Troubleshooting](TROUBLESHOOTING.md) |

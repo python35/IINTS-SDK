@@ -2,6 +2,10 @@
 
 Use this workflow when you want a real benchmark study instead of a single illustrative run.
 
+**Before this page:** [Getting Started](GETTING_STARTED.md) if you have not completed a single run yet.
+
+**After this page:** [Study Analysis](STUDY_ANALYSIS.md) for interpreting the generated study bundle.
+
 ## Goal
 
 The SDK now supports a reproducible study engine built around:
@@ -279,3 +283,13 @@ That gives you one deterministic package for:
 - benchmark evidence
 - safety comparison
 - poster figures
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| interpret study outputs | [Study Analysis](STUDY_ANALYSIS.md) |
+| certify data before running studies | [MDMP Quickstart](MDMP_QUICKSTART.md) |
+| explain source evidence | [Evidence Base](EVIDENCE_BASE.md) |
+| run studies on a Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| inspect all study commands | [Command Reference](COMMAND_REFERENCE.md) |

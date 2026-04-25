@@ -126,6 +126,7 @@ Open `http://127.0.0.1:8765/dashboard`. You will see a virtual patient running c
 
 | | |
 |---|---|
+| Start here | [Open guide map](https://python35.github.io/IINTS-SDK/USER_GUIDE_MAP/) |
 | Getting started | [Open guide](https://python35.github.io/IINTS-SDK/GETTING_STARTED/) |
 | Edge hardware | [Open guide](https://python35.github.io/IINTS-SDK/EDGE_HARDWARE/) |
 | Raspberry Pi setup | [Open guide](https://python35.github.io/IINTS-SDK/DIGITAL_PATIENT_PI/) |

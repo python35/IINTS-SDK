@@ -2,6 +2,10 @@
 
 Use this guide when you want the SDK to keep a virtual patient running continuously on a Raspberry Pi.
 
+**Before this page:** [Installation](INSTALLATION.md) if the edge SDK profile is not installed yet.
+
+**After this page:** [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) for laptop-to-Pi setup, or [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for event use.
+
 The Raspberry Pi digital-patient workflow gives you:
 - a persistent virtual patient runtime
 - SQLite-backed state on disk
@@ -441,3 +445,13 @@ One simple live flow is:
 - research use only
 - not a medical device
 - not a clinical treatment controller
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| deploy from a laptop | [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) |
+| make the Pi booth-ready | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) |
+| run an event checklist | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) |
+| add UNO Q hardware feedback | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| export/analyze edge results | [Study Analysis](STUDY_ANALYSIS.md) |

@@ -13,8 +13,11 @@ It combines three core workflows:
 
 ## Decide What You Need
 
+New external users should start with the [User Guide Map](USER_GUIDE_MAP.md). It links the quickstart, research, data, edge, and maintainer paths into one readable route.
+
 | I want to... | Start here | Why |
 |---|---|---|
+| Understand the whole docs site | [User Guide Map](USER_GUIDE_MAP.md) | Connected manual-style route |
 | Get a recommended command | `iints start` | Goal-based first-run plan |
 | See something work in a few minutes | [Quickstart](QUICKSTART.md) | Fastest route to a successful first run |
 | Let the CLI guide me | `iints guide` | Interactive beginner path |
@@ -56,10 +59,11 @@ iints demo --dry-run
 ## Choose Your Path
 
 ### New Users
-1. [Quickstart](QUICKSTART.md)
-2. [Installation](INSTALLATION.md)
-3. [Troubleshooting](TROUBLESHOOTING.md)
-4. [Command Reference](COMMAND_REFERENCE.md)
+1. [User Guide Map](USER_GUIDE_MAP.md)
+2. [Quickstart](QUICKSTART.md)
+3. [Getting Started](GETTING_STARTED.md)
+4. [Troubleshooting](TROUBLESHOOTING.md)
+5. [Command Reference](COMMAND_REFERENCE.md)
 
 ### Researchers
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
@@ -83,3 +87,7 @@ iints demo --dry-run
 - Research use only.
 - Not a medical device.
 - No clinical dosing advice.
+
+## Next Step
+
+Start with [User Guide Map](USER_GUIDE_MAP.md) if you want a guided route, or [Quickstart](QUICKSTART.md) if you want to run the SDK immediately.

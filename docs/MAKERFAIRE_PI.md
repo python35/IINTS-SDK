@@ -2,6 +2,10 @@
 
 Use this page when the Raspberry Pi is your show-ready virtual patient for Maker Faire.
 
+**Before this page:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) or [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md), depending on whether you set up locally or remotely.
+
+**After this page:** [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before using the setup in public.
+
 The goal is simple:
 
 - one Pi runs the digital patient
@@ -200,3 +204,13 @@ Use the full live checklist here:
 - Do not rely on editing configs during the event.
 - Test the full flow on the exact Pi you will bring.
 - If the UNO Q is attached, test the bridge separately before the event opens.
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+|---|---|
+| run the event checklist | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) |
+| add the UNO Q physical layer | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| deploy the Pi remotely | [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) |
+| analyze results afterward | [Study Analysis](STUDY_ANALYSIS.md) |
+| recover from setup problems | [Troubleshooting](TROUBLESHOOTING.md) |

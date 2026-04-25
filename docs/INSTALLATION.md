@@ -5,6 +5,10 @@ This page is the simplest answer to two common questions:
 1. "How do I install IINTS correctly?"
 2. "From which folder am I supposed to run this command?"
 
+**Before this page:** [Quickstart](QUICKSTART.md) if you simply want the fastest first run.
+
+**After this page:** [Getting Started](GETTING_STARTED.md) for the first complete workflow, or [Troubleshooting](TROUBLESHOOTING.md) if a command failed.
+
 ## The Short Rule
 
 - `iints ...` commands can run from any working folder once the SDK is installed.
@@ -488,3 +492,13 @@ Check it:
 ```bash
 python --version
 ```
+
+## Where To Go Next
+
+| If you installed... | Continue with |
+|---|---|
+| the full SDK | [Getting Started](GETTING_STARTED.md) |
+| the edge profile | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| local AI extras | [AI Assistant](AI_ASSISTANT.md) |
+| data certification tools | [MDMP Quickstart](MDMP_QUICKSTART.md) |
+| but something failed | [Troubleshooting](TROUBLESHOOTING.md) |
