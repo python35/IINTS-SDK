@@ -2,7 +2,7 @@
 
 **This page is for:** people who want a first successful run fast.
 
-**Fastest path:** run `iints demo` first. If that works, move to `iints quickstart` for your own project folder.
+**Fastest path:** run `iints start` first. It tells you the shortest next command for a demo, project, study, edge setup, or data workflow.
 
 ## Option 1: One-Command Demo
 
@@ -13,6 +13,7 @@ python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 iints doctor --suggest
+iints start
 iints demo
 ```
 
@@ -26,6 +27,9 @@ What you get:
 Useful variants:
 
 ```bash
+iints start --goal project
+iints start --goal project --run
+iints start --goal edge
 iints demo --dry-run
 iints demo --full
 iints demo --output-dir results/my_first_demo

@@ -7,6 +7,18 @@
 ### `iints guide`
 Use this when you are not sure where to start.
 
+### `iints start`
+Print a goal-based first-run plan, or run the safe starter action.
+
+Common forms:
+
+```bash
+iints start
+iints start --goal project --run
+iints start --goal edge
+iints start --goal data
+```
+
 ### `iints demo`
 Zero-config first run.
 

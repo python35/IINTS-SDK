@@ -90,3 +90,46 @@ def test_doctor_suggest_prints_actionable_next_steps(monkeypatch) -> None:
     assert result.exit_code == 1
     assert "Suggested Next Steps" in result.stdout
     assert "Install the main SDK stack" in result.stdout
+
+
+def test_start_prints_beginner_plan(tmp_path) -> None:
+    output_dir = tmp_path / "demo"
+
+    result = runner.invoke(app, ["start", "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert "Recommended First Step" in result.stdout
+    assert "iints demo" in result.stdout
+    assert "demo_assets" in result.stdout
+    assert not output_dir.exists()
+
+
+def test_start_supports_goal_aliases() -> None:
+    result = runner.invoke(app, ["start", "--goal", "pi"])
+
+    assert result.exit_code == 0
+    assert "Goal: edge" in result.stdout
+    assert "iints edge doctor" in result.stdout
+    assert "iints makerfaire up" in result.stdout
+
+
+def test_start_run_dispatches_to_demo(monkeypatch, tmp_path) -> None:
+    called: dict[str, object] = {}
+
+    def _fake_demo(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.demo", _fake_demo)
+
+    output_dir = tmp_path / "starter_demo"
+    result = runner.invoke(app, ["start", "--goal", "demo", "--run", "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert called["output_dir"] == output_dir
+
+
+def test_start_rejects_unknown_goal() -> None:
+    result = runner.invoke(app, ["start", "--goal", "unknown"])
+
+    assert result.exit_code == 1
+    assert "Unknown goal" in result.stdout

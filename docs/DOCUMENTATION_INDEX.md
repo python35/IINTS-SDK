@@ -12,6 +12,7 @@ Start in this order:
 4. [Command Reference](COMMAND_REFERENCE.md)
 
 Beginner-friendly CLI entry points:
+- `iints start`
 - `iints guide`
 - `iints demo`
 - `iints run --wizard`

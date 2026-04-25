@@ -56,6 +56,7 @@ def test_run_edge_long_study_writes_nested_outputs(monkeypatch, tmp_path: Path) 
                 "algorithms:",
                 "  - Clinical Baseline",
                 "  - PID Controller",
+                "  - Correction Bolus",
                 "week_schedule:",
                 "  monday: school_day",
                 "  tuesday: sport_day",
@@ -103,14 +104,14 @@ def test_run_edge_long_study_writes_nested_outputs(monkeypatch, tmp_path: Path) 
     monkeypatch.setattr("iints.live_patient.long_study.iints.run_simulation", _fake_run_simulation)
     monkeypatch.setattr(
         "iints.live_patient.long_study.analyze_study_directory",
-        lambda root: _FakeSummary(run_count=8),
+        lambda root: _FakeSummary(run_count=12),
     )
 
     outputs = run_edge_long_study(config_path=config_path, project_dir=project_dir)
 
     output_root = Path(outputs["output_dir"])
     assert output_root.is_dir()
-    assert outputs["completed_runs"] == 8
+    assert outputs["completed_runs"] == 12
     assert outputs["scratch_dir"].endswith("scratch_stage/long_study")
     assert seen_run_dirs
     assert all("scratch_stage" in str(path) for path in seen_run_dirs)

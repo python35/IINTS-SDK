@@ -15,6 +15,7 @@ It combines three core workflows:
 
 | I want to... | Start here | Why |
 |---|---|---|
+| Get a recommended command | `iints start` | Goal-based first-run plan |
 | See something work in a few minutes | [Quickstart](QUICKSTART.md) | Fastest route to a successful first run |
 | Let the CLI guide me | `iints guide` | Interactive beginner path |
 | Run a zero-config example | `iints demo` | No custom files required |
@@ -46,6 +47,7 @@ iints demo --dry-run
 
 ## Friendly CLI Entry Points
 
+- `iints start`: prints the shortest path for demo, project, study, edge, or data work
 - `iints guide`: asks what you want to do and points you to the right flow
 - `iints demo`: zero-config first run
 - `iints run --wizard`: guided custom run

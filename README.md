@@ -53,6 +53,7 @@ For the full scientific write-up, see:
 python3 -m venv .venv && source .venv/bin/activate
 pip install -U "iints-sdk-python35[full,mdmp]"
 iints doctor --smoke-run
+iints start
 ```
 
 **Edge devices (Raspberry Pi 5, Arduino UNO Q):**
@@ -64,6 +65,15 @@ pip install -U "iints-sdk-python35[edge,mdmp]"
 ---
 
 ## Quick Start
+
+Not sure what path you need yet?
+
+```bash
+iints start
+iints start --goal project --run
+```
+
+Or create a starter project directly:
 
 ```bash
 iints quickstart --project-name my_study

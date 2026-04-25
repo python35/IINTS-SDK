@@ -3213,6 +3213,192 @@ def demo(
     )
 
 
+_START_GOAL_ALIASES = {
+    "first": "demo",
+    "first-run": "demo",
+    "quick": "demo",
+    "simulation": "demo",
+    "new-project": "project",
+    "quickstart": "project",
+    "research": "study",
+    "benchmark": "study",
+    "pi": "edge",
+    "raspberry-pi": "edge",
+    "makerfaire": "edge",
+    "certify": "data",
+    "import": "data",
+}
+
+
+def _normalize_start_goal(goal: str) -> str:
+    normalized = goal.strip().lower().replace("_", "-")
+    normalized = _START_GOAL_ALIASES.get(normalized, normalized)
+    if normalized not in {"demo", "project", "study", "edge", "data"}:
+        supported = "demo, project, study, edge, data"
+        raise typer.BadParameter(f"Unknown goal '{goal}'. Choose one of: {supported}.")
+    return normalized
+
+
+def _start_plan_for_goal(
+    *,
+    goal: str,
+    output_dir: Path,
+    project_name: str,
+    edge_output_dir: Path,
+    board: str,
+) -> tuple[str, list[str], list[str]]:
+    if goal == "demo":
+        return (
+            "Run the zero-config demo first.",
+            [
+                "iints doctor --suggest",
+                f"iints demo --output-dir {output_dir}",
+            ],
+            [
+                f"Results: {output_dir}",
+                f"Editable algorithm: {output_dir / 'demo_assets' / 'example_algorithm.py'}",
+                "Next: iints run --wizard",
+            ],
+        )
+    if goal == "project":
+        return (
+            "Create a ready-to-edit project folder.",
+            [
+                f"iints quickstart --project-name {project_name}",
+                f"cd {project_name}",
+                "iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py",
+            ],
+            [
+                "Includes an example algorithm, demo data, and certification contract.",
+                "Next: edit algorithms/example_algorithm.py",
+            ],
+        )
+    if goal == "study":
+        return (
+            "Prepare a reproducible benchmark workflow.",
+            [
+                "iints study-protocol --output-dir results/study_protocol",
+                "iints run-study --experiment results/study_protocol/study_experiment.yaml",
+                "iints analyze results/study_results",
+            ],
+            [
+                "Use fixed seeds for report-ready results.",
+                "Use iints run-study --help for algorithm and seed options.",
+            ],
+        )
+    if goal == "edge":
+        return (
+            "Prepare a Raspberry Pi or UNO Q edge project.",
+            [
+                f"iints edge doctor --board {board}",
+                f"iints edge setup --output-dir {edge_output_dir} --board {board} --scenario-profile expo_hot_start",
+                f"iints makerfaire up --project-dir {edge_output_dir}",
+            ],
+            [
+                "For remote Pi setup, use iints edge deploy --host raspberrypi.local --user pi.",
+                "For offline recovery, use iints edge offline-bundle --output iints_offline.tar.gz.",
+            ],
+        )
+    return (
+        "Import, validate, and certify data before study use.",
+        [
+            "iints data list",
+            "iints import-demo --output-dir results/demo_import",
+            "iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv --output-json audit/certification.json",
+        ],
+        [
+            "Use iints data fetch --help for public packs.",
+            "Use iints import-carelink or iints import-nightscout for real-world exports.",
+        ],
+    )
+
+
+@app.command(name="start")
+def start(
+    goal: Annotated[
+        str,
+        typer.Option(
+            "--goal",
+            help="What you want to do: demo, project, study, edge, or data. Aliases like pi, research, and quickstart also work.",
+        ),
+    ] = "demo",
+    run_now: Annotated[
+        bool,
+        typer.Option("--run", help="Run the safe starter action for demo, project, or edge instead of only printing the plan."),
+    ] = False,
+    output_dir: Annotated[Path, typer.Option(help="Output directory for --goal demo.")] = Path("results/demo"),
+    project_name: Annotated[str, typer.Option(help="Project folder name for --goal project.")] = "iints_quickstart",
+    edge_output_dir: Annotated[Path, typer.Option(help="Edge project folder for --goal edge.")] = Path("iints_pi_demo"),
+    board: Annotated[str, typer.Option(help="Edge board for --goal edge: raspberry_pi or uno_q.")] = "raspberry_pi",
+) -> None:
+    """
+    Friendly first command for new users.
+
+    Examples:
+      iints start
+      iints start --goal project --run
+      iints start --goal edge
+    """
+    console = Console()
+    try:
+        normalized_goal = _normalize_start_goal(goal)
+    except typer.BadParameter as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    title, commands, notes = _start_plan_for_goal(
+        goal=normalized_goal,
+        output_dir=output_dir,
+        project_name=project_name,
+        edge_output_dir=edge_output_dir,
+        board=board,
+    )
+
+    command_table = Table(title="IINTS Start")
+    command_table.add_column("Step", justify="right", style="cyan")
+    command_table.add_column("Command", overflow="fold")
+    for index, command in enumerate(commands, start=1):
+        command_table.add_row(str(index), command)
+
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Goal: {normalized_goal}",
+                    title,
+                    "Run this plan with --run when the goal is demo, project, or edge.",
+                ]
+            ),
+            title="Recommended First Step",
+            border_style="green",
+        )
+    )
+    console.print(command_table)
+    console.print(
+        Panel(
+            "\n".join(notes),
+            title="What This Gives You",
+            border_style="blue",
+        )
+    )
+
+    if not run_now:
+        return
+
+    if normalized_goal == "demo":
+        demo(output_dir=output_dir)
+        return
+    if normalized_goal == "project":
+        quickstart(project_name=project_name)
+        return
+    if normalized_goal == "edge":
+        edge_setup(output_dir=edge_output_dir, board=board, scenario_profile="expo_hot_start")
+        return
+
+    console.print("[yellow]--run is only available for demo, project, and edge starter flows.[/yellow]")
+    raise typer.Exit(code=1)
+
+
 @app.command(name="guide")
 def guide():
     """Friendly entry point that helps beginners choose the right first command."""
