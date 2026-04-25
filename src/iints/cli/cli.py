@@ -3256,7 +3256,7 @@ def _start_plan_for_goal(
             ],
             [
                 f"Results: {output_dir}",
-                f"Editable algorithm: {output_dir / 'demo_assets' / 'example_algorithm.py'}",
+                "Editable algorithm: demo_assets/example_algorithm.py inside the demo output.",
                 "Next: iints run --wizard",
             ],
         )
