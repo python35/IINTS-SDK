@@ -72,6 +72,7 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Maintainers & Governance:
+      - Maintainer Guide: MAINTAINER_GUIDE.md
       - Maintainer Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
       - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md

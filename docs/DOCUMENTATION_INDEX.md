@@ -51,6 +51,7 @@ Start here:
 ## If You Maintain The SDK
 
 Use:
+- [Maintainer Guide](MAINTAINER_GUIDE.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
 - [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
 - [Release Archive](releases/INDEX.md)

@@ -24,6 +24,7 @@ It combines three core workflows:
 | Browse the CLI surface | [Command Reference](COMMAND_REFERENCE.md) | Short command map without deep internals |
 | Run reproducible studies | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, study bundles, comparisons |
 | Bring a Pi to Maker Faire | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | Show-ready Raspberry Pi flow |
+| Maintain or release the SDK | [Maintainer Guide](MAINTAINER_GUIDE.md) | Local checks, release audit, and manual upkeep |
 
 ## 5-Minute First Run
 
@@ -69,6 +70,11 @@ iints demo --dry-run
 - [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
 - [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
 - [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
+
+### Maintainers
+- [Maintainer Guide](MAINTAINER_GUIDE.md)
+- [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
+- [Release Archive](releases/INDEX.md)
 
 ## Scope
 
