@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -27,11 +28,24 @@ SECURITY_RESPONSE_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 }
 
 
-def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None) -> str:
+def _build_dashboard_csp(nonce: str) -> str:
+    return (
+        "default-src 'self'; "
+        f"script-src 'self' 'nonce-{nonce}'; "
+        f"style-src 'self' 'nonce-{nonce}'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'"
+    )
+
+
+def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None, csp_nonce: str) -> str:
     body_class = "kiosk" if kiosk else ""
     subtitle = (
         "Fullscreen expo view for the persistent IINTS digital patient."
@@ -45,7 +59,7 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>IINTS Digital Patient</title>
-  <style>
+  <style nonce="{csp_nonce}">
     :root {{
       --bg: #f5f7f2;
       --panel: #ffffff;
@@ -72,6 +86,10 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
     body.kiosk .label {{ font-size: 1rem; }}
     .value {{ font-size: 1.65rem; font-weight: 700; }}
     body.kiosk .value {{ font-size: 2rem; }}
+    .value.small {{ font-size: 1.2rem; }}
+    .value.compact {{ font-size: 1.15rem; }}
+    body.kiosk .value.small {{ font-size: 1.35rem; }}
+    body.kiosk .value.compact {{ font-size: 1.35rem; }}
     .pill {{ display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.85rem; font-weight: 700; }}
     .pill.ok {{ background: rgba(22, 111, 71, 0.12); color: var(--ok); }}
     .pill.warn {{ background: rgba(201, 74, 42, 0.12); color: var(--warn); }}
@@ -102,36 +120,36 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
       <div class="card"><div class="label">Runtime</div><div class="value" id="runtime-status">-</div></div>
       <div class="card"><div class="label">Simulated Clock</div><div class="value" id="runtime-clock">-</div></div>
       <div class="card"><div class="label">Current Glucose</div><div class="value" id="runtime-glucose">-</div></div>
-      <div class="card"><div class="label">Last Event</div><div class="value" id="runtime-event" style="font-size:1.15rem">-</div></div>
+      <div class="card"><div class="label">Last Event</div><div class="value compact" id="runtime-event">-</div></div>
     </div>
     <div class="mini-meta">
-      <div class="card"><div class="label">Scenario</div><div class="value" id="runtime-scenario" style="font-size:1.2rem">-</div></div>
-      <div class="card"><div class="label">Algorithm</div><div class="value" id="runtime-algo" style="font-size:1.2rem">-</div></div>
-      <div class="card"><div class="label">Certification</div><div class="value" id="runtime-cert" style="font-size:1.1rem">-</div></div>
-      <div class="card"><div class="label">Realism Review</div><div class="value" id="runtime-review" style="font-size:1.1rem">-</div></div>
+      <div class="card"><div class="label">Scenario</div><div class="value small" id="runtime-scenario">-</div></div>
+      <div class="card"><div class="label">Algorithm</div><div class="value small" id="runtime-algo">-</div></div>
+      <div class="card"><div class="label">Certification</div><div class="value small" id="runtime-cert">-</div></div>
+      <div class="card"><div class="label">Realism Review</div><div class="value small" id="runtime-review">-</div></div>
     </div>
     <div class="chart-card">
       <svg viewBox="0 0 960 360" preserveAspectRatio="none" id="glucose-chart"></svg>
       <div class="section-title">Live controls</div>
       <div class="controls">
-        <button onclick="sendCommand('/control/pause')">Pause</button>
-        <button onclick="sendCommand('/control/resume')">Resume</button>
-        <button class="primary" onclick="sendMeal(60)">Inject 60 g meal</button>
-        <button class="warn" onclick="sendCommand('/control/expo-reset')">Expo reset</button>
+        <button data-command="/control/pause">Pause</button>
+        <button data-command="/control/resume">Resume</button>
+        <button class="primary" data-meal="60">Inject 60 g meal</button>
+        <button class="warn" data-command="/control/expo-reset">Expo reset</button>
       </div>
       <div class="section-title">Scenario shortcuts</div>
       <div class="controls">
-        <button onclick="sendScenario('normal_day')">Normal day</button>
-        <button onclick="sendScenario('sport_day')">Sport day</button>
-        <button onclick="sendScenario('bad_carb_count')">Bad carb count</button>
-        <button onclick="sendScenario('night_hypo_risk')">Night hypo risk</button>
-        <button class="warn" onclick="sendScenario('expo_hot_start')">Expo hot start</button>
+        <button data-scenario="normal_day">Normal day</button>
+        <button data-scenario="sport_day">Sport day</button>
+        <button data-scenario="bad_carb_count">Bad carb count</button>
+        <button data-scenario="night_hypo_risk">Night hypo risk</button>
+        <button class="warn" data-scenario="expo_hot_start">Expo hot start</button>
       </div>
       <div class="status-note" id="status-note"></div>
     </div>
     <p class="footer">Tip: present this page full-screen on the Raspberry Pi and use <code>Raspberry Pi Connect</code> screen sharing to control it from your laptop.</p>
   </div>
-  <script>
+  <script nonce="{csp_nonce}">
     const CONTROL_HEADER_NAME = {json.dumps(CONTROL_HEADER_NAME)};
     const CONTROL_HEADER_VALUE = {json.dumps(CONTROL_HEADER_VALUE)};
     const AUTH_TOKEN = {token_literal};
@@ -242,18 +260,32 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
       `;
     }}
 
-    function renderCertification(certification) {{
-      if (!certification || !certification.exists) {{
-        return '<span class="pill warn">Not certified yet</span>';
-      }}
-      return `<span class="pill ok">${{certification.grade || 'certified'}}</span>`;
+    function renderBadge(elementId, label, variant) {{
+      const target = document.getElementById(elementId);
+      target.replaceChildren();
+      const pill = document.createElement('span');
+      pill.className = `pill ${{variant}}`;
+      pill.textContent = label;
+      target.appendChild(pill);
     }}
 
-    function renderReview(review) {{
-      if (!review || !review.exists) {{
-        return '<span class="pill warn">No review yet</span>';
-      }}
-      return `<span class="pill ok">Review ready</span>`;
+    function bindControls() {{
+      document.querySelectorAll('[data-command]').forEach((button) => {{
+        button.addEventListener('click', async () => {{
+          await sendCommand(button.dataset.command);
+        }});
+      }});
+      document.querySelectorAll('[data-scenario]').forEach((button) => {{
+        button.addEventListener('click', async () => {{
+          await sendScenario(button.dataset.scenario);
+        }});
+      }});
+      document.querySelectorAll('[data-meal]').forEach((button) => {{
+        button.addEventListener('click', async () => {{
+          const carbs = Number(button.dataset.meal || '0');
+          await sendMeal(carbs);
+        }});
+      }});
     }}
 
     async function refresh() {{
@@ -269,8 +301,16 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
         document.getElementById('runtime-event').textContent = status.last_event_summary || 'No recent manual events';
         document.getElementById('runtime-scenario').textContent = status.scenario_profile || '-';
         document.getElementById('runtime-algo').textContent = status.algorithm_name || '-';
-        document.getElementById('runtime-cert').innerHTML = renderCertification(status.certification);
-        document.getElementById('runtime-review').innerHTML = renderReview(status.review);
+        if (!status.certification || !status.certification.exists) {{
+          renderBadge('runtime-cert', 'Not certified yet', 'warn');
+        }} else {{
+          renderBadge('runtime-cert', status.certification.grade || 'certified', 'ok');
+        }}
+        if (!status.review || !status.review.exists) {{
+          renderBadge('runtime-review', 'No review yet', 'warn');
+        }} else {{
+          renderBadge('runtime-review', 'Review ready', 'ok');
+        }}
         if (status.message) {{
           setStatusNote(status.message);
         }}
@@ -281,6 +321,7 @@ def _render_dashboard_html(*, kiosk: bool = False, api_token: str | None = None)
       }}
     }}
 
+    bindControls();
     refresh();
     setInterval(refresh, 2000);
   </script>
@@ -323,19 +364,31 @@ def create_patient_app(workspace: str | Path, api_token: str | None = None) -> F
             )
 
     @app.get("/", response_class=HTMLResponse)
-    def root(request: Request) -> str:
+    def root(request: Request) -> HTMLResponse:
         _require_read_access(request)
-        return _render_dashboard_html(api_token=api_token)
+        nonce = secrets.token_urlsafe(16)
+        return HTMLResponse(
+            _render_dashboard_html(api_token=api_token, csp_nonce=nonce),
+            headers={"Content-Security-Policy": _build_dashboard_csp(nonce)},
+        )
 
     @app.get("/dashboard", response_class=HTMLResponse)
-    def dashboard(request: Request) -> str:
+    def dashboard(request: Request) -> HTMLResponse:
         _require_read_access(request)
-        return _render_dashboard_html(api_token=api_token)
+        nonce = secrets.token_urlsafe(16)
+        return HTMLResponse(
+            _render_dashboard_html(api_token=api_token, csp_nonce=nonce),
+            headers={"Content-Security-Policy": _build_dashboard_csp(nonce)},
+        )
 
     @app.get("/kiosk", response_class=HTMLResponse)
-    def kiosk(request: Request) -> str:
+    def kiosk(request: Request) -> HTMLResponse:
         _require_read_access(request)
-        return _render_dashboard_html(kiosk=True, api_token=api_token)
+        nonce = secrets.token_urlsafe(16)
+        return HTMLResponse(
+            _render_dashboard_html(kiosk=True, api_token=api_token, csp_nonce=nonce),
+            headers={"Content-Security-Policy": _build_dashboard_csp(nonce)},
+        )
 
     @app.get("/status")
     def status(request: Request) -> JSONResponse:

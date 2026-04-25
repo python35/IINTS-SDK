@@ -32,7 +32,7 @@ def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
         return payload if isinstance(payload, dict) else None
-    except Exception:
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
 
 
@@ -61,7 +61,7 @@ def _review_preview(path: Path) -> str:
             text = line.strip()
             if text and not text.startswith("#"):
                 return text[:180]
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         pass
     return "Review file present."
 

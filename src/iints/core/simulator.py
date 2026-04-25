@@ -420,7 +420,8 @@ class Simulator:
         carb_component = 0.0
         if icr > 0:
             carb_effect_per_gram = isf / icr
-            carb_component = cob_grams * carb_effect_per_gram * min(horizon_minutes / carb_absorption_minutes, 1.0)
+            absorption_fraction = 1.0 if carb_absorption_minutes <= 0 else min(horizon_minutes / carb_absorption_minutes, 1.0)
+            carb_component = cob_grams * carb_effect_per_gram * absorption_fraction
 
         return current_glucose + trend_component + insulin_component + carb_component
 

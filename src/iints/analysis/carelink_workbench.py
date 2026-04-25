@@ -43,7 +43,7 @@ def _round(value: Any, digits: int = 2) -> float | int | None:
         return None
     try:
         number = float(value)
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return None
     if math.isnan(number) or math.isinf(number):
         return None

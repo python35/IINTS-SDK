@@ -1,5 +1,6 @@
 import os
 import tempfile
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -13,6 +14,8 @@ from fpdf.enums import XPos, YPos
 
 from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
 from iints.utils.plotting import apply_plot_style
+
+logger = logging.getLogger("iints")
 
 
 class ClinicalReportGenerator:
@@ -41,8 +44,8 @@ class ClinicalReportGenerator:
             x_pos = pdf.w - pdf.r_margin - logo_width
             y_pos = 6
             pdf.image(str(logo_path), x=x_pos, y=y_pos, w=logo_width)
-        except Exception:
-            # Fallback silently if image fails to load
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.debug("Skipping report logo render: %s", exc)
             return
 
     def _plot_glucose(self, df: pd.DataFrame, output_path: Path) -> None:

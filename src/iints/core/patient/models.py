@@ -67,6 +67,23 @@ class CustomPatientModel:
 
         self.reset() # Call reset to ensure initial state consistency
 
+    def _effective_insulin_curve(self) -> tuple[float, float]:
+        """
+        Return a numerically safe insulin action duration / peak pair.
+
+        The simplified patient model is often used with ad-hoc configs during
+        stress testing, so fail soft instead of crashing on bad curve values.
+        """
+        duration = max(float(self.insulin_action_duration), 1.0)
+        peak = float(self.insulin_peak_time)
+        if peak <= 0.0 or peak >= duration:
+            peak = duration / 2.0
+        return duration, peak
+
+    def _effective_carb_absorption_duration(self) -> float:
+        """Return a numerically safe carb absorption window."""
+        return max(float(self.carb_absorption_duration_minutes), 1.0)
+
     def reset(self):
         """Resets the patient's state to initial conditions."""
         self.current_glucose = self.initial_glucose
@@ -106,6 +123,8 @@ class CustomPatientModel:
         """
         # Convert time_step to hours for basal rate
         time_step_hours = time_step / 60.0
+        insulin_action_duration, insulin_peak_time = self._effective_insulin_curve()
+        carb_absorption_duration = self._effective_carb_absorption_duration()
 
         # --- Insulin effect ---
         # Add new insulin dose
@@ -116,29 +135,29 @@ class CustomPatientModel:
         for dose in self.active_insulin_doses:
             dose['age'] += time_step
         
-        self.active_insulin_doses = [d for d in self.active_insulin_doses if d['age'] <= self.insulin_action_duration]
+        self.active_insulin_doses = [d for d in self.active_insulin_doses if d['age'] <= insulin_action_duration]
 
         # Calculate IOB (Insulin on Board) using a linear decay model for remaining insulin
         iob = 0.0
         for dose in self.active_insulin_doses:
-            remaining_fraction = (self.insulin_action_duration - dose['age']) / self.insulin_action_duration
+            remaining_fraction = (insulin_action_duration - dose['age']) / insulin_action_duration
             iob += dose['amount'] * remaining_fraction
         self.insulin_on_board = iob
 
         # Calculate Insulin Action for this time step using a bilinear activity curve
         total_insulin_action = 0.0
         for dose in self.active_insulin_doses:
-            if dose['age'] < self.insulin_peak_time:
+            if dose['age'] < insulin_peak_time:
                 # Action ramps up
-                action_factor = dose['age'] / self.insulin_peak_time
+                action_factor = dose['age'] / insulin_peak_time
             else:
                 # Action ramps down
-                action_factor = (self.insulin_action_duration - dose['age']) / (self.insulin_action_duration - self.insulin_peak_time)
+                action_factor = (insulin_action_duration - dose['age']) / (insulin_action_duration - insulin_peak_time)
             
             # Normalize the action so the total effect of 1U of insulin equals 1U * insulin_sensitivity
             # The area under the bilinear activity curve is 0.5 * peak_time + 0.5 * (duration - peak_time) = 0.5 * duration
             # The action for this step is a fraction of the total dose effect.
-            dose_action_this_step = dose['amount'] * action_factor * (time_step / (0.5 * self.insulin_action_duration))
+            dose_action_this_step = dose['amount'] * action_factor * (time_step / (0.5 * insulin_action_duration))
             total_insulin_action += dose_action_this_step
 
         insulin_effect = total_insulin_action * self.insulin_sensitivity
@@ -160,7 +179,7 @@ class CustomPatientModel:
             # Simple model: carbs absorb over time, peaking around meal_effect_delay
             # This is a very rough approximation
             absorption_factor = 0.0
-            if carb_event['time_since_intake'] <= self.carb_absorption_duration_minutes: # Carbs absorb for ~4 hours
+            if carb_event['time_since_intake'] <= carb_absorption_duration: # Carbs absorb for ~4 hours
                 absorption_factor = self.glucose_absorption_rate * (np.exp(-carb_event['time_since_intake'] / self.meal_effect_delay) - np.exp(-carb_event['time_since_intake'] / (self.meal_effect_delay * 0.5)))
                 carb_effect += carb_event['amount'] * absorption_factor
                 new_active_carb_intakes.append(carb_event)
@@ -171,7 +190,7 @@ class CustomPatientModel:
         for carb_event in self.active_carb_intakes:
             remaining_fraction = max(
                 0.0,
-                1.0 - (carb_event['time_since_intake'] / self.carb_absorption_duration_minutes),
+                1.0 - (carb_event['time_since_intake'] / carb_absorption_duration),
             )
             carb_remaining += carb_event['amount'] * remaining_fraction
         self.carbs_on_board = carb_remaining

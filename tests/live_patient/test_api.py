@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi.testclient import TestClient
 
 from iints.live_patient.api import create_patient_app
@@ -110,3 +112,8 @@ def test_live_patient_api_sets_security_headers(tmp_path) -> None:
     assert response.headers["referrer-policy"] == "no-referrer"
     assert response.headers["x-frame-options"] == "DENY"
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+    assert "'unsafe-inline'" not in response.headers["content-security-policy"]
+    assert "nonce-" in response.headers["content-security-policy"]
+    assert re.search(r'<script nonce="[^"]+">', response.text)
+    assert re.search(r'<style nonce="[^"]+">', response.text)
+    assert 'onclick=' not in response.text

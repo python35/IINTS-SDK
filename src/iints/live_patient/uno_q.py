@@ -129,7 +129,7 @@ def bridge_state_from_runtime_status(status: Mapping[str, Any] | None) -> str:
     glucose = status.get("last_glucose_mgdl")
     try:
         glucose_value = float(glucose) if glucose is not None else None
-    except Exception:
+    except (TypeError, ValueError):
         glucose_value = None
 
     safety_reason = str(status.get("last_safety_reason", "") or "").strip()
@@ -208,7 +208,7 @@ def _uno_q_serial_connection(
         try:
             connection.reset_input_buffer()
             connection.reset_output_buffer()
-        except Exception:
+        except (AttributeError, OSError):
             pass
         if boot_delay_seconds > 0:
             time.sleep(boot_delay_seconds)
@@ -226,7 +226,7 @@ def _send_state_over_connection(
     normalized_state = _normalize_bridge_state(state)
     try:
         connection.reset_input_buffer()
-    except Exception:
+    except (AttributeError, OSError):
         pass
     payload = f"{normalized_state}\n".encode("utf-8")
     connection.write(payload)

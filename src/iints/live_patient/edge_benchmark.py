@@ -23,7 +23,7 @@ def _platform_label(requested: str) -> str:
         model_path = Path("/proc/device-tree/model")
         if model_path.is_file():
             return model_path.read_text(encoding="utf-8", errors="ignore").strip()
-    except Exception:
+    except OSError:
         pass
     return f"{system} ({machine})"
 

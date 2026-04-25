@@ -22,6 +22,7 @@ class PIDController(InsulinAlgorithm):
         self.integral = 0
         self.previous_error = 0
         self.target_glucose = 120  # mg/dL target
+        self.integral_limit = 300.0  # Anti-windup clamp on accumulated error
         
         # Safety limits
         self.max_insulin = 5.0  # Maximum insulin dose
@@ -33,14 +34,29 @@ class PIDController(InsulinAlgorithm):
         # Calculate error from target
         error = data.current_glucose - self.target_glucose
         self._log_reason(f"Glucose error from target ({self.target_glucose} mg/dL)", "glucose_level", error, f"Current glucose: {data.current_glucose:.0f} mg/dL")
-        
-        # Integral term (accumulated error)
-        self.integral += error
-        self._log_reason("Integral term updated", "control_parameter", self.integral)
-        
+
         # Derivative term (rate of change)
         derivative = error - self.previous_error
         self._log_reason("Derivative term calculated", "control_parameter", derivative)
+
+        # Integral term (accumulated error) with anti-windup protection
+        proposed_integral = max(-self.integral_limit, min(self.integral + error, self.integral_limit))
+        unsaturated_output = (
+            self.kp * error
+            + self.ki * proposed_integral
+            + self.kd * derivative
+        )
+        if (unsaturated_output > self.max_insulin and error > 0) or (
+            unsaturated_output < self.min_insulin and error < 0
+        ):
+            self._log_reason(
+                "Integral term held to prevent windup while output is saturated",
+                "control_parameter",
+                self.integral,
+            )
+        else:
+            self.integral = proposed_integral
+            self._log_reason("Integral term updated", "control_parameter", self.integral)
         
         # PID formula
         insulin_dose = (self.kp * error + 
