@@ -111,6 +111,7 @@ def test_live_patient_api_sets_security_headers(tmp_path) -> None:
     assert response.headers["pragma"] == "no-cache"
     assert response.headers["referrer-policy"] == "no-referrer"
     assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["x-iints-version"]
     assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
     assert "'unsafe-inline'" not in response.headers["content-security-policy"]
     assert "nonce-" in response.headers["content-security-policy"]

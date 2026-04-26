@@ -65,6 +65,7 @@ Important:
 - before `iints quickstart`, commands can be run from any folder
 - after `iints quickstart`, move into the generated project folder
 - repository helper scripts such as `./scripts/run_live_stage_demo.sh` belong to the SDK repository, not the quickstart project
+- custom algorithms can be installed later with `iints plugin install algorithms/my_algo.py`
 
 ## 5) Run A Baseline Simulation
 
@@ -110,7 +111,7 @@ A typical run writes:
 - `clinical_report.pdf`: summary report for review
 - `audit/`: safety and decision trail
 - `run_manifest.json`: file hashes for reproducibility
-- `run_metadata.json`: run configuration and environment details
+- `run_metadata.json`: run configuration, environment details, SDK version, and data-format versions
 - `certification.json`: trust grade and dataset checks after `iints data certify`
 
 ## 9) Build A Study-Ready Bundle

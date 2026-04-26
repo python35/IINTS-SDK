@@ -11,6 +11,11 @@ from pydantic import BaseModel, Field
 from .edge_ops import summarize_edge_workspace
 from .runtime import PatientRuntimeStore
 
+try:
+    from iints import __version__ as IINTS_SDK_VERSION
+except Exception:  # pragma: no cover - defensive fallback during unusual imports
+    IINTS_SDK_VERSION = "unknown"
+
 
 class MealRequest(BaseModel):
     carbs: float = Field(..., gt=0.0, description="Meal carbohydrate amount in grams")
@@ -28,6 +33,7 @@ SECURITY_RESPONSE_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
+    "X-IINTS-Version": IINTS_SDK_VERSION,
 }
 
 

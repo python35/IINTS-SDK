@@ -12,72 +12,73 @@ description = "A pre-clinical Edge-AI SDK for diabetes management validation."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE", "LICENSE-MIT-IINTS-LEGACY"]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.15"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: OS Independent",
     "Development Status :: 5 - Production/Stable",
 ]
 dependencies = [
-    "fastapi>=0.115.0",
-    "numpy>=1.24.0",
-    "pandas>=2.0.0",
-    "pydantic>=2.0.0",
-    "PyYAML",
-    "rich>=12.0.0",
-    "scipy>=1.9.0",
-    "typer[all]",
-    "uvicorn>=0.30.0",
+    "fastapi>=0.115.0,<1.0.0",
+    "numpy>=1.24.0,<3.0.0",
+    "pandas>=2.0.0,<3.0.0",
+    "pydantic>=2.0.0,<3.0.0",
+    "PyYAML>=6.0.0,<7.0.0",
+    "rich>=12.0.0,<15.0.0",
+    "scipy>=1.9.0,<2.0.0",
+    "typer[all]>=0.9.0,<1.0.0",
+    "uvicorn>=0.30.0,<1.0.0",
 ]
 
 [project.optional-dependencies]
 edge = [
-  "pyserial>=3.5",
+  "pyserial>=3.5,<4.0",
 ]
 reports = [
-  "fpdf2>=2.8.0",
-  "matplotlib>=3.5.0",
-  "openpyxl>=3.0.0",
-  "pillow>=12.1.1",
-  "seaborn>=0.11.0",
+  "fpdf2>=2.8.0,<3.0.0",
+  "matplotlib>=3.5.0,<4.0.0",
+  "openpyxl>=3.0.0,<4.0.0",
+  "pillow>=12.1.1,<13.0.0",
+  "seaborn>=0.11.0,<1.0.0",
 ]
 full = [
-  "fpdf2>=2.8.0",
-  "matplotlib>=3.5.0",
-  "openpyxl>=3.0.0",
-  "pyserial>=3.5",
-  "pillow>=12.1.1",
-  "seaborn>=0.11.0",
+  "fpdf2>=2.8.0,<3.0.0",
+  "matplotlib>=3.5.0,<4.0.0",
+  "openpyxl>=3.0.0,<4.0.0",
+  "pyserial>=3.5,<4.0",
+  "pillow>=12.1.1,<13.0.0",
+  "seaborn>=0.11.0,<1.0.0",
 ]
 dev = [
-  "pytest>=7.0.0",
-  "hypothesis>=6.0.0",
-  "flake8",
-  "httpx>=0.27.0",
-  "mypy",
-  "pandas-stubs",
-  "types-PyYAML",
-  "types-psutil",
+  "pytest>=7.0.0,<10.0.0",
+  "hypothesis>=6.0.0,<7.0.0",
+  "flake8>=7.0.0,<8.0.0",
+  "httpx>=0.27.0,<1.0.0",
+  "mypy>=1.8.0,<2.0.0",
+  "pandas-stubs>=2.0.0,<3.0.0",
+  "types-PyYAML>=6.0.0,<7.0.0",
+  "types-psutil>=7.0.0,<8.0.0",
 ]
 torch = [
-  "torch>=1.9.0",
+  "torch>=1.9.0,<3.0.0",
 ]
 nightscout = [
   "py-nightscout",
 ]
 research = [
-  "torch>=2.0.0",
-  "pyarrow>=12.0.0",
-  "h5py>=3.10.0",
-  "onnx>=1.16.0",
-  "onnxscript>=0.1.0",
+  "torch>=2.0.0,<3.0.0",
+  "pyarrow>=12.0.0,<25.0.0",
+  "h5py>=3.10.0,<4.0.0",
+  "onnx>=1.16.0,<2.0.0",
+  "onnxscript>=0.1.0,<1.0.0",
 ]
 mdmp = [
-  "cryptography>=42.0.0",
+  "cryptography>=42.0.0,<47.0.0",
 ]
 
 [project.scripts]

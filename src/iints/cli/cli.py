@@ -40,7 +40,15 @@ from iints.analysis.study_analysis import analyze_study_directory, compare_studi
 from iints.analysis.study_experiment import load_study_experiment_config
 from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
 from iints.analysis.study_protocol import write_study_protocol_bundle
-from iints.api.registry import list_algorithm_plugins
+from iints.api.registry import (
+    get_plugin_home,
+    install_algorithm_plugin,
+    install_file_plugin,
+    list_algorithm_plugins,
+    list_local_plugin_records,
+    uninstall_local_plugin,
+)
+from iints.core.patient.patient_factory import BERGMAN_AVAILABLE, SIMGLUCOSE_AVAILABLE
 from iints.core.patient.profile import PatientProfile
 from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.core.safety import SafetyConfig
@@ -193,6 +201,9 @@ data_app = typer.Typer(help="Data import, certification, and public data packs."
 mdmp_app = typer.Typer(help="Legacy MDMP namespace kept for backwards compatibility.")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
+plugin_app = typer.Typer(help="Install and manage local IINTS extension plugins.")
+plugin_register_app = typer.Typer(help="Register a local plugin file by extension kind.")
+patientmodel_app = typer.Typer(help="Patient model registry and extension discovery.")
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 app.add_typer(docs_app, name="docs")
@@ -203,6 +214,9 @@ app.add_typer(mdmp_app, name="mdmp", hidden=True, deprecated=True)
 app.add_typer(ai_app, name="ai")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
+app.add_typer(plugin_app, name="plugin")
+plugin_app.add_typer(plugin_register_app, name="register")
+app.add_typer(patientmodel_app, name="patientmodel")
 app.add_typer(edge_app, name="edge")
 app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
@@ -1621,10 +1635,13 @@ def _load_algorithm_plugin_instance(display_name: str) -> iints.InsulinAlgorithm
         match = next((entry for entry in entries if entry.name == display_name and entry.status == "available"), None)
         algorithm_class = None
         if match is not None:
-            class_path = match.class_path.replace(":", ".")
-            module_name, class_name = class_path.rsplit(".", 1)
-            module = importlib.import_module(module_name)
-            algorithm_class = getattr(module, class_name)
+            if match.plugin_path:
+                algorithm_class = _load_algorithm_class_silent(Path(match.plugin_path))
+            else:
+                class_path = match.class_path.replace(":", ".")
+                module_name, class_name = class_path.rsplit(".", 1)
+                module = importlib.import_module(module_name)
+                algorithm_class = getattr(module, class_name)
         else:
             fallback_registry = {
                 "Clinical Baseline": ("iints.core.algorithms.clinical_baseline", "ClinicalBaselineAlgorithm"),
@@ -6809,6 +6826,166 @@ def algorithms_info(
         console.print(f"[bold red]Error:[/bold red] {entry.error}")
     if entry.metadata:
         console.print_json(json.dumps(entry.metadata.to_dict(), indent=2))
+
+
+def _print_plugin_record(console: Console, record_name: str, record_kind: str, installed_path: str) -> None:
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Name: {record_name}",
+                    f"Kind: {record_kind}",
+                    f"Installed file: {installed_path}",
+                    f"Registry: {get_plugin_home() / 'registry.json'}",
+                ]
+            ),
+            title="Plugin Registered",
+            border_style="green",
+        )
+    )
+
+
+@plugin_app.command(name="install")
+def plugin_install(
+    path: Annotated[Path, typer.Argument(help="Path to a local InsulinAlgorithm .py file")],
+    name: Annotated[Optional[str], typer.Option(help="Optional display name override")] = None,
+):
+    """Install a local algorithm plugin without modifying SDK source code."""
+    console = Console()
+    try:
+        record = install_algorithm_plugin(path, name=name)
+    except Exception as exc:
+        console.print(f"[bold red]Plugin install failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_plugin_record(console, record.name, record.kind, record.installed_path)
+    console.print("[cyan]Next:[/cyan] iints algorithms list")
+
+
+@plugin_register_app.command(name="algo")
+def plugin_register_algo(
+    path: Annotated[Path, typer.Argument(help="Path to a local InsulinAlgorithm .py file")],
+    name: Annotated[Optional[str], typer.Option(help="Optional display name override")] = None,
+):
+    """Register a local algorithm plugin file."""
+    plugin_install(path, name=name)
+
+
+@plugin_register_app.command(name="patient-model")
+def plugin_register_patient_model(
+    path: Annotated[Path, typer.Argument(help="Path to a local patient model .py file")],
+    name: Annotated[Optional[str], typer.Option(help="Optional display name override")] = None,
+):
+    """Register a patient model extension for discovery and documentation."""
+    console = Console()
+    try:
+        record = install_file_plugin("patient_model", path, name=name)
+    except Exception as exc:
+        console.print(f"[bold red]Patient model plugin registration failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_plugin_record(console, record.name, record.kind, record.installed_path)
+    console.print("[cyan]Next:[/cyan] iints patientmodel list")
+
+
+@plugin_register_app.command(name="data-source")
+def plugin_register_data_source(
+    path: Annotated[Path, typer.Argument(help="Path to a local data source .py file")],
+    name: Annotated[Optional[str], typer.Option(help="Optional display name override")] = None,
+):
+    """Register a data source extension for future import hooks."""
+    console = Console()
+    try:
+        record = install_file_plugin("data_source", path, name=name)
+    except Exception as exc:
+        console.print(f"[bold red]Data source plugin registration failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_plugin_record(console, record.name, record.kind, record.installed_path)
+
+
+@plugin_register_app.command(name="validator")
+def plugin_register_validator(
+    path: Annotated[Path, typer.Argument(help="Path to a local validator .py file")],
+    name: Annotated[Optional[str], typer.Option(help="Optional display name override")] = None,
+):
+    """Register a validation extension for future safety-check hooks."""
+    console = Console()
+    try:
+        record = install_file_plugin("validator", path, name=name)
+    except Exception as exc:
+        console.print(f"[bold red]Validator plugin registration failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_plugin_record(console, record.name, record.kind, record.installed_path)
+
+
+@plugin_app.command(name="list")
+def plugin_list(
+    kind: Annotated[Optional[str], typer.Option(help="Filter by kind: algorithm, patient_model, data_source, validator")] = None,
+):
+    """List locally installed extension plugins."""
+    console = Console()
+    try:
+        records = list_local_plugin_records(kind.replace("-", "_") if kind else None)
+    except Exception as exc:
+        console.print(f"[bold red]Could not read local plugin registry:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title=f"IINTS Local Plugins ({get_plugin_home()})")
+    table.add_column("Kind", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Installed file", overflow="fold")
+    table.add_column("Registered UTC", style="yellow")
+    for record in records:
+        table.add_row(record.kind, record.name, record.installed_path, record.registered_at_utc)
+    console.print(table)
+    if not records:
+        console.print("[yellow]No local plugins installed yet.[/yellow]")
+        console.print("[cyan]Try:[/cyan] iints plugin install algorithms/example_algorithm.py")
+
+
+@plugin_app.command(name="uninstall")
+def plugin_uninstall(
+    name: Annotated[str, typer.Argument(help="Local plugin display name")],
+    kind: Annotated[Optional[str], typer.Option(help="Optional kind filter")] = None,
+    remove_file: Annotated[bool, typer.Option(help="Also delete the copied plugin file from the plugin home")] = False,
+):
+    """Remove a local plugin registry entry."""
+    console = Console()
+    removed = uninstall_local_plugin(name, kind=kind.replace("-", "_") if kind else None, remove_file=remove_file)
+    if not removed:
+        console.print(f"[bold red]No local plugin named '{name}' was found.[/bold red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Removed local plugin:[/green] {name}")
+
+
+@patientmodel_app.command(name="list")
+def patientmodel_list():
+    """List built-in and locally registered patient model options."""
+    console = Console()
+    table = Table(title="IINTS Patient Models")
+    table.add_column("Name", style="green")
+    table.add_column("Source", style="cyan")
+    table.add_column("Status", style="yellow")
+    table.add_column("Notes", overflow="fold")
+    table.add_row("custom", "builtin", "available", "Lightweight deterministic educational model.")
+    table.add_row(
+        "bergman",
+        "builtin",
+        "available" if BERGMAN_AVAILABLE else "fallback",
+        "ODE-based model; falls back to custom when scipy/Bergman support is unavailable.",
+    )
+    table.add_row(
+        "simglucose",
+        "optional",
+        "available" if SIMGLUCOSE_AVAILABLE else "missing optional dependency",
+        "FDA-style virtual patient set when simglucose is installed.",
+    )
+    try:
+        for record in list_local_plugin_records("patient_model"):
+            table.add_row(record.name, "local", "registered", record.installed_path)
+    except Exception as exc:
+        table.add_row("local registry", "local", "unavailable", str(exc))
+    console.print(table)
+
+
 @docs_app.command(name="algo")
 def docs_algo(
     algo_path: Annotated[Path, typer.Option(help="Path to the algorithm Python file to document")],

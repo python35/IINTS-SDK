@@ -20,6 +20,10 @@ try:
 except Exception:  # pragma: no cover - stdlib fallback
     pkg_version = None  # type: ignore[assignment]
 
+RUN_METADATA_FORMAT_VERSION = "1.0"
+RUN_MANIFEST_FORMAT_VERSION = "1.0"
+RESULTS_CSV_FORMAT_VERSION = "1.0"
+
 
 def resolve_seed(seed: Optional[int]) -> int:
     if seed is None:
@@ -94,11 +98,17 @@ def build_run_metadata(run_id: str, seed: int, config: Dict[str, Any], output_di
         git_sha = "unknown"
 
     return {
+        "schema_version": RUN_METADATA_FORMAT_VERSION,
         "run_id": run_id,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "seed": seed,
         "output_dir": str(output_dir),
         "sdk_version": get_sdk_version(),
+        "format_versions": {
+            "run_metadata": RUN_METADATA_FORMAT_VERSION,
+            "run_manifest": RUN_MANIFEST_FORMAT_VERSION,
+            "results_csv": RESULTS_CSV_FORMAT_VERSION,
+        },
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
         "git_sha": git_sha,
@@ -117,6 +127,7 @@ def compute_sha256(path: Path) -> str:
 
 def build_run_manifest(output_dir: Path, files: Dict[str, Path]) -> Dict[str, Any]:
     manifest: Dict[str, Any] = {
+        "schema_version": RUN_MANIFEST_FORMAT_VERSION,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "output_dir": str(output_dir),
         "files": {},

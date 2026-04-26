@@ -66,6 +66,57 @@ Run a matrix of scenarios in parallel.
 ### `iints benchmark`
 Compare algorithms across standard workloads.
 
+## Extension Commands
+
+### `iints plugin install`
+Install a local algorithm plugin without editing SDK source code.
+
+```bash
+iints plugin install algorithms/my_algo.py
+iints algorithms list
+```
+
+The SDK copies the file into the local plugin home and records it in
+`~/.iints/plugins/registry.json`. For tests or portable environments, set
+`IINTS_PLUGIN_HOME` to another folder.
+
+### `iints plugin register`
+Register extension files by kind.
+
+```bash
+iints plugin register algo algorithms/my_algo.py
+iints plugin register patient-model patient_models/my_model.py --name "My Model"
+iints plugin register data-source data_sources/my_importer.py
+iints plugin register validator validators/my_check.py
+```
+
+Algorithm plugins become visible in `iints algorithms list`. Patient model,
+data source, and validator plugins are registered for discovery/documentation
+hooks so the SDK can grow without source-code edits.
+
+### `iints plugin list`
+Show local extension plugins.
+
+```bash
+iints plugin list
+iints plugin list --kind algorithm
+```
+
+### `iints plugin uninstall`
+Remove a local plugin registry entry.
+
+```bash
+iints plugin uninstall "My Algorithm"
+iints plugin uninstall "My Algorithm" --remove-file
+```
+
+### `iints patientmodel list`
+Show built-in and locally registered patient models.
+
+```bash
+iints patientmodel list
+```
+
 ## Study / Research Commands
 
 ### `iints study-protocol`
