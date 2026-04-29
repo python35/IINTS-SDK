@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import tempfile
 from pathlib import Path
@@ -10,12 +11,19 @@ from typing import Any, Dict, List
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "iints-mpl"))
 os.environ.setdefault("XDG_CACHE_HOME", str(Path(tempfile.gettempdir()) / "iints-cache"))
 
-from iints.utils.run_io import build_run_manifest
+REPO_ROOT = Path(__file__).resolve().parents[2]
+RUN_IO_PATH = REPO_ROOT / "src" / "iints" / "utils" / "run_io.py"
+RUN_IO_SPEC = importlib.util.spec_from_file_location("_iints_run_io", RUN_IO_PATH)
+assert RUN_IO_SPEC is not None
+assert RUN_IO_SPEC.loader is not None
+RUN_IO_MODULE = importlib.util.module_from_spec(RUN_IO_SPEC)
+RUN_IO_SPEC.loader.exec_module(RUN_IO_MODULE)
+build_run_manifest = RUN_IO_MODULE.build_run_manifest
 
 
 def _check_license() -> List[str]:
     issues: List[str] = []
-    license_path = Path("LICENSE")
+    license_path = REPO_ROOT / "LICENSE"
     if not license_path.exists():
         return ["Missing LICENSE file."]
     text = license_path.read_text(encoding="utf-8").strip()
@@ -26,7 +34,7 @@ def _check_license() -> List[str]:
 
 def _check_sbom() -> List[str]:
     issues: List[str] = []
-    sbom_path = Path("sbom.json")
+    sbom_path = REPO_ROOT / "sbom.json"
     if not sbom_path.exists():
         return ["Missing sbom.json. Generate SBOM before governance checks."]
     try:
@@ -45,7 +53,7 @@ def _check_sbom() -> List[str]:
 
 def _check_dataset_licenses() -> List[str]:
     issues: List[str] = []
-    registry_path = Path("src/iints/data/datasets.json")
+    registry_path = REPO_ROOT / "src/iints/data/datasets.json"
     payload = json.loads(registry_path.read_text(encoding="utf-8"))
     if not isinstance(payload, list):
         return ["src/iints/data/datasets.json must be a list."]

@@ -1,15 +1,20 @@
-# Core Simulatie & AI
-numpy>=1.24.0
-pandas>=2.0.0
-pydantic>=2.0.0
-scipy>=1.9.0
+# Runtime dependency snapshot for governance and vulnerability auditing.
+# Keep this aligned with `pyproject.toml` and avoid platform-specific build
+# requirements that are not part of the published SDK runtime.
 
-# Visualisatie & Demo
-pygame>=2.6.1
-matplotlib>=3.5.0
-seaborn>=0.11.0
-rich>=12.0.0
+fastapi>=0.115.0,<1.0.0
+numpy>=1.24.0,<3.0.0
+pandas>=2.0.0,<3.0.0
+pydantic>=2.0.0,<3.0.0
+PyYAML>=6.0.0,<7.0.0
+rich>=12.0.0,<15.0.0
+scipy>=1.9.0,<2.0.0
+typer>=0.9.0,<1.0.0
+uvicorn>=0.30.0,<1.0.0
 
-# Rapportage
-fpdf2>=2.8.0
-pillow>=12.1.1
+# Reporting stack used by the main publish/report flows.
+fpdf2>=2.8.0,<3.0.0
+matplotlib>=3.5.0,<4.0.0
+openpyxl>=3.0.0,<4.0.0
+pillow>=12.1.1,<13.0.0
+seaborn>=0.11.0,<1.0.0
