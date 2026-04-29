@@ -16,8 +16,13 @@ def _load_governance_module():
 
 def test_governance_uses_repo_root_for_license(monkeypatch, tmp_path) -> None:
     module = _load_governance_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "LICENSE").write_text("Apache License 2.0", encoding="utf-8")
+    outside_dir = tmp_path / "outside"
+    outside_dir.mkdir()
 
-    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(module, "REPO_ROOT", repo_root)
+    monkeypatch.chdir(outside_dir)
 
-    assert (module.REPO_ROOT / "LICENSE").is_file()
     assert module._check_license() == []
