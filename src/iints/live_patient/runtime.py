@@ -10,6 +10,7 @@ import sqlite3
 import sys
 import threading
 import time
+from contextlib import closing
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -295,7 +296,7 @@ class PatientRuntimeStore:
         return connection
 
     def _initialize(self) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 """
@@ -410,18 +411,18 @@ class PatientRuntimeStore:
             "last_event_summary": "UPDATE runtime_status SET last_event_summary = ? WHERE id = 1",
             "message": "UPDATE runtime_status SET message = ? WHERE id = 1",
         }
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             for key, value in updates.items():
                 conn.execute(query_map[key], (value,))
             conn.commit()
 
     def read_status(self) -> dict[str, Any]:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             row = conn.execute("SELECT * FROM runtime_status WHERE id = 1").fetchone()
         return dict(row) if row is not None else {}
 
     def append_reading(self, payload: dict[str, Any], *, event_summary: str = "") -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             conn.execute(
                 """
                 INSERT INTO readings (
@@ -447,7 +448,7 @@ class PatientRuntimeStore:
             conn.commit()
 
     def get_recent_readings(self, limit: int = 288) -> list[dict[str, Any]]:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             rows = conn.execute(
                 "SELECT * FROM readings ORDER BY id DESC LIMIT ?",
                 (max(1, int(limit)),),
@@ -455,12 +456,12 @@ class PatientRuntimeStore:
         return [dict(row) for row in reversed(rows)]
 
     def get_latest_reading(self) -> dict[str, Any] | None:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             row = conn.execute("SELECT * FROM readings ORDER BY id DESC LIMIT 1").fetchone()
         return dict(row) if row is not None else None
 
     def enqueue_command(self, command: str, payload: dict[str, Any] | None = None) -> int:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             cursor = conn.execute(
                 "INSERT INTO commands (command, payload_json, status, created_at_utc) VALUES (?, ?, 'pending', ?)",
                 (command, json.dumps(payload or {}, sort_keys=True), _now_utc()),
@@ -470,7 +471,7 @@ class PatientRuntimeStore:
             return int(lastrowid) if lastrowid is not None else 0
 
     def fetch_pending_commands(self) -> list[dict[str, Any]]:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             conn.execute("BEGIN IMMEDIATE")
             rows = conn.execute(
                 "SELECT * FROM commands WHERE status = 'pending' ORDER BY id ASC"
@@ -489,7 +490,7 @@ class PatientRuntimeStore:
         return commands
 
     def complete_command(self, command_id: int, *, status: str, result: dict[str, Any] | None = None) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             conn.execute(
                 "UPDATE commands SET status = ?, processed_at_utc = ?, result_json = ? WHERE id = ?",
                 (status, _now_utc(), json.dumps(result or {}, sort_keys=True), int(command_id)),
@@ -499,7 +500,7 @@ class PatientRuntimeStore:
     def await_command(self, command_id: int, timeout_seconds: float = 5.0) -> dict[str, Any] | None:
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
-            with self._lock, self._connect() as conn:
+            with self._lock, closing(self._connect()) as conn:
                 row = conn.execute("SELECT * FROM commands WHERE id = ?", (int(command_id),)).fetchone()
             if row is None:
                 return None
@@ -511,13 +512,13 @@ class PatientRuntimeStore:
         return None
 
     def clear_runtime_data(self) -> None:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             conn.execute("DELETE FROM readings")
             conn.execute("DELETE FROM commands WHERE status != 'pending'")
             conn.commit()
 
     def build_audit_summary(self) -> dict[str, Any]:
-        with self._lock, self._connect() as conn:
+        with self._lock, closing(self._connect()) as conn:
             total_steps = int(conn.execute("SELECT COUNT(*) FROM readings").fetchone()[0])
             total_overrides = int(conn.execute("SELECT COUNT(*) FROM readings WHERE safety_triggered = 1").fetchone()[0])
             reasons_rows = conn.execute(
