@@ -28,6 +28,28 @@ def _flat_meal_trace() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _late_insulin_trace() -> pd.DataFrame:
+    rows = []
+    meals = {420: 45.0, 720: 65.0, 1080: 80.0}
+    insulin = {540: 3.5, 840: 5.5, 1200: 6.5}
+    for timestamp in range(0, 1440, 5):
+        glucose = 109.0
+        for meal_time, carbs in meals.items():
+            dt = timestamp - meal_time
+            if dt > 0:
+                glucose += min(70.0, carbs * 0.9 * (1.0 - pow(2.718281828, -dt / 55.0))) * pow(2.718281828, -max(dt - 80.0, 0.0) / 180.0)
+        glucose += 4.0 * ((timestamp % 1440) / 1440.0)
+        rows.append(
+            {
+                "timestamp": timestamp,
+                "glucose": round(glucose, 1),
+                "carbs": meals.get(timestamp, 0.0),
+                "insulin": insulin.get(timestamp, 0.0),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def test_realism_validator_accepts_bundled_demo_trace() -> None:
     demo_df = load_demo_dataframe()
     standard_df = import_cgm_dataframe(demo_df, data_format="generic", source="demo")
@@ -38,6 +60,7 @@ def test_realism_validator_accepts_bundled_demo_trace() -> None:
     assert report.metrics["meal_count"] == 4
     assert report.metrics["insulin_event_count"] == 4
     assert any(check.code == "meal_response" and check.status == "passed" for check in report.checks)
+    assert any(check.code == "causal_alignment" and check.status == "passed" for check in report.checks)
 
 
 def test_realism_validator_flags_flat_too_neat_trace() -> None:
@@ -47,6 +70,15 @@ def test_realism_validator_flags_flat_too_neat_trace() -> None:
     statuses = {check.code: check.status for check in report.checks}
     assert statuses["glucose_variability"] == "failed"
     assert statuses["event_balance"] == "failed"
+
+
+def test_realism_validator_flags_late_insulin_causal_mismatch() -> None:
+    report = validate_realism_dataset(_late_insulin_trace())
+
+    statuses = {check.code: check.status for check in report.checks}
+    assert statuses["meal_response"] == "passed"
+    assert statuses["event_balance"] == "passed"
+    assert statuses["causal_alignment"] == "failed"
 
 
 def test_data_realism_check_cli_writes_json_and_gates_verdict(tmp_path) -> None:

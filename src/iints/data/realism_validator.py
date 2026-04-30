@@ -53,8 +53,10 @@ class MealResponse:
     peak_glucose_mgdl: float
     rise_mgdl: float
     peak_lag_minutes: float
+    matched_insulin_units: float
+    insulin_lead_minutes: float | None = None
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> Dict[str, float | None]:
         return {
             "meal_time_minutes": round(self.meal_time_minutes, 3),
             "carbs_grams": round(self.carbs_grams, 3),
@@ -62,6 +64,8 @@ class MealResponse:
             "peak_glucose_mgdl": round(self.peak_glucose_mgdl, 3),
             "rise_mgdl": round(self.rise_mgdl, 3),
             "peak_lag_minutes": round(self.peak_lag_minutes, 3),
+            "matched_insulin_units": round(self.matched_insulin_units, 3),
+            "insulin_lead_minutes": _round_or_none(self.insulin_lead_minutes),
         }
 
 
@@ -122,6 +126,9 @@ def _evaluate_meal_responses(
     pre_window_minutes: float = 30.0,
     post_peak_start_minutes: float = 20.0,
     post_peak_end_minutes: float = 180.0,
+    insulin_match_window_before_minutes: float = 45.0,
+    insulin_match_window_after_minutes: float = 20.0,
+    insulin_event_threshold_units: float = 0.3,
 ) -> List[MealResponse]:
     meals = _meal_rows(df, min_meal_grams=min_meal_grams)
     responses: List[MealResponse] = []
@@ -142,6 +149,16 @@ def _evaluate_meal_responses(
         peak_idx = pd.to_numeric(post["glucose"], errors="coerce").idxmax()
         peak_glucose = float(pd.to_numeric(pd.Series([post.loc[peak_idx, "glucose"]]), errors="coerce").iloc[0])
         peak_time = float(pd.to_numeric(pd.Series([post.loc[peak_idx, "timestamp"]]), errors="coerce").iloc[0])
+        insulin_window = df[
+            (df["timestamp"] >= meal_time - insulin_match_window_before_minutes)
+            & (df["timestamp"] <= meal_time + insulin_match_window_after_minutes)
+            & (df["insulin"] >= insulin_event_threshold_units)
+        ]
+        matched_insulin_units = float(pd.to_numeric(insulin_window["insulin"], errors="coerce").fillna(0.0).sum())
+        insulin_lead_minutes: float | None = None
+        if not insulin_window.empty:
+            first_insulin_time = float(pd.to_numeric(insulin_window["timestamp"], errors="coerce").iloc[0])
+            insulin_lead_minutes = meal_time - first_insulin_time
         responses.append(
             MealResponse(
                 meal_time_minutes=meal_time,
@@ -150,9 +167,23 @@ def _evaluate_meal_responses(
                 peak_glucose_mgdl=peak_glucose,
                 rise_mgdl=peak_glucose - baseline,
                 peak_lag_minutes=peak_time - meal_time,
+                matched_insulin_units=matched_insulin_units,
+                insulin_lead_minutes=insulin_lead_minutes,
             )
         )
     return responses
+
+
+def _correlation(values_a: np.ndarray, values_b: np.ndarray) -> float | None:
+    if len(values_a) < 3 or len(values_b) < 3:
+        return None
+    if np.allclose(values_a, values_a[0]) or np.allclose(values_b, values_b[0]):
+        return None
+    matrix = np.corrcoef(values_a, values_b)
+    corr = float(matrix[0, 1])
+    if not np.isfinite(corr):
+        return None
+    return corr
 
 
 def _check_quality_basics(df: pd.DataFrame, *, expected_interval_minutes: int) -> tuple[RealismCheck, Dict[str, Any]]:
@@ -377,6 +408,115 @@ def _check_meal_response(
     )
 
 
+def _check_causal_alignment(
+    responses: Sequence[MealResponse],
+    *,
+    meal_count: int,
+) -> RealismCheck:
+    if meal_count == 0:
+        return RealismCheck(
+            code="causal_alignment",
+            title="Meal-insulin-glucose causal alignment",
+            status="skipped",
+            severity="info",
+            detail="No meal annotations were present, so causal alignment could not be evaluated.",
+        )
+    if not responses:
+        return RealismCheck(
+            code="causal_alignment",
+            title="Meal-insulin-glucose causal alignment",
+            status="warning",
+            severity="warning",
+            detail="Meal annotations exist, but there was not enough surrounding data to test causal alignment.",
+            score_impact=0.08,
+            metrics={"assessed_meals": 0, "meal_count": meal_count},
+        )
+
+    coherent_flags: list[bool] = []
+    carb_values = np.array([response.carbs_grams for response in responses], dtype=float)
+    rise_values = np.array([response.rise_mgdl for response in responses], dtype=float)
+    insulin_values = np.array([response.matched_insulin_units for response in responses], dtype=float)
+    matched_mask = insulin_values >= 0.3
+    carb_rise_corr = _correlation(carb_values, rise_values)
+    carb_insulin_corr = _correlation(carb_values[matched_mask], insulin_values[matched_mask]) if matched_mask.sum() >= 3 else None
+
+    for response in responses:
+        response_visible = response.rise_mgdl >= 15.0 and 20.0 <= response.peak_lag_minutes <= 180.0
+        if response.carbs_grams < 20.0:
+            response_visible = response.rise_mgdl >= 8.0 and 15.0 <= response.peak_lag_minutes <= 180.0
+        insulin_present = response.matched_insulin_units >= 0.3
+        insulin_timing_ok = True
+        insulin_ratio_ok = True
+        if insulin_present:
+            assert response.insulin_lead_minutes is not None
+            insulin_timing_ok = -20.0 <= response.insulin_lead_minutes <= 60.0
+            insulin_ratio = response.matched_insulin_units / max(response.carbs_grams, 1.0)
+            insulin_ratio_ok = 0.02 <= insulin_ratio <= 0.35
+        else:
+            insulin_ratio = None
+
+        if response.carbs_grams >= 25.0:
+            coherent = response_visible and insulin_present and insulin_timing_ok and insulin_ratio_ok
+        else:
+            coherent = response_visible and (not insulin_present or (insulin_timing_ok and insulin_ratio_ok))
+        coherent_flags.append(coherent)
+
+    coherent_ratio = float(np.mean(coherent_flags)) if coherent_flags else 0.0
+    metrics = {
+        "assessed_meals": len(responses),
+        "coherent_meals": int(sum(coherent_flags)),
+        "coherent_ratio": _round_or_none(coherent_ratio, 4),
+        "matched_insulin_meals": int(matched_mask.sum()),
+        "median_insulin_lead_minutes": _round_or_none(
+            float(np.median([response.insulin_lead_minutes for response in responses if response.insulin_lead_minutes is not None]))
+            if any(response.insulin_lead_minutes is not None for response in responses)
+            else None
+        ),
+        "carb_rise_correlation": _round_or_none(carb_rise_corr, 4),
+        "carb_insulin_correlation": _round_or_none(carb_insulin_corr, 4),
+    }
+
+    if coherent_ratio < 0.5 or (carb_rise_corr is not None and carb_rise_corr < 0.0):
+        return RealismCheck(
+            code="causal_alignment",
+            title="Meal-insulin-glucose causal alignment",
+            status="failed",
+            severity="critical",
+            detail=(
+                f"Meal inputs do not align causally with insulin timing and glucose responses. "
+                f"Only {int(sum(coherent_flags))}/{len(responses)} assessed meals followed a believable meal-insulin-glucose chain."
+            ),
+            score_impact=0.18,
+            metrics=metrics,
+        )
+    if coherent_ratio < 0.75 or (carb_rise_corr is not None and carb_rise_corr < 0.2) or (
+        carb_insulin_corr is not None and carb_insulin_corr < 0.25
+    ):
+        return RealismCheck(
+            code="causal_alignment",
+            title="Meal-insulin-glucose causal alignment",
+            status="warning",
+            severity="warning",
+            detail=(
+                f"Causal alignment is only partial: {int(sum(coherent_flags))}/{len(responses)} assessed meals "
+                f"showed believable insulin timing and glucose follow-through."
+            ),
+            score_impact=0.08,
+            metrics=metrics,
+        )
+    return RealismCheck(
+        code="causal_alignment",
+        title="Meal-insulin-glucose causal alignment",
+        status="passed",
+        severity="info",
+        detail=(
+            f"Meal size, insulin timing, and glucose excursions line up coherently across "
+            f"{int(sum(coherent_flags))}/{len(responses)} assessed meals."
+        ),
+        metrics=metrics,
+    )
+
+
 def _check_overnight_shape(df: pd.DataFrame, *, overall_sd: float) -> RealismCheck:
     minute_of_day = pd.to_numeric(df["timestamp"], errors="coerce").mod(1440.0)
     overnight = df[(minute_of_day >= 0.0) & (minute_of_day < 360.0)]
@@ -483,6 +623,7 @@ def validate_realism_dataset(
         _check_variability(summary_metrics, meal_count=meal_count),
         _check_event_balance(meal_count=meal_count, insulin_event_count=insulin_events),
         _check_meal_response(responses, meal_count=meal_count),
+        _check_causal_alignment(responses, meal_count=meal_count),
         _check_overnight_shape(df, overall_sd=float(clinical.sd)),
     ]
 
