@@ -5,12 +5,66 @@
     "source": "IINTS-AF",
     "access": "bundled",
     "license": "Demo-only (bundled with SDK)",
-    "description": "Tiny CGM sample for quickstart and offline demos.",
+    "description": "Bundled full-day demo trace with meal and bolus annotations for quickstarts, reporting, and offline demos.",
     "bundled_path": "demo/demo_cgm.csv",
-    "sha256": "e869e033887e595ab4c41cb14cde6f2328cc9d55e0fb2c741e7fbe3e0ae3af96",
+    "sha256": "6a8916ec0f5f41bfe77a4bd5664355996ec1bfbc38aa3353fd35b47574c80381",
     "citation": {
-      "text": "IINTS-AF Team. IINTS Sample CGM (bundled). Accessed 2026-02-16.",
-      "bibtex": "@misc{iints_sample_cgm, title={IINTS Sample CGM (bundled)}, author={IINTS-AF Team}, year={2026}, note={Bundled with IINTS-AF SDK, accessed 2026-02-16}}"
+      "text": "IINTS-AF Team. IINTS Sample CGM (bundled). Accessed 2026-04-30.",
+      "bibtex": "@misc{iints_sample_cgm, title={IINTS Sample CGM (bundled)}, author={IINTS-AF Team}, year={2026}, note={Bundled with IINTS-AF SDK, accessed 2026-04-30}}"
+    }
+  },
+  {
+    "id": "ohio_t1dm",
+    "name": "OhioT1DM Dataset",
+    "source": "UNC Charlotte Smart Health Lab",
+    "access": "request",
+    "license": "Research access on request (see dataset page)",
+    "description": "Eight weeks each for 12 people with type 1 diabetes; includes CGM, fingersticks, basal/bolus insulin, meals, exercise, sleep, work, stress, illness, and fitness-band physiology.",
+    "landing_page": "https://webpages.charlotte.edu/rbunescu/data/ohiot1dm/OhioT1DM-dataset.html",
+    "citation": {
+      "text": "Marling C, Bunescu R. The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020. The 6th International Workshop on Knowledge Discovery from Healthcare Data (KDH). Dataset access page accessed 2026-04-30. https://webpages.charlotte.edu/rbunescu/data/ohiot1dm/OhioT1DM-dataset.html",
+      "bibtex": "@inproceedings{marling2020ohiot1dm, title={The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020}, author={Marling, Cindy and Bunescu, Razvan}, booktitle={The 6th International Workshop on Knowledge Discovery from Healthcare Data (KDH)}, year={2020}, url={https://webpages.charlotte.edu/rbunescu/data/ohiot1dm/OhioT1DM-dataset.html}}"
+    }
+  },
+  {
+    "id": "diatrend",
+    "name": "DiaTrend Dataset",
+    "source": "Dartmouth College / Scientific Data",
+    "access": "request",
+    "license": "Controlled access via Synapse",
+    "description": "Controlled-access CGM and insulin pump dataset from 54 people with type 1 diabetes, with carb logs, bolus data, and selected pump settings.",
+    "landing_page": "https://doi.org/10.7303/syn38187184",
+    "citation": {
+      "text": "Prioleau T, Bartolome A, Comi R, Stanger C. DiaTrend: A dataset from advanced diabetes technology to enable development of novel analytic solutions. Scientific Data. 2023;10:556. doi:10.1038/s41597-023-02469-5. Synapse record accessed 2026-04-30 via https://doi.org/10.7303/syn38187184",
+      "bibtex": "@article{prioleau2023diatrend, title={DiaTrend: A dataset from advanced diabetes technology to enable development of novel analytic solutions}, author={Prioleau, Temiloluwa and Bartolome, Abigail and Comi, Richard and Stanger, Catherine}, journal={Scientific Data}, volume={10}, pages={556}, year={2023}, doi={10.1038/s41597-023-02469-5}}"
+    }
+  },
+  {
+    "id": "t1d_uom",
+    "name": "T1D-UOM Longitudinal Multimodal Dataset",
+    "source": "University of Manchester / Zenodo",
+    "access": "manual",
+    "license": "Open dataset on Zenodo (see record terms)",
+    "description": "Twelve-week multimodal dataset from 17 people with type 1 diabetes, including CGM, basal and bolus insulin, meal macronutrients, physical activity, and sleep.",
+    "landing_page": "https://doi.org/10.5281/zenodo.15806142",
+    "doi": "10.5281/zenodo.15806142",
+    "citation": {
+      "text": "Alsuhaymi A, Bilal A, Gasca Garcia D, Kongdee R, Lubasinski N, Thabit H, Nutter PW, Harper S. A Longitudinal Multimodal Dataset of Type 1 Diabetes. Scientific Data. 2025;12:1379. doi:10.1038/s41597-025-05695-1. Zenodo record accessed 2026-04-30 via https://doi.org/10.5281/zenodo.15806142",
+      "bibtex": "@article{alsuhaymi2025t1duom, title={A Longitudinal Multimodal Dataset of Type 1 Diabetes}, author={Alsuhaymi, Ashwaq and Bilal, Ahmad and Gasca Garcia, Daniel and Kongdee, Rujiravee and Lubasinski, Nicole and Thabit, Hood and Nutter, Paul W. and Harper, Simon}, journal={Scientific Data}, volume={12}, pages={1379}, year={2025}, doi={10.1038/s41597-025-05695-1}}"
+    }
+  },
+  {
+    "id": "t1d_granada",
+    "name": "T1DiabetesGranada Dataset",
+    "source": "University of Granada / Zenodo",
+    "access": "request",
+    "license": "Zenodo Data Usage Agreement / specific-permission access",
+    "description": "Longitudinal flash glucose, demographic, diagnostic, and biochemical dataset spanning four years and 736 people with type 1 diabetes.",
+    "landing_page": "https://doi.org/10.5281/zenodo.10050944",
+    "doi": "10.5281/zenodo.10050944",
+    "citation": {
+      "text": "Rodriguez-Leon C, Aviles-Perez MD, Banos O, Quesada-Charneco M, Lopez-Ibarra Lozano PJ, Villalonga C, Munoz-Torres M. T1DiabetesGranada: a longitudinal multi-modal dataset of type 1 diabetes mellitus. Scientific Data. 2023;10:916. doi:10.1038/s41597-023-02737-4. Zenodo record accessed 2026-04-30 via https://doi.org/10.5281/zenodo.10050944",
+      "bibtex": "@article{rodriguezleon2023t1diabetesgranada, title={T1DiabetesGranada: a longitudinal multi-modal dataset of type 1 diabetes mellitus}, author={Rodriguez-Leon, Ciro and Aviles-Perez, Maria Dolores and Banos, Oresti and Quesada-Charneco, Miguel and Lopez-Ibarra Lozano, Pablo J. and Villalonga, Claudia and Munoz-Torres, Manuel}, journal={Scientific Data}, volume={10}, pages={916}, year={2023}, doi={10.1038/s41597-023-02737-4}}"
     }
   },
   {

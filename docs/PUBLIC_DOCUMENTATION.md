@@ -110,6 +110,13 @@ iints data info <dataset_id>
 iints data fetch <dataset_id> --output-dir data_packs/<dataset_id>
 ```
 
+Recommended starting points:
+- `ohio_t1dm` for a trusted CGM + insulin + meal benchmark.
+- `diatrend` when you need a larger controlled-access pump/CGM cohort.
+- `t1d_uom` when you need meal macronutrients, activity, and sleep together.
+- `t1d_granada` for large longitudinal glucose-only population work.
+- `azt1d` or `hupa_ucm` when you want meal + insulin data that is already supported in the current prep commands.
+
 If a public source does not publish a pinned SHA-256 yet, the secure fallback is explicit:
 
 ```bash

@@ -11,6 +11,7 @@ from .runner import ContractRunner, ValidationResult
 
 
 ContractInput = Union[ModelReadyContract, Mapping[str, Any]]
+_SPARSE_EVENT_TOKENS = ("carb", "meal", "insulin", "bolus", "basal", "exercise", "activity")
 
 
 @dataclass(frozen=True)
@@ -89,7 +90,55 @@ def _is_datetime_type(expected: str) -> bool:
     return expected in {"datetime", "timestamp"}
 
 
-def _build_timeline(series: pd.Series, n_rows: int) -> List[str]:
+def _is_numeric_timestamp_series(series: pd.Series) -> bool:
+    if pd.api.types.is_numeric_dtype(series):
+        return True
+    non_null = series.dropna()
+    if non_null.empty:
+        return False
+    text = non_null.astype(str).str.strip()
+    return bool(text.str.fullmatch(r"-?\d+(?:\.\d+)?").all())
+
+
+def _safe_nanmean(series: pd.Series) -> float:
+    values = pd.to_numeric(series, errors="coerce").to_numpy(dtype=float, copy=False)
+    valid = values[np.isfinite(values)]
+    if valid.size == 0:
+        return 0.0
+    return float(valid.mean())
+
+
+def _safe_nanstd(series: pd.Series) -> float:
+    values = pd.to_numeric(series, errors="coerce").to_numpy(dtype=float, copy=False)
+    valid = values[np.isfinite(values)]
+    if valid.size == 0:
+        return 0.0
+    return float(valid.std())
+
+
+def _build_numeric_timeline(series: pd.Series, n_rows: int) -> List[Union[int, float, str]]:
+    numeric = pd.to_numeric(series, errors="coerce")
+    valid = numeric.dropna()
+    if len(valid) < 2:
+        start = 0.0
+        step = 5.0
+    else:
+        ordered = valid.sort_values()
+        deltas = ordered.diff().dropna()
+        positive_deltas = deltas[deltas > 0]
+        step = float(positive_deltas.median()) if not positive_deltas.empty else 5.0
+        if not np.isfinite(step) or step <= 0:
+            step = 5.0
+        start = float(ordered.iloc[0])
+    timeline = start + np.arange(n_rows, dtype=float) * step
+    if np.allclose(timeline, np.rint(timeline)):
+        return [int(round(value)) for value in timeline]
+    return [round(float(value), 6) for value in timeline]
+
+
+def _build_timeline(series: pd.Series, n_rows: int) -> List[Union[int, float, str]]:
+    if _is_numeric_timestamp_series(series):
+        return _build_numeric_timeline(series, n_rows)
     parsed = pd.to_datetime(series, errors="coerce", utc=True)
     valid = parsed.dropna()
     if len(valid) < 2:
@@ -104,6 +153,41 @@ def _build_timeline(series: pd.Series, n_rows: int) -> List[str]:
         start = ordered.iloc[0]
         step = median_delta
     return [(start + idx * step).strftime("%Y-%m-%dT%H:%M:%SZ") for idx in range(n_rows)]
+
+
+def _sample_contiguous_blocks(
+    source_df: pd.DataFrame,
+    *,
+    n_rows: int,
+    rng: np.random.Generator,
+) -> pd.DataFrame:
+    block_size = min(len(source_df), max(4, min(18, len(source_df))))
+    blocks: list[pd.DataFrame] = []
+    produced = 0
+    while produced < n_rows:
+        if len(source_df) <= block_size:
+            start = 0
+        else:
+            start = int(rng.integers(0, len(source_df) - block_size + 1))
+        block = source_df.iloc[start : start + block_size].copy(deep=True)
+        blocks.append(block)
+        produced += len(block)
+    return pd.concat(blocks, ignore_index=True).iloc[:n_rows].copy(deep=True)
+
+
+def _is_sparse_event_column(column: str, values: pd.Series) -> bool:
+    valid = pd.to_numeric(values, errors="coerce").dropna()
+    if valid.empty:
+        return False
+    non_zero = valid[valid != 0]
+    if non_zero.empty:
+        return False
+    non_zero_ratio = float((valid != 0).mean())
+    if non_zero_ratio > 0.35:
+        return False
+    if float(valid.min()) < 0:
+        return False
+    return any(token in column.lower() for token in _SPARSE_EVENT_TOKENS)
 
 
 def _apply_contract_ranges(df: pd.DataFrame, ranges: Dict[str, Dict[str, float]]) -> pd.DataFrame:
@@ -171,10 +255,10 @@ def _build_summary(
     for column in shared_numeric:
         src = pd.to_numeric(source_df[column], errors="coerce")
         syn = pd.to_numeric(synthetic_df[column], errors="coerce")
-        src_mean = float(np.nanmean(src)) if np.isfinite(np.nanmean(src)) else 0.0
-        syn_mean = float(np.nanmean(syn)) if np.isfinite(np.nanmean(syn)) else 0.0
-        src_std = float(np.nanstd(src)) if np.isfinite(np.nanstd(src)) else 0.0
-        syn_std = float(np.nanstd(syn)) if np.isfinite(np.nanstd(syn)) else 0.0
+        src_mean = _safe_nanmean(src)
+        syn_mean = _safe_nanmean(syn)
+        src_std = _safe_nanstd(src)
+        syn_std = _safe_nanstd(syn)
         numeric_stats[column] = {
             "source_mean": round(src_mean, 4),
             "synthetic_mean": round(syn_mean, 4),
@@ -217,17 +301,24 @@ def generate_synthetic_mirror(
         raise ValueError("rows must be > 0")
 
     rng = np.random.default_rng(seed)
-    sampled_idx = rng.integers(0, len(source_df), size=n_rows)
-    synthetic = source_df.iloc[sampled_idx].reset_index(drop=True).copy(deep=True)
+    synthetic = _sample_contiguous_blocks(source_df, n_rows=n_rows, rng=rng)
 
     for column in synthetic.columns:
         if not pd.api.types.is_numeric_dtype(source_df[column]):
             continue
         source_values = pd.to_numeric(source_df[column], errors="coerce")
         synth_values = pd.to_numeric(synthetic[column], errors="coerce").astype(float)
-        std = float(np.nanstd(source_values))
-        if np.isfinite(std) and std > 0 and noise_scale > 0:
-            synth_values = synth_values + rng.normal(0.0, std * noise_scale, size=n_rows)
+        if _is_sparse_event_column(column, source_values):
+            if noise_scale > 0:
+                jitter = 1.0 + rng.normal(0.0, max(noise_scale, 0.01) * 0.35, size=n_rows)
+                jitter = np.clip(jitter, 0.5, 1.5)
+                non_zero_mask = synth_values != 0
+                synth_values.loc[non_zero_mask] = synth_values.loc[non_zero_mask] * jitter[non_zero_mask]
+            synth_values = synth_values.clip(lower=0.0)
+        else:
+            std = _safe_nanstd(source_values)
+            if np.isfinite(std) and std > 0 and noise_scale > 0:
+                synth_values = synth_values + rng.normal(0.0, std * noise_scale, size=n_rows)
         if pd.api.types.is_integer_dtype(source_df[column]):
             synthetic[column] = np.rint(synth_values).astype(int)
         else:

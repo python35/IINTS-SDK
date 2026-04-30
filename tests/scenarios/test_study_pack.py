@@ -4,6 +4,19 @@ from iints.scenarios.study_pack import build_eucys_arm_scenario, build_eucys_stu
 from iints.validation import validate_scenario_dict
 
 
+def test_official_scenarios_cover_a_full_day_rhythm() -> None:
+    pack = build_eucys_study_pack(seeds=[1])
+
+    for entry in pack["scenarios"]:
+        events = entry["scenario"]["stress_events"]
+        meal_times = sorted(event["start_time"] for event in events if event["event_type"] == "meal")
+
+        assert len(events) >= 4
+        assert any(start < 600 for start in meal_times)
+        assert any(600 <= start < 900 for start in meal_times)
+        assert any(start >= 900 for start in meal_times)
+
+
 def test_build_eucys_arm_scenario_keeps_payload_schema_valid() -> None:
     pack = build_eucys_study_pack(seeds=[1])
     base_scenario = dict(pack["scenarios"][0]["scenario"])

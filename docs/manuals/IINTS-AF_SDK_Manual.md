@@ -1099,10 +1099,15 @@ iints data cite aide_t1d
 ```
 
 **Available Datasets:**
-- `aide_t1d`: AIDE Type 1 Diabetes Dataset
+- `sample`: Bundled full-day demo trace (no download needed)
+- `ohio_t1dm`: Classic request-gated benchmark with CGM, insulin, meals, and daily-life events
+- `diatrend`: Larger controlled-access CGM + pump dataset from 54 people with T1D
+- `t1d_uom`: 12-week multimodal dataset with CGM, insulin, meal macros, activity, and sleep
+- `t1d_granada`: Large longitudinal glucose-focused dataset from 736 people with T1D
 - `azt1d`: Arizona Type 1 Diabetes Dataset
-- `ohio_t1dm`: OhioT1DM Dataset
-- `sample`: Bundled demo data (no download needed)
+- `hupa_ucm`: HUPA-UCM free-living T1D dataset
+- `aide_t1d`: AIDE Type 1 Diabetes Dataset
+- `pedap`: Pediatric Artificial Pancreas dataset
 
 **Integrity and reproducibility**
 - Public sources without a published pinned SHA-256 now require `--no-verify`.

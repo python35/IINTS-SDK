@@ -84,6 +84,38 @@ def test_generate_synthetic_mirror_respects_contract_ranges() -> None:
     assert artifact.validation.is_compliant is True
 
 
+def test_generate_synthetic_mirror_preserves_numeric_timestamp_cadence() -> None:
+    source = pd.DataFrame(
+        {
+            "timestamp": [0, 5, 10, 15, 20, 25],
+            "glucose": [110.0, 118.0, 125.0, 119.0, 116.0, 114.0],
+            "carbs": [0.0, 0.0, 25.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    synth, _ = generate_synthetic_mirror(source, _contract_payload(), rows=12, seed=17)
+
+    assert synth["timestamp"].tolist() == list(range(0, 60, 5))
+
+
+def test_generate_synthetic_mirror_keeps_sparse_events_sparse() -> None:
+    source = pd.DataFrame(
+        {
+            "timestamp": list(range(0, 60, 5)),
+            "glucose": [108.0, 110.0, 112.0, 126.0, 138.0, 144.0, 139.0, 128.0, 120.0, 114.0, 110.0, 108.0],
+            "carbs": [0.0, 0.0, 0.0, 42.0, 0.0, 0.0, 0.0, 0.0, 18.0, 0.0, 0.0, 0.0],
+            "insulin": [0.0, 0.0, 3.8, 0.0, 0.0, 0.0, 0.0, 1.1, 0.0, 0.0, 0.0, 0.0],
+        }
+    )
+
+    synth, _ = generate_synthetic_mirror(source, _contract_payload(), rows=24, seed=21, noise_scale=0.2)
+
+    assert ((synth["carbs"] > 0.0) & (synth["carbs"] < 1.0)).sum() == 0
+    assert ((synth["insulin"] > 0.0) & (synth["insulin"] < 0.25)).sum() == 0
+    assert (synth["carbs"] == 0.0).sum() > 0
+    assert (synth["insulin"] == 0.0).sum() > 0
+
+
 def test_cli_synthetic_mirror_writes_artifacts(tmp_path) -> None:
     input_csv = tmp_path / "input.csv"
     contract_yaml = tmp_path / "contract.yaml"
