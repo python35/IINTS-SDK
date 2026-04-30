@@ -145,6 +145,9 @@ Fetch a pack into a local directory.
 ### `iints data certify`
 Run data certification.
 
+### `iints data realism-check`
+Judge whether a glucose trace looks physiologically plausible for research or demo use.
+
 ### `iints import-carelink`, `iints import-nightscout`, `iints import-tidepool`
 Import real-world CGM sources.
 

@@ -82,6 +82,12 @@ from iints.data.registry import (
 )
 from iints.data.contracts import load_contract_yaml
 from iints.data.synthetic_mirror import generate_synthetic_mirror
+from iints.data.realism_validator import (
+    REALISM_VERDICT_ORDER,
+    realism_verdict_meets_minimum,
+    validate_realism_csv,
+    write_realism_report,
+)
 from iints.demo_assets import export_live_stage_demo
 from iints.live_patient.edge_benchmark import run_edge_benchmark
 from iints.live_patient.edge_ops import (
@@ -5433,6 +5439,90 @@ def data_certify(
         fail_on_noncompliant=fail_on_noncompliant,
         min_mdmp_grade=min_mdmp_grade,
     )
+
+
+@data_app.command(name="realism-check")
+def data_realism_check(
+    input_csv: Annotated[Path, typer.Argument(help="Path to CSV in generic/dexcom/libre/carelink format")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
+    data_format: Annotated[str, typer.Option(help="Data format preset: generic, dexcom, libre, carelink")] = "generic",
+    time_unit: Annotated[str, typer.Option(help="Timestamp unit for numeric timestamps: minutes or seconds")] = "minutes",
+    expected_interval_minutes: Annotated[int, typer.Option(help="Expected reading interval in minutes")] = 5,
+    min_meal_grams: Annotated[float, typer.Option(help="Minimum carbs (g) that count as a meal event")] = 10.0,
+    min_realism_verdict: Annotated[
+        Optional[str],
+        typer.Option(help="Optional gate: likely_realistic or needs_review. Exit code 1 if the report is worse."),
+    ] = None,
+    mapping: Annotated[List[str], typer.Option("--map", help="Column mapping key=value (e.g., timestamp=Time, glucose=SGV)")] = [],
+):
+    """Judge whether a CGM trace looks physiologically plausible for research/demo use."""
+    console = Console()
+    if not input_csv.is_file():
+        console.print(f"[bold red]Input CSV not found: {input_csv}[/bold red]")
+        raise typer.Exit(code=1)
+
+    column_map = _parse_column_mapping(mapping, console)
+    try:
+        report = validate_realism_csv(
+            input_csv,
+            data_format=data_format,
+            column_map=column_map or None,
+            time_unit=time_unit,
+            source="realism_check",
+            expected_interval_minutes=expected_interval_minutes,
+            min_meal_grams=min_meal_grams,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Realism check failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    summary = Table(title="Realism Summary", show_header=True, header_style="bold cyan")
+    summary.add_column("Metric", style="green")
+    summary.add_column("Value", style="white")
+    summary.add_row("Verdict", report.verdict)
+    summary.add_row("Realism score", f"{report.realism_score:.2f}")
+    summary.add_row("Mean glucose", f"{report.metrics.get('mean_glucose_mgdl')} mg/dL")
+    summary.add_row("CV", f"{report.metrics.get('cv_pct')}%")
+    summary.add_row("TIR 70-180", f"{report.metrics.get('tir_70_180_pct')}%")
+    summary.add_row("Meals", str(report.metrics.get("meal_count")))
+    summary.add_row("Insulin events", str(report.metrics.get("insulin_event_count")))
+    console.print(summary)
+
+    checks_table = Table(title="Realism Checks", show_header=True, header_style="bold cyan")
+    checks_table.add_column("Check", style="green")
+    checks_table.add_column("Status")
+    checks_table.add_column("Detail")
+    for check in report.checks:
+        status = check.status
+        if status == "passed":
+            rendered_status = "[green]passed[/green]"
+        elif status == "warning":
+            rendered_status = "[yellow]warning[/yellow]"
+        elif status == "failed":
+            rendered_status = "[red]failed[/red]"
+        else:
+            rendered_status = "[dim]skipped[/dim]"
+        checks_table.add_row(check.title, rendered_status, check.detail)
+    console.print(checks_table)
+    console.print(report.summary)
+
+    if output_json is not None:
+        write_realism_report(report, output_json)
+        console.print(f"[green]Realism report written:[/green] {output_json}")
+
+    if min_realism_verdict is not None:
+        normalized = min_realism_verdict.strip().lower()
+        allowed = ", ".join(REALISM_VERDICT_ORDER)
+        if normalized not in REALISM_VERDICT_ORDER:
+            console.print(
+                f"[bold red]Invalid --min-realism-verdict value: {min_realism_verdict}. Use one of: {allowed}[/bold red]"
+            )
+            raise typer.Exit(code=1)
+        if not realism_verdict_meets_minimum(report.verdict, normalized):
+            console.print(
+                f"[bold red]Realism gate failed:[/bold red] got {report.verdict}, requires at least {normalized}"
+            )
+            raise typer.Exit(code=1)
 
 
 @data_app.command(name="mdmp-visualizer", hidden=True, deprecated=True)

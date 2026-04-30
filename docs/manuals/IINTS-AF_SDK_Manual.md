@@ -1096,6 +1096,9 @@ iints data fetch aide_t1d --output-dir data_packs/aide --no-verify
 
 # Cite dataset in publication
 iints data cite aide_t1d
+
+# Check whether a trace still looks like believable T1D data
+iints data realism-check data/my_trace.csv --output-json results/realism_report.json
 ```
 
 **Available Datasets:**

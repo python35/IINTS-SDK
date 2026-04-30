@@ -21,6 +21,16 @@ from .importer import (
     summarize_carelink_csv,
 )
 from .quality_checker import DataQualityChecker, QualityReport, DataGap, DataAnomaly
+from .realism_validator import (
+    REALISM_VERDICT_ORDER,
+    MealResponse,
+    RealismCheck,
+    RealismReport,
+    realism_verdict_meets_minimum,
+    validate_realism_csv,
+    validate_realism_dataset,
+    write_realism_report,
+)
 from .certify import (
     certify_csv,
     certify_dataset,
@@ -83,6 +93,14 @@ __all__ = [
     'QualityReport',
     'DataGap',
     'DataAnomaly',
+    'REALISM_VERDICT_ORDER',
+    'MealResponse',
+    'RealismCheck',
+    'RealismReport',
+    'realism_verdict_meets_minimum',
+    'validate_realism_csv',
+    'validate_realism_dataset',
+    'write_realism_report',
     'certify_csv',
     'certify_dataset',
     'render_certification_dashboard',

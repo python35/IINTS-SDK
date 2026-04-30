@@ -75,6 +75,7 @@ For non-technical readers, start with:
 - Use `iints data certify-visualizer` to turn `certification.json` into a shareable single-file audit dashboard.
 - Use `iints init --template clinical-trial` for a ready-made MDMP scaffold (contract + demo data + audit folders).
 - Use `iints data synthetic-mirror` to build privacy-safe synthetic datasets from validated source data.
+- Use `iints data realism-check` to flag traces that are too flat, too perfect, or poorly matched to annotated meals.
 - Prefer `iints data certify ...` commands and `iints.data` imports for public-facing certification workflows.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
