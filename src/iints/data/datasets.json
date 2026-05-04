@@ -7,6 +7,7 @@
     "license": "Demo-only (bundled with SDK)",
     "description": "Bundled full-day demo trace with meal and bolus annotations for quickstarts, reporting, and offline demos.",
     "bundled_path": "demo/demo_cgm.csv",
+    "realism_reference_profile": "free_living_t1d",
     "sha256": "6a8916ec0f5f41bfe77a4bd5664355996ec1bfbc38aa3353fd35b47574c80381",
     "citation": {
       "text": "IINTS-AF Team. IINTS Sample CGM (bundled). Accessed 2026-04-30.",
@@ -110,6 +111,7 @@
     "access": "manual",
     "license": "CC BY 4.0",
     "description": "Real-world T1D dataset (CGM + insulin + meals) from 25 individuals on AID systems.",
+    "realism_reference_profile": "azt1d_daily",
     "landing_page": "https://data.mendeley.com/datasets/gk9m674wcx/1",
     "doi": "10.17632/gk9m674wcx.1",
     "citation": {
@@ -124,6 +126,7 @@
     "access": "manual",
     "license": "CC BY 4.0",
     "description": "Free-living T1D dataset with CGM, insulin, meals, and activity data.",
+    "realism_reference_profile": "hupa_ucm_daily",
     "landing_page": "https://data.mendeley.com/datasets/3hbcscwz44/1",
     "doi": "10.17632/3hbcscwz44.1",
     "citation": {

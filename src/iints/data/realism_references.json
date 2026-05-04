@@ -1,0 +1,56 @@
+[
+  {
+    "id": "free_living_t1d",
+    "label": "Free-Living T1D Daily Envelope",
+    "source": "Derived from local AZT1D and HUPA-UCM public packs bundled with the workspace",
+    "description": "Broad daily realism envelope for free-living T1D traces. Glucose metrics come from pooled AZT1D and HUPA-UCM day windows; meal-response metrics come from AZT1D meal-annotated day windows.",
+    "dataset_ids": ["azt1d", "hupa_ucm"],
+    "metric_bands": {
+      "mean_glucose_mgdl": { "warning_low": 114.423, "target_low": 127.618, "median": 141.306, "target_high": 159.264, "warning_high": 179.925 },
+      "sd_mgdl": { "warning_low": 25.235, "target_low": 31.062, "median": 39.104, "target_high": 51.582, "warning_high": 64.221 },
+      "cv_pct": { "warning_low": 19.487, "target_low": 22.898, "median": 28.083, "target_high": 34.253, "warning_high": 40.672 },
+      "tir_70_180_pct": { "warning_low": 47.917, "target_low": 64.236, "median": 78.819, "target_high": 88.997, "warning_high": 95.486 },
+      "tir_above_180_pct": { "warning_low": 0.349, "target_low": 7.292, "median": 17.014, "target_high": 31.353, "warning_high": 47.569 },
+      "tir_below_70_pct": { "warning_low": 0.0, "target_low": 0.0, "median": 0.694, "target_high": 4.514, "warning_high": 11.806 },
+      "glucose_range_mgdl": { "warning_low": 111.6, "target_low": 135.0, "median": 166.0, "target_high": 210.0, "warning_high": 255.4 },
+      "meal_response_ratio": { "warning_low": 0.5, "target_low": 0.667, "median": 1.0, "target_high": 1.0, "warning_high": 1.0 },
+      "median_peak_lag_minutes": { "warning_low": 37.504, "target_low": 55.0, "median": 82.5, "target_high": 115.017, "warning_high": 143.746 },
+      "median_meal_rise_mgdl": { "warning_low": 15.5, "target_low": 33.75, "median": 53.0, "target_high": 79.812, "warning_high": 106.125 }
+    }
+  },
+  {
+    "id": "azt1d_daily",
+    "label": "AZT1D Daily Envelope",
+    "source": "Derived from the local AZT1D public pack in data_packs/public/azt1d",
+    "description": "Empirical daily envelope for meal-annotated free-living T1D traces derived from AZT1D subject-day windows.",
+    "dataset_ids": ["azt1d"],
+    "metric_bands": {
+      "mean_glucose_mgdl": { "warning_low": 126.967, "target_low": 134.16, "median": 143.868, "target_high": 158.818, "warning_high": 176.16 },
+      "sd_mgdl": { "warning_low": 26.382, "target_low": 31.268, "median": 38.592, "target_high": 49.146, "warning_high": 59.261 },
+      "cv_pct": { "warning_low": 19.547, "target_low": 22.294, "median": 26.602, "target_high": 31.572, "warning_high": 36.829 },
+      "tir_70_180_pct": { "warning_low": 56.389, "target_low": 68.858, "median": 80.696, "target_high": 88.889, "warning_high": 95.139 },
+      "tir_above_180_pct": { "warning_low": 3.889, "target_low": 10.069, "median": 18.056, "target_high": 29.514, "warning_high": 42.639 },
+      "tir_below_70_pct": { "warning_low": 0.0, "target_low": 0.0, "median": 0.0, "target_high": 1.736, "warning_high": 3.846 },
+      "glucose_range_mgdl": { "warning_low": 119.0, "target_low": 140.0, "median": 170.0, "target_high": 208.0, "warning_high": 241.0 },
+      "meal_response_ratio": { "warning_low": 0.5, "target_low": 0.667, "median": 1.0, "target_high": 1.0, "warning_high": 1.0 },
+      "median_peak_lag_minutes": { "warning_low": 37.504, "target_low": 55.0, "median": 82.5, "target_high": 115.017, "warning_high": 143.746 },
+      "median_meal_rise_mgdl": { "warning_low": 15.5, "target_low": 33.75, "median": 53.0, "target_high": 79.812, "warning_high": 106.125 }
+    }
+  },
+  {
+    "id": "hupa_ucm_daily",
+    "label": "HUPA-UCM Daily Envelope",
+    "source": "Derived from the local HUPA-UCM public pack in data_packs/public/hupa_ucm",
+    "description": "Empirical daily glucose envelope for free-living T1D traces derived from HUPA-UCM subject-day windows.",
+    "dataset_ids": ["hupa_ucm"],
+    "metric_bands": {
+      "mean_glucose_mgdl": { "warning_low": 106.198, "target_low": 118.793, "median": 136.481, "target_high": 160.048, "warning_high": 183.611 },
+      "sd_mgdl": { "warning_low": 24.101, "target_low": 30.813, "median": 39.619, "target_high": 54.965, "warning_high": 70.052 },
+      "cv_pct": { "warning_low": 19.311, "target_low": 23.818, "median": 29.937, "target_high": 36.624, "warning_high": 44.93 },
+      "tir_70_180_pct": { "warning_low": 41.667, "target_low": 58.594, "median": 75.868, "target_high": 89.323, "warning_high": 96.076 },
+      "tir_above_180_pct": { "warning_low": 0.0, "target_low": 4.167, "median": 15.625, "target_high": 34.375, "warning_high": 51.632 },
+      "tir_below_70_pct": { "warning_low": 0.0, "target_low": 0.0, "median": 2.778, "target_high": 8.333, "warning_high": 18.75 },
+      "glucose_range_mgdl": { "warning_low": 105.3, "target_low": 130.0, "median": 161.167, "target_high": 212.0, "warning_high": 266.7 }
+    }
+  }
+]

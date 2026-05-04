@@ -12,6 +12,12 @@ from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
 
 from .importer import import_cgm_csv
 from .quality_checker import DataQualityChecker
+from .realism_reference import (
+    ReferenceComparison,
+    RealismReferenceProfile,
+    build_reference_comparisons,
+    get_realism_reference,
+)
 
 
 RealismStatus = Literal["passed", "warning", "failed", "skipped"]
@@ -78,6 +84,8 @@ class RealismReport:
     checks: List[RealismCheck]
     meal_responses: List[MealResponse]
     warnings: List[str]
+    reference_profile: RealismReferenceProfile | None = None
+    reference_comparisons: List[ReferenceComparison] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -88,6 +96,8 @@ class RealismReport:
             "checks": [check.to_dict() for check in self.checks],
             "meal_responses": [response.to_dict() for response in self.meal_responses],
             "warnings": self.warnings,
+            "reference_profile": self.reference_profile.to_dict() if self.reference_profile else None,
+            "reference_comparisons": [comparison.to_dict() for comparison in self.reference_comparisons],
         }
 
 
@@ -564,6 +574,105 @@ def _check_overnight_shape(df: pd.DataFrame, *, overall_sd: float) -> RealismChe
     )
 
 
+def _meal_response_summary_metrics(
+    responses: Sequence[MealResponse],
+) -> Dict[str, float | None]:
+    if not responses:
+        return {
+            "meal_response_ratio": None,
+            "median_peak_lag_minutes": None,
+            "median_meal_rise_mgdl": None,
+        }
+
+    rises = np.array([response.rise_mgdl for response in responses], dtype=float)
+    lags = np.array([response.peak_lag_minutes for response in responses], dtype=float)
+    responding = (rises >= 15.0) & (lags >= 20.0) & (lags <= 180.0)
+    return {
+        "meal_response_ratio": _round_or_none(float(responding.mean()), 4),
+        "median_peak_lag_minutes": _round_or_none(float(np.median(lags))),
+        "median_meal_rise_mgdl": _round_or_none(float(np.median(rises))),
+    }
+
+
+def _check_reference_envelope(
+    summary_metrics: Dict[str, Any],
+    *,
+    reference_profile: RealismReferenceProfile,
+) -> tuple[RealismCheck, List[ReferenceComparison]]:
+    comparisons = build_reference_comparisons(summary_metrics, reference_profile)
+    assessed = [comparison for comparison in comparisons if comparison.status != "skipped"]
+    warning_count = sum(1 for comparison in assessed if comparison.status == "warning")
+    failed_count = sum(1 for comparison in assessed if comparison.status == "failed")
+    metrics = {
+        "reference_profile_id": reference_profile.id,
+        "reference_profile_label": reference_profile.label,
+        "assessed_metrics": len(assessed),
+        "warning_metrics": warning_count,
+        "failed_metrics": failed_count,
+        "comparisons": [comparison.to_dict() for comparison in comparisons],
+    }
+
+    if not assessed:
+        return (
+            RealismCheck(
+                code="reference_envelope",
+                title="Reference cohort envelope",
+                status="skipped",
+                severity="info",
+                detail=(
+                    f"Reference profile '{reference_profile.label}' was selected, "
+                    "but none of its metrics were available for this trace."
+                ),
+                metrics=metrics,
+            ),
+            comparisons,
+        )
+
+    if failed_count >= 2 or (failed_count >= 1 and len(assessed) >= 6):
+        return (
+            RealismCheck(
+                code="reference_envelope",
+                title="Reference cohort envelope",
+                status="failed",
+                severity="critical",
+                detail=(
+                    f"Trace falls outside the '{reference_profile.label}' envelope on "
+                    f"{failed_count}/{len(assessed)} assessed metric(s)."
+                ),
+                score_impact=0.18,
+                metrics=metrics,
+            ),
+            comparisons,
+        )
+    if failed_count or warning_count:
+        return (
+            RealismCheck(
+                code="reference_envelope",
+                title="Reference cohort envelope",
+                status="warning",
+                severity="warning",
+                detail=(
+                    f"Trace is close to but not cleanly inside the '{reference_profile.label}' envelope: "
+                    f"{failed_count} failed metric(s), {warning_count} warning metric(s)."
+                ),
+                score_impact=0.08,
+                metrics=metrics,
+            ),
+            comparisons,
+        )
+    return (
+        RealismCheck(
+            code="reference_envelope",
+            title="Reference cohort envelope",
+            status="passed",
+            severity="info",
+            detail=f"Trace sits comfortably inside the '{reference_profile.label}' empirical envelope.",
+            metrics=metrics,
+        ),
+        comparisons,
+    )
+
+
 def realism_verdict_meets_minimum(verdict: str, minimum: str) -> bool:
     return REALISM_VERDICT_ORDER.index(verdict) >= REALISM_VERDICT_ORDER.index(minimum)
 
@@ -573,6 +682,7 @@ def validate_realism_dataset(
     *,
     expected_interval_minutes: int = 5,
     min_meal_grams: float = 10.0,
+    reference: str | RealismReferenceProfile | None = None,
 ) -> RealismReport:
     if "timestamp" not in dataframe.columns or "glucose" not in dataframe.columns:
         raise ValueError("Realism validation requires at least 'timestamp' and 'glucose' columns.")
@@ -597,8 +707,9 @@ def validate_realism_dataset(
     insulin_events = _insulin_event_count(df)
     median_interval = _median_interval_minutes(df["timestamp"])
     responses = _evaluate_meal_responses(df, min_meal_grams=min_meal_grams)
+    summary_metrics = _meal_response_summary_metrics(responses)
 
-    summary_metrics: Dict[str, Any] = {
+    summary_metrics.update({
         "row_count": int(len(df)),
         "duration_hours": _round_or_none(duration_hours),
         "median_interval_minutes": _round_or_none(median_interval),
@@ -614,7 +725,7 @@ def validate_realism_dataset(
         "meal_count": meal_count,
         "insulin_event_count": insulin_events,
         "assessed_meal_responses": len(responses),
-    }
+    })
 
     quality_check, quality_metrics = _check_quality_basics(df, expected_interval_minutes=expected_interval_minutes)
     summary_metrics.update(quality_metrics)
@@ -626,6 +737,15 @@ def validate_realism_dataset(
         _check_causal_alignment(responses, meal_count=meal_count),
         _check_overnight_shape(df, overall_sd=float(clinical.sd)),
     ]
+    reference_profile: RealismReferenceProfile | None = None
+    reference_comparisons: List[ReferenceComparison] = []
+    if reference is not None:
+        reference_profile = reference if isinstance(reference, RealismReferenceProfile) else get_realism_reference(reference)
+        reference_check, reference_comparisons = _check_reference_envelope(
+            summary_metrics,
+            reference_profile=reference_profile,
+        )
+        checks.append(reference_check)
 
     realism_score = max(0.0, 1.0 - sum(check.score_impact for check in checks))
     failed_checks = [check for check in checks if check.status == "failed"]
@@ -638,9 +758,11 @@ def validate_realism_dataset(
         verdict = "likely_realistic"
 
     warnings = [check.detail for check in checks if check.status in {"warning", "failed"}]
+    reference_suffix = f" Reference: {reference_profile.label}." if reference_profile else ""
     summary = (
         f"{verdict.replace('_', ' ')}: mean {clinical.mean_glucose:.1f} mg/dL, CV {clinical.cv:.1f}%, "
         f"{meal_count} meal event(s), {insulin_events} insulin event(s), realism score {realism_score:.2f}."
+        f"{reference_suffix}"
     )
     return RealismReport(
         verdict=verdict,
@@ -650,6 +772,8 @@ def validate_realism_dataset(
         checks=checks,
         meal_responses=responses,
         warnings=warnings,
+        reference_profile=reference_profile,
+        reference_comparisons=reference_comparisons,
     )
 
 
@@ -662,6 +786,7 @@ def validate_realism_csv(
     source: Optional[str] = None,
     expected_interval_minutes: int = 5,
     min_meal_grams: float = 10.0,
+    reference: str | RealismReferenceProfile | None = None,
 ) -> RealismReport:
     df = import_cgm_csv(
         input_csv,
@@ -674,6 +799,7 @@ def validate_realism_csv(
         df,
         expected_interval_minutes=expected_interval_minutes,
         min_meal_grams=min_meal_grams,
+        reference=reference,
     )
 
 

@@ -51,6 +51,7 @@ from iints.api.registry import (
 from iints.core.patient.patient_factory import BERGMAN_AVAILABLE, SIMGLUCOSE_AVAILABLE
 from iints.core.patient.profile import PatientProfile
 from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
+from iints.core.devices.models import SENSOR_PROFILES
 from iints.core.safety import SafetyConfig
 from iints.scenarios import (
     ScenarioGeneratorConfig,
@@ -66,6 +67,7 @@ from iints.data.importer import (
     export_demo_csv,
     export_standard_csv,
     guess_column_mapping,
+    import_cgm_csv,
     import_cgm_dataframe,
     summarize_carelink_csv,
     load_demo_dataframe,
@@ -85,9 +87,10 @@ from iints.data.synthetic_mirror import generate_synthetic_mirror
 from iints.data.realism_validator import (
     REALISM_VERDICT_ORDER,
     realism_verdict_meets_minimum,
-    validate_realism_csv,
+    validate_realism_dataset,
     write_realism_report,
 )
+from iints.data.realism_dashboard import write_realism_dashboard
 from iints.demo_assets import export_live_stage_demo
 from iints.live_patient.edge_benchmark import run_edge_benchmark
 from iints.live_patient.edge_ops import (
@@ -3562,6 +3565,10 @@ def presets_run(
     compare_baselines: Annotated[bool, typer.Option(help="Run PID and standard pump baselines in the background")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
     patient_model_type: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
+    sensor_profile: Annotated[
+        Optional[str],
+        typer.Option(help=f"Sensor artifact profile: {', '.join(sorted(SENSOR_PROFILES))}"),
+    ] = None,
     sensor_noise_std: Annotated[Optional[float], typer.Option("--sensor-noise-std", help="CGM noise std (mg/dL)")] = None,
     sensor_lag_minutes: Annotated[Optional[int], typer.Option("--sensor-lag-minutes", help="CGM lag (minutes)")] = None,
     sensor_dropout_prob: Annotated[Optional[float], typer.Option("--sensor-dropout-prob", help="CGM dropout probability (0-1)")] = None,
@@ -3639,22 +3646,20 @@ def presets_run(
     )
 
     sensor_model = None
-    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
-        sensor_model = iints.SensorModel(
-            noise_std=float(sensor_noise_std or 0.0),
-            lag_minutes=int(sensor_lag_minutes or 0),
-            dropout_prob=float(sensor_dropout_prob or 0.0),
-            bias=float(sensor_bias or 0.0),
+    sensor_overrides = {
+        "noise_std": sensor_noise_std,
+        "lag_minutes": sensor_lag_minutes,
+        "dropout_prob": sensor_dropout_prob,
+        "bias": sensor_bias,
+    }
+    if sensor_profile is not None or any(v is not None for v in sensor_overrides.values()):
+        sensor_model = iints.create_sensor_model(
+            profile=sensor_profile or "clinical_cgm",
             seed=resolved_seed,
+            **sensor_overrides,
         )
     elif patient_model_type == "auto":
-        sensor_model = iints.SensorModel(
-            noise_std=7.0,
-            lag_minutes=10,
-            dropout_prob=0.0,
-            bias=0.0,
-            seed=resolved_seed,
-        )
+        sensor_model = iints.create_sensor_model(profile="clinical_cgm", seed=resolved_seed)
 
     simulator_kwargs: Dict[str, Any] = {
         "patient_model": patient_model,
@@ -4033,6 +4038,10 @@ def run(
     compare_baselines: Annotated[bool, typer.Option(help="Run built-in baselines in the background for comparison")] = True,
     seed: Annotated[Optional[int], typer.Option(help="Random seed for deterministic runs")] = None,
     patient_model_type: Annotated[str, typer.Option("--patient-model", help="Patient model: auto, bergman, custom, simglucose")] = "auto",
+    sensor_profile: Annotated[
+        Optional[str],
+        typer.Option(help=f"Sensor artifact profile: {', '.join(sorted(SENSOR_PROFILES))}"),
+    ] = None,
     sensor_noise_std: Annotated[Optional[float], typer.Option("--sensor-noise-std", help="CGM noise std (mg/dL)")] = None,
     sensor_lag_minutes: Annotated[Optional[int], typer.Option("--sensor-lag-minutes", help="CGM lag (minutes)")] = None,
     sensor_dropout_prob: Annotated[Optional[float], typer.Option("--sensor-dropout-prob", help="CGM dropout probability (0-1)")] = None,
@@ -4295,22 +4304,20 @@ def run(
         progress.update(task, description="Configuring sensor model")
 
         sensor_model = None
-        if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
-            sensor_model = iints.SensorModel(
-                noise_std=float(sensor_noise_std or 0.0),
-                lag_minutes=int(sensor_lag_minutes or 0),
-                dropout_prob=float(sensor_dropout_prob or 0.0),
-                bias=float(sensor_bias or 0.0),
+        sensor_overrides = {
+            "noise_std": sensor_noise_std,
+            "lag_minutes": sensor_lag_minutes,
+            "dropout_prob": sensor_dropout_prob,
+            "bias": sensor_bias,
+        }
+        if sensor_profile is not None or any(v is not None for v in sensor_overrides.values()):
+            sensor_model = iints.create_sensor_model(
+                profile=sensor_profile or "clinical_cgm",
                 seed=resolved_seed,
+                **sensor_overrides,
             )
         elif patient_model_type == "auto":
-            sensor_model = iints.SensorModel(
-                noise_std=7.0,
-                lag_minutes=10,
-                dropout_prob=0.0,
-                bias=0.0,
-                seed=resolved_seed,
-            )
+            sensor_model = iints.create_sensor_model(profile="clinical_cgm", seed=resolved_seed)
         progress.advance(task, 1)
         progress.update(task, description="Starting simulator")
 
@@ -5445,10 +5452,17 @@ def data_certify(
 def data_realism_check(
     input_csv: Annotated[Path, typer.Argument(help="Path to CSV in generic/dexcom/libre/carelink format")],
     output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
+    output_html: Annotated[Optional[Path], typer.Option(help="Optional output dashboard HTML path")] = None,
     data_format: Annotated[str, typer.Option(help="Data format preset: generic, dexcom, libre, carelink")] = "generic",
     time_unit: Annotated[str, typer.Option(help="Timestamp unit for numeric timestamps: minutes or seconds")] = "minutes",
     expected_interval_minutes: Annotated[int, typer.Option(help="Expected reading interval in minutes")] = 5,
     min_meal_grams: Annotated[float, typer.Option(help="Minimum carbs (g) that count as a meal event")] = 10.0,
+    reference: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Optional realism reference profile or dataset id (for example free_living_t1d, azt1d, hupa_ucm)."
+        ),
+    ] = None,
     min_realism_verdict: Annotated[
         Optional[str],
         typer.Option(help="Optional gate: likely_realistic or needs_review. Exit code 1 if the report is worse."),
@@ -5463,14 +5477,18 @@ def data_realism_check(
 
     column_map = _parse_column_mapping(mapping, console)
     try:
-        report = validate_realism_csv(
+        dataframe = import_cgm_csv(
             input_csv,
             data_format=data_format,
             column_map=column_map or None,
             time_unit=time_unit,
             source="realism_check",
+        )
+        report = validate_realism_dataset(
+            dataframe,
             expected_interval_minutes=expected_interval_minutes,
             min_meal_grams=min_meal_grams,
+            reference=reference,
         )
     except Exception as exc:
         console.print(f"[bold red]Realism check failed:[/bold red] {exc}")
@@ -5486,6 +5504,8 @@ def data_realism_check(
     summary.add_row("TIR 70-180", f"{report.metrics.get('tir_70_180_pct')}%")
     summary.add_row("Meals", str(report.metrics.get("meal_count")))
     summary.add_row("Insulin events", str(report.metrics.get("insulin_event_count")))
+    if report.reference_profile is not None:
+        summary.add_row("Reference", report.reference_profile.label)
     console.print(summary)
 
     checks_table = Table(title="Realism Checks", show_header=True, header_style="bold cyan")
@@ -5509,6 +5529,14 @@ def data_realism_check(
     if output_json is not None:
         write_realism_report(report, output_json)
         console.print(f"[green]Realism report written:[/green] {output_json}")
+    if output_html is not None:
+        write_realism_dashboard(
+            report,
+            dataframe,
+            output_html,
+            source_label=str(input_csv),
+        )
+        console.print(f"[green]Realism dashboard written:[/green] {output_html}")
 
     if min_realism_verdict is not None:
         normalized = min_realism_verdict.strip().lower()

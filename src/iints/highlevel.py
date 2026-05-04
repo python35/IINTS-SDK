@@ -11,7 +11,7 @@ from iints.api.base_algorithm import InsulinAlgorithm
 from iints.core.patient.patient_factory import PatientFactory
 from iints.core.patient.profile import PatientProfile
 from iints.core.simulator import Simulator
-from iints.core.devices.models import SensorModel
+from iints.core.devices.models import SensorModel, create_sensor_model
 from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.validation import (
@@ -87,6 +87,7 @@ def run_simulation(
     sensor_lag_minutes: Optional[int] = None,
     sensor_dropout_prob: Optional[float] = None,
     sensor_bias: Optional[float] = None,
+    sensor_profile: Optional[str] = None,
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
@@ -113,22 +114,20 @@ def run_simulation(
     effective_safety_config = safety_config or SafetyConfig()
 
     sensor_model = None
-    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
-        sensor_model = SensorModel(
-            noise_std=float(sensor_noise_std or 0.0),
-            lag_minutes=int(sensor_lag_minutes or 0),
-            dropout_prob=float(sensor_dropout_prob or 0.0),
-            bias=float(sensor_bias or 0.0),
+    overrides = {
+        "noise_std": sensor_noise_std,
+        "lag_minutes": sensor_lag_minutes,
+        "dropout_prob": sensor_dropout_prob,
+        "bias": sensor_bias,
+    }
+    if sensor_profile is not None or any(v is not None for v in overrides.values()):
+        sensor_model = create_sensor_model(
+            profile=sensor_profile or "clinical_cgm",
             seed=resolved_seed,
+            **overrides,
         )
     elif patient_model_type == "auto":
-        sensor_model = SensorModel(
-            noise_std=7.0,
-            lag_minutes=10,
-            dropout_prob=0.0,
-            bias=0.0,
-            seed=resolved_seed,
-        )
+        sensor_model = create_sensor_model(profile="clinical_cgm", seed=resolved_seed)
 
     simulator = Simulator(
         patient_model=patient_model,
@@ -254,6 +253,7 @@ def run_full(
     sensor_lag_minutes: Optional[int] = None,
     sensor_dropout_prob: Optional[float] = None,
     sensor_bias: Optional[float] = None,
+    sensor_profile: Optional[str] = None,
     duration_minutes: int = 720,
     time_step: int = 5,
     seed: Optional[int] = None,
@@ -278,22 +278,20 @@ def run_full(
     effective_safety_config = safety_config or SafetyConfig()
 
     sensor_model = None
-    if any(v is not None for v in (sensor_noise_std, sensor_lag_minutes, sensor_dropout_prob, sensor_bias)):
-        sensor_model = SensorModel(
-            noise_std=float(sensor_noise_std or 0.0),
-            lag_minutes=int(sensor_lag_minutes or 0),
-            dropout_prob=float(sensor_dropout_prob or 0.0),
-            bias=float(sensor_bias or 0.0),
+    overrides = {
+        "noise_std": sensor_noise_std,
+        "lag_minutes": sensor_lag_minutes,
+        "dropout_prob": sensor_dropout_prob,
+        "bias": sensor_bias,
+    }
+    if sensor_profile is not None or any(v is not None for v in overrides.values()):
+        sensor_model = create_sensor_model(
+            profile=sensor_profile or "clinical_cgm",
             seed=resolved_seed,
+            **overrides,
         )
     elif patient_model_type == "auto":
-        sensor_model = SensorModel(
-            noise_std=7.0,
-            lag_minutes=10,
-            dropout_prob=0.0,
-            bias=0.0,
-            seed=resolved_seed,
-        )
+        sensor_model = create_sensor_model(profile="clinical_cgm", seed=resolved_seed)
 
     simulator = Simulator(
         patient_model=patient_model,

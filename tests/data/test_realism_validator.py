@@ -63,6 +63,18 @@ def test_realism_validator_accepts_bundled_demo_trace() -> None:
     assert any(check.code == "causal_alignment" and check.status == "passed" for check in report.checks)
 
 
+def test_realism_validator_can_compare_against_reference_envelope() -> None:
+    demo_df = load_demo_dataframe()
+    standard_df = import_cgm_dataframe(demo_df, data_format="generic", source="demo")
+
+    report = validate_realism_dataset(standard_df, reference="free_living_t1d")
+
+    assert report.reference_profile is not None
+    assert report.reference_profile.id == "free_living_t1d"
+    assert any(check.code == "reference_envelope" for check in report.checks)
+    assert any(comparison.metric_key == "cv_pct" for comparison in report.reference_comparisons)
+
+
 def test_realism_validator_flags_flat_too_neat_trace() -> None:
     report = validate_realism_dataset(_flat_meal_trace())
 
@@ -103,3 +115,27 @@ def test_data_realism_check_cli_writes_json_and_gates_verdict(tmp_path) -> None:
     payload = json.loads(output_json.read_text())
     assert payload["verdict"] == "likely_unrealistic"
     assert "checks" in payload
+
+
+def test_data_realism_check_cli_writes_html_dashboard(tmp_path) -> None:
+    input_csv = tmp_path / "demo.csv"
+    output_html = tmp_path / "realism_dashboard.html"
+    load_demo_dataframe().to_csv(input_csv, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "data",
+            "realism-check",
+            str(input_csv),
+            "--reference",
+            "free_living_t1d",
+            "--output-html",
+            str(output_html),
+        ],
+    )
+
+    assert result.exit_code == 0
+    content = output_html.read_text()
+    assert "Reference Envelope" in content
+    assert "Free-Living T1D Daily Envelope" in content

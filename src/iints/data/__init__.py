@@ -31,6 +31,18 @@ from .realism_validator import (
     validate_realism_dataset,
     write_realism_report,
 )
+from .realism_reference import (
+    ReferenceBand,
+    ReferenceComparison,
+    RealismReferenceProfile,
+    get_realism_reference,
+    list_realism_reference_ids,
+    load_realism_reference_registry,
+)
+from .realism_dashboard import (
+    build_realism_dashboard_html,
+    write_realism_dashboard,
+)
 from .certify import (
     certify_csv,
     certify_dataset,
@@ -101,6 +113,14 @@ __all__ = [
     'validate_realism_csv',
     'validate_realism_dataset',
     'write_realism_report',
+    'ReferenceBand',
+    'ReferenceComparison',
+    'RealismReferenceProfile',
+    'get_realism_reference',
+    'list_realism_reference_ids',
+    'load_realism_reference_registry',
+    'build_realism_dashboard_html',
+    'write_realism_dashboard',
     'certify_csv',
     'certify_dataset',
     'render_certification_dashboard',

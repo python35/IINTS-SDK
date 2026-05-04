@@ -147,6 +147,11 @@ Run data certification.
 
 ### `iints data realism-check`
 Judge whether a glucose trace looks physiologically plausible for research or demo use.
+Supports:
+- `--reference free_living_t1d`, `--reference azt1d`, or `--reference hupa_ucm`
+- `--output-json results/realism_report.json`
+- `--output-html results/realism_dashboard.html`
+- `--min-realism-verdict needs_review`
 
 ### `iints import-carelink`, `iints import-nightscout`, `iints import-tidepool`
 Import real-world CGM sources.

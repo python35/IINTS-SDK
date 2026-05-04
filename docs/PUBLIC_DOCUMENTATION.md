@@ -76,6 +76,8 @@ For non-technical readers, start with:
 - Use `iints init --template clinical-trial` for a ready-made MDMP scaffold (contract + demo data + audit folders).
 - Use `iints data synthetic-mirror` to build privacy-safe synthetic datasets from validated source data.
 - Use `iints data realism-check` to flag traces that are too flat, too perfect, or poorly matched to annotated meals.
+- Add `--reference free_living_t1d`, `--reference azt1d`, or `--reference hupa_ucm` when you want the realism check anchored to an empirical cohort envelope.
+- Add `--output-html` when you want a single-file realism dashboard with a trace preview and per-check breakdown.
 - Prefer `iints data certify ...` commands and `iints.data` imports for public-facing certification workflows.
 - Record the SDK version + git SHA from `run_metadata.json`.
 
@@ -109,6 +111,7 @@ Use the CLI to discover and access datasets:
 iints data list
 iints data info <dataset_id>
 iints data fetch <dataset_id> --output-dir data_packs/<dataset_id>
+iints data realism-check data/my_trace.csv --reference free_living_t1d --output-html results/realism_dashboard.html
 ```
 
 Recommended starting points:

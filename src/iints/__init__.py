@@ -47,7 +47,7 @@ except Exception:  # pragma: no cover - fallback if torch/device manager import 
         def get_device(self):
             return self._device
 from .core.safety import SafetyConfig, SafetySupervisor
-from .core.devices.models import SensorModel, PumpModel
+from .core.devices.models import SENSOR_PROFILES, SensorModel, PumpModel, create_sensor_model
 from .core.algorithms.standard_pump_algo import StandardPumpAlgorithm
 from .core.algorithms.mock_algorithms import (
     ConstantDoseAlgorithm,
@@ -224,6 +224,8 @@ __all__ = [
     "SafetyConfig",
     "SensorModel",
     "PumpModel",
+    "SENSOR_PROFILES",
+    "create_sensor_model",
     "StandardPumpAlgorithm",
     "ConstantDoseAlgorithm",
     "RandomDoseAlgorithm",

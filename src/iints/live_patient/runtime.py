@@ -19,7 +19,7 @@ from typing import Any, Iterable, Optional
 import yaml
 
 from iints.api.base_algorithm import InsulinAlgorithm
-from iints.core.devices.models import SensorModel
+from iints.core.devices.models import create_sensor_model
 from iints.core.patient.patient_factory import PatientFactory
 from iints.core.patient.profile import PatientProfile
 from iints.core.safety import SafetyConfig
@@ -639,7 +639,7 @@ class LivePatientDaemon:
         patient_params = self._resolve_patient_config()
         self.algorithm_instance = _load_algorithm_instance_silent(self.config.algo_file)
         patient_model = PatientFactory.create_patient(patient_type=self.config.patient_model_type, **patient_params)
-        sensor_model = SensorModel(noise_std=7.0, lag_minutes=10, dropout_prob=0.0, bias=0.0, seed=self.active_seed)
+        sensor_model = create_sensor_model(profile="clinical_cgm", seed=self.active_seed)
         simulator = Simulator(
             patient_model=patient_model,
             algorithm=self.algorithm_instance,

@@ -1099,6 +1099,11 @@ iints data cite aide_t1d
 
 # Check whether a trace still looks like believable T1D data
 iints data realism-check data/my_trace.csv --output-json results/realism_report.json
+
+# Compare against an empirical cohort envelope and export a dashboard
+iints data realism-check data/my_trace.csv \
+  --reference free_living_t1d \
+  --output-html results/realism_dashboard.html
 ```
 
 **Available Datasets:**
