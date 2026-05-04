@@ -1,3 +1,47 @@
+.md-header {
+  background: linear-gradient(90deg, #232948 0%, #272f58 100%);
+  box-shadow: 0 1px 0 rgba(148, 163, 184, 0.08);
+}
+
+.md-tabs {
+  background: #171d36;
+  border-top: 1px solid rgba(148, 163, 184, 0.06);
+}
+
+.md-search__form {
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 0.7rem;
+  background: rgba(12, 18, 34, 0.82);
+}
+
+.md-search__input::placeholder {
+  color: rgba(226, 232, 240, 0.45);
+}
+
+.md-typeset a {
+  transition: color 140ms ease;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #101525;
+  --md-default-fg-color: #f8fafc;
+  --md-default-fg-color--light: rgba(226, 232, 240, 0.74);
+  --md-default-fg-color--lighter: rgba(148, 163, 184, 0.92);
+  --md-default-fg-color--lightest: rgba(148, 163, 184, 0.56);
+  --md-typeset-a-color: #8ae9dc;
+}
+
+.md-main {
+  background:
+    radial-gradient(circle at top left, rgba(45, 212, 191, 0.08), transparent 24%),
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.07), transparent 20%),
+    #101525;
+}
+
+.md-content__inner {
+  margin-top: 0.4rem;
+}
+
 .support-table {
   width: 100%;
   border-collapse: collapse;
@@ -101,4 +145,299 @@
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+
+.md-typeset .home-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.2rem 0 3rem;
+}
+
+.md-typeset .home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 2.4rem;
+  align-items: center;
+  padding: 2.6rem 0 2rem;
+}
+
+.md-typeset .home-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.38rem 0.72rem;
+  border: 1px solid rgba(129, 230, 217, 0.24);
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.08);
+  color: #8ae9dc;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.md-typeset .home-hero h1 {
+  margin: 0.9rem 0 0.8rem;
+  font-size: clamp(2.6rem, 4vw, 4.3rem);
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+
+.md-typeset .home-lead {
+  max-width: 42rem;
+  margin: 0 0 1.4rem;
+  color: rgba(226, 232, 240, 0.76);
+  font-size: 1.05rem;
+}
+
+.md-typeset .home-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 1.4rem 0 1.25rem;
+}
+
+.md-typeset .home-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 10rem;
+  padding: 0.82rem 1.15rem;
+  border: 1px solid rgba(129, 230, 217, 0.18);
+  border-radius: 999px;
+  background: rgba(129, 230, 217, 0.1);
+  color: #dffdfa;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.md-typeset .home-pill:hover {
+  transform: translateY(-1px);
+  border-color: rgba(129, 230, 217, 0.35);
+  background: rgba(129, 230, 217, 0.16);
+}
+
+.md-typeset .home-pill-primary {
+  background: linear-gradient(135deg, #7ee7d6 0%, #55d6e8 100%);
+  border-color: transparent;
+  color: #112031;
+  box-shadow: 0 12px 28px rgba(72, 217, 212, 0.18);
+}
+
+.md-typeset .home-meta-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  max-width: 52rem;
+  margin-top: 1.3rem;
+}
+
+.md-typeset .home-meta-card,
+.md-typeset .home-card,
+.md-typeset .home-workflow-card,
+.md-typeset .home-command-panel {
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 1.25rem;
+  background: linear-gradient(180deg, rgba(18, 25, 45, 0.92), rgba(13, 19, 35, 0.94));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16);
+}
+
+.md-typeset .home-meta-card {
+  padding: 1rem 1.05rem;
+}
+
+.md-typeset .home-meta-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: rgba(148, 163, 184, 0.88);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.md-typeset .home-hero-art {
+  position: relative;
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.md-typeset .home-logo-wrap {
+  position: relative;
+  z-index: 2;
+  width: min(92%, 380px);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2rem;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(52, 211, 153, 0.16), transparent 48%),
+    radial-gradient(circle at 70% 70%, rgba(56, 189, 248, 0.18), transparent 52%);
+}
+
+.md-typeset .home-logo-mark {
+  width: min(100%, 280px);
+  filter: drop-shadow(0 20px 32px rgba(46, 215, 206, 0.2));
+}
+
+.md-typeset .home-orbit {
+  position: absolute;
+  right: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #86efdc, #22d3ee);
+  opacity: 0.92;
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.18);
+}
+
+.md-typeset .home-orbit-one {
+  top: 18%;
+  right: 14%;
+  width: 1rem;
+  height: 1rem;
+}
+
+.md-typeset .home-orbit-two {
+  top: 36%;
+  right: 5%;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.md-typeset .home-orbit-three {
+  top: 52%;
+  right: 11%;
+  width: 2.45rem;
+  height: 2.45rem;
+}
+
+.md-typeset .home-section {
+  margin-top: 1.8rem;
+}
+
+.md-typeset .home-section-head {
+  margin-bottom: 1rem;
+}
+
+.md-typeset .home-section-head h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.8rem;
+}
+
+.md-typeset .home-section-head p {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.86);
+}
+
+.md-typeset .home-card-grid,
+.md-typeset .home-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.md-typeset .home-card {
+  display: block;
+  padding: 1.2rem 1.15rem;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.md-typeset .home-card:hover,
+.md-typeset .home-workflow-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(94, 234, 212, 0.28);
+}
+
+.md-typeset .home-card-title {
+  display: block;
+  margin-bottom: 0.42rem;
+  color: #f8fafc;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.md-typeset .home-card-body {
+  display: block;
+  color: rgba(148, 163, 184, 0.92);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.md-typeset .home-workflow-card {
+  padding: 1.3rem 1.2rem 1.2rem;
+}
+
+.md-typeset .home-workflow-card h3 {
+  margin: 0.15rem 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.md-typeset .home-workflow-card p {
+  margin: 0 0 0.9rem;
+  color: rgba(148, 163, 184, 0.92);
+}
+
+.md-typeset .home-workflow-card a {
+  color: #8ae9dc;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.md-typeset .home-workflow-index {
+  display: inline-block;
+  margin-bottom: 0.3rem;
+  color: #58dfea;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.md-typeset .home-command-panel {
+  padding: 0.2rem 0.25rem;
+  overflow: hidden;
+}
+
+.md-typeset .home-command-panel pre {
+  margin: 0;
+  padding: 1.15rem 1.2rem;
+  border-radius: 1rem;
+  background: transparent;
+}
+
+.md-typeset .home-command-panel code {
+  color: #d7fffb;
+  font-size: 0.9rem;
+}
+
+.md-typeset .home-footer-note {
+  margin-top: 1.5rem;
+  color: rgba(148, 163, 184, 0.82);
+  font-size: 0.94rem;
+}
+
+.md-main__inner:has(.home-shell) {
+  max-width: 1340px;
+}
+
+@media screen and (max-width: 960px) {
+  .md-typeset .home-hero,
+  .md-typeset .home-card-grid,
+  .md-typeset .home-workflow-grid,
+  .md-typeset .home-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .md-typeset .home-hero {
+    gap: 1.4rem;
+    padding-top: 1.2rem;
+  }
+
+  .md-typeset .home-hero-art {
+    min-height: 260px;
+    order: -1;
+  }
 }

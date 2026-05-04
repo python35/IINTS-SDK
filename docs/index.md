@@ -1,93 +1,113 @@
-# IINTS-AF SDK Documentation
+---
+hide:
+  - toc
+---
 
-IINTS-AF is a research SDK for testing insulin algorithms on virtual patients, validating data quality, and reviewing outputs with reproducible reports.
+<div class="home-shell">
+  <section class="home-hero">
+    <div class="home-hero-copy">
+      <div class="home-kicker">IINTS-AF SDK</div>
+      <h1>Welcome to the IINTS-AF Documentation</h1>
+      <p class="home-lead">
+        Safety-first simulation, data certification, and reproducible insulin
+        algorithm research in one open research platform.
+      </p>
+      <div class="home-pill-row">
+        <a class="home-pill home-pill-primary" href="./QUICKSTART/">Getting Started</a>
+        <a class="home-pill" href="./USER_GUIDE_MAP/">Docs Map</a>
+        <a class="home-pill" href="./COMMAND_REFERENCE/">CLI Guide</a>
+      </div>
+      <div class="home-meta-row">
+        <div class="home-meta-card">
+          <span class="home-meta-label">Best for</span>
+          <strong>Researchers, evaluators, edge builders</strong>
+        </div>
+        <div class="home-meta-card">
+          <span class="home-meta-label">Focus</span>
+          <strong>Simulation, trust grading, publication-ready review</strong>
+        </div>
+      </div>
+    </div>
+    <div class="home-hero-art" aria-hidden="true">
+      <div class="home-logo-wrap">
+        <img src="assets/iints-logo.png" alt="IINTS logo" class="home-logo-mark">
+      </div>
+      <div class="home-orbit home-orbit-one"></div>
+      <div class="home-orbit home-orbit-two"></div>
+      <div class="home-orbit home-orbit-three"></div>
+    </div>
+  </section>
 
-It combines three core workflows:
-- **Simulate** closed-loop behavior on virtual patients
-- **Certify** datasets and outputs with built-in trust grading
-- **Review** runs with reports, posters, and optional local AI tooling
+  <section class="home-section">
+    <div class="home-section-head">
+      <h2>Start Here</h2>
+      <p>Pick the fastest route based on what you want to achieve today.</p>
+    </div>
+    <div class="home-card-grid">
+      <a class="home-card" href="./QUICKSTART/">
+        <span class="home-card-title">5-Minute Quickstart</span>
+        <span class="home-card-body">The shortest path to a successful first run with `iints demo`.</span>
+      </a>
+      <a class="home-card" href="./USER_GUIDE_MAP/">
+        <span class="home-card-title">User Guide Map</span>
+        <span class="home-card-body">A connected route through quickstart, research, edge, data, and maintenance docs.</span>
+      </a>
+      <a class="home-card" href="./TROUBLESHOOTING/">
+        <span class="home-card-title">Troubleshooting</span>
+        <span class="home-card-body">Exact fixes for broken installs, missing dependencies, and failing commands.</span>
+      </a>
+      <a class="home-card" href="./COMMAND_REFERENCE/">
+        <span class="home-card-title">Command Reference</span>
+        <span class="home-card-body">A concise map of the CLI surface when you want to move fast without digging through internals.</span>
+      </a>
+    </div>
+  </section>
 
-!!! important "Use a Virtual Environment"
-    Run SDK commands from an active Python virtual environment such as `.venv`.
-    This avoids package conflicts and missing dependency issues.
+  <section class="home-section">
+    <div class="home-section-head">
+      <h2>Main Workflows</h2>
+      <p>The SDK revolves around three practical tracks.</p>
+    </div>
+    <div class="home-workflow-grid">
+      <div class="home-workflow-card">
+        <span class="home-workflow-index">01</span>
+        <h3>Simulate</h3>
+        <p>Run virtual-patient studies, compare algorithms, and inspect safety behavior under controlled scenarios.</p>
+        <a href="./SCIENTIFIC_WORKFLOW/">Open scientific workflow</a>
+      </div>
+      <div class="home-workflow-card">
+        <span class="home-workflow-index">02</span>
+        <h3>Certify</h3>
+        <p>Check realism, trust grading, and output quality with MDMP-oriented validation and dataset tooling.</p>
+        <a href="./MDMP_QUICKSTART/">Open MDMP quickstart</a>
+      </div>
+      <div class="home-workflow-card">
+        <span class="home-workflow-index">03</span>
+        <h3>Deploy</h3>
+        <p>Prepare Raspberry Pi, Jetson, and booth-ready edge flows for demos or long-running stress studies.</p>
+        <a href="./EDGE_HARDWARE/">Open edge guide</a>
+      </div>
+    </div>
+  </section>
 
-## Decide What You Need
-
-New external users should start with the [User Guide Map](USER_GUIDE_MAP.md). It links the quickstart, research, data, edge, and maintainer paths into one readable route.
-
-| I want to... | Start here | Why |
-|---|---|---|
-| Understand the whole docs site | [User Guide Map](USER_GUIDE_MAP.md) | Connected manual-style route |
-| Get a recommended command | `iints start` | Goal-based first-run plan |
-| See something work in a few minutes | [Quickstart](QUICKSTART.md) | Fastest route to a successful first run |
-| Let the CLI guide me | `iints guide` | Interactive beginner path |
-| Run a zero-config example | `iints demo` | No custom files required |
-| Build my own simulation command | `iints run --wizard` | Guided custom run builder |
-| Install or repair the environment | [Installation](INSTALLATION.md) | Dependency and environment setup |
-| Fix a failing command | [Troubleshooting](TROUBLESHOOTING.md) | Common errors and exact fixes |
-| Browse the CLI surface | [Command Reference](COMMAND_REFERENCE.md) | Short command map without deep internals |
-| Run reproducible studies | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | Protocols, study bundles, comparisons |
-| Bring a Pi to Maker Faire | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | Show-ready Raspberry Pi flow |
-| Maintain or release the SDK | [Maintainer Guide](MAINTAINER_GUIDE.md) | Local checks, release audit, and manual upkeep |
-
-## 5-Minute First Run
-
-```bash
-python3 -m venv .venv
+  <section class="home-section">
+    <div class="home-section-head">
+      <h2>Quick Commands</h2>
+      <p>Good defaults when you want the CLI to lead.</p>
+    </div>
+    <div class="home-command-panel">
+      <pre><code>python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 iints doctor --suggest
-iints demo
-```
+iints start
+iints demo</code></pre>
+    </div>
+  </section>
 
-If you want to inspect the plan before running anything:
-
-```bash
-iints demo --dry-run
-```
-
-## Friendly CLI Entry Points
-
-- `iints start`: prints the shortest path for demo, project, study, edge, or data work
-- `iints guide`: asks what you want to do and points you to the right flow
-- `iints demo`: zero-config first run
-- `iints run --wizard`: guided custom run
-- `iints doctor --full --suggest`: diagnostics plus concrete next commands
-
-## Choose Your Path
-
-### New Users
-1. [User Guide Map](USER_GUIDE_MAP.md)
-2. [Quickstart](QUICKSTART.md)
-3. [Getting Started](GETTING_STARTED.md)
-4. [Troubleshooting](TROUBLESHOOTING.md)
-5. [Command Reference](COMMAND_REFERENCE.md)
-
-### Researchers
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [Evidence Base](EVIDENCE_BASE.md)
-
-### Edge / Maker Faire Users
-- [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
-- [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
-- [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
-- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
-- [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
-
-### Maintainers
-- [Maintainer Guide](MAINTAINER_GUIDE.md)
-- [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
-- [Release Archive](releases/INDEX.md)
-
-## Scope
-
-- Research use only.
-- Not a medical device.
-- No clinical dosing advice.
-
-## Next Step
-
-Start with [User Guide Map](USER_GUIDE_MAP.md) if you want a guided route, or [Quickstart](QUICKSTART.md) if you want to run the SDK immediately.
+  <section class="home-footer-note">
+    <p><strong>Scope:</strong> research use only, not a medical device, and not clinical dosing advice.</p>
+  </section>
+</div>

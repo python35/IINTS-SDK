@@ -10,9 +10,15 @@ theme:
   language: en
   logo: assets/iints-logo.png
   favicon: assets/iints-logo.png
+  palette:
+    - scheme: slate
+      primary: indigo
+      accent: teal
   features:
+    - navigation.tabs
     - navigation.sections
     - navigation.top
+    - navigation.instant
     - content.code.copy
     - search.suggest
     - search.highlight
