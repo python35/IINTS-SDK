@@ -11,8 +11,8 @@ theme:
   logo: assets/iints-logo.png
   favicon: assets/iints-logo.png
   palette:
-    - scheme: slate
-      primary: indigo
+    - scheme: default
+      primary: white
       accent: teal
   features:
     - navigation.tabs
