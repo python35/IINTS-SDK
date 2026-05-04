@@ -6,7 +6,7 @@ hide:
 <div class="home-shell">
   <section class="home-hero">
     <div class="home-brand-row">
-      <img src="assets/iints-logo.png" alt="IINTS-AF logo" class="home-brand-mark">
+      <img src="assets/iints-mark.png" alt="IINTS-AF logo" class="home-brand-mark">
       <span>IINTS-AF SDK</span>
     </div>
     <div class="home-hero-grid">
@@ -18,27 +18,27 @@ hide:
         </p>
         <div class="home-action-row">
           <a class="home-button home-button-primary" href="./QUICKSTART/">Start with Quickstart</a>
-          <a class="home-button" href="./USER_GUIDE_MAP/">Open Guide Map</a>
-          <a class="home-button" href="./COMMAND_REFERENCE/">Browse CLI</a>
+          <a class="home-button" href="./USER_GUIDE_MAP/">Guide Map</a>
+          <a class="home-button" href="./COMMAND_REFERENCE/">CLI Reference</a>
         </div>
       </div>
       <div class="home-summary-panel" aria-label="Documentation highlights">
         <div class="home-summary-item">
-          <span class="home-summary-icon home-icon-workflow" aria-hidden="true"></span>
+          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
           <div>
             <span class="home-summary-label">Research workflow</span>
             <strong>Simulation to report</strong>
           </div>
         </div>
         <div class="home-summary-item">
-          <span class="home-summary-icon home-icon-quality" aria-hidden="true"></span>
+          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
           <div>
             <span class="home-summary-label">Data quality</span>
             <strong>MDMP and realism checks</strong>
           </div>
         </div>
         <div class="home-summary-item">
-          <span class="home-summary-icon home-icon-edge" aria-hidden="true"></span>
+          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
           <div>
             <span class="home-summary-label">Edge hardware</span>
             <strong>Pi, UNO Q, Jetson</strong>
@@ -55,22 +55,22 @@ hide:
     </div>
     <div class="home-card-grid">
       <a class="home-card" href="./QUICKSTART/">
-        <span class="home-card-icon home-icon-quickstart" aria-hidden="true"></span>
+        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">5-Minute Quickstart</span>
         <span class="home-card-body">Install the SDK, run a first demo, and confirm your environment is ready.</span>
       </a>
       <a class="home-card" href="./USER_GUIDE_MAP/">
-        <span class="home-card-icon home-icon-map" aria-hidden="true"></span>
+        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">User Guide Map</span>
         <span class="home-card-body">A connected route through beginner, research, data, edge, and maintainer docs.</span>
       </a>
       <a class="home-card" href="./TROUBLESHOOTING/">
-        <span class="home-card-icon home-icon-tools" aria-hidden="true"></span>
+        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">Troubleshooting</span>
         <span class="home-card-body">Common failures, exact fixes, and recovery steps for local installs.</span>
       </a>
       <a class="home-card" href="./COMMAND_REFERENCE/">
-        <span class="home-card-icon home-icon-cli" aria-hidden="true"></span>
+        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">Command Reference</span>
         <span class="home-card-body">A compact map of the CLI surface when you already know what you want to run.</span>
       </a>

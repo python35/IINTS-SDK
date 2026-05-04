@@ -8,8 +8,8 @@ edit_uri: edit/main/docs/
 theme:
   name: material
   language: en
-  logo: assets/iints-logo.png
-  favicon: assets/iints-logo.png
+  logo: assets/iints-mark.png
+  favicon: assets/iints-mark.png
   palette:
     - scheme: default
       primary: white
