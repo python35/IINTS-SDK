@@ -186,6 +186,41 @@ Package a long-study folder into a transfer-ready zip archive for another device
 ### `iints edge remote-status`, `iints edge remote-reset`, `iints edge remote-stop`
 Run common Raspberry Pi maintenance commands remotely over SSH.
 
+## Jetson Endurance Commands
+
+### `iints jetson doctor`
+Check Jetson-like hardware probes, thermal zones, and NVIDIA tooling before a long headless run.
+
+### `iints jetson endurance start`
+Run a headless adversarial endurance study.
+
+```bash
+iints jetson endurance start \
+  --algo algorithms/example_algorithm.py \
+  --predictor models/lstm_predictor.pt \
+  --duration 7d \
+  --output-dir results/jetson_7day \
+  --profile mixed_adversarial \
+  --seed 42
+```
+
+### `iints jetson endurance status`
+Show progress, current glucose, TIR so far, interventions, and critical events.
+
+### `iints jetson endurance monitor`
+Print the same status repeatedly with `--watch`.
+
+### `iints jetson endurance stop`
+Request a safe stop and optional report finalization.
+
+### `iints jetson endurance export`
+Package the complete endurance folder into a transfer-ready `.zip`.
+
+### `iints jetson endurance install-service`
+Write a systemd service file with automatic `--resume` for multi-day Jetson runs.
+
+Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
+
 ### `iints makerfaire up`
 Start the Pi booth flow.
 

@@ -26,6 +26,7 @@ iints start
 | Certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [MDMP Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
 | Add your own algorithms or models | [Command Reference](COMMAND_REFERENCE.md) | [Technical Reference](TECHNICAL_README.md) | `iints plugin install` |
 | Prepare a Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) | [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) | `iints edge setup` |
+| Run Jetson stress studies | [Jetson Endurance Mode](JETSON_ENDURANCE.md) | [Command Reference](COMMAND_REFERENCE.md) | `iints jetson endurance start` |
 | Prepare an event booth | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) | `iints makerfaire up` |
 | Understand every command | [Command Reference](COMMAND_REFERENCE.md) | [Technical Reference](TECHNICAL_README.md) | `iints --help` |
 | Maintain the SDK | [Maintainer Guide](MAINTAINER_GUIDE.md) | [Release Checklist](PUBLIC_RELEASE_CHECKLIST.md) | `tools/dev/sdk_check.sh quick` |
@@ -37,6 +38,7 @@ The public docs are split by job:
 - Start pages explain the shortest route to a successful first result.
 - User guides explain one workflow at a time.
 - Edge guides explain Raspberry Pi, UNO Q, remote deploy, offline install, and long-running studies.
+- Jetson guides explain headless adversarial endurance runs and systemd resume.
 - Extension commands explain local algorithm and patient-model plugins without editing SDK source.
 - Data guides explain certification, data trust, and MDMP output.
 - Reference pages explain all commands and deeper architecture.
@@ -73,6 +75,14 @@ Raspberry Pi Digital Patient
   -> Maker Faire Pi Mode
   -> Maker Faire Pi Checklist
   -> Arduino UNO Q Setup
+```
+
+For Jetson robustness testing:
+
+```text
+Jetson Endurance Mode
+  -> Command Reference
+  -> Scientific Workflow
 ```
 
 ## If You Get Lost

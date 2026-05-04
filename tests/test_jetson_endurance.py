@@ -1,0 +1,157 @@
+import json
+import zipfile
+from pathlib import Path
+
+import pandas as pd
+from typer.testing import CliRunner
+
+from iints.cli.cli import app
+from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
+from iints.jetson.endurance import (
+    EnduranceConfig,
+    build_endurance_service_file,
+    export_endurance_archive,
+    load_endurance_status,
+    parse_duration_to_minutes,
+    run_endurance_study,
+)
+
+
+runner = CliRunner()
+
+
+def _run_short_endurance(output_dir: Path):
+    config = EnduranceConfig(
+        algo_path="builtin:clinical_baseline",
+        predictor_path=None,
+        duration="1h",
+        duration_minutes=parse_duration_to_minutes("1h"),
+        time_step_minutes=5,
+        output_dir=str(output_dir),
+        profile="normal",
+        seed=42,
+        patient_model="custom",
+        sensor_profile="clinical_cgm",
+    )
+    return run_endurance_study(algorithm=ClinicalBaselineAlgorithm(), predictor=None, config=config)
+
+
+def test_parse_duration_to_minutes() -> None:
+    assert parse_duration_to_minutes("1h") == 60
+    assert parse_duration_to_minutes("7d") == 10080
+    assert parse_duration_to_minutes("2w") == 20160
+
+
+def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_1h"
+
+    result = _run_short_endurance(output_dir)
+
+    assert result["status"]["status"] == "completed"
+    assert result["status"]["completed_steps"] == 12
+    assert (output_dir / "protocol" / "test_config.yaml").is_file()
+    assert (output_dir / "protocol" / "hardware_info.json").is_file()
+    assert (output_dir / "raw" / "steps.csv").is_file()
+    assert (output_dir / "raw" / "interventions.csv").is_file()
+    assert (output_dir / "raw" / "critical_events.csv").is_file()
+    assert (output_dir / "daily" / "day_01_summary.json").is_file()
+    assert (output_dir / "final" / "test_summary.json").is_file()
+    assert (output_dir / "final" / "tir_timeseries.csv").is_file()
+    assert (output_dir / "final" / "supervisor_analysis.json").is_file()
+    assert (output_dir / "final" / "worst_case_events.json").is_file()
+    assert (output_dir / "final" / "ENDURANCE_REPORT.md").is_file()
+    assert (output_dir / "final" / "main_figure.png").is_file()
+
+    steps = pd.read_csv(output_dir / "raw" / "steps.csv")
+    summary = json.loads((output_dir / "final" / "test_summary.json").read_text())
+    assert len(steps) == 12
+    assert summary["expected_steps"] == 12
+    assert 0.0 <= summary["total_tir_70_180_pct"] <= 100.0
+
+
+def test_status_and_export_helpers(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_1h"
+    archive_path = tmp_path / "jetson_1h.zip"
+    _run_short_endurance(output_dir)
+
+    status = load_endurance_status(output_dir)
+    archive = export_endurance_archive(output_dir, archive_path)
+
+    assert status["status"] == "completed"
+    assert archive == archive_path
+    with zipfile.ZipFile(archive_path) as archive_file:
+        names = set(archive_file.namelist())
+    assert "status.json" in names
+    assert "raw/steps.csv" in names
+    assert "final/ENDURANCE_REPORT.md" in names
+
+
+def test_jetson_endurance_cli_status_and_export(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_1h"
+    archive_path = tmp_path / "export.zip"
+    _run_short_endurance(output_dir)
+
+    status_result = runner.invoke(app, ["jetson", "endurance", "status", "--output-dir", str(output_dir)])
+    export_result = runner.invoke(
+        app,
+        ["jetson", "endurance", "export", "--output-dir", str(output_dir), "--output", str(archive_path)],
+    )
+
+    assert status_result.exit_code == 0
+    assert "IINTS Jetson Endurance Status" in status_result.stdout
+    assert export_result.exit_code == 0
+    assert archive_path.is_file()
+
+
+def test_jetson_endurance_cli_start_runs_short_study(tmp_path: Path) -> None:
+    algo_path = tmp_path / "demo_algo.py"
+    output_dir = tmp_path / "jetson_start"
+    algo_path.write_text(
+        "from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm\n\n"
+        "class DemoAlgo(ClinicalBaselineAlgorithm):\n"
+        "    pass\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "jetson",
+            "endurance",
+            "start",
+            "--algo",
+            str(algo_path),
+            "--duration",
+            "30m",
+            "--output-dir",
+            str(output_dir),
+            "--profile",
+            "normal",
+            "--patient-model",
+            "custom",
+            "--sensor-profile",
+            "clinical_cgm",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Endurance artifacts written to" in result.stdout
+    assert (output_dir / "status.json").is_file()
+    assert (output_dir / "final" / "test_summary.json").is_file()
+
+
+def test_service_file_contains_resume_command() -> None:
+    unit = build_endurance_service_file(
+        algo="algorithms/example_algorithm.py",
+        predictor="models/lstm_predictor.pt",
+        duration="7d",
+        output_dir="results/jetson_7day",
+        profile="mixed_adversarial",
+        seed=42,
+        working_directory="/opt/iints",
+    )
+
+    assert "WorkingDirectory=/opt/iints" in unit
+    assert "iints jetson endurance start" in unit
+    assert "--resume" in unit
+    assert "--predictor models/lstm_predictor.pt" in unit

@@ -110,6 +110,18 @@ from iints.live_patient.long_study import (
     run_edge_long_study,
 )
 from iints.live_patient.runtime import PatientRuntimeConfig
+from iints.jetson.endurance import (
+    ENDURANCE_PROFILES,
+    EnduranceConfig,
+    JetsonEnduranceError,
+    build_endurance_service_file,
+    collect_jetson_hardware_info,
+    export_endurance_archive,
+    load_endurance_status,
+    parse_duration_to_minutes,
+    run_endurance_study,
+    stop_endurance_study,
+)
 from iints.live_patient.uno_q import (
     UNO_Q_BRIDGE_BAUDRATE,
     export_uno_q_bridge,
@@ -215,6 +227,8 @@ plugin_register_app = typer.Typer(help="Register a local plugin file by extensio
 patientmodel_app = typer.Typer(help="Patient model registry and extension discovery.")
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
+jetson_app = typer.Typer(help="NVIDIA Jetson headless research tooling.")
+jetson_endurance_app = typer.Typer(help="Headless long-running adversarial endurance tests.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
@@ -229,6 +243,8 @@ app.add_typer(patientmodel_app, name="patientmodel")
 app.add_typer(edge_app, name="edge")
 app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
+app.add_typer(jetson_app, name="jetson")
+jetson_app.add_typer(jetson_endurance_app, name="endurance")
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     try:
@@ -7102,6 +7118,210 @@ def patientmodel_list():
     except Exception as exc:
         table.add_row("local registry", "local", "unavailable", str(exc))
     console.print(table)
+
+
+def _print_endurance_status(console: Console, status: Dict[str, Any]) -> None:
+    table = Table(title="IINTS Jetson Endurance Status", show_header=True, header_style="bold cyan")
+    table.add_column("Field", style="green")
+    table.add_column("Value", overflow="fold")
+    fields = [
+        ("Status", status.get("status")),
+        ("Duration", status.get("duration")),
+        ("Profile", status.get("profile")),
+        ("Progress", f"{float(status.get('progress_pct') or 0.0):.1f}%"),
+        ("Steps", f"{status.get('completed_steps', 0)} / {status.get('expected_steps', 0)}"),
+        ("Elapsed minutes", status.get("elapsed_minutes")),
+        ("Remaining minutes", status.get("remaining_minutes")),
+        ("Current glucose", status.get("current_glucose_mgdl")),
+        ("TIR so far", status.get("tir_so_far_pct")),
+        ("Interventions", status.get("interventions")),
+        ("Critical events", status.get("critical_events")),
+        ("Worst glucose", status.get("worst_glucose_mgdl")),
+        ("Updated UTC", status.get("updated_at_utc")),
+    ]
+    for label, value in fields:
+        table.add_row(label, "n/a" if value is None else str(value))
+    console.print(table)
+
+
+def _validate_endurance_profile(profile: str) -> str:
+    normalized = profile.strip().lower()
+    if normalized not in ENDURANCE_PROFILES:
+        valid = ", ".join(sorted(ENDURANCE_PROFILES))
+        raise typer.BadParameter(f"Unknown endurance profile '{profile}'. Choose one of: {valid}")
+    return normalized
+
+
+@jetson_app.command(name="doctor")
+def jetson_doctor():
+    """Inspect Jetson hardware health before a headless endurance run."""
+    console = Console()
+    info = collect_jetson_hardware_info()
+
+    table = Table(title="IINTS Jetson Doctor")
+    table.add_column("Check", style="cyan")
+    table.add_column("Value", overflow="fold")
+    platform_info = info.get("platform", {})
+    table.add_row("Platform", str(platform_info.get("system")))
+    table.add_row("Machine", str(platform_info.get("machine")))
+    table.add_row("Python", str(platform_info.get("python")))
+    table.add_row("Is Jetson-like", str(info.get("is_jetson_like")))
+    table.add_row("CUDA available", str(info.get("cuda_available")))
+    table.add_row("NVIDIA SMI", str(info.get("nvidia_smi") or "not available"))
+    table.add_row("tegrastats", str(info.get("tegrastats") or "not available"))
+    table.add_row("Thermal zones", json.dumps(info.get("thermal_zones", []), indent=2))
+    console.print(table)
+
+
+@jetson_endurance_app.command(name="start")
+def jetson_endurance_start(
+    algo: Annotated[Path, typer.Option("--algo", help="Path to an InsulinAlgorithm Python file")],
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional LSTM predictor checkpoint")] = None,
+    duration: Annotated[str, typer.Option(help="Duration such as 1h, 24h, 7d, 30d")] = "24h",
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the endurance study")] = Path("results/jetson_endurance"),
+    profile: Annotated[str, typer.Option(help="Endurance profile name")] = "mixed_adversarial",
+    seed: Annotated[int, typer.Option(help="Deterministic simulation seed")] = 42,
+    patient_model: Annotated[str, typer.Option(help="Patient model name passed to PatientFactory")] = "auto",
+    sensor_profile: Annotated[str, typer.Option(help="Sensor profile for the simulated CGM stream")] = "free_living_cgm",
+    custom_profile: Annotated[Optional[Path], typer.Option(help="YAML file for --profile custom")] = None,
+    time_step: Annotated[int, typer.Option(help="Simulation step size in minutes")] = 5,
+    resume: Annotated[bool, typer.Option(help="Resume from the latest snapshot in the output directory")] = False,
+):
+    """Run a headless Jetson endurance stress test and write publication-ready artifacts."""
+    console = Console()
+    try:
+        normalized_profile = _validate_endurance_profile(profile)
+        duration_minutes = parse_duration_to_minutes(duration)
+        if time_step <= 0:
+            raise typer.BadParameter("--time-step must be greater than zero")
+        algorithm = _load_algorithm_instance(algo, console)
+        predictor = _load_predictor_service_from_path(predictor_path, console)
+        config = EnduranceConfig(
+            algo_path=str(algo),
+            predictor_path=str(predictor_path) if predictor_path else None,
+            duration=duration,
+            duration_minutes=duration_minutes,
+            time_step_minutes=time_step,
+            output_dir=str(output_dir),
+            profile=normalized_profile,
+            seed=seed,
+            patient_model=patient_model,
+            sensor_profile=sensor_profile,
+            custom_profile_path=str(custom_profile) if custom_profile else None,
+            resume=resume,
+        )
+        result = run_endurance_study(algorithm=algorithm, predictor=predictor, config=config)
+    except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:
+        console.print(f"[bold red]Jetson endurance start failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    _print_endurance_status(console, result["status"])
+    console.print(f"[green]Endurance artifacts written to:[/green] {output_dir}")
+
+
+@jetson_endurance_app.command(name="status")
+def jetson_endurance_status(
+    output_dir: Annotated[Path, typer.Option(help="Endurance output directory")],
+):
+    """Show the latest status for a headless endurance run."""
+    console = Console()
+    try:
+        status = load_endurance_status(output_dir)
+    except JetsonEnduranceError as exc:
+        console.print(f"[bold red]Could not read endurance status:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_endurance_status(console, status)
+
+
+@jetson_endurance_app.command(name="monitor")
+def jetson_endurance_monitor(
+    output_dir: Annotated[Path, typer.Option(help="Endurance output directory")],
+    watch: Annotated[bool, typer.Option(help="Refresh while the run is active")] = False,
+    interval_seconds: Annotated[int, typer.Option(help="Refresh interval for --watch")] = 5,
+):
+    """Print live progress and hardware metrics for a headless endurance run."""
+    console = Console()
+    while True:
+        try:
+            status = load_endurance_status(output_dir)
+        except JetsonEnduranceError as exc:
+            console.print(f"[bold red]Could not read endurance status:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+        if watch:
+            console.clear()
+        _print_endurance_status(console, status)
+        if not watch or status.get("status") not in {"running", "stopping"}:
+            break
+        time.sleep(max(1, interval_seconds))
+
+
+@jetson_endurance_app.command(name="stop")
+def jetson_endurance_stop(
+    output_dir: Annotated[Path, typer.Option(help="Endurance output directory")],
+    generate_report: Annotated[bool, typer.Option(help="Ask the runner to finalize reports before stopping")] = False,
+):
+    """Request a running headless endurance test to stop safely."""
+    console = Console()
+    try:
+        status = stop_endurance_study(output_dir, generate_report=generate_report)
+    except JetsonEnduranceError as exc:
+        console.print(f"[bold red]Could not stop endurance run:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print("[yellow]Stop requested. The runner will finish the current simulation step safely.[/yellow]")
+    _print_endurance_status(console, status)
+
+
+@jetson_endurance_app.command(name="export")
+def jetson_endurance_export(
+    output_dir: Annotated[Path, typer.Option(help="Endurance output directory")],
+    output: Annotated[Path, typer.Option(help="Destination zip archive")],
+):
+    """Export all endurance artifacts as a reproducible zip archive."""
+    console = Console()
+    try:
+        archive = export_endurance_archive(output_dir, output)
+    except JetsonEnduranceError as exc:
+        console.print(f"[bold red]Could not export endurance run:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Exported endurance archive:[/green] {archive}")
+
+
+@jetson_endurance_app.command(name="install-service")
+def jetson_endurance_install_service(
+    algo: Annotated[Path, typer.Option("--algo", help="Path to an InsulinAlgorithm Python file")],
+    duration: Annotated[str, typer.Option(help="Duration such as 24h, 7d, 30d")] = "7d",
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the endurance study")] = Path("results/jetson_endurance"),
+    predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional LSTM predictor checkpoint")] = None,
+    profile: Annotated[str, typer.Option(help="Endurance profile name")] = "mixed_adversarial",
+    seed: Annotated[int, typer.Option(help="Deterministic simulation seed")] = 42,
+    service_path: Annotated[Optional[Path], typer.Option(help="Where to write the systemd unit file")] = None,
+):
+    """Generate a systemd service file for long Jetson endurance tests."""
+    console = Console()
+    try:
+        normalized_profile = _validate_endurance_profile(profile)
+        parse_duration_to_minutes(duration)
+        target = service_path or output_dir / "protocol" / "iints-jetson-endurance.service"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        unit = build_endurance_service_file(
+            algo=str(algo),
+            duration=duration,
+            output_dir=str(output_dir),
+            predictor=str(predictor_path) if predictor_path else None,
+            profile=normalized_profile,
+            seed=seed,
+        )
+        target.write_text(unit, encoding="utf-8")
+    except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:
+        console.print(f"[bold red]Could not generate endurance service:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Systemd service written to:[/green] {target}")
+    console.print("[cyan]Install with:[/cyan]")
+    console.print(f"  sudo cp {target} /etc/systemd/system/iints-jetson-endurance.service")
+    console.print("  sudo systemctl daemon-reload")
+    console.print("  sudo systemctl enable iints-jetson-endurance")
+    console.print("  sudo systemctl start iints-jetson-endurance")
 
 
 @docs_app.command(name="algo")

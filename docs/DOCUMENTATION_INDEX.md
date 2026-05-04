@@ -33,6 +33,7 @@ Go here first:
 
 Start here:
 - [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
+- [Jetson Endurance Mode](JETSON_ENDURANCE.md)
 - [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 - [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
 - [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)

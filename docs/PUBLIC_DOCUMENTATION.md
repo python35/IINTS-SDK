@@ -156,6 +156,7 @@ For non‑code content (notebooks, PDF reports, plots), the following tools are 
 ### Hardware / Platform Compatibility
 - macOS / Linux / Windows (tested on macOS + Ubuntu)
 - GPU **not required** (Torch optional)
+- NVIDIA Jetson can be used for headless adversarial endurance runs with `iints jetson endurance`; see `JETSON_ENDURANCE.md`.
 
 ### Usage Instructions
 - Notebooks: open `examples/notebooks/*.ipynb` locally or in Colab.
