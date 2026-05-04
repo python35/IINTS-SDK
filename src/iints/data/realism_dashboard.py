@@ -202,6 +202,7 @@ def build_realism_dashboard_html(
         "</tr>"
         for response in report.meal_responses[:12]
     )
+    meal_rows_html = meal_html or '<tr><td colspan="5">No meal responses were available.</td></tr>'
     reference_block = ""
     if report.reference_profile is not None:
         reference_block = f"""
@@ -358,7 +359,7 @@ def build_realism_dashboard_html(
         <thead>
           <tr><th>Minute</th><th>Carbs (g)</th><th>Rise (mg/dL)</th><th>Peak lag (min)</th><th>Matched insulin (U)</th></tr>
         </thead>
-        <tbody>{meal_html or '<tr><td colspan=\"5\">No meal responses were available.</td></tr>'}</tbody>
+        <tbody>{meal_rows_html}</tbody>
       </table>
     </section>
 
