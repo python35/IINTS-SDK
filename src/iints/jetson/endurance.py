@@ -12,7 +12,7 @@ import zipfile
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -351,6 +351,12 @@ def _safe_float(record: Optional[Dict[str, Any]], key: str) -> Optional[float]:
     return round(float(value), 3)
 
 
+def _coerce_scalar_int(value: object) -> int:
+    if isinstance(value, np.generic):
+        return int(value.item())
+    return int(cast(Any, value))
+
+
 def _glucose_series(df: pd.DataFrame) -> pd.Series:
     return pd.to_numeric(df.get("glucose_actual_mgdl", pd.Series(dtype=float)), errors="coerce").dropna()
 
@@ -368,14 +374,15 @@ def _hourly_summary(df: pd.DataFrame, time_step_minutes: int) -> pd.DataFrame:
     work["hour_index"] = (pd.to_numeric(work["time_minutes"], errors="coerce") // 60).astype(int)
     rows: List[Dict[str, Any]] = []
     for hour, group in work.groupby("hour_index"):
+        hour_index = _coerce_scalar_int(hour)
         glucose = _glucose_series(group)
         interventions = group.get("safety_triggered", pd.Series(dtype=bool)).fillna(False).astype(bool)
         uncertainty = pd.to_numeric(group.get("predictor_uncertainty_std_mgdl", pd.Series(dtype=float)), errors="coerce")
         latency = pd.to_numeric(group.get("algorithm_latency_ms", pd.Series(dtype=float)), errors="coerce")
         rows.append(
             {
-                "hour_index": int(hour),
-                "start_minute": int(hour) * 60,
+                "hour_index": hour_index,
+                "start_minute": hour_index * 60,
                 "mean_glucose_mgdl": round(float(glucose.mean()), 3) if not glucose.empty else None,
                 "tir_70_180_pct": round(_tir_pct(glucose), 3),
                 "time_below_70_pct": round(float((glucose < 70.0).mean() * 100.0), 3) if not glucose.empty else 0.0,
@@ -397,13 +404,14 @@ def _daily_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
     work["day_index"] = (pd.to_numeric(work["time_minutes"], errors="coerce") // 1440).astype(int)
     summaries: List[Dict[str, Any]] = []
     for day, group in work.groupby("day_index"):
+        day_index = _coerce_scalar_int(day)
         glucose = _glucose_series(group)
         interventions = group.get("safety_triggered", pd.Series(dtype=bool)).fillna(False).astype(bool)
         critical = glucose[glucose < 54.0]
         summaries.append(
             {
-                "day": int(day) + 1,
-                "start_minute": int(day) * 1440,
+                "day": day_index + 1,
+                "start_minute": day_index * 1440,
                 "step_count": int(len(group)),
                 "tir_70_180_pct": round(_tir_pct(glucose), 3),
                 "worst_glucose_mgdl": round(float(glucose.min()), 3) if not glucose.empty else None,
@@ -678,7 +686,8 @@ def run_endurance_study(
         simulator.load_state(snapshot["simulator_state"])
         steps_path = raw_dir / "steps.csv"
         if steps_path.is_file():
-            records = pd.read_csv(steps_path).to_dict(orient="records")
+            csv_records = pd.read_csv(steps_path).to_dict(orient="records")
+            records = [{str(key): value for key, value in row.items()} for row in csv_records]
 
     _write_json(
         output_dir / "status.json",
