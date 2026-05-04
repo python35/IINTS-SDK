@@ -37,11 +37,13 @@ markdown_extensions:
       permalink: true
 
 extra_javascript:
+  - javascripts/force-light.js
   - https://unpkg.com/mermaid@11/dist/mermaid.min.js
   - javascripts/mermaid.js
 
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/force-light.css
 
 nav:
   - Home: index.md
