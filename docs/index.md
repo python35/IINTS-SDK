@@ -24,25 +24,16 @@ hide:
       </div>
       <div class="home-summary-panel" aria-label="Documentation highlights">
         <div class="home-summary-item">
-          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
-          <div>
-            <span class="home-summary-label">Research workflow</span>
-            <strong>Simulation to report</strong>
-          </div>
+          <span class="home-summary-label">Research workflow</span>
+          <strong>Simulation to report</strong>
         </div>
         <div class="home-summary-item">
-          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
-          <div>
-            <span class="home-summary-label">Data quality</span>
-            <strong>MDMP and realism checks</strong>
-          </div>
+          <span class="home-summary-label">Data quality</span>
+          <strong>MDMP and realism checks</strong>
         </div>
         <div class="home-summary-item">
-          <img src="assets/iints-mark.png" alt="" class="home-summary-mark">
-          <div>
-            <span class="home-summary-label">Edge hardware</span>
-            <strong>Pi, UNO Q, Jetson</strong>
-          </div>
+          <span class="home-summary-label">Edge hardware</span>
+          <strong>Pi, UNO Q, Jetson</strong>
         </div>
       </div>
     </div>
@@ -55,22 +46,18 @@ hide:
     </div>
     <div class="home-card-grid">
       <a class="home-card" href="./QUICKSTART/">
-        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">5-Minute Quickstart</span>
         <span class="home-card-body">Install the SDK, run a first demo, and confirm your environment is ready.</span>
       </a>
       <a class="home-card" href="./USER_GUIDE_MAP/">
-        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">User Guide Map</span>
         <span class="home-card-body">A connected route through beginner, research, data, edge, and maintainer docs.</span>
       </a>
       <a class="home-card" href="./TROUBLESHOOTING/">
-        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">Troubleshooting</span>
         <span class="home-card-body">Common failures, exact fixes, and recovery steps for local installs.</span>
       </a>
       <a class="home-card" href="./COMMAND_REFERENCE/">
-        <img src="assets/iints-mark.png" alt="" class="home-card-mark">
         <span class="home-card-title">Command Reference</span>
         <span class="home-card-body">A compact map of the CLI surface when you already know what you want to run.</span>
       </a>
