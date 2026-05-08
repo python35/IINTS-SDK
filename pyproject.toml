@@ -78,7 +78,7 @@ research = [
   "onnxscript>=0.1.0,<1.0.0",
 ]
 mdmp = [
-  "cryptography>=42.0.0,<48.0.0",
+  "cryptography>=42.0.0,<49.0.0",
 ]
 
 [project.scripts]
