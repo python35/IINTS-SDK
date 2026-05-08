@@ -22,7 +22,7 @@ Options:
                        Default: 1,2,3,4,5,6,7,8,9,10
   --help               Show this help text.
 
-Any additional flags are forwarded to `iints run-eucys-study`.
+Any additional flags are forwarded to the source-tree `run-eucys-study` CLI command.
 Example:
   tools/research/run_eucys_final.sh \
     --algo algorithms/example_algorithm.py \
@@ -69,7 +69,12 @@ echo "  Output dir: $output_dir"
 echo "  Seeds:      $seeds"
 echo
 
-iints run-eucys-study \
+python_cmd="${PYTHON:-python3}"
+export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+export MPLCONFIGDIR="${MPLCONFIGDIR:-$ROOT_DIR/.mplt_eucys}"
+mkdir -p "$MPLCONFIGDIR"
+
+"$python_cmd" -c 'from iints.cli.cli import app; app()' -- run-eucys-study \
   --algo "$algo" \
   --output-dir "$output_dir" \
   --seeds "$seeds" \
@@ -77,7 +82,7 @@ iints run-eucys-study \
 
 echo
 echo "[IINTS] Building competition-ready EUCYS result package"
-iints eucys-results "$output_dir"
+"$python_cmd" -c 'from iints.cli.cli import app; app()' -- eucys-results "$output_dir"
 
 echo
 echo "[IINTS] Final EUCYS study workflow complete"
