@@ -53,7 +53,11 @@ local/
 .mplt_demo/
 .mplt_test/
 .mplt_patient/
+.mplt_eucys/
 .cache_demo/
+.cache_eucys/
+.cache/
+iints_uno_q_demo/
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/
 tools/local/*

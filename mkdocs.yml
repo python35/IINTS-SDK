@@ -62,6 +62,7 @@ nav:
       - Booth Demo & Presentation Flow: BOOTH_DEMO.md
   - Edge & Deployment:
       - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
+      - Jetson Endurance Mode: JETSON_ENDURANCE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
