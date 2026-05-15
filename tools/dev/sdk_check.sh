@@ -46,6 +46,9 @@ run_edge() {
 }
 
 run_docs() {
+  echo "[IINTS] docs: generated API reference"
+  python3 tools/docs/generate_api_reference.py
+
   echo "[IINTS] docs: MkDocs strict build"
   mkdocs build --strict
 
@@ -64,6 +67,7 @@ run_full() {
   mypy src/iints/
 
   echo "[IINTS] full: docs"
+  python3 tools/docs/generate_api_reference.py
   mkdocs build --strict
 
   echo "[IINTS] full: package build"

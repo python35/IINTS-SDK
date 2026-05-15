@@ -43,6 +43,9 @@ For non-technical readers, start with:
 
 ### Developer Docs
 - **Primary entry point**: `DEVELOPER_PORTAL.md`
+- **Visual architecture**: `ARCHITECTURE_OVERVIEW.md`
+- **Generated API reference**: `API_REFERENCE.md`
+- **Contribution safety**: `CONTRIBUTING_SAFELY.md`
 - **Architecture guide**: `COMPREHENSIVE_GUIDE.md`
 - **Technical details**: `TECHNICAL_README.md`
 - **Data protocol (MDMP draft)**: `MDMP.md`

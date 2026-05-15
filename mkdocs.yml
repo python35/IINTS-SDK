@@ -75,6 +75,8 @@ nav:
       - MDMP Specification (Draft): MDMP.md
   - Reference:
       - Developer Portal: DEVELOPER_PORTAL.md
+      - Visual Architecture: ARCHITECTURE_OVERVIEW.md
+      - API Reference: API_REFERENCE.md
       - Command Reference: COMMAND_REFERENCE.md
       - CLI & Advanced Reference: TECHNICAL_README.md
       - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
@@ -84,6 +86,7 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Maintainers & Governance:
+      - Contribute Safely: CONTRIBUTING_SAFELY.md
       - Maintainer Guide: MAINTAINER_GUIDE.md
       - Maintainer Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
       - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md

@@ -56,6 +56,9 @@ Start here:
 
 Use:
 - [Developer Portal](DEVELOPER_PORTAL.md)
+- [Visual Architecture](ARCHITECTURE_OVERVIEW.md)
+- [API Reference](API_REFERENCE.md)
+- [Contribute Safely](CONTRIBUTING_SAFELY.md)
 - [Maintainer Guide](MAINTAINER_GUIDE.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
 - [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)

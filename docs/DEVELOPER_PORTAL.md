@@ -16,8 +16,11 @@ If you need to understand the codebase, find the right subsystem, change behavio
 
 | Need | Start Here |
 | --- | --- |
+| See the system visually before editing | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
+| Find every Python module and its public symbols | [API Reference](API_REFERENCE.md) |
 | Understand the whole SDK architecture | [Architecture & Module Guide](COMPREHENSIVE_GUIDE.md) |
 | Check exact CLI behavior and advanced commands | [CLI & Advanced Reference](TECHNICAL_README.md) |
+| Contribute without weakening safety or docs | [Contribute Safely](CONTRIBUTING_SAFELY.md) |
 | Maintain the repository safely | [Maintainer Guide](MAINTAINER_GUIDE.md) |
 | See every public documentation surface | [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md) |
 | Prepare a maintained release | [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md) |
@@ -50,6 +53,12 @@ tools/dev/sdk_check.sh quick
 tools/dev/sdk_check.sh edge
 tools/dev/sdk_check.sh docs
 tools/dev/sdk_check.sh full
+```
+
+The generated [API Reference](API_REFERENCE.md) is built from `src/iints/**/*.py`. Regenerate it after public module changes with:
+
+```bash
+python3 tools/docs/generate_api_reference.py
 ```
 
 ## What Must Stay True
