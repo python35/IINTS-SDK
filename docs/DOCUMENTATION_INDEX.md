@@ -55,6 +55,7 @@ Start here:
 ## If You Maintain The SDK
 
 Use:
+- [Developer Portal](DEVELOPER_PORTAL.md)
 - [Maintainer Guide](MAINTAINER_GUIDE.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
 - [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)

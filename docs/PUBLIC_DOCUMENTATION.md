@@ -42,7 +42,8 @@ For non-technical readers, start with:
 - When implementing a new algorithm, run workflow, or integration.
 
 ### Developer Docs
-- **Primary guide**: `COMPREHENSIVE_GUIDE.md`
+- **Primary entry point**: `DEVELOPER_PORTAL.md`
+- **Architecture guide**: `COMPREHENSIVE_GUIDE.md`
 - **Technical details**: `TECHNICAL_README.md`
 - **Data protocol (MDMP draft)**: `MDMP.md`
 - **Evidence base**: `EVIDENCE_BASE.md`

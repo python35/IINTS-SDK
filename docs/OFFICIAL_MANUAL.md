@@ -17,6 +17,7 @@ All command examples in the documentation assume `.venv` is active.
 ## Best Entry Points
 
 - `USER_GUIDE_MAP.md`: connected route through the public docs for external users.
+- `DEVELOPER_PORTAL.md`: technical entry point for contributors who modify the SDK itself.
 - `GETTING_STARTED.md`: fastest route to a working run.
 - `PLAIN_LANGUAGE_GUIDE.md`: non-technical explanation.
 - `TECHNICAL_README.md`: command and integration reference.

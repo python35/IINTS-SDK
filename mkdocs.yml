@@ -7,6 +7,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
+  custom_dir: docs/overrides
   language: en
   logo: assets/iints-mark.png
   favicon: assets/iints-mark.png
@@ -73,6 +74,7 @@ nav:
       - MDMP Guide: MDMP_FULL_GUIDE.md
       - MDMP Specification (Draft): MDMP.md
   - Reference:
+      - Developer Portal: DEVELOPER_PORTAL.md
       - Command Reference: COMMAND_REFERENCE.md
       - CLI & Advanced Reference: TECHNICAL_README.md
       - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
