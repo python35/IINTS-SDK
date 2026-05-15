@@ -1,12 +1,14 @@
 # Troubleshooting
 
-**This page is for:** when a command failed and you want the shortest path to a fix.
+Use this page when a command failed and you want the shortest safe path back to a working state.
 
-**Before this page:** [Installation](INSTALLATION.md) if the SDK may not be installed correctly.
+**Read before:** [Installation](INSTALLATION.md) if you are not sure the SDK is installed correctly.
 
-**After this page:** [Command Reference](COMMAND_REFERENCE.md) if you need to confirm the right command shape.
+**Read next:** [Command Reference](COMMAND_REFERENCE.md) when you need to confirm exact command syntax.
 
-## First Recovery Commands
+## First Recovery Pass
+
+Run these before changing anything else:
 
 ```bash
 iints doctor --full --suggest
@@ -14,15 +16,13 @@ iints demo --dry-run
 iints run --dry-run --preset baseline_t1d
 ```
 
-## Common Problems
+If one of these commands already tells you what is wrong, fix that first. It is usually faster than guessing.
+
+## Common Failures
 
 ### `Algorithm file not found`
 
-What it usually means:
-- the path is wrong
-- you are not in the project folder you expected
-
-Good fixes:
+Usually means the path is wrong or you are not inside the project folder you expected.
 
 ```bash
 pwd
@@ -30,26 +30,22 @@ ls algorithms
 iints demo
 ```
 
-If the CLI shows `Did you mean ...`, use that path directly.
+If the CLI prints `Did you mean ...`, use that path directly.
 
 ### `Scenario file not found`
-
-Good fixes:
 
 ```bash
 ls scenarios
 iints scenarios generate --output-path scenarios/generated_scenario.json
 ```
 
-Or skip the scenario file and use a preset:
+Or skip the file and use a preset:
 
 ```bash
 iints run --preset baseline_t1d
 ```
 
 ### `Patient config file not found`
-
-Good fixes:
 
 ```bash
 iints profiles create --name my_profile
@@ -64,9 +60,7 @@ iints run --preset baseline_t1d
 
 ### `No such command ...`
 
-This usually means the installed CLI is older than the docs or repo checkout.
-
-Good fixes:
+This normally means the installed CLI is older than the docs or older than your repository checkout.
 
 ```bash
 python -m pip install -U pip
@@ -75,42 +69,42 @@ hash -r
 iints --help
 ```
 
-### `demo-booth`, AI, or reporting commands are missing
+### AI, reporting, or booth commands are missing
 
-Install the reporting stack:
+Install the reporting extras:
 
 ```bash
 python -m pip install -U "iints-sdk-python35[reports]"
 ```
 
-Or everything:
+Or install the full profile:
 
 ```bash
 python -m pip install -U "iints-sdk-python35[full]"
 ```
 
-### Public dataset fetch says verification failed
+### Dataset fetch verification failed
 
-That is often expected for public packs without a pinned hash yet.
-
-Use:
+Some public sources still do not publish a pinned SHA-256. If you trust the source and deliberately accept the weaker verification mode:
 
 ```bash
 iints data fetch aide_t1d --no-verify --output-dir data_packs/public/aide_t1d
 ```
 
-Only do this when you trust the source and understand that verification is relaxed.
+Treat `--no-verify` as an explicit trust decision, not as a normal success path.
 
-### Raspberry Pi / Maker Faire setup is confusing
+### Raspberry Pi or Maker Faire setup feels unclear
 
-Use these in order:
-- [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
-- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
-- [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
+Read these in order:
+
+1. [Hardware Hub](HARDWARE.md)
+2. [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
+3. [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
+4. [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 
 ## Before Filing A Bug
 
-Collect these:
+Collect:
 
 ```bash
 iints doctor --full --suggest
@@ -118,17 +112,18 @@ iints --help
 python -V
 ```
 
-And include:
-- the exact command you ran
-- the full error text
-- your OS and Python version
+Then include:
+
+- the command you ran
+- the exact error output
+- whether you installed from PyPI or from source
+- the working directory where you ran it
 
 ## Where To Go Next
 
-| If the issue is fixed and you want to... | Continue with |
-|---|---|
-| run the first demo | [Quickstart](QUICKSTART.md) |
-| continue the full workflow | [Getting Started](GETTING_STARTED.md) |
-| check command syntax | [Command Reference](COMMAND_REFERENCE.md) |
-| troubleshoot edge hardware | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
-| understand docs routes again | [Choose Your Path](USER_GUIDE_MAP.md) |
+| If you want to... | Continue with |
+| --- | --- |
+| reinstall cleanly | [Installation](INSTALLATION.md) |
+| finish the first workflow | [Getting Started](GETTING_STARTED.md) |
+| confirm a command shape | [Command Reference](COMMAND_REFERENCE.md) |
+| choose a docs route again | [Choose Your Path](USER_GUIDE_MAP.md) |

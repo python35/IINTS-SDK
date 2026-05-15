@@ -1,13 +1,21 @@
 # Installation And Paths
 
-This page is the simplest answer to two common questions:
+Use this page when the problem is not the science yet, but the environment:
 
-1. "How do I install IINTS correctly?"
-2. "From which folder am I supposed to run this command?"
+1. how to install the SDK correctly
+2. which folder a command belongs in
 
-**Before this page:** [Quickstart](QUICKSTART.md) if you simply want the fastest first run.
+**Read before:** [Quickstart](QUICKSTART.md) if you only need the fastest first run.
 
-**After this page:** [Getting Started](GETTING_STARTED.md) for the first complete workflow, or [Troubleshooting](TROUBLESHOOTING.md) if a command failed.
+**Read next:** [Getting Started](GETTING_STARTED.md) for the full first workflow, or [Troubleshooting](TROUBLESHOOTING.md) if something failed.
+
+## Choose The Install Path
+
+| If you are... | Use |
+| --- | --- |
+| trying the SDK on a normal laptop or workstation | released `full` install |
+| preparing Raspberry Pi or UNO Q hardware | lighter `edge` install |
+| modifying the SDK itself | source install from the repository root |
 
 ## The Short Rule
 
@@ -37,7 +45,7 @@ iints doctor --smoke-run
 python -c "import iints; print(iints.__version__)"
 ```
 
-## Option 1b: Install The Edge Runtime Profile
+## Option 2: Install The Edge Runtime Profile
 
 For Raspberry Pi or UNO Q style deployments, use the lighter edge profile:
 
@@ -87,7 +95,7 @@ cd iints_uno_q_demo
 
 Then upload `uno_q_bridge/iints_supervisor_bridge.ino` once and use `./test_uno_q_bridge.sh`.
 
-## Option 2: Install From Source
+## Option 3: Install From Source
 
 Use this only if you are developing the SDK itself.
 

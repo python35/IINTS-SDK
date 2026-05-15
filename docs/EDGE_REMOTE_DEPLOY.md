@@ -2,9 +2,9 @@
 
 Use this guide when you want to prepare a Raspberry Pi from your laptop in one command, while keeping the live dashboard local to the Pi.
 
-**Before this page:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) for the runtime model.
+**Read before:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) for the runtime model.
 
-**After this page:** [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for booth startup, or [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before an event.
+**Read next:** [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for booth startup, or [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before an event.
 
 ## Recommended Remote Pattern
 

@@ -2,9 +2,9 @@
 
 Use this page when the Raspberry Pi is your show-ready virtual patient for Maker Faire.
 
-**Before this page:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) or [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md), depending on whether you set up locally or remotely.
+**Read before:** [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) or [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md), depending on whether you set up locally or remotely.
 
-**After this page:** [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before using the setup in public.
+**Read next:** [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) before using the setup in public.
 
 The goal is simple:
 

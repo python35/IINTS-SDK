@@ -1,37 +1,40 @@
 # Data Certification Quickstart
 
-Data certification is the IINTS trust layer for validating data quality before modeling or evaluation.
+Use this page when you need a quick, defensible answer to one question: “is this dataset good enough to use?”
 
-**Before this page:** [Getting Started](GETTING_STARTED.md) if you have not produced a run or dataset yet.
+By the end, you should have a contract, a certification report, and a shareable audit dashboard.
 
-**After this page:** [MDMP Guide](MDMP_FULL_GUIDE.md) for deeper certification details, or [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) to use certified data in studies.
+**Read before:** [Getting Started](GETTING_STARTED.md) if you have not produced a run or dataset yet.
 
-!!! important "Use a Virtual Environment"
-    Run all commands from an active `.venv`:
-    `python3 -m venv .venv && source .venv/bin/activate`
+**Read next:** [Data Certification Full Guide](MDMP_FULL_GUIDE.md) when you need the full protocol details.
+
+!!! important "Use a virtual environment"
+    Run all commands from an active `.venv`.
 
 ## What Certification Produces
 
-- Contract validation results (pass/fail per rule)
-- Compliance score
-- Deterministic dataset + contract fingerprints
-- Trust grade: `draft`, `research_grade`, or `clinical_grade`
+- contract validation results
+- compliance score
+- deterministic dataset and contract fingerprints
+- trust grade: `draft`, `research_grade`, or `clinical_grade`
 
-## 1) Generate a Contract Template
+## Fastest Working Path
+
+### 1. Create a contract
 
 ```bash
 iints data certify-template --output-path data_contract.yaml
 ```
 
-Edit the contract to match your dataset schema and bounds.
+Edit the schema, units, and value ranges so they match your dataset.
 
-## 2) Validate a Dataset
+### 2. Validate the dataset
 
 ```bash
 iints data certify data_contract.yaml data/my_cgm.csv --output-json results/certification.json
 ```
 
-Strict mode for pipelines:
+For pipelines, use a strict gate:
 
 ```bash
 iints data certify data_contract.yaml data/my_cgm.csv \
@@ -40,15 +43,15 @@ iints data certify data_contract.yaml data/my_cgm.csv \
   --output-json results/certification.json
 ```
 
-## 3) Generate an Audit Dashboard
+### 3. Generate a dashboard
 
 ```bash
 iints data certify-visualizer results/certification.json --output-html results/mdmp_dashboard.html
 ```
 
-This creates a single-file HTML report that can be shared offline.
+The dashboard is a single-file HTML artifact you can share offline.
 
-## 4) Create Synthetic Mirror Data
+## Optional: Create Synthetic Mirror Data
 
 ```bash
 iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
@@ -56,15 +59,17 @@ iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
   --output-json results/synthetic_mirror_report.json
 ```
 
-Use this for safe development/testing when real data access is restricted.
+Use this when you need schema-realistic development data without distributing raw sensitive rows.
 
-## Grade Interpretation
+## Grade Meaning
 
-- `draft`: schema partially valid, not ready for rigorous research workflows.
-- `research_grade`: acceptable quality for research experiments.
-- `clinical_grade`: strongest validation profile available in the SDK.
+| Grade | Interpretation |
+| --- | --- |
+| `draft` | useful for iteration, not ready for rigorous research claims |
+| `research_grade` | acceptable for research workflows |
+| `clinical_grade` | strongest validation level currently exposed by the SDK |
 
-## Python Gate (Optional)
+## Optional Python Gate
 
 ```python
 import pandas as pd
@@ -75,18 +80,12 @@ def process(df: pd.DataFrame) -> int:
     return len(df)
 ```
 
-This blocks or warns if input data does not meet required quality.
-
-## Important Scope
-
-MDMP improves data quality and traceability. It does not provide clinical approval.
+This blocks or warns when incoming data does not meet the required quality level.
 
 ## Where To Go Next
 
 | If you want to... | Continue with |
-|---|---|
-| run a benchmark with certified data | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
-| learn the full MDMP model | [MDMP Guide](MDMP_FULL_GUIDE.md) |
-| import real-world data first | [Getting Started](GETTING_STARTED.md) |
-| diagnose data command errors | [Troubleshooting](TROUBLESHOOTING.md) |
-| find related commands | [Command Reference](COMMAND_REFERENCE.md) |
+| --- | --- |
+| understand every rule and fingerprint | [Data Certification Full Guide](MDMP_FULL_GUIDE.md) |
+| use certified data in a benchmark | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| inspect the science behind realism claims | [Evidence Base](EVIDENCE_BASE.md) |

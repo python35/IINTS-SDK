@@ -1,23 +1,25 @@
 # Scientific Workflow
 
-Use this workflow when you want a real benchmark study instead of a single illustrative run.
+Use this page when one illustrative run is no longer enough and you need a benchmark that other people can review.
 
-**Before this page:** [Getting Started](GETTING_STARTED.md) if you have not completed a single run yet.
+By the end, you should have a frozen protocol, repeated study runs, arm comparisons, and a poster-ready summary.
 
-**After this page:** [Study Analysis](STUDY_ANALYSIS.md) for interpreting the generated study bundle.
+**Read before:** [Getting Started](GETTING_STARTED.md) if you have not completed one run yet.
 
-## Goal
+**Read next:** [Study Analysis](STUDY_ANALYSIS.md) for interpreting the generated bundle.
 
-The SDK now supports a reproducible study engine built around:
+## What Makes A Study Defensible
+
+The study engine is built around:
 - fixed profile sets
 - fixed scenario families
 - explicit study arms
 - shared seeds across all comparisons
 - automatic summaries, comparisons, and poster assets
 
-That means we can compare a candidate algorithm against baseline controllers, safety conditions, and corrupted-data ablations without hand-stitching folders afterward.
+That lets you compare a candidate algorithm against baselines, safety conditions, and corrupted-data ablations without hand-stitching folders afterward.
 
-## The Main Commands
+## Main Commands
 
 The scientific workflow now centers on five commands:
 - `iints study-protocol`

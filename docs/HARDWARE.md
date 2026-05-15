@@ -1,30 +1,37 @@
 # Hardware Hub
 
-Use this page when the question is no longer “how do I run the SDK?” but “where should this run?”
+Use this page when you already know the SDK workflow and need to decide where it should run.
 
-## Pick The Device
+## Choose The Device
 
-| Device | Best for | Start with |
+| If you need... | Best fit | Start with |
 | --- | --- | --- |
-| Raspberry Pi | live digital-patient demos, kiosk viewing, long-running edge studies | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
-| Arduino UNO Q | simple physical bridge demos with a thin microcontroller layer | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
-| NVIDIA Jetson | accelerated adversarial endurance studies and GPU-backed stress testing | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
+| a stable live digital-patient demo | Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| visible hardware feedback with a small bridge layer | Arduino UNO Q | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| accelerated stress testing over long simulated periods | NVIDIA Jetson | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
 
-## Fastest Safe Entry Point
+## Fastest Safe Start
+
+Raspberry Pi:
 
 ```bash
 iints edge quickstart --board raspberry_pi
+```
+
+Arduino UNO Q:
+
+```bash
 iints edge quickstart --board uno_q
 ```
 
-For Jetson:
+Jetson:
 
 ```bash
 iints jetson doctor
 iints jetson endurance start --duration 7d --profile mixed_adversarial --output-dir results/jetson_7day
 ```
 
-## Hardware Routes
+## Device Routes
 
 ### Raspberry Pi
 
@@ -32,7 +39,7 @@ iints jetson endurance start --duration 7d --profile mixed_adversarial --output-
 Edge Hardware Matrix
   -> Raspberry Pi Digital Patient
   -> Remote Deploy & Pi Connect
-  -> Maker Faire Pi Mode if you need a booth setup
+  -> Maker Faire Pi Mode if needed
 ```
 
 ### Arduino UNO Q
@@ -41,10 +48,10 @@ Edge Hardware Matrix
 Edge Hardware Matrix
   -> Arduino UNO Q Setup
   -> upload bridge sketch once
-  -> run Linux-side patient runtime
+  -> run the Linux-side patient runtime
 ```
 
-### Jetson
+### NVIDIA Jetson
 
 ```text
 Jetson Endurance Mode
@@ -55,7 +62,7 @@ Jetson Endurance Mode
 
 ## Read Next
 
-- [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
+- [Edge Hardware Matrix](EDGE_HARDWARE.md)
 - [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 - [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
 - [Jetson Endurance Mode](JETSON_ENDURANCE.md)

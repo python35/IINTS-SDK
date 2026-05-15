@@ -1,6 +1,10 @@
 # Data Certification Full Guide
 
-This page is the complete implementation guide for the IINTS data-certification layer.
+Use this page when the quickstart is no longer enough and you need the full behavior of the IINTS data-certification layer.
+
+**Read before:** [Data Certification Quickstart](MDMP_QUICKSTART.md) if you only need the normal workflow.
+
+**Read next:** [Evidence Base](EVIDENCE_BASE.md) when you need the science behind the realism and trust claims.
 
 ## Environment Requirement
 
@@ -12,13 +16,13 @@ source .venv/bin/activate
 python -m pip install -U pip
 ```
 
-## Who This Page Is For
+## Who This Guide Is For
 
 - Researchers who need reproducible data validation before model training/evaluation.
 - Engineers implementing quality gates in scripts, CI, and services.
 - Reviewers who need traceable evidence for dataset integrity.
 
-## What Data Certification Is (And Is Not)
+## What Certification Is - And Is Not
 
 Data certification is the data-quality protocol layer in IINTS-AF.
 
@@ -275,11 +279,13 @@ For each experiment, store together:
 4. Grade gate fails unexpectedly
 - Check both compliance and score; `clinical_grade` requires compliance + >=90.
 
-## Quick Decision Matrix
+## Where To Go Next
 
-- Want fastest onboarding: use [MDMP Quickstart](MDMP_QUICKSTART.md)
-- Want full semantics and edge cases: use this page
-- Want concise protocol definition: use [MDMP Specification (Draft)](MDMP.md)
+| If you need... | Continue with |
+| --- | --- |
+| the shortest normal workflow | [MDMP Quickstart](MDMP_QUICKSTART.md) |
+| the protocol definition | [MDMP Specification](MDMP.md) |
+| the supporting science | [Evidence Base](EVIDENCE_BASE.md) |
 
 ## Scope Reminder
 

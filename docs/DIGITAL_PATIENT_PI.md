@@ -1,20 +1,20 @@
 # Raspberry Pi Digital Patient
 
-Use this guide when you want the SDK to keep a virtual patient running continuously on a Raspberry Pi.
+Use this guide when you want a Raspberry Pi to keep one virtual patient running continuously, with a local dashboard and exportable evidence bundle.
 
-**Before this page:** [Installation](INSTALLATION.md) if the edge SDK profile is not installed yet.
+**Read before:** [Hardware Hub](HARDWARE.md) if you have not chosen the device yet, or [Installation](INSTALLATION.md) if the edge profile is not installed.
 
-**After this page:** [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) for laptop-to-Pi setup, or [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for event use.
+**Read next:** [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) for laptop-to-Pi setup, or [Maker Faire Pi Mode](MAKERFAIRE_PI.md) for event use.
 
-The Raspberry Pi digital-patient workflow gives you:
+By the end, you should have:
 - a persistent virtual patient runtime
 - SQLite-backed state on disk
 - a lightweight dashboard for the live glucose view
 - exportable run bundles for later workstation-side analysis
 - optional auto-start through `systemd`
 
-If your main goal is a booth-ready startup routine, jump to [Maker Faire Pi Mode](MAKERFAIRE_PI.md).
-If your main goal is preparing a Pi remotely from your laptop, jump to [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md).
+If you mainly need a booth startup routine, jump to [Maker Faire Pi Mode](MAKERFAIRE_PI.md).
+If you mainly need laptop-to-Pi setup, jump to [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md).
 
 ## Recommended Hardware
 

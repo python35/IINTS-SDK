@@ -1,13 +1,15 @@
 # Booth Demo Guide
 
-The SDK now includes a fair-ready demo flow that creates:
+Use this page when you need a clean live story for a Zoom call, jury table, sponsor walkthrough, or fair booth.
+
+The demo bundle creates:
 
 - three simulation runs
 - a jury-friendly poster
 - a written talk track
 - optional AI-ready artifacts for the safety case
 
-## What It Shows
+## The Story It Tells
 
 The booth demo tells one clean story in three panels:
 
@@ -18,7 +20,7 @@ The booth demo tells one clean story in three panels:
 3. `Supervisor Override`
    A deliberately unsafe AI request that gets blocked by the safety supervisor.
 
-That makes it easy to explain the SDK in public:
+The public message stays simple:
 
 - it simulates
 - it stresses

@@ -1,6 +1,8 @@
 # AI Assistant Guide
 
-This guide explains how the local open-weight Ministral 3 AI layer works inside IINTS-AF.
+Use this guide when you want local AI help for explaining validated outputs, without giving the model dosing authority.
+
+By the end, you should understand what the assistant can do, how MDMP gating protects the workflow, and how to run the local setup end to end.
 
 ## Scope
 
@@ -51,7 +53,7 @@ Supported convenience aliases include:
 
 If the alias is used, IINTS resolves it to the installed local Ollama tag before generation.
 
-## Recommended Setup
+## Fastest Working Setup
 
 Always work from an active virtual environment:
 
@@ -62,7 +64,7 @@ python -m pip install -U pip
 python -m pip install -e ".[full,mdmp]"
 ```
 
-## Clean Ollama Setup (Small Version)
+## Full Ollama Setup
 
 This is the shortest reliable setup if you want the local AI layer working end to end.
 
@@ -182,7 +184,7 @@ General advice:
 - Run `iints ai models` in the CLI to see the same recommendations in a terminal-friendly table.
 - If `ministral-3:8b` closes the connection during generation, try `ministral-3:3b` first before assuming something is wrong with the SDK.
 
-## Recommended Workflow
+## Recommended Run Workflow
 
 After a run completes, prepare the run directory once:
 

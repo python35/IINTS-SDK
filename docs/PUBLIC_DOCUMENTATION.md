@@ -1,7 +1,8 @@
 # Documentation Coverage Reference
 
-This document summarizes the main documentation surfaces in the IINTS-AF SDK across
-**software**, **data**, **content**, and **AI system** topics.
+Use this page when you need an audit-style map of the documentation surface rather than a tutorial route.
+
+It summarizes the main documentation areas across **software**, **data**, **content**, and **AI system** topics.
 
 Public docs site: `https://python35.github.io/IINTS-SDK/`
 

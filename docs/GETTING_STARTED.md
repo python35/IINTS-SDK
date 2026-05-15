@@ -1,12 +1,14 @@
 # Getting Started
 
-Use this page for the fastest reliable path from installation to a first complete SDK run.
+Use this page when you want the first complete SDK workflow, not only a demo.
 
-**Before this page:** [Quickstart](QUICKSTART.md) if you have not run `iints demo` yet.
+By the end, you will have installed the SDK, created a project, run a baseline simulation, certified the output, and reviewed the resulting bundle.
 
-**After this page:** [Workflow Hub](WORKFLOWS.md), [MDMP Quickstart](MDMP_QUICKSTART.md), or [Hardware Hub](HARDWARE.md), depending on your goal.
+**Read before:** [Quickstart](QUICKSTART.md) if you have not run `iints demo` yet.
 
-The core workflow is:
+**Read next:** [Workflow Hub](WORKFLOWS.md), [MDMP Quickstart](MDMP_QUICKSTART.md), or [Hardware Hub](HARDWARE.md), depending on your goal.
+
+## The Workflow In One View
 
 1. run a simulation
 2. certify the output data
@@ -125,7 +127,7 @@ This adds:
 - `sources_manifest.json`
 - `SUMMARY.md`
 
-## 10) Common Next Steps
+## 10) Pick Your Next Workflow
 
 ### Import Personal Pump / CGM Data
 
@@ -248,20 +250,6 @@ That edge flow gives you:
 - a kiosk dashboard URL for Raspberry Pi Connect screen sharing
 - a ZIP bundle for workstation-side analysis and reporting
 
-## Related Guides
-
-- [Choose Your Path](USER_GUIDE_MAP.md)
-- [Workflow Hub](WORKFLOWS.md)
-- [Hardware Hub](HARDWARE.md)
-- [Quickstart](QUICKSTART.md)
-- [Updating An Existing Install](UPDATING.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- [AI Assistant](AI_ASSISTANT.md)
-- [Evidence Base](EVIDENCE_BASE.md)
-- [MDMP Quickstart](MDMP_QUICKSTART.md)
-- [CLI & Advanced Reference](TECHNICAL_README.md)
-
 ## Where To Go Next
 
 | If you finished this page and want to... | Continue with |
@@ -271,6 +259,13 @@ That edge flow gives you:
 | certify datasets and outputs | [MDMP Quickstart](MDMP_QUICKSTART.md) |
 | use local AI reporting | [AI Assistant](AI_ASSISTANT.md) |
 | deploy to Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+
+More references:
+
+- [Choose Your Path](USER_GUIDE_MAP.md)
+- [Updating The SDK](UPDATING.md)
+- [Evidence Base](EVIDENCE_BASE.md)
+- [CLI & Advanced Reference](TECHNICAL_README.md)
 
 ## Safety Scope
 

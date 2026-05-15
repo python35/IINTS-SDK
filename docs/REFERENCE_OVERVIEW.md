@@ -1,17 +1,17 @@
 # Reference Hub
 
-Use this page when you are not looking for a tutorial anymore and need the exact source of truth.
+Use this page when you already know the workflow and need the exact source of truth.
 
-## Main Reference Types
+## Find The Right Reference
 
-| Need | Use |
+| If you need... | Use |
 | --- | --- |
-| one command or command family | [Command Reference](COMMAND_REFERENCE.md) |
-| exact advanced CLI behavior | [CLI & Advanced Reference](TECHNICAL_README.md) |
-| module-level code map | [API Reference](API_REFERENCE.md) |
-| subsystem relationships | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
+| one public command or command family | [Command Reference](COMMAND_REFERENCE.md) |
+| advanced CLI behavior and integration details | [CLI & Advanced Reference](TECHNICAL_README.md) |
+| Python modules and public symbols | [API Reference](API_REFERENCE.md) |
+| subsystem boundaries and data flow | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
 | scientific justification and citations | [Evidence Base](EVIDENCE_BASE.md) |
-| long-form printable documentation | [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md) |
+| a long-form printable manual | [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md) |
 
 ## By Audience
 
@@ -34,14 +34,12 @@ Use this page when you are not looking for a tutorial anymore and need the exact
 - [MDMP Specification](MDMP.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
 
-## Release And Change History
+## Releases
 
 - [Latest release notes](releases/v1.5.4.md)
 - [Release archive](releases/INDEX.md)
 
-## If You Need A Route Instead Of A Reference
-
-Go back to:
+## If You Need A Route Instead
 
 - [Choose Your Path](USER_GUIDE_MAP.md)
 - [Workflow Hub](WORKFLOWS.md)

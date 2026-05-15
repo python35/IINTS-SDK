@@ -1,6 +1,8 @@
 # Jetson Endurance Mode
 
-Jetson Endurance Mode turns an NVIDIA Jetson into a headless scientific stress-test machine. It does not start a dashboard or demo UI. Configure once, let the run finish, then collect a reproducible results folder.
+Jetson Endurance Mode turns an NVIDIA Jetson into a headless scientific stress-test machine. It is for long adversarial runs, not for dashboards or stage demos.
+
+Configure it once, let the study run, and collect one reproducible results folder at the end.
 
 ## When To Use
 
@@ -12,6 +14,14 @@ Use this mode when you want to test safety behavior under long-running adversari
 - multi-week regression studies on edge hardware
 
 For Raspberry Pi demos and realistic long-study behavior, use `iints edge long-study`. Jetson Endurance Mode is more aggressive: it targets supervisor limits, sensor failures, double meals, exercise hypoglycemia, and cold-start behavior.
+
+## What You Get
+
+- headless long-run execution
+- hardware monitoring
+- daily summaries and snapshots
+- worst-case event logs
+- publication-ready export artifacts
 
 ## Quick Start
 

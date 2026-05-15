@@ -1,6 +1,8 @@
 # Architecture & Deep Dive
 
-This document provides a complete, end-to-end manual for the IINTS-AF (Intelligent Insulin Titration System for Artificial Pancreas) SDK. It covers installation, project structure, key APIs, command-line interface usage, data formats, safety features, profiling, examples, and development workflows.
+Use this guide when you need the full technical picture rather than a task-specific route.
+
+It is the long-form architecture manual for the IINTS-AF SDK: installation, project structure, APIs, CLI behavior, data formats, safety features, profiling, examples, and development workflows in one place.
 
 ## Who This Page Is For
 

@@ -1,75 +1,80 @@
-# Plain Language Overview
+# Plain-Language Overview
 
-This page explains the SDK in simple terms.
+Use this page if you want to understand the SDK before reading commands, code, or research detail.
 
-## What Is IINTS-AF?
-IINTS-AF is a **safe testing environment** for insulin algorithms.
+## What IINTS-AF Is
 
-You can think of it as a flight simulator:
-- You test ideas in simulation.
-- You measure what happens.
-- You keep an audit trail.
-- You do **not** treat real patients with this SDK.
+IINTS-AF is a research sandbox for testing insulin algorithms without treating real patients.
 
-## What Happens During a Run?
-When you run a simulation, the SDK does this:
+The simplest analogy is a flight simulator:
 
-1. Reads glucose and scenario events (meal, exercise, sensor issue).
-2. Checks if glucose input is biologically plausible (`InputValidator`).
-3. Gets an insulin suggestion from your algorithm.
-4. Optionally reads AI forecast signals (advisory only).
-5. Applies hard deterministic safety checks (`IndependentSupervisor`).
-6. Simulates the patient response and stores all outputs.
+- it creates realistic test situations,
+- lets an algorithm respond,
+- records what happened,
+- and keeps the final safety logic visible and inspectable.
 
-## Why “Open Logic” Matters
-IINTS-AF is not “AI decides everything.”
+It is built for research, education, validation, and technical review. It is not a medical device and does not provide clinical dosing advice.
 
-- Layer 1: `InputValidator` filters impossible sensor values.
-- Layer 2: `Predictor` estimates future glucose (optional, advisory).
-- Layer 3: `IndependentSupervisor` can block or reduce unsafe doses.
+## What Happens During A Run
 
-Final dosing is always safety-constrained.
+1. The simulator reads glucose and scenario events such as meals, exercise, or sensor issues.
+2. An input validator rejects values that are biologically impossible.
+3. An algorithm proposes an insulin action.
+4. An optional predictor may estimate future glucose, but only as advisory information.
+5. A deterministic safety supervisor can block or reduce unsafe actions.
+6. The simulator stores the results, reports, and audit trail.
 
-## Who Should Use It?
-- Researchers testing control algorithms.
-- Developers building simulation pipelines.
-- Clinical innovation teams preparing pre-clinical evidence.
-- Students learning diabetes algorithm validation.
+## Why The Safety Design Matters
 
-## What It Is Not
-- Not a medical device.
-- Not cleared for direct patient treatment.
-- Not clinical decision support in production care.
+IINTS-AF is not built around “AI decides everything.”
 
-## 5-Minute Start
+| Layer | Role |
+| --- | --- |
+| `InputValidator` | rejects impossible sensor values |
+| optional predictor | estimates future glucose trends |
+| `IndependentSupervisor` | applies final deterministic safety limits |
+
+The supervisor remains the final authority. That separation is the central design choice of the SDK.
+
+## Who It Helps
+
+- researchers comparing insulin-control strategies
+- developers building simulation or validation workflows
+- clinical-innovation teams preparing pre-clinical evidence
+- students learning how safety-constrained algorithms are evaluated
+
+## The Fastest First Run
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp]"
-iints quickstart --project-name iints_quickstart
-cd iints_quickstart
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints demo
 ```
 
-If you are unsure which folder to use for which command, see `docs/INSTALLATION.md`.
+That gives you:
 
-You will get output files like:
-- `results.csv` (time-series outputs)
-- `audit/` (decision trace)
-- `report.pdf` (visual summary)
+- `results.csv` for the simulated time series
+- `report.pdf` for a readable summary
+- `audit/` for the safety trail
 
-## “I Need X” Quick Map
-- “I want a first run” -> `README.md`
-- “I want full CLI commands” -> `docs/TECHNICAL_README.md`
-- “I want full architecture details” -> `docs/COMPREHENSIVE_GUIDE.md`
-- “I want the real research sources behind assumptions” -> `docs/EVIDENCE_BASE.md`
-- “I want predictor training” -> `research/README.md`
-- “I want step-by-step notebooks” -> `examples/notebooks/README.md`
+If you want the full first workflow rather than only a demo, continue to [Getting Started](GETTING_STARTED.md).
+
+## Where To Go Next
+
+| If you want to... | Continue with |
+| --- | --- |
+| get one successful run quickly | [Quickstart](QUICKSTART.md) |
+| understand the full first workflow | [Getting Started](GETTING_STARTED.md) |
+| inspect the science behind the claims | [Evidence Base](EVIDENCE_BASE.md) |
+| train or evaluate predictors | `../research/README.md` |
+| browse exact commands | [Command Reference](COMMAND_REFERENCE.md) |
 
 ## Short Glossary
-- **TIR**: Time in Range (usually 70-180 mg/dL).
-- **IOB**: Insulin On Board (active insulin still working).
-- **COB**: Carbs On Board (carbohydrates still absorbing).
-- **Fail-soft**: Keep simulation running using last safe value when input is invalid.
-- **Dual-Guard**: Predictor + deterministic supervisor, with safety as final authority.
+
+- **TIR**: Time in Range, commonly 70-180 mg/dL.
+- **IOB**: Insulin On Board, meaning active insulin still working.
+- **COB**: Carbs On Board, meaning carbohydrates still absorbing.
+- **Fail-soft**: keep the simulation running with the last safe value when input is invalid.
+- **Dual-Guard**: optional predictor plus deterministic supervisor, with safety remaining final.

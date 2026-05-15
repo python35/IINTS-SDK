@@ -1,8 +1,8 @@
 # Developer Portal
 
-This is the technical entry point for people who are allowed to change the IINTS-AF SDK itself.
+Use this portal when you are changing the SDK itself, not only running it.
 
-If you need to understand the codebase, find the right subsystem, change behavior safely, run the correct checks, or prepare a release, start here.
+It routes contributors to the architecture, generated API map, subsystem guides, validation commands, and release discipline needed to change behavior safely.
 
 ## What This Portal Covers
 
@@ -32,7 +32,7 @@ If you need to understand the codebase, find the right subsystem, change behavio
 | --- | --- | --- |
 | simulation loop, patient state, safety gates | `src/iints/core/` | [Architecture & Module Guide](COMPREHENSIVE_GUIDE.md) |
 | CLI commands and public workflows | `src/iints/cli/` | [CLI & Advanced Reference](TECHNICAL_README.md) |
-| CGM imports, registries, quality checks, realism | `src/iints/data/` | [MDMP Guide](MDMP_FULL_GUIDE.md), [Evidence Base](EVIDENCE_BASE.md) |
+| CGM imports, registries, quality checks, realism | `src/iints/data/` | [Data Certification Full Guide](MDMP_FULL_GUIDE.md), [Evidence Base](EVIDENCE_BASE.md) |
 | reporting, posters, study analysis | `src/iints/analysis/` | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md), [Study Analysis](STUDY_ANALYSIS.md) |
 | local AI preparation and explanation gates | `src/iints/ai/` | [AI Assistant](AI_ASSISTANT.md) |
 | Pi, UNO Q, Jetson, long studies | `src/iints/live_patient/`, `src/iints/jetson/` | [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md), [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
@@ -85,7 +85,7 @@ python3 tools/docs/generate_api_reference.py
 
 ### Change Data Or Realism Logic
 
-- Start with [MDMP Guide](MDMP_FULL_GUIDE.md) and [Evidence Base](EVIDENCE_BASE.md)
+- Start with [Data Certification Full Guide](MDMP_FULL_GUIDE.md) and [Evidence Base](EVIDENCE_BASE.md)
 - Keep registry metadata, source citations, validators, and docs synchronized
 - Preserve deterministic certification behavior
 

@@ -1,11 +1,19 @@
 # Edge Hardware Profiles
 
-IINTS supports two installation styles:
+Use this page when you need to choose a board, an install profile, and a deployment pattern before opening a board-specific guide.
+
+IINTS supports two deployment styles:
 
 - a `full` workstation install for laptops and desktops
 - a lighter `edge` install for always-on single-board computers and hybrid Linux boards
 
-Use this page to choose a supported board, the right install profile, and a practical deployment pattern for edge use.
+## Choose By Goal
+
+| If you need... | Best fit | Continue with |
+| --- | --- | --- |
+| the default live digital-patient demo | Raspberry Pi 5 | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
+| a Linux runtime plus visible physical feedback | Arduino UNO Q | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| accelerated long-running stress tests | NVIDIA Jetson | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
 
 ## SBC Support Matrix
 

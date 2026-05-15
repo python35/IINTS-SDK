@@ -15,7 +15,7 @@ Use this page when you know what you want to achieve, but not yet which guide de
 | see the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints demo` |
 | understand the project without jargon | [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Getting Started](GETTING_STARTED.md) | `iints start` |
 | run a scientific benchmark | [Workflow Hub](WORKFLOWS.md) | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | `iints run-study` |
-| certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [MDMP Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
+| certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Data Certification Full Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
 | analyze a finished study | [Study Analysis](STUDY_ANALYSIS.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints study analyze` |
 | prepare a live demo | [Booth Demo Guide](BOOTH_DEMO.md) | [Workflow Hub](WORKFLOWS.md) | `iints demo-live` |
 | deploy hardware | [Hardware Hub](HARDWARE.md) | board-specific guide | `iints edge quickstart` |
@@ -45,7 +45,7 @@ Workflow Hub
 
 ```text
 MDMP Quickstart
-  -> MDMP Guide
+  -> Data Certification Full Guide
   -> Evidence Base
 ```
 

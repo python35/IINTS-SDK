@@ -1,6 +1,6 @@
 # Developer CLI Guide
 
-This document contains the full technical usage for the IINTS-AF SDK.
+Use this guide when you need the exact technical behavior of the CLI, including integration paths and artifact expectations.
 
 If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
 If you intend to modify SDK source code, start with the [Developer Portal](DEVELOPER_PORTAL.md) first so you get the architecture, maintainer, testing, and release map before diving into command details.

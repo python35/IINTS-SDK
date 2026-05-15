@@ -1,10 +1,10 @@
 # Manual Overview
 
-Use this page to choose the right manual quickly.
+Use this page when you want the right long-form document quickly, without browsing every section of the docs site.
 
-## Environment Baseline
+## Before You Start
 
-Before following any manual, activate a virtual environment:
+All examples assume an active virtual environment:
 
 ```bash
 python3 -m venv .venv
@@ -12,52 +12,59 @@ source .venv/bin/activate
 python -m pip install -U pip
 ```
 
-All command examples in the documentation assume `.venv` is active.
-
 ## Best Entry Points
 
-- `USER_GUIDE_MAP.md`: connected route through the public docs for external users.
-- `DEVELOPER_PORTAL.md`: technical entry point for contributors who modify the SDK itself.
-- `ARCHITECTURE_OVERVIEW.md`: visual map of subsystem boundaries and run flow.
-- `API_REFERENCE.md`: generated public-symbol map for every Python module.
-- `CONTRIBUTING_SAFELY.md`: safe contribution workflow and validation matrix.
-- `GETTING_STARTED.md`: fastest route to a working run.
-- `PLAIN_LANGUAGE_GUIDE.md`: non-technical explanation.
-- `TECHNICAL_README.md`: command and integration reference.
-- `AI_ASSISTANT.md`: how the local open-weight Ministral 3 assistant works, how it is gated, and how to debug it.
+| If you need... | Start with |
+| --- | --- |
+| the right first page for your goal | [Choose Your Path](USER_GUIDE_MAP.md) |
+| the first complete SDK workflow | [Getting Started](GETTING_STARTED.md) |
+| a non-technical explanation | [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md) |
+| contributor and maintenance docs | [Developer Portal](DEVELOPER_PORTAL.md) |
+| the subsystem map | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
+| exact Python symbols | [API Reference](API_REFERENCE.md) |
+| exact CLI behavior | [CLI & Advanced Reference](TECHNICAL_README.md) |
+| guarded local AI behavior | [AI Assistant](AI_ASSISTANT.md) |
 
 ## Full Manuals
 
-- `manuals/IINTS-AF_SDK_Manual.md`: full long-form technical manual.
-- `manuals/IINTS-AF_SDK_Manual.pdf`: printable/export version.
-- `COMPREHENSIVE_GUIDE.md`: architecture + workflows + SDK concepts.
+- [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md)
+- `manuals/IINTS-AF_SDK_Manual.pdf`
+- [Architecture & Module Guide](COMPREHENSIVE_GUIDE.md)
 
-## Recommended Reading Order
+## Recommended Reading Orders
 
-For a new external user:
+### New user
 
 1. [Choose Your Path](USER_GUIDE_MAP.md)
 2. [Quickstart](QUICKSTART.md)
 3. [Getting Started](GETTING_STARTED.md)
 4. [Command Reference](COMMAND_REFERENCE.md)
 
-For a research user:
+### Research user
 
-1. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-2. [Study Analysis](STUDY_ANALYSIS.md)
-3. [MDMP Quickstart](MDMP_QUICKSTART.md)
+1. [Workflow Hub](WORKFLOWS.md)
+2. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+3. [Study Analysis](STUDY_ANALYSIS.md)
+4. [MDMP Quickstart](MDMP_QUICKSTART.md)
 
-For an edge user:
+### Hardware user
 
-1. [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
-2. [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md)
-3. [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
+1. [Hardware Hub](HARDWARE.md)
+2. [Edge Hardware Matrix](EDGE_HARDWARE.md)
+3. board-specific guide
 
-## Research-Specific Manual
+### SDK contributor
 
-- `../research/README.md`: predictor data prep, training, and evaluation.
+1. [Developer Portal](DEVELOPER_PORTAL.md)
+2. [Visual Architecture](ARCHITECTURE_OVERVIEW.md)
+3. [Contribute Safely](CONTRIBUTING_SAFELY.md)
+
+## Research-Specific Material
+
+- `../research/README.md`: predictor data preparation, training, and evaluation.
 
 ## Scope
 
-- Research and simulation only.
-- Not a medical device.
+- research and simulation only
+- not a medical device
+- no clinical dosing advice

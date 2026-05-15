@@ -1,10 +1,10 @@
 # Command Reference
 
-**This page is for:** people who want a quick map of the CLI without reading the full technical manual.
+Use this page when you know the task and want the public command family quickly, without reading the full technical manual.
 
-**Before this page:** [Choose Your Path](USER_GUIDE_MAP.md) if you are not sure which command family you need.
+**Read before:** [Choose Your Path](USER_GUIDE_MAP.md) if you are not sure which command family you need.
 
-**After this page:** [Technical Reference](TECHNICAL_README.md) for deeper integration details.
+**Read next:** [Technical Reference](TECHNICAL_README.md) for deeper integration details.
 
 ## Beginner-Friendly Entry Points
 

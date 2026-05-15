@@ -1,28 +1,26 @@
 # Study Analysis
 
-Use `iints analyze` when you have multiple run folders and want one summary for posters, demos, or review.
+Use this page when you already have multiple run folders and need one defensible summary for review, comparison, or presentation.
 
-**Before this page:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) if you have not created a study bundle yet.
+**Read before:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) if you have not created a study bundle yet.
 
-**After this page:** [Evidence Base](EVIDENCE_BASE.md) if you need to explain what your metrics and sources mean.
+**Read next:** [Evidence Base](EVIDENCE_BASE.md) when you need to explain what the metrics mean.
 
-## What It Does
+## What The Analyzer Produces
 
-`iints analyze` scans a study directory for run folders containing `results.csv` and aggregates:
+`iints analyze` scans run folders with `results.csv` and summarizes:
 
-- mean time in range (`tir_70_180`)
-- mean hypo and hyper exposure (`tir_below_70`, `tir_below_54`, `tir_above_180`, `tir_above_250`)
-- mean supervisor interventions
-- mean glucose and CV
+- mean time in range and out-of-range exposure
+- severe hypo and hyper exposure
+- supervisor interventions
+- mean glucose and coefficient of variation
 - descriptive statistics including standard deviation and 95% confidence intervals
-- baseline comparison rows when available
-- certification split (`certified` vs `uncertified`) when certification JSON exists
-- failure analysis for worst runs, severe hypo, and early terminations
-- optional external plausibility comparison against `carelink_metrics.json`
+- baseline comparisons when available
+- certification splits when certification JSON exists
+- failure analysis for worst runs, severe hypo, and early termination
+- optional plausibility deltas against CareLink-style real-world metrics
 
-## Recommended Flow
-
-Run a small study:
+## Fastest Useful Flow
 
 ```bash
 for seed in 1 2 3 4 5 6 7 8 9 10; do
@@ -32,20 +30,17 @@ for seed in 1 2 3 4 5 6 7 8 9 10; do
     --duration 1440 \
     --output-dir "results/study/run_$seed"
 done
-```
 
-Then aggregate it:
-
-```bash
 iints analyze results/study \
   --output-json results/study_summary.json \
   --output-markdown results/study_summary.md \
   --output-csv results/evidence_table.csv \
-  --output-evidence-markdown results/evidence_table.md \
-  --carelink-metrics results/personal_carelink/carelink_metrics.json
+  --output-evidence-markdown results/evidence_table.md
 ```
 
-Compare two studies directly:
+## Common Follow-Up Commands
+
+### Compare two study arms
 
 ```bash
 iints compare-study results/study_certified results/study_uncertified \
@@ -53,32 +48,21 @@ iints compare-study results/study_certified results/study_uncertified \
   --output-markdown results/study_comparison.md
 ```
 
-Build a poster from the study:
+### Build a poster
 
 ```bash
 iints poster-study results/study_summary.json \
   --output-path results/study_poster.png
 ```
 
-Build the full expo bundle:
-
-```bash
-iints demo-expo --output-dir results/expo_demo
-```
-
-Write a reproducible study protocol before you start:
+### Start from a written protocol
 
 ```bash
 iints study-protocol --output-dir results/study_protocol
-```
-
-Then run the exact same plan from the generated experiment file:
-
-```bash
 iints run-study --experiment results/study_protocol/study_experiment.yaml
 ```
 
-Generate a controlled corrupted dataset for the uncertified arm:
+### Create a controlled corrupted arm
 
 ```bash
 iints data corrupt-for-study data/demo/diabetes_cgm.csv \
@@ -88,59 +72,50 @@ iints data corrupt-for-study data/demo/diabetes_cgm.csv \
   --mode glucose_spikes
 ```
 
-## Output
+## Output Files
 
 - `study_summary.json`: machine-readable aggregate summary
-- `study_summary.md`: easy-to-share narrative summary
-- `evidence_table.csv`: poster/paper-ready evidence rows
+- `study_summary.md`: readable narrative summary
+- `evidence_table.csv`: poster- and paper-ready rows
 - `evidence_table.md`: markdown table for docs or slides
-- `external_validation`: optional deltas vs CareLink-style real-world metrics
-- `failure_analysis`: worst runs and safety-heavy run counts
-- `aggregate_stats`: descriptive stats and confidence intervals
+- `external_validation`: optional real-world plausibility deltas
+- `failure_analysis`: worst runs and safety-heavy cases
+- `aggregate_stats`: descriptive statistics and confidence intervals
 
-Each run entry includes:
+Each run entry records:
 
 - run id
-- scenario name
+- scenario
 - algorithm
 - TIR 70-180
 - supervisor interventions
 - certification grade
-- delta versus baseline reference when baseline comparison exists
+- baseline delta when available
 - quality badges such as `strong_tir`, `stable_variability`, or `supervisor_heavy`
 
 ## Official Study Pack
-
-Export the built-in public study pack:
 
 ```bash
 iints scenarios export-study-pack --output-dir scenarios/study_pack
 ```
 
-That writes:
-
-- reusable scenario JSON files
-- `study_pack_manifest.json` with the recommended seed list
-- a small README with the batch-loop pattern
+This writes reusable scenario JSON files, a manifest with the recommended seed list, and a short README with the batch pattern.
 
 ## Why This Matters
 
-This is the command that turns “we ran the simulator” into evidence you can show:
+Study analysis is the step that turns “we ran the simulator” into evidence you can defend:
 
-- average performance over many runs
-- safety behavior across scenarios
-- comparison against baseline algorithms
-- clinician-style `Clinical Baseline` comparison in the default protocol bundle
-- comparison between certified and uncertified data when both are present
-- a written protocol that explains the hypothesis and study matrix
-- a deliberate corruption workflow instead of vague “bad data”
+- repeated-run performance rather than one cherry-picked trace
+- explicit safety behavior across scenarios
+- candidate-versus-baseline comparison
+- certified-versus-uncertified comparison when both exist
+- a written study protocol instead of an undocumented benchmark
 
 ## Where To Go Next
 
 | If you want to... | Continue with |
-|---|---|
+| --- | --- |
 | build the study from scratch | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
 | certify or corrupt data deliberately | [MDMP Quickstart](MDMP_QUICKSTART.md) |
-| create poster-ready assets | [Booth Demo & Presentation Flow](BOOTH_DEMO.md) |
-| understand source claims | [Evidence Base](EVIDENCE_BASE.md) |
-| browse every analysis command | [Command Reference](COMMAND_REFERENCE.md) |
+| create presentation assets | [Booth Demo Guide](BOOTH_DEMO.md) |
+| explain source claims | [Evidence Base](EVIDENCE_BASE.md) |

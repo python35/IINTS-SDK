@@ -1,18 +1,20 @@
 # Workflow Hub
 
-This is the central page for people who already have the SDK running and now need to do real work with it.
+Use this page after your first successful run, when the question changes from “does the SDK work?” to “what do I want to do with it?”
 
-## Choose A Workflow
+## Choose The Job
 
-| Workflow | Use it when you need to... | Start with |
+| If you need to... | Start with | Typical output |
 | --- | --- | --- |
-| Research study | compare algorithms, generate benchmark evidence, or prepare a study bundle | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
-| Study review | inspect completed runs, compare arms, or summarize findings | [Study Analysis](STUDY_ANALYSIS.md) |
-| Data quality | certify a dataset, inspect realism, or defend a data-quality claim | [MDMP Quickstart](MDMP_QUICKSTART.md) |
-| Local AI review | prepare explanations, reviews, and reports from validated outputs | [AI Assistant](AI_ASSISTANT.md) |
-| Presentation | show code plus results during a meeting or booth demo | [Booth Demo Guide](BOOTH_DEMO.md) |
+| compare algorithms in a reproducible study | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | protocol bundle, study runs, comparisons |
+| summarize a completed batch of runs | [Study Analysis](STUDY_ANALYSIS.md) | aggregate metrics, evidence table, poster-ready figures |
+| prove whether input data is trustworthy | [MDMP Quickstart](MDMP_QUICKSTART.md) | certification JSON, dashboard, trust grade |
+| explain validated outputs locally | [AI Assistant](AI_ASSISTANT.md) | guarded summaries and review notes |
+| present the SDK live | [Booth Demo Guide](BOOTH_DEMO.md) | showable code, poster, talk track |
 
-## Recommended Research Route
+## Recommended Routes
+
+### Research
 
 ```text
 Getting Started
@@ -21,20 +23,20 @@ Getting Started
   -> Evidence Base
 ```
 
-## Recommended Data Route
+### Data Quality
 
 ```text
 MDMP Quickstart
-  -> MDMP Guide
+  -> MDMP Full Guide
   -> Evidence Base
 ```
 
-## Recommended Presentation Route
+### Presentation
 
 ```text
 Booth Demo Guide
   -> iints demo-live
-  -> poster + run bundle + talk track
+  -> poster + talk track + proof bundle
 ```
 
 ## Common Commands

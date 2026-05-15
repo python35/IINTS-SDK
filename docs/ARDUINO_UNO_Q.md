@@ -1,12 +1,12 @@
 # Arduino UNO Q Setup
 
-Use this guide when you want the Linux side of an Arduino UNO Q to run the IINTS digital patient runtime and the STM32 side to act as a simple LED / buzzer bridge.
+Use this guide when you want the Linux side of an Arduino UNO Q to run the digital-patient runtime while the STM32 side provides simple LED or buzzer feedback.
 
-This page is intentionally simple. If you only want one recommended path, use the method below exactly as written.
+This page has one preferred route. Follow that route first; use the deeper sections only when you need to debug or customize the setup.
 
-## New Easiest Path
+## Fastest Working Path
 
-Start here. This creates the project, starts the Linux-side digital patient, and writes three tiny helper scripts so you do not have to remember the long commands.
+Run this from the SDK repository root:
 
 ```bash
 cd /path/to/IINTS-SDK
@@ -20,42 +20,44 @@ iints edge quickstart --board uno_q
 cd iints_uno_q_demo
 ```
 
-Then do only these three things:
+The quickstart command creates the project, starts the Linux-side runtime, and writes helper scripts so you do not need to memorize the longer commands.
 
-The quickstart command already starts the Linux-side runtime. If you reboot or stop the runtime later, restart it with `./start_edge_easy.sh`.
+Then:
 
-Upload this sketch with Arduino IDE:
+1. Upload the bridge sketch with Arduino IDE:
 
 ```text
 uno_q_bridge/iints_supervisor_bridge.ino
 ```
 
-Then test and run the physical bridge:
+2. Test and run the bridge:
 
 ```bash
 ./test_uno_q_bridge.sh
 ./run_uno_q_bridge.sh
 ```
 
-If auto-detect sees more than one serial device, pass the port:
+3. If auto-detect sees more than one serial device, pass the port explicitly:
 
 ```bash
 ./test_uno_q_bridge.sh /dev/ttyACM0
 ./run_uno_q_bridge.sh /dev/ttyACM0
 ```
 
-That is the preferred EUCYS/demo path. The longer sections below are still useful when you need to debug or customize something.
+If you reboot or stop the runtime later, restart it with:
 
-## Recommended Method
+```bash
+./start_edge_easy.sh
+```
 
-For Arduino UNO Q, the easiest method is:
+## What Success Looks Like
 
-1. install the SDK from the repository source tree
-2. run `iints edge quickstart --board uno_q`
-3. upload the generated STM32 bridge sketch once
-4. use `./test_uno_q_bridge.sh` and `./run_uno_q_bridge.sh`
+- `daemon_status` is `running`
+- `uno_q_bridge/iints_supervisor_bridge.ino` exists
+- the kiosk opens at `http://127.0.0.1:8765/kiosk`
+- `./test_uno_q_bridge.sh` changes the bridge outputs as expected
 
-Why this is the recommended method:
+## Why This Is The Recommended Route
 
 - it matches the current docs exactly
 - it avoids CLI version mismatch
@@ -73,51 +75,18 @@ your installed `iints` CLI is older than the current docs.
 
 Do this instead:
 
-- use the source-install method below
-- do not continue with `cd iints_uno_q_demo` until `iints edge setup ...` succeeds
+- install from the source tree as shown above
+- do not continue until `iints edge doctor --board uno_q` works
 
-## Copy-Paste Method
-
-Run this from the SDK repository root, the folder that contains `pyproject.toml`:
-
-```bash
-cd /path/to/IINTS-SDK
-python3 -m venv .venv_unoq
-source .venv_unoq/bin/activate
-python -m pip install -U pip
-python -m pip install -U -e ".[edge,mdmp]"
-hash -r
-
-iints edge setup --output-dir iints_uno_q_demo --board uno_q
-cd iints_uno_q_demo
-./start_edge_easy.sh
-```
-
-In a second terminal, run:
-
-```bash
-cd /path/to/IINTS-SDK/iints_uno_q_demo
-source ../.venv_unoq/bin/activate
-iints edge status --project-dir .
-./test_uno_q_bridge.sh /dev/ttyACM0
-```
-
-Success looks like:
-
-- `daemon_status` is `running`
-- `./start_edge_easy.sh` works
-- `uno_q_bridge/iints_supervisor_bridge.ino` exists
-- the kiosk is available at `http://127.0.0.1:8765/kiosk`
-
-Security defaults:
+## Security Defaults
 
 - the Linux-side dashboard stays on `127.0.0.1` unless you opt into remote binding
 - remote binding now requires both `--allow-remote-api` and a token source
 - bridge flashing and bridge testing do not require remote API exposure
 
-## Quick Path
+## Detailed Baseline Path
 
-If you want the fastest possible route to a working baseline, follow these four blocks first.
+Use these four blocks when you want the same setup with each checkpoint made explicit.
 
 !!! success "Step 1 - Install IINTS on the Linux side"
     Recommended for UNO Q: install from the SDK repository root, not from an older global install.
