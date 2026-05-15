@@ -17,6 +17,8 @@ def test_edge_setup_and_status_commands(tmp_path) -> None:
     result = runner.invoke(app, ["edge", "setup", "--output-dir", str(setup_dir), "--board", "raspberry_pi"])
     assert result.exit_code == 0
     assert (setup_dir / "run_edge_patient.sh").is_file()
+    assert (setup_dir / "start_edge_easy.sh").is_file()
+    assert (setup_dir / "EDGE_EASY_START.md").is_file()
     assert (setup_dir / "patient_runtime" / "iints-digital-patient.service").is_file()
 
     workspace = tmp_path / "patient_runtime"
@@ -41,6 +43,41 @@ def test_edge_setup_and_status_commands(tmp_path) -> None:
     assert status.exit_code == 0
     assert "IINTS Edge Runtime Status" in status.stdout
     assert "research_grade" in status.stdout
+
+
+def test_edge_quickstart_starts_uno_q_easy_path(monkeypatch, tmp_path) -> None:
+    start_calls: list[dict[str, object]] = []
+
+    def _fake_start(**kwargs):
+        start_calls.append(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.patient_cli_module.start", _fake_start)
+
+    setup_dir = tmp_path / "uno_q_demo"
+    result = runner.invoke(
+        app,
+        [
+            "edge",
+            "quickstart",
+            "--board",
+            "uno_q",
+            "--output-dir",
+            str(setup_dir),
+            "--max-steps",
+            "1",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert len(start_calls) == 1
+    assert start_calls[0]["scenario_profile"] == "expo_hot_start"
+    assert start_calls[0]["reset"] is True
+    assert (setup_dir / "start_edge_easy.sh").is_file()
+    assert (setup_dir / "test_uno_q_bridge.sh").is_file()
+    assert (setup_dir / "run_uno_q_bridge.sh").is_file()
+    assert (setup_dir / "EDGE_EASY_START.md").is_file()
+    assert "UNO Q Simple Path" in result.stdout
+    assert "uno_q_bridge/iints_supervisor_bridge.ino" in result.stdout
 
 
 def test_edge_deploy_invokes_remote_deployer(monkeypatch, tmp_path) -> None:

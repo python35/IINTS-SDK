@@ -34,6 +34,20 @@ iints demo --full
 iints demo --dry-run
 ```
 
+### `iints demo-live`
+One-command live presentation flow for calls, juries, and sponsor walkthroughs.
+
+It exports showable Python code, prints the key SDK calls in the terminal, runs the live demo, and lists the poster plus proof artifacts to open next.
+
+Common forms:
+
+```bash
+iints demo-live
+iints demo-live --output-dir results/live_demo
+iints demo-live --no-run
+iints demo-live --prepare-ai
+```
+
 ### `iints quickstart`
 Create a ready-to-run project folder.
 
@@ -160,6 +174,9 @@ Import real-world CGM sources.
 
 ### `iints edge doctor`
 Preflight for Raspberry Pi or UNO Q.
+
+### `iints edge quickstart`
+Create the easiest Pi or UNO Q demo project and optionally start the Linux-side runtime.
 
 ### `iints edge setup`
 Generate an edge project scaffold.

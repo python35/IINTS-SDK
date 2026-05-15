@@ -141,7 +141,34 @@ This profile is designed around:
 
 It intentionally avoids the heavier reporting stack by default.
 
-## One-Line Edge Workflow
+## Easiest Edge Workflow
+
+Use `quickstart` when you just want a board online without learning the full command set first.
+
+Raspberry Pi:
+
+```bash
+iints edge quickstart --board raspberry_pi
+cd iints_pi_demo
+```
+
+Arduino UNO Q:
+
+```bash
+iints edge quickstart --board uno_q
+cd iints_uno_q_demo
+```
+
+For UNO Q, upload `uno_q_bridge/iints_supervisor_bridge.ino` once with Arduino IDE, then run:
+
+```bash
+./test_uno_q_bridge.sh
+./run_uno_q_bridge.sh
+```
+
+If auto-detect finds multiple serial devices, pass the port to the helper scripts, for example `./run_uno_q_bridge.sh /dev/ttyACM0`.
+
+## Full Edge Workflow
 
 The new edge namespace ties the SBC story together:
 
@@ -173,9 +200,8 @@ Recommended starting setup:
 Typical live runtime flow:
 
 ```bash
-iints edge setup --output-dir iints_pi_demo --board raspberry_pi
+iints edge quickstart --board raspberry_pi
 cd iints_pi_demo
-iints edge up --project-dir .
 iints edge status --project-dir .
 iints edge kiosk --project-dir .
 ```
@@ -189,19 +215,18 @@ UNO Q combines:
 - a Linux-capable side for the IINTS runtime
 - an STM32 side for simple physical feedback
 
-The recommended path is:
+The recommended path is now:
 
 1. install the `edge` profile on the Linux side
-2. generate a UNO Q scaffold with `iints edge setup --board uno_q`
-3. start the Linux-side digital patient
-4. flash the generated bridge sketch onto the STM32 side
-5. run `iints edge bridge-test --port ...`
-6. run `iints edge bridge-run --project-dir . --port ...`
+2. run `iints edge quickstart --board uno_q`
+3. upload `uno_q_bridge/iints_supervisor_bridge.ino` once
+4. run `./test_uno_q_bridge.sh`
+5. run `./run_uno_q_bridge.sh`
 
-Fastest scaffold command:
+Fastest scaffold/start command:
 
 ```bash
-iints edge setup --output-dir iints_uno_q_demo --board uno_q
+iints edge quickstart --board uno_q
 ```
 
 If you only need the bridge sketch:

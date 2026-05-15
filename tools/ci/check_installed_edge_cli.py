@@ -70,6 +70,7 @@ def main() -> None:
 
         _run(prefix, ["--help"], env=env)
         _run(prefix, ["edge", "--help"], env=env)
+        _run(prefix, ["edge", "quickstart", "--help"], env=env)
 
         doctor_pi = _run(prefix, ["edge", "doctor", "--board", "raspberry_pi"], env=env)
         _assert("Raspberry Pi Edge Check" in doctor_pi.stdout, "Raspberry Pi doctor output was not rendered.")
@@ -81,6 +82,7 @@ def main() -> None:
         pi_dir = root / "iints_pi_demo"
         _run(prefix, ["edge", "setup", "--output-dir", str(pi_dir), "--board", "raspberry_pi"], env=env)
         _assert((pi_dir / "run_edge_patient.sh").is_file(), "Pi setup did not create run_edge_patient.sh.")
+        _assert((pi_dir / "start_edge_easy.sh").is_file(), "Pi setup did not create start_edge_easy.sh.")
         _assert(
             (pi_dir / "patient_runtime" / "patient_runtime_config.json").is_file(),
             "Pi setup did not create patient_runtime_config.json.",
@@ -101,6 +103,9 @@ def main() -> None:
             "UNO Q setup did not create the bridge sketch.",
         )
         _assert((uno_dir / "EDGE_SETUP.md").is_file(), "UNO Q setup did not create EDGE_SETUP.md.")
+        _assert((uno_dir / "start_edge_easy.sh").is_file(), "UNO Q setup did not create start_edge_easy.sh.")
+        _assert((uno_dir / "test_uno_q_bridge.sh").is_file(), "UNO Q setup did not create test_uno_q_bridge.sh.")
+        _assert((uno_dir / "run_uno_q_bridge.sh").is_file(), "UNO Q setup did not create run_uno_q_bridge.sh.")
         _run(
             prefix,
             ["edge", "up", "--project-dir", str(uno_dir), "--foreground", "--max-steps", "1"],

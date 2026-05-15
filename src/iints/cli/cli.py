@@ -13,6 +13,7 @@ import importlib
 import sys
 import json
 import platform
+import subprocess
 import tempfile
 import time
 import shutil
@@ -26,6 +27,7 @@ from click.core import ParameterSource
 from rich.console import Console  # type: ignore # For pretty printing
 from rich.table import Table  # type: ignore # For comparison table
 from rich.panel import Panel  # type: ignore # For nicer auto-doc output
+from rich.syntax import Syntax  # type: ignore
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn  # type: ignore
 
 import iints # Import the top-level SDK package
@@ -3333,11 +3335,14 @@ def _start_plan_for_goal(
             "Prepare a Raspberry Pi or UNO Q edge project.",
             [
                 f"iints edge doctor --board {board}",
-                f"iints edge setup --output-dir {edge_output_dir} --board {board} --scenario-profile expo_hot_start",
-                f"iints makerfaire up --project-dir {edge_output_dir}",
+                f"iints edge quickstart --output-dir {edge_output_dir} --board {board}",
+                f"cd {edge_output_dir}",
             ],
             [
+                "The quickstart command creates the project and starts the Linux-side runtime.",
+                "After reboot or stop, restart locally with ./start_edge_easy.sh.",
                 "For remote Pi setup, use iints edge deploy --host raspberrypi.local --user pi.",
+                "For UNO Q, upload uno_q_bridge/iints_supervisor_bridge.ino once, then run ./test_uno_q_bridge.sh.",
                 "For offline recovery, use iints edge offline-bundle --output iints_offline.tar.gz.",
             ],
         )
@@ -3434,7 +3439,7 @@ def start(
         quickstart(project_name=project_name)
         return
     if normalized_goal == "edge":
-        edge_setup(output_dir=edge_output_dir, board=board, scenario_profile="expo_hot_start")
+        edge_quickstart(output_dir=edge_output_dir, board=board)
         return
 
     console.print("[yellow]--run is only available for demo, project, and edge starter flows.[/yellow]")
@@ -3477,9 +3482,9 @@ def guide():
                     [
                         "Pi-only booth flow:",
                         "1. iints edge doctor --board raspberry_pi",
-                        "2. iints edge setup --output-dir iints_pi_demo --board raspberry_pi --scenario-profile expo_hot_start",
+                        "2. iints edge quickstart --output-dir iints_pi_demo --board raspberry_pi",
                         "3. cd iints_pi_demo",
-                        "4. iints makerfaire up --project-dir .",
+                        "4. Open the kiosk: iints edge kiosk --project-dir .",
                         "",
                         f"Docs: {Path.cwd() / 'docs' / 'MAKERFAIRE_PI.md'}",
                     ]
@@ -4997,6 +5002,143 @@ def demo_export(
     console.print(table)
     console.print(
         "[green]Next:[/green] open `07_live_stage_demo.py`, explain the visible SDK calls, then run `python 07_live_stage_demo.py`."
+    )
+
+
+def _build_live_demo_code_preview(script_text: str) -> str:
+    """Return the smallest useful code slice for a live walkthrough."""
+    interesting_prefixes = (
+        "PATIENT_CONFIG =",
+        "OUTPUT_DIR =",
+        "DURATION_MINUTES =",
+        "TIME_STEP_MINUTES =",
+        "SEED =",
+        "outputs = run_full(",
+        "poster_outputs = generate_results_poster(",
+        "ai_outputs = prepare_ai_ready_artifacts(",
+    )
+    selected_lines = [
+        line
+        for line in script_text.splitlines()
+        if line.strip().startswith(interesting_prefixes)
+    ]
+    return "\n".join(selected_lines)
+
+
+def _live_demo_result_rows(summary: dict[str, Any], results_dir: Path) -> list[tuple[str, str]]:
+    rows = [
+        ("poster_png", str(summary["poster_png"])),
+        ("demo_summary_json", str(results_dir / "demo_summary.json")),
+        ("jury_talk_track", str(results_dir / "JURY_TALK_TRACK.md")),
+        ("live_demo_notes", str(results_dir / "BEURS_LIVE_DEMO_SCRIPT.txt")),
+    ]
+    rows.extend(
+        (str(scenario["label"]), str(scenario["output_dir"]))
+        for scenario in summary.get("scenarios", [])
+    )
+    return rows
+
+
+@app.command(name="demo-live")
+def demo_live(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Root directory for the exported code and generated live-demo results."),
+    ] = Path("./results/live_demo"),
+    run_demo: Annotated[
+        bool,
+        typer.Option("--run/--no-run", help="Run the exported demo after showing the code preview."),
+    ] = True,
+    prepare_ai: Annotated[
+        bool,
+        typer.Option(
+            "--prepare-ai/--skip-ai",
+            help="Prepare optional local-AI artifacts during the demo run.",
+        ),
+    ] = False,
+    full_code: Annotated[
+        bool,
+        typer.Option("--full-code/--preview-code", help="Print the whole exported script instead of the curated preview."),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite/--no-overwrite", help="Allow replacing previously exported demo code files."),
+    ] = True,
+) -> None:
+    """Export, show, run, and summarize one Zoom-friendly live demo flow."""
+    console = Console()
+    root_dir = output_dir.expanduser().resolve()
+    code_dir = root_dir / "showable_code"
+    results_dir = root_dir / "results"
+
+    try:
+        exported = export_live_stage_demo(output_dir=code_dir, overwrite=overwrite)
+    except FileExistsError as exc:
+        console.print(f"[bold red]Live demo export stopped:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Live demo export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    script_path = Path(exported["script_path"])
+    script_text = script_path.read_text(encoding="utf-8")
+    code_to_show = script_text if full_code else _build_live_demo_code_preview(script_text)
+
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Showable script: {script_path}",
+                    f"Results folder: {results_dir}",
+                    f"AI artifacts: {'enabled' if prepare_ai else 'skipped for a faster live run'}",
+                ]
+            ),
+            title="IINTS Live Demo",
+            border_style="cyan",
+        )
+    )
+    console.print(
+        "[bold]1. Code to explain on the call[/bold]\n"
+        "The full script is exported above; this is the shortest useful slice to talk through first."
+    )
+    console.print(Syntax(code_to_show, "python", line_numbers=False, word_wrap=True))
+
+    if not run_demo:
+        console.print(
+            "[green]Prepared only:[/green] run the same flow later with `iints demo-live --run`."
+        )
+        return
+
+    command = [
+        sys.executable,
+        str(script_path),
+        "--output-dir",
+        str(results_dir),
+    ]
+    command.append("--prepare-ai" if prepare_ai else "--skip-ai")
+
+    console.print("[bold]2. Running the exported demo code[/bold]")
+    completed = subprocess.run(command, check=False)
+    if completed.returncode != 0:
+        console.print(f"[bold red]Live demo failed with exit code {completed.returncode}.[/bold red]")
+        raise typer.Exit(code=completed.returncode)
+
+    summary_path = results_dir / "demo_summary.json"
+    if not summary_path.is_file():
+        console.print(f"[bold red]Live demo finished without summary file:[/bold red] {summary_path}")
+        raise typer.Exit(code=1)
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    table = Table(title="IINTS Live Demo Results")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for label, path in _live_demo_result_rows(summary, results_dir):
+        table.add_row(label, path)
+    console.print("[bold]3. Results to show next[/bold]")
+    console.print(table)
+    console.print(
+        "[green]Suggested call flow:[/green] show the preview, explain `run_full(...)`, open the poster, "
+        "then open one scenario folder if someone asks for proof."
     )
 
 
@@ -7805,6 +7947,8 @@ def edge_setup(
         "config",
         "run_script",
         "kiosk_script",
+        "easy_start_script",
+        "easy_guide",
         "makerfaire_script",
         "makerfaire_guide",
         "makerfaire_kiosk_script",
@@ -7825,6 +7969,10 @@ def edge_setup(
         table.add_row(key, outputs[key])
     if "uno_q_bridge" in outputs:
         table.add_row("uno_q_bridge", outputs["uno_q_bridge"])
+    if "uno_test_script" in outputs:
+        table.add_row("uno_test_script", outputs["uno_test_script"])
+    if "uno_run_bridge_script" in outputs:
+        table.add_row("uno_run_bridge_script", outputs["uno_run_bridge_script"])
     if "uno_bridge_service" in outputs:
         table.add_row("uno_bridge_service", outputs["uno_bridge_service"])
     if "uno_bridge_service_notes" in outputs:
@@ -7849,6 +7997,122 @@ def edge_setup(
             border_style="green",
         )
     )
+
+
+@edge_app.command(name="quickstart")
+def edge_quickstart(
+    board: Annotated[str, typer.Option(help="Edge board target: raspberry_pi or uno_q.")] = "raspberry_pi",
+    output_dir: Annotated[Optional[Path], typer.Option(help="Project directory to create. Defaults to iints_pi_demo or iints_uno_q_demo.")] = None,
+    scenario_profile: Annotated[str, typer.Option(help="Initial live scenario profile.")] = "expo_hot_start",
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    mode: Annotated[str, typer.Option(help="Clock mode for the generated edge project.")] = "demo-time",
+    speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts 60 or 60x.")] = "60x",
+    api_host: Annotated[str, typer.Option(help="Dashboard host to bake into the generated runtime config.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Dashboard port to bake into the generated runtime config.")] = 8765,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+    start: Annotated[bool, typer.Option("--start/--no-start", help="Start the Linux-side digital patient after creating the project.")] = True,
+    reset: Annotated[bool, typer.Option(help="Reset runtime state when starting.")] = True,
+    foreground: Annotated[bool, typer.Option(help="Run in the foreground instead of spawning the daemon.")] = False,
+    bridge_port: Annotated[str, typer.Option(help="UNO Q bridge port for printed commands and optional testing. Use auto for autodetect.")] = "auto",
+    test_bridge: Annotated[bool, typer.Option(help="After setup, run one UNO Q bridge test if a board is connected.")] = False,
+    max_steps: Annotated[Optional[int], typer.Option("--max-steps", hidden=True)] = None,
+) -> None:
+    """Create and optionally start the simplest Raspberry Pi / UNO Q edge demo."""
+    console = Console()
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+
+    root = output_dir or Path("iints_uno_q_demo" if normalized_board == "uno_q" else "iints_pi_demo")
+    outputs = export_edge_setup(
+        root,
+        board=normalized_board,
+        scenario_profile=scenario_profile,
+        patient_config=patient_config,
+        patient_model_type=patient_model,
+        mode=mode,
+        speed=_parse_edge_speed(speed),
+        api_host=api_host,
+        api_port=api_port,
+        seed=seed,
+        include_uno_bridge=normalized_board == "uno_q",
+    )
+
+    cfg = _load_edge_project_config(Path(outputs["root"]))
+    if start:
+        patient_cli_module.start(
+            algo=Path(cfg.algo_path),
+            patient_config=cfg.patient_config,
+            patient_model=cfg.patient_model_type,
+            scenario_profile=cfg.scenario_profile,
+            workspace=Path(cfg.workspace),
+            mode=cfg.mode,
+            speed=f"{cfg.speed:g}x",
+            api_host=cfg.api_host,
+            api_port=cfg.api_port,
+            seed=cfg.seed,
+            foreground=foreground,
+            max_steps=max_steps,
+            reset=reset,
+        )
+
+    bridge_test_result = "skipped"
+    if normalized_board == "uno_q" and test_bridge:
+        try:
+            run_uno_q_bridge_test(bridge_port)
+            bridge_test_result = "passed"
+        except Exception as exc:
+            console.print(f"[bold red]UNO Q bridge test failed:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Edge Quickstart")
+    table.add_column("Item", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("board", normalized_board)
+    table.add_row("project", outputs["root"])
+    table.add_row("started", "yes" if start else "no")
+    table.add_row("easy guide", outputs["easy_guide"])
+    table.add_row("easy start", outputs["easy_start_script"])
+    table.add_row("kiosk", f"http://{cfg.api_host}:{cfg.api_port}/kiosk")
+    if normalized_board == "uno_q":
+        table.add_row("bridge sketch", str(Path(outputs["root"]) / "uno_q_bridge" / "iints_supervisor_bridge.ino"))
+        table.add_row("bridge test", bridge_test_result)
+    console.print(table)
+
+    project_display = outputs["root"]
+    if normalized_board == "uno_q":
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"1. Go to the project: cd {project_display}",
+                        "2. If the Linux side is not running: ./start_edge_easy.sh",
+                        "3. Upload this sketch with Arduino IDE: uno_q_bridge/iints_supervisor_bridge.ino",
+                        f"4. Test the bridge: ./test_uno_q_bridge.sh {bridge_port}",
+                        f"5. Run live hardware feedback: ./run_uno_q_bridge.sh {bridge_port}",
+                    ]
+                ),
+                title="UNO Q Simple Path",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"1. Go to the project: cd {project_display}",
+                        "2. If the runtime is not running: ./start_edge_easy.sh",
+                        "3. Open the kiosk: iints edge kiosk --project-dir .",
+                        "4. Reset between demos: iints edge reset --project-dir .",
+                    ]
+                ),
+                title="Raspberry Pi Simple Path",
+                border_style="green",
+            )
+        )
 
 
 @edge_app.command(name="deploy")

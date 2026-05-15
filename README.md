@@ -29,6 +29,8 @@ iints doctor --smoke-run
 **Raspberry Pi / Arduino UNO Q:**
 ```bash
 pip install "iints-sdk-python35[edge,mdmp]"
+iints edge quickstart --board raspberry_pi
+iints edge quickstart --board uno_q
 ```
 
 ---
@@ -43,6 +45,18 @@ iints ai report results/<run_id>
 ```
 
 Full documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
+
+---
+
+## Live Demo
+
+For a Zoom call, jury walkthrough, or sponsor demo where you want to show both the code and the generated outputs in one terminal flow:
+
+```bash
+iints demo-live --output-dir results/live_demo
+```
+
+That exports the showable demo script, prints the key SDK calls, runs the demo, and lists the poster plus proof artifacts to open next.
 
 ---
 

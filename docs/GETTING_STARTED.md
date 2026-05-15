@@ -171,10 +171,16 @@ iints poster \
 ### Run A Prepared Presentation Demo
 
 ```bash
-./scripts/run_live_stage_demo.sh
+iints demo-live --output-dir results/live_demo
 ```
 
-This is a convenient repository wrapper when you want a ready-made live walkthrough with code, outputs, and presentation assets.
+This is the easiest option for Zoom calls, jury meetings, or sponsor walkthroughs: it exports showable Python code, prints the key SDK calls in the terminal, runs the demo, and then tells you which poster and proof artifacts to open next.
+
+If you are working from the repository and want the older script-only flow, you can still use:
+
+```bash
+./scripts/run_live_stage_demo.sh
+```
 
 If the machine only has the installed SDK and not the repository checkout, export the same demo code first:
 
@@ -215,10 +221,18 @@ Full guide: [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 ### Build An Edge-Ready SBC Project
 
 ```bash
-iints edge setup --output-dir iints_edge_demo --board raspberry_pi
-cd iints_edge_demo
-./run_edge_patient.sh
+iints edge quickstart --board raspberry_pi
+cd iints_pi_demo
 ```
+
+For Arduino UNO Q, use the same easy path:
+
+```bash
+iints edge quickstart --board uno_q
+cd iints_uno_q_demo
+```
+
+Then upload `uno_q_bridge/iints_supervisor_bridge.ino` once and run `./test_uno_q_bridge.sh`.
 
 Export the live runtime back to a workstation with:
 

@@ -119,7 +119,15 @@ What to point at first:
 - `DURATION_MINUTES` and `TIME_STEP_MINUTES` - show simulation control
 - `SEED` - show reproducibility
 
-Then run:
+For a Zoom call or jury meeting, the easiest all-in-one command is:
+
+```bash
+iints demo-live --output-dir results/live_demo
+```
+
+That prints the important code lines first, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+
+If you specifically want to drive the repository script yourself, then run:
 
 ```bash
 ./scripts/run_live_stage_demo.sh

@@ -1,5 +1,5 @@
 version: 1
-updated_utc: "2026-03-05T00:00:00Z"
+updated_utc: "2026-05-10T00:00:00Z"
 sources:
   - id: ada_2026_glycemic_goals
     category: guideline
@@ -89,6 +89,14 @@ sources:
     doi: "10.1177/1932296818757747"
     url: "https://doi.org/10.1177/1932296818757747"
     rationale: "Reference for simulator validation methodology and in-silico credibility."
+  - id: mujahid_2024_generative_t1d_simulator
+    category: model
+    component: simulation_realism
+    title: "Generative deep learning for the development of a type 1 diabetes simulator"
+    citation: "Mujahid O, Contreras I, Beneyto A, Vehi J. Commun Med (Lond). 2024;4:51."
+    doi: "10.1038/s43856-024-00476-0"
+    url: "https://doi.org/10.1038/s43856-024-00476-0"
+    rationale: "Reference for modern data-driven T1D simulator realism framing and the limits of purely physiological approximations."
   - id: riddell_2017_exercise_consensus
     category: consensus
     component: exercise_stress_scenarios

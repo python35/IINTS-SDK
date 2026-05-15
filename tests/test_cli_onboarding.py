@@ -110,7 +110,8 @@ def test_start_supports_goal_aliases() -> None:
     assert result.exit_code == 0
     assert "Goal: edge" in result.stdout
     assert "iints edge doctor" in result.stdout
-    assert "iints makerfaire up" in result.stdout
+    assert "iints edge quickstart" in result.stdout
+    assert "./start_edge_easy.sh" in result.stdout
 
 
 def test_start_run_dispatches_to_demo(monkeypatch, tmp_path) -> None:

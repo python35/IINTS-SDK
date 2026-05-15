@@ -1,0 +1,21 @@
+algorithm,is_candidate,metric,metric_label,value
+ExampleAlgorithm,True,mean_tir_70_180,TIR 70-180 (%),93.0363321799308
+ExampleAlgorithm,True,mean_tir_below_70,Time <70 (%),4.195501730103806
+ExampleAlgorithm,True,mean_tir_above_180,Time >180 (%),2.7681660899653977
+ExampleAlgorithm,True,mean_supervisor_interventions,Safety interventions,116.975
+Clinical Baseline,False,mean_tir_70_180,TIR 70-180 (%),89.00519031141869
+Clinical Baseline,False,mean_tir_below_70,Time <70 (%),6.453287197231834
+Clinical Baseline,False,mean_tir_above_180,Time >180 (%),4.541522491349481
+Clinical Baseline,False,mean_supervisor_interventions,Safety interventions,172.70416666666668
+CorrectionBolus,False,mean_tir_70_180,TIR 70-180 (%),89.01095732410612
+CorrectionBolus,False,mean_tir_below_70,Time <70 (%),7.938292964244521
+CorrectionBolus,False,mean_tir_above_180,Time >180 (%),3.050749711649366
+CorrectionBolus,False,mean_supervisor_interventions,Safety interventions,213.04583333333332
+PIDController,False,mean_tir_70_180,TIR 70-180 (%),88.63177623990772
+PIDController,False,mean_tir_below_70,Time <70 (%),7.515859284890427
+PIDController,False,mean_tir_above_180,Time >180 (%),3.8523644752018456
+PIDController,False,mean_supervisor_interventions,Safety interventions,241.65833333333333
+Standard Pump,False,mean_tir_70_180,TIR 70-180 (%),91.81372549019608
+Standard Pump,False,mean_tir_below_70,Time <70 (%),6.154844290657439
+Standard Pump,False,mean_tir_above_180,Time >180 (%),2.031430219146482
+Standard Pump,False,mean_supervisor_interventions,Safety interventions,141.55

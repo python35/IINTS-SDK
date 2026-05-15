@@ -4,16 +4,56 @@ Use this guide when you want the Linux side of an Arduino UNO Q to run the IINTS
 
 This page is intentionally simple. If you only want one recommended path, use the method below exactly as written.
 
+## New Easiest Path
+
+Start here. This creates the project, starts the Linux-side digital patient, and writes three tiny helper scripts so you do not have to remember the long commands.
+
+```bash
+cd /path/to/IINTS-SDK
+python3 -m venv .venv_unoq
+source .venv_unoq/bin/activate
+python -m pip install -U pip
+python -m pip install -U -e ".[edge,mdmp]"
+hash -r
+
+iints edge quickstart --board uno_q
+cd iints_uno_q_demo
+```
+
+Then do only these three things:
+
+The quickstart command already starts the Linux-side runtime. If you reboot or stop the runtime later, restart it with `./start_edge_easy.sh`.
+
+Upload this sketch with Arduino IDE:
+
+```text
+uno_q_bridge/iints_supervisor_bridge.ino
+```
+
+Then test and run the physical bridge:
+
+```bash
+./test_uno_q_bridge.sh
+./run_uno_q_bridge.sh
+```
+
+If auto-detect sees more than one serial device, pass the port:
+
+```bash
+./test_uno_q_bridge.sh /dev/ttyACM0
+./run_uno_q_bridge.sh /dev/ttyACM0
+```
+
+That is the preferred EUCYS/demo path. The longer sections below are still useful when you need to debug or customize something.
+
 ## Recommended Method
 
 For Arduino UNO Q, the easiest method is:
 
 1. install the SDK from the repository source tree
-2. generate the UNO Q scaffold
-3. start the Linux-side runtime
-4. flash the STM32 bridge sketch
-5. test the bridge from the CLI
-6. run the bridge forwarder from the CLI
+2. run `iints edge quickstart --board uno_q`
+3. upload the generated STM32 bridge sketch once
+4. use `./test_uno_q_bridge.sh` and `./run_uno_q_bridge.sh`
 
 Why this is the recommended method:
 
@@ -50,7 +90,7 @@ hash -r
 
 iints edge setup --output-dir iints_uno_q_demo --board uno_q
 cd iints_uno_q_demo
-iints edge up --project-dir .
+./start_edge_easy.sh
 ```
 
 In a second terminal, run:
@@ -59,13 +99,13 @@ In a second terminal, run:
 cd /path/to/IINTS-SDK/iints_uno_q_demo
 source ../.venv_unoq/bin/activate
 iints edge status --project-dir .
-iints edge bridge-test --port /dev/ttyACM0
+./test_uno_q_bridge.sh /dev/ttyACM0
 ```
 
 Success looks like:
 
 - `daemon_status` is `running`
-- `iints edge up --project-dir .` works
+- `./start_edge_easy.sh` works
 - `uno_q_bridge/iints_supervisor_bridge.ino` exists
 - the kiosk is available at `http://127.0.0.1:8765/kiosk`
 
@@ -121,7 +161,7 @@ If you want the fastest possible route to a working baseline, follow these four 
     Run:
 
     ```bash
-    iints edge up --project-dir .
+    ./start_edge_easy.sh
     iints edge status --project-dir .
     ```
 
@@ -141,7 +181,7 @@ If you want the fastest possible route to a working baseline, follow these four 
     Then test it with:
 
     ```bash
-    iints edge bridge-test --port /dev/ttyACM0
+    ./test_uno_q_bridge.sh /dev/ttyACM0
     ```
 
     Or open Serial Monitor at `115200` baud and send:

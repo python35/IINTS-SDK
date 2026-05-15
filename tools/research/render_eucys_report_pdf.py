@@ -44,7 +44,8 @@ class MarkdownPdf(FPDF):
         self.set_y(8)
         self.set_font("Helvetica", size=9)
         self.set_text_color(*MUTED_TEXT)
-        self.cell(0, 6, "IINTS-AF EUCYS Research Report", new_x="LMARGIN", new_y="NEXT", align="R")
+        header_title = getattr(self, "header_title", "IINTS-AF EUCYS Research Report")
+        self.cell(0, 6, normalize_text(header_title), new_x="LMARGIN", new_y="NEXT", align="R")
         self.set_draw_color(*BORDER_COLOR)
         self.line(self.l_margin, self.y, self.w - self.r_margin, self.y)
         self.ln(2)
@@ -82,7 +83,7 @@ def add_title_page(pdf: MarkdownPdf, title: str, metadata_lines: Iterable[str]) 
     pdf.ln(2)
     pdf.set_text_color(*MUTED_TEXT)
     pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(pdf.epw - 16, 6, "Reproducible benchmark report for EUCYS submission review", align="L")
+    pdf.multi_cell(pdf.epw - 16, 6, "Competition evidence bundle for EUCYS review", align="L")
     pdf.set_text_color(0, 0, 0)
     pdf.set_y(82)
     for line in metadata_lines:
@@ -200,7 +201,7 @@ def render_markdown(input_path: Path, output_path: Path) -> None:
     pdf = MarkdownPdf(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_margins(16, 16, 16)
-    pdf.set_title("IINTS-AF EUCYS Research Report")
+    pdf.set_title("IINTS-AF EUCYS Evidence Bundle")
     pdf.set_author("Runebob Baers")
 
     title = "IINTS-AF EUCYS Research Report"
@@ -218,7 +219,9 @@ def render_markdown(input_path: Path, output_path: Path) -> None:
     else:
         start_index = len(lines)
 
+    pdf.set_title(title)
     add_title_page(pdf, title, metadata_lines)
+    pdf.header_title = title
 
     i = start_index
     while i < len(lines):
@@ -299,7 +302,7 @@ def render_markdown(input_path: Path, output_path: Path) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Render the EUCYS markdown report to a styled offline PDF.")
+    parser = argparse.ArgumentParser(description="Render an EUCYS markdown evidence document to a styled offline PDF.")
     parser.add_argument("--input", default="research/EUCYS_REPORT.md", help="Input markdown report path")
     parser.add_argument("--output", default="research/EUCYS_REPORT.pdf", help="Output PDF path")
     args = parser.parse_args()

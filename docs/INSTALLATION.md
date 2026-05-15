@@ -73,11 +73,19 @@ Important for UNO Q users:
 Typical SBC bootstrap:
 
 ```bash
-iints edge setup --output-dir iints_edge_demo --board raspberry_pi
-cd iints_edge_demo
-iints edge up --project-dir .
+iints edge quickstart --board raspberry_pi
+cd iints_pi_demo
 iints edge status --project-dir .
 ```
+
+UNO Q bootstrap:
+
+```bash
+iints edge quickstart --board uno_q
+cd iints_uno_q_demo
+```
+
+Then upload `uno_q_bridge/iints_supervisor_bridge.ino` once and use `./test_uno_q_bridge.sh`.
 
 ## Option 2: Install From Source
 

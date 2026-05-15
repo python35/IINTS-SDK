@@ -54,7 +54,7 @@ That split is intentional:
 | Insulin action profiles (rapid and ultra-rapid) | Parameterize onset/peak assumptions from pharmacology literature | `heise_2017_fiasp_pkpd`, `klaff_2020_urli_pkpd` |
 | Input validation and CGM lag rationale | Keep signal handling biologically plausible | `wentholt_2004_cgm_lag` |
 | Virtual patient meal dynamics | Ground meal disturbance dynamics in established models | `dalla_man_2007_meal_model` |
-| Simulator realism/validation framing | Align in-silico model evaluation with accepted simulator literature | `visentin_2018_uvapadova` |
+| Simulator realism/validation framing | Align in-silico model evaluation with accepted simulator literature | `visentin_2018_uvapadova`, `mujahid_2024_generative_t1d_simulator` |
 | Exercise stress scenarios | Use consensus guidance for exercise-related glucose behavior | `riddell_2017_exercise_consensus` |
 | Forecast training data provenance | Use publicly documented dataset references | `marling_2020_ohiot1dm` |
 | Local AI setup and model selection docs | Keep Ollama and open Mistral setup instructions grounded in official docs | `ollama_linux_install`, `mistral_2025_ministral_3_announcement`, `mistral_2025_ministral_3_3b`, `mistral_2025_ministral_3_8b`, `mistral_2025_ministral_3_14b` |
@@ -106,11 +106,15 @@ That split is intentional:
     Visentin R, et al. *The University of Virginia/Padova Type 1 Diabetes Simulator Matches the 2014 DMMS.R*. J Diabetes Sci Technol. 2018.  
     DOI: [10.1177/1932296818757747](https://doi.org/10.1177/1932296818757747)
 
-12. `riddell_2017_exercise_consensus`  
+12. `mujahid_2024_generative_t1d_simulator`
+    Mujahid O, Contreras I, Beneyto A, Vehi J. *Generative deep learning for the development of a type 1 diabetes simulator*. Communications Medicine. 2024.
+    DOI: [10.1038/s43856-024-00476-0](https://doi.org/10.1038/s43856-024-00476-0)
+
+13. `riddell_2017_exercise_consensus`
     Riddell MC, et al. *Exercise management in type 1 diabetes: a consensus statement*. Lancet Diabetes Endocrinol. 2017.  
     DOI: [10.1016/S2213-8587(17)30014-1](https://doi.org/10.1016/S2213-8587(17)30014-1)
 
-13. `marling_2020_ohiot1dm`  
+14. `marling_2020_ohiot1dm`
     Marling C, Bunescu R. *The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020*. CEUR Workshop Proceedings.  
     Paper: [ceur-ws.org/Vol-2675/paper2.pdf](http://ceur-ws.org/Vol-2675/paper2.pdf)
 

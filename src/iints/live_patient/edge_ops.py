@@ -500,6 +500,38 @@ def export_edge_setup(
     )
     kiosk_script.chmod(kiosk_script.stat().st_mode | stat.S_IXUSR)
 
+    easy_start_script = root / "start_edge_easy.sh"
+    easy_start_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'cd "$(dirname "$0")"',
+        "iints edge up --project-dir . --reset",
+        "iints edge status --project-dir .",
+        f'echo "Kiosk: http://{api_host}:{api_port}/kiosk"',
+    ]
+    if board == "raspberry_pi":
+        easy_start_lines.extend(
+            [
+                'echo "Open the kiosk with: iints edge kiosk --project-dir ."',
+                'echo "Reset between demos with: iints edge reset --project-dir ."',
+            ]
+        )
+    else:
+        easy_start_lines.extend(
+            [
+                'echo "Next: upload uno_q_bridge/iints_supervisor_bridge.ino to the STM32 side."',
+                'echo "Then test with: ./test_uno_q_bridge.sh"',
+                'echo "Then forward live states with: ./run_uno_q_bridge.sh"',
+            ]
+        )
+    easy_start_script.write_text("\n".join(easy_start_lines) + "\n", encoding="utf-8")
+    easy_start_script.chmod(easy_start_script.stat().st_mode | stat.S_IXUSR)
+
+    easy_guide = root / "EDGE_EASY_START.md"
+
+    uno_test_script: Path | None = None
+    uno_run_bridge_script: Path | None = None
+
     makerfaire_script = root / "start_makerfaire_patient.sh"
     makerfaire_script.write_text(
         "\n".join(
@@ -536,6 +568,101 @@ def export_edge_setup(
     bridge_service_outputs: dict[str, str] | None = None
 
     if board == "uno_q":
+        uno_test_script = root / "test_uno_q_bridge.sh"
+        uno_test_script.write_text(
+            "\n".join(
+                [
+                    "#!/usr/bin/env bash",
+                    "set -euo pipefail",
+                    'cd "$(dirname "$0")"',
+                    'PORT="${1:-auto}"',
+                    'echo "Testing UNO Q bridge on port: $PORT"',
+                    'iints edge bridge-test --port "$PORT"',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        uno_test_script.chmod(uno_test_script.stat().st_mode | stat.S_IXUSR)
+
+        uno_run_bridge_script = root / "run_uno_q_bridge.sh"
+        uno_run_bridge_script.write_text(
+            "\n".join(
+                [
+                    "#!/usr/bin/env bash",
+                    "set -euo pipefail",
+                    'cd "$(dirname "$0")"',
+                    'PORT="${1:-auto}"',
+                    'echo "Forwarding live IINTS state to UNO Q on port: $PORT"',
+                    'iints edge bridge-run --project-dir . --port "$PORT"',
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        uno_run_bridge_script.chmod(uno_run_bridge_script.stat().st_mode | stat.S_IXUSR)
+
+        easy_guide.write_text(
+            "\n".join(
+                [
+                    "# UNO Q Easy Start",
+                    "",
+                    "Use this page when you want the shortest working path.",
+                    "",
+                    "## 1. Start the Linux-side digital patient",
+                    "",
+                    "```bash",
+                    "./start_edge_easy.sh",
+                    "```",
+                    "",
+                    "This starts the IINTS runtime, prints status, and shows the kiosk URL.",
+                    "",
+                    "## 2. Upload the bridge sketch",
+                    "",
+                    "Open this sketch in Arduino IDE and upload it to the STM32 side:",
+                    "",
+                    "```text",
+                    "uno_q_bridge/iints_supervisor_bridge.ino",
+                    "```",
+                    "",
+                    "Serial Monitor settings:",
+                    "",
+                    "- baud: `115200`",
+                    "- line ending: `Newline`",
+                    "- expected banner: `IINTS UNO Q supervisor bridge ready`",
+                    "",
+                    "## 3. Test the physical bridge",
+                    "",
+                    "```bash",
+                    "./test_uno_q_bridge.sh",
+                    "```",
+                    "",
+                    "If auto-detect finds multiple serial devices, pass the port:",
+                    "",
+                    "```bash",
+                    "./test_uno_q_bridge.sh /dev/ttyACM0",
+                    "```",
+                    "",
+                    "## 4. Run the live bridge",
+                    "",
+                    "```bash",
+                    "./run_uno_q_bridge.sh",
+                    "```",
+                    "",
+                    "## What To Remember",
+                    "",
+                    "- Linux side first: `./start_edge_easy.sh`",
+                    "- Upload once: `uno_q_bridge/iints_supervisor_bridge.ino`",
+                    "- Test physical output: `./test_uno_q_bridge.sh`",
+                    "- Live physical output: `./run_uno_q_bridge.sh`",
+                    "- Stop the digital patient: `iints edge stop --project-dir .`",
+                    "",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
         guide_lines = [
             "# IINTS Edge Setup",
             "",
@@ -547,6 +674,16 @@ def export_edge_setup(
             "",
             "1. the Linux side runs the IINTS digital patient",
             "2. the STM32 side runs the simple LED / buzzer bridge sketch",
+            "",
+            "## Easiest path",
+            "",
+            "```bash",
+            "./start_edge_easy.sh",
+            "./test_uno_q_bridge.sh",
+            "./run_uno_q_bridge.sh",
+            "```",
+            "",
+            "Read `EDGE_EASY_START.md` if you only want the short path.",
             "",
             "## 1. Start the Linux side",
             "",
@@ -589,6 +726,12 @@ def export_edge_setup(
             "",
             "## 4. Manual bridge test",
             "",
+            "Easiest:",
+            "",
+            "```bash",
+            "./test_uno_q_bridge.sh",
+            "```",
+            "",
             "Send these serial messages one by one:",
             "",
             "```text",
@@ -612,6 +755,14 @@ def export_edge_setup(
             "- note: the bridge test ends on the last state you send, so LEDs can stay lit until the next `OK`",
             "",
             "## 5. Live bridge forwarding",
+            "",
+            "Easiest:",
+            "",
+            "```bash",
+            "./run_uno_q_bridge.sh",
+            "```",
+            "",
+            "Equivalent CLI command:",
             "",
             "```bash",
             "iints edge bridge-run --project-dir . --port /dev/ttyACM0",
@@ -646,6 +797,9 @@ def export_edge_setup(
             "",
             "## Useful live commands",
             "",
+            "- `./start_edge_easy.sh`",
+            "- `./test_uno_q_bridge.sh`",
+            "- `./run_uno_q_bridge.sh`",
             "- `iints edge status --project-dir .`",
             "- `iints edge kiosk --project-dir .`",
             "- `iints edge reset --project-dir .`",
@@ -656,6 +810,43 @@ def export_edge_setup(
             "",
         ]
     else:
+        easy_guide.write_text(
+            "\n".join(
+                [
+                    "# Raspberry Pi Easy Start",
+                    "",
+                    "Use this page when you want the shortest working path.",
+                    "",
+                    "## Start",
+                    "",
+                    "```bash",
+                    "./start_edge_easy.sh",
+                    "```",
+                    "",
+                    "## Open The Kiosk",
+                    "",
+                    "```bash",
+                    "iints edge kiosk --project-dir .",
+                    "```",
+                    "",
+                    "## Reset Between Demos",
+                    "",
+                    "```bash",
+                    "iints edge reset --project-dir .",
+                    "```",
+                    "",
+                    "## Stop",
+                    "",
+                    "```bash",
+                    "iints edge stop --project-dir .",
+                    "```",
+                    "",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
         guide_lines = [
             "# IINTS Edge Setup",
             "",
@@ -664,6 +855,12 @@ def export_edge_setup(
             f"Workspace: `{workspace}`",
             "",
             "## First run",
+            "",
+            "```bash",
+            "./start_edge_easy.sh",
+            "```",
+            "",
+            "Equivalent CLI command:",
             "",
             "```bash",
             "iints edge up --project-dir .",
@@ -688,6 +885,7 @@ def export_edge_setup(
             "",
             "## Useful live commands",
             "",
+            "- `./start_edge_easy.sh`",
             "- `iints edge status --project-dir .`",
             "- `iints edge kiosk --project-dir .`",
             "- `iints edge reset --project-dir .`",
@@ -858,6 +1056,8 @@ def export_edge_setup(
         "config": str(config.config_path),
         "run_script": str(run_script),
         "kiosk_script": str(kiosk_script),
+        "easy_start_script": str(easy_start_script),
+        "easy_guide": str(easy_guide),
         "makerfaire_script": str(makerfaire_script),
         "makerfaire_guide": str(makerfaire_guide),
         "makerfaire_kiosk_script": makerfaire_autostart["kiosk_script"],
@@ -879,6 +1079,10 @@ def export_edge_setup(
     if board == "uno_q" or include_uno_bridge:
         bridge = export_uno_q_bridge(root / "uno_q_bridge")
         outputs["uno_q_bridge"] = bridge["output_dir"]
+        if uno_test_script is not None:
+            outputs["uno_test_script"] = str(uno_test_script)
+        if uno_run_bridge_script is not None:
+            outputs["uno_run_bridge_script"] = str(uno_run_bridge_script)
         if uno_bridge_port:
             bridge_service_outputs = write_uno_q_bridge_service_artifact(
                 project_root=root,
