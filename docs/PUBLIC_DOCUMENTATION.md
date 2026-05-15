@@ -61,6 +61,10 @@ For non-technical readers, start with:
 - **CLI**: `src/iints/cli/cli.py`
 
 ### User Guides
+- **Choose a route**: `USER_GUIDE_MAP.md`
+- **Workflow hub**: `WORKFLOWS.md`
+- **Hardware hub**: `HARDWARE.md`
+- **Reference hub**: `REFERENCE_OVERVIEW.md`
 - **Quickstart**: `../README.md`
 - **Notebooks**: `examples/notebooks/` (step‑by‑step walkthroughs)
 - **Presets**: `src/iints/presets/presets.json`
@@ -214,6 +218,10 @@ inside the SDK:
 ## Canonical Entry Points (Public)
 
 - `../README.md` (start here)
+- `USER_GUIDE_MAP.md`
+- `WORKFLOWS.md`
+- `HARDWARE.md`
+- `REFERENCE_OVERVIEW.md`
 - `COMPREHENSIVE_GUIDE.md`
 - `TECHNICAL_README.md`
 - `data_packs/DATA_SCHEMA.md`

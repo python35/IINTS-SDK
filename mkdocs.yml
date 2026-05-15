@@ -48,50 +48,52 @@ extra_css:
 
 nav:
   - Home: index.md
-  - Start Here:
-      - User Guide Map: USER_GUIDE_MAP.md
-      - Overview In Plain Language: PLAIN_LANGUAGE_GUIDE.md
+  - Start:
+      - Choose Your Path: USER_GUIDE_MAP.md
+      - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - 5-Minute Quickstart: QUICKSTART.md
       - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md
       - Troubleshooting: TROUBLESHOOTING.md
-      - Updating An Existing Install: UPDATING.md
-  - User Guides:
-      - AI Assistant: AI_ASSISTANT.md
-      - Study Analysis: STUDY_ANALYSIS.md
+      - Updating The SDK: UPDATING.md
+  - Workflows:
+      - Workflow Hub: WORKFLOWS.md
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
-      - Booth Demo & Presentation Flow: BOOTH_DEMO.md
-  - Edge & Deployment:
-      - Edge Hardware & SBC Matrix: EDGE_HARDWARE.md
-      - Jetson Endurance Mode: JETSON_ENDURANCE.md
+      - Study Analysis: STUDY_ANALYSIS.md
+      - Data Certification Quickstart: MDMP_QUICKSTART.md
+      - Data Certification Guide: MDMP_FULL_GUIDE.md
+      - AI Assistant: AI_ASSISTANT.md
+      - Booth Demo & Presentation: BOOTH_DEMO.md
+  - Hardware:
+      - Hardware Hub: HARDWARE.md
+      - Edge Hardware Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
+      - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
+      - Jetson Endurance Mode: JETSON_ENDURANCE.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
-      - Maker Faire Pi Checklist: MAKERFAIRE_PI_CHECKLIST.md
-      - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
-  - Data Quality (MDMP):
-      - MDMP Quickstart: MDMP_QUICKSTART.md
-      - MDMP Guide: MDMP_FULL_GUIDE.md
-      - MDMP Specification (Draft): MDMP.md
-  - Reference:
+      - Maker Faire Checklist: MAKERFAIRE_PI_CHECKLIST.md
+  - Developers:
       - Developer Portal: DEVELOPER_PORTAL.md
       - Visual Architecture: ARCHITECTURE_OVERVIEW.md
       - API Reference: API_REFERENCE.md
-      - Command Reference: COMMAND_REFERENCE.md
-      - CLI & Advanced Reference: TECHNICAL_README.md
-      - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
-      - Emulation Notes: emulation_references.md
-      - Evidence Base: EVIDENCE_BASE.md
-      - Documentation By Role: DOCUMENTATION_INDEX.md
-      - Manual Overview: OFFICIAL_MANUAL.md
-      - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
-  - Maintainers & Governance:
       - Contribute Safely: CONTRIBUTING_SAFELY.md
+      - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
+      - CLI & Advanced Reference: TECHNICAL_README.md
       - Maintainer Guide: MAINTAINER_GUIDE.md
       - Maintainer Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
-      - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
-  - Release Notes:
+  - Reference:
+      - Reference Hub: REFERENCE_OVERVIEW.md
+      - Command Reference: COMMAND_REFERENCE.md
+      - Evidence Base: EVIDENCE_BASE.md
+      - MDMP Specification: MDMP.md
+      - Emulation Notes: emulation_references.md
+      - Documentation By Role: DOCUMENTATION_INDEX.md
+      - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
+      - Manual Overview: OFFICIAL_MANUAL.md
+      - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
+  - Releases:
       - Latest (v1.5.4): releases/v1.5.4.md
       - Release Archive: releases/INDEX.md
       - Older Releases:

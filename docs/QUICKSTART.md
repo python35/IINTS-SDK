@@ -4,7 +4,7 @@
 
 **Fastest path:** run `iints start` first. It tells you the shortest next command for a demo, project, study, edge setup, or data workflow.
 
-**Before this page:** [User Guide Map](USER_GUIDE_MAP.md) if you want the whole route.
+**Before this page:** [Choose Your Path](USER_GUIDE_MAP.md) if you want the whole route.
 
 **After this page:** [Getting Started](GETTING_STARTED.md) for the complete first project workflow.
 

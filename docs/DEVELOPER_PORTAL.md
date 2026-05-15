@@ -112,4 +112,4 @@ Before a code change is considered complete:
 - generated docs still build cleanly
 - release-facing files are updated when public behavior changed
 
-If you are unsure where to begin, use [Documentation By Role](DOCUMENTATION_INDEX.md) or [User Guide Map](USER_GUIDE_MAP.md) to route yourself to the right level of detail.
+If you are unsure where to begin, use [Documentation By Role](DOCUMENTATION_INDEX.md) or [Choose Your Path](USER_GUIDE_MAP.md) to route yourself to the right level of detail.

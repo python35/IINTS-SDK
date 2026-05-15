@@ -1,12 +1,12 @@
 # Documentation By Role
 
-Use this page when you want the shortest route to the right documentation.
+This is the slower, exhaustive index. If you only need the fastest next click, start with [Choose Your Path](USER_GUIDE_MAP.md).
 
 ## If You Are New
 
 Start in this order:
 
-1. [User Guide Map](USER_GUIDE_MAP.md)
+1. [Choose Your Path](USER_GUIDE_MAP.md)
 2. [Quickstart](QUICKSTART.md)
 3. [Getting Started](GETTING_STARTED.md)
 4. [Installation](INSTALLATION.md)
@@ -23,6 +23,7 @@ Beginner-friendly CLI entry points:
 ## If You Are A Research User
 
 Go here first:
+- [Workflow Hub](WORKFLOWS.md)
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
@@ -32,6 +33,7 @@ Go here first:
 ## If You Are Working On Edge Hardware
 
 Start here:
+- [Hardware Hub](HARDWARE.md)
 - [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
 - [Jetson Endurance Mode](JETSON_ENDURANCE.md)
 - [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
@@ -42,6 +44,7 @@ Start here:
 ## If You Need A Fast CLI Map
 
 Read:
+- [Reference Hub](REFERENCE_OVERVIEW.md)
 - [Command Reference](COMMAND_REFERENCE.md)
 - [CLI & Advanced Reference](TECHNICAL_README.md)
 
@@ -67,4 +70,4 @@ Use:
 
 ## If You Want The Whole Map
 
-Read [User Guide Map](USER_GUIDE_MAP.md). It connects the public docs into a single route for external users, researchers, edge users, and maintainers.
+Read [Choose Your Path](USER_GUIDE_MAP.md). It connects the public docs into a single route for external users, researchers, edge users, and maintainers.

@@ -36,7 +36,7 @@ All command examples in the documentation assume `.venv` is active.
 
 For a new external user:
 
-1. [User Guide Map](USER_GUIDE_MAP.md)
+1. [Choose Your Path](USER_GUIDE_MAP.md)
 2. [Quickstart](QUICKSTART.md)
 3. [Getting Started](GETTING_STARTED.md)
 4. [Command Reference](COMMAND_REFERENCE.md)

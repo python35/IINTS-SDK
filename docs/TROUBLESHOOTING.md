@@ -131,4 +131,4 @@ And include:
 | continue the full workflow | [Getting Started](GETTING_STARTED.md) |
 | check command syntax | [Command Reference](COMMAND_REFERENCE.md) |
 | troubleshoot edge hardware | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
-| understand docs routes again | [User Guide Map](USER_GUIDE_MAP.md) |
+| understand docs routes again | [Choose Your Path](USER_GUIDE_MAP.md) |

@@ -1,88 +1,69 @@
-# User Guide Map
+# Choose Your Path
 
-Use this page when you are outside the project and want the documentation to behave like one connected manual.
+Use this page when you know what you want to achieve, but not yet which guide deserves your time.
 
-## First Three Clicks
+## If You Only Click Three Things
 
-If you are new, follow this order:
+1. [Quickstart](QUICKSTART.md) - prove the SDK works on your machine.
+2. [Getting Started](GETTING_STARTED.md) - make your first complete run bundle.
+3. [Workflow Hub](WORKFLOWS.md) - continue into research, data, AI, or demo work.
 
-1. [Quickstart](QUICKSTART.md)
-2. [Getting Started](GETTING_STARTED.md)
-3. [Troubleshooting](TROUBLESHOOTING.md)
+## Choose By Goal
 
-If you prefer the CLI to choose the route for you:
+| I want to... | Start here | Continue with | Main command |
+| --- | --- | --- | --- |
+| see the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints demo` |
+| understand the project without jargon | [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Getting Started](GETTING_STARTED.md) | `iints start` |
+| run a scientific benchmark | [Workflow Hub](WORKFLOWS.md) | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | `iints run-study` |
+| certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [MDMP Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
+| analyze a finished study | [Study Analysis](STUDY_ANALYSIS.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints study analyze` |
+| prepare a live demo | [Booth Demo Guide](BOOTH_DEMO.md) | [Workflow Hub](WORKFLOWS.md) | `iints demo-live` |
+| deploy hardware | [Hardware Hub](HARDWARE.md) | board-specific guide | `iints edge quickstart` |
+| change SDK code | [Developer Portal](DEVELOPER_PORTAL.md) | [Contribute Safely](CONTRIBUTING_SAFELY.md) | `tools/dev/sdk_check.sh quick` |
+| look up a command fast | [Command Reference](COMMAND_REFERENCE.md) | [Reference Hub](REFERENCE_OVERVIEW.md) | `iints --help` |
 
-```bash
-iints start
-```
+## Choose By Role
 
-## Choose Your Path
-
-| Goal | Read first | Then read | Main command |
-|---|---|---|---|
-| See the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints demo` |
-| Build your own starter project | [Quickstart](QUICKSTART.md) | [Command Reference](COMMAND_REFERENCE.md) | `iints start --goal project --run` |
-| Run scientific benchmarks | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | [Study Analysis](STUDY_ANALYSIS.md) | `iints run-study` |
-| Certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [MDMP Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
-| Add your own algorithms or models | [Command Reference](COMMAND_REFERENCE.md) | [Technical Reference](TECHNICAL_README.md) | `iints plugin install` |
-| Prepare a Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) | [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md) | `iints edge setup` |
-| Run Jetson stress studies | [Jetson Endurance Mode](JETSON_ENDURANCE.md) | [Command Reference](COMMAND_REFERENCE.md) | `iints jetson endurance start` |
-| Prepare an event booth | [Maker Faire Pi Mode](MAKERFAIRE_PI.md) | [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md) | `iints makerfaire up` |
-| Understand every command | [Command Reference](COMMAND_REFERENCE.md) | [Technical Reference](TECHNICAL_README.md) | `iints --help` |
-| Maintain the SDK | [Maintainer Guide](MAINTAINER_GUIDE.md) | [Release Checklist](PUBLIC_RELEASE_CHECKLIST.md) | `tools/dev/sdk_check.sh quick` |
-
-## How The Docs Fit Together
-
-The public docs are split by job:
-
-- Start pages explain the shortest route to a successful first result.
-- User guides explain one workflow at a time.
-- Edge guides explain Raspberry Pi, UNO Q, remote deploy, offline install, and long-running studies.
-- Jetson guides explain headless adversarial endurance runs and systemd resume.
-- Extension commands explain local algorithm and patient-model plugins without editing SDK source.
-- Data guides explain certification, data trust, and MDMP output.
-- Reference pages explain all commands and deeper architecture.
-- Maintainer pages explain checks, release steps, and repo upkeep.
-
-## Recommended External User Route
-
-For a first-time external evaluator:
+### First-Time User
 
 ```text
-Home
-  -> User Guide Map
-  -> Quickstart
+Quickstart
   -> Getting Started
-  -> Command Reference
-  -> Scientific Workflow or Raspberry Pi Digital Patient
+  -> Troubleshooting if needed
 ```
 
-For a researcher:
+### Researcher
 
 ```text
-Scientific Workflow
-  -> Study Analysis
-  -> MDMP Quickstart
-  -> Evidence Base
-  -> Full Technical Manual
-```
-
-For an edge demo:
-
-```text
-Raspberry Pi Digital Patient
-  -> Remote Deploy & Pi Connect
-  -> Maker Faire Pi Mode
-  -> Maker Faire Pi Checklist
-  -> Arduino UNO Q Setup
-```
-
-For Jetson robustness testing:
-
-```text
-Jetson Endurance Mode
-  -> Command Reference
+Workflow Hub
   -> Scientific Workflow
+  -> Study Analysis
+  -> Evidence Base
+```
+
+### Data Reviewer
+
+```text
+MDMP Quickstart
+  -> MDMP Guide
+  -> Evidence Base
+```
+
+### Hardware Builder
+
+```text
+Hardware Hub
+  -> Raspberry Pi / UNO Q / Jetson guide
+  -> Remote Deploy if the board is off your desk
+```
+
+### SDK Contributor
+
+```text
+Developer Portal
+  -> Visual Architecture
+  -> API Reference
+  -> Contribute Safely
 ```
 
 ## If You Get Lost
@@ -97,5 +78,5 @@ iints doctor --full --suggest
 Then return to:
 
 - [Troubleshooting](TROUBLESHOOTING.md)
-- [Command Reference](COMMAND_REFERENCE.md)
+- [Reference Hub](REFERENCE_OVERVIEW.md)
 - [Documentation By Role](DOCUMENTATION_INDEX.md)
