@@ -163,6 +163,142 @@ Both training and evaluation outputs include lineage metadata:
 - dataframe fingerprint
 - optional source file SHA-256
 
+## Simulator realism benchmark
+Use the empirical daily envelope derived from the real AZT1D and HUPA-UCM packs to
+keep simulator tuning honest across multiple seeds:
+
+```bash
+PYTHONPATH=src python3 research/evaluate_simulator_realism.py \
+  --presets realistic_reference_day,baseline_t1d,free_living_t1d \
+  --seeds 1,2,3,42,99 \
+  --reference free_living_t1d \
+  --out results/simulator_realism_benchmark.json
+```
+
+This benchmark is deliberately separate from predictor training. It checks
+whether simulated traces resemble real daily CGM envelopes; the predictor
+training commands above measure forecast quality on real data.
+
+## Simulator realism calibration
+When a full-day preset needs improvement, calibrate the patient profile against
+the same real-data envelope instead of hand-tuning one seed by eye:
+
+```bash
+PYTHONPATH=src python3 research/calibrate_simulator_realism.py \
+  --preset realistic_reference_day \
+  --reference free_living_t1d \
+  --seeds 1,2,3,42,99 \
+  --out results/simulator_calibration.json \
+  --best-profile-out results/reference_free_living_t1d_calibrated.yaml
+```
+
+The calibrator searches plausible physiology settings, evaluates every candidate
+across multiple deterministic seeds, and ranks them by robust realism first:
+how many runs are `likely_realistic`, then average realism score, then distance
+from the empirical reference median. That makes the chosen preset reproducible
+and less vulnerable to one lucky-looking trace.
+
+To calibrate the packaged reference profiles for every supported real-data
+envelope in one pass:
+
+```bash
+PYTHONPATH=src python3 research/calibrate_dataset_profiles.py \
+  --out-dir results/dataset_profile_calibration \
+  --profiles-dir src/iints/data/virtual_patients
+```
+
+That command refreshes:
+- `reference_free_living_t1d`
+- `reference_azt1d_t1d`
+- `reference_hupa_ucm_t1d`
+
+## Empirical physiology residuals
+The mechanistic simulator should remain the source of meal-insulin physiology,
+but real CGM days also contain small unmodeled fluctuations. Build the optional
+empirical residual library from the local AZT1D and HUPA-UCM packs with:
+
+```bash
+PYTHONPATH=src python3 research/build_empirical_residual_profiles.py
+```
+
+Then enable the additive residual layer when you explicitly want that research
+variant:
+
+```python
+outputs = run_simulation(
+    algorithm=ClinicalBaselineAlgorithm(),
+    scenario=get_preset("free_living_t1d_empirical")["scenario"],
+    patient_config="reference_free_living_t1d",
+    physiology_variation_profile="free_living_t1d",
+    physiology_variation_scale=0.05,
+)
+```
+
+The default `free_living_t1d` preset stays purely mechanistic because that path
+currently scores better against the full realism validator; the empirical layer
+is available for controlled experiments rather than silently changing every
+benchmark.
+
+## Real-vs-simulator gallery
+Render side-by-side overlays for representative AZT1D and HUPA-UCM days:
+
+```bash
+MPLCONFIGDIR=.mplt PYTHONPATH=src python3 research/plot_simulator_vs_real.py \
+  --output-dir results/realism_gallery
+```
+
+## Multi-reference scenario search
+Use the scenario search loop when you want the free-living day itself to improve
+against several real-data envelopes at once:
+
+```bash
+PYTHONPATH=src python3 research/search_realistic_scenarios.py \
+  --references free_living_t1d,azt1d_daily,hupa_ucm_daily \
+  --seeds 1,42,99 \
+  --out results/scenario_search/report.json \
+  --best-scenario-out results/scenario_search/best_multi_reference_scenario.json
+```
+
+The ranker prefers candidates that stay realistic across **all** references
+before rewarding one-off high scores on a single cohort.
+
+## Predictor retraining on improved data
+Build a blended real+simulator dataset using the calibrated scenarios:
+
+```bash
+PYTHONPATH=src python3 research/build_augmented_training_set.py \
+  --output data_packs/generated/realism_augmented_multimodal.csv \
+  --manifest data_packs/generated/realism_augmented_multimodal_manifest.json
+```
+
+Then warm-start the existing multimodal predictor and fine-tune on the blended
+dataset:
+
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/generated/realism_augmented_multimodal.csv \
+  --config research/configs/predictor_multimodal_realism_retrain.yaml \
+  --warm-start models/hupa_finetuned_v2/predictor.pt \
+  --out models/realism_augmented_v1
+```
+
+Evaluate the retrained checkpoint on both public real-data packs before using it
+as a new default:
+
+```bash
+PYTHONPATH=src python3 research/evaluate_predictor.py \
+  --data data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv \
+  --model models/realism_augmented_v1/predictor.pt \
+  --config research/configs/predictor_multimodal_realism_retrain.yaml \
+  --out results/realism_augmented_v1_hupa_eval.json
+
+PYTHONPATH=src python3 research/evaluate_predictor.py \
+  --data data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --model models/realism_augmented_v1/predictor.pt \
+  --config research/configs/predictor_multimodal_realism_retrain.yaml \
+  --out results/realism_augmented_v1_azt1d_eval.json
+```
+
 ## Export
 ```bash
 python research/export_predictor.py --model models/predictor.pt --out models/predictor.onnx

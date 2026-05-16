@@ -10,6 +10,7 @@ from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 from iints.core.safety import InputValidator, SafetyConfig
 from iints.core.devices.models import SensorModel, PumpModel
+from iints.core.physiology_variation import EmpiricalResidualModel
 import numpy as np
 
 logger = logging.getLogger("iints")
@@ -98,6 +99,7 @@ class Simulator:
         critical_glucose_duration_minutes: int = 30,
         safety_config: Optional[SafetyConfig] = None,
         predictor: Optional[object] = None,
+        physiology_variation_model: Optional[EmpiricalResidualModel] = None,
     ) -> None:
         """
         Initializes the simulator.
@@ -117,9 +119,14 @@ class Simulator:
         self.seed = seed
         self.safety_config = safety_config or SafetyConfig()
         self.supervisor = IndependentSupervisor(safety_config=self.safety_config)
+        # Raw physiology and CGM-facing values each need their own temporal
+        # history. Sharing one stateful validator made raw glucose compare
+        # against the previous noisy sensor sample.
+        self.raw_input_validator = InputValidator(safety_config=self.safety_config)
         self.input_validator = InputValidator(safety_config=self.safety_config)
         self.sensor_model = sensor_model or SensorModel(seed=seed)
         self.pump_model = pump_model or PumpModel(seed=seed)
+        self.physiology_variation_model = physiology_variation_model
         self.predictor = predictor
         self._predictor_history: List[Dict[str, float]] = []
         self._predictor_feature_columns: List[str] = [
@@ -338,17 +345,25 @@ class Simulator:
         except Exception as exc:
             logger.warning("on_safety_event callback raised: %s", exc)
 
-    def _validate_glucose_fail_soft(self, glucose_value: float, current_time: float, source: str) -> float:
+    def _validate_glucose_fail_soft(
+        self,
+        glucose_value: float,
+        current_time: float,
+        source: str,
+        *,
+        validator: Optional[InputValidator] = None,
+    ) -> float:
+        active_validator = validator or self.input_validator
         try:
-            return self.input_validator.validate_glucose(glucose_value, current_time)
+            return active_validator.validate_glucose(glucose_value, current_time)
         except ValueError as exc:
             self._input_validator_fail_soft_count += 1
             self._input_validator_last_error = str(exc)
             self._input_validator_last_step_fail_soft = True
-            fallback = self.input_validator.last_valid_glucose
+            fallback = active_validator.last_valid_glucose
             if fallback is None:
                 fallback = float(
-                    max(self.input_validator.min_glucose, min(glucose_value, self.input_validator.max_glucose))
+                    max(active_validator.min_glucose, min(glucose_value, active_validator.max_glucose))
                 )
             self._write_audit_log(
                 {
@@ -360,8 +375,8 @@ class Simulator:
                     "error": str(exc),
                 }
             )
-            self.input_validator.last_valid_glucose = fallback
-            self.input_validator.last_validation_time = current_time
+            active_validator.last_valid_glucose = fallback
+            active_validator.last_validation_time = current_time
             return fallback
     def _apply_ratio_overrides(self, current_time: float) -> Dict[str, float]:
         if self._base_ratio_state is None:
@@ -542,9 +557,12 @@ class Simulator:
             self.patient_model.reset()
             self.algorithm.reset()
             self.supervisor.reset()
+            self.raw_input_validator.reset()
             self.input_validator.reset() # Reset input validator for new run
             self.sensor_model.reset()
             self.pump_model.reset()
+            if self.physiology_variation_model is not None:
+                self.physiology_variation_model.reset()
             self.simulation_data = []
             self.meal_queue = [] # Reset meal queue for new run
             self._predictor_history = []
@@ -577,10 +595,17 @@ class Simulator:
             patient_carb_intake_this_step = 0.0
             algo_carb_intake_this_step = 0.0
             self._input_validator_last_step_fail_soft = False
-            actual_glucose_reading = self.patient_model.get_current_glucose()
+            mechanistic_glucose_reading = self.patient_model.get_current_glucose()
+            physiology_residual = 0.0
+            if self.physiology_variation_model is not None:
+                physiology_residual = self.physiology_variation_model.offset_at(float(current_time))
+            actual_glucose_reading = mechanistic_glucose_reading + physiology_residual
             # Validate the raw sensor reading
             actual_glucose_reading = self._validate_glucose_fail_soft(
-                actual_glucose_reading, float(current_time), "sensor_raw"
+                actual_glucose_reading,
+                float(current_time),
+                "sensor_raw",
+                validator=self.raw_input_validator,
             )
             sensor_reading = self.sensor_model.read(actual_glucose_reading, float(current_time))
             glucose_to_algorithm = sensor_reading.value
@@ -888,6 +913,8 @@ class Simulator:
             record = {
                 "time_minutes": current_time,
                 "glucose_actual_mgdl": actual_glucose_reading,
+                "glucose_mechanistic_mgdl": mechanistic_glucose_reading,
+                "physiology_residual_mgdl": physiology_residual,
                 "glucose_to_algo_mgdl": glucose_to_algorithm,
                 "glucose_trend_mgdl_min": glucose_trend,
                 "predicted_glucose_30min": predicted_glucose_30,
@@ -968,6 +995,11 @@ class Simulator:
             "input_validator_state": self.input_validator.get_state(),
             "sensor_state": self.sensor_model.get_state(),
             "pump_state": self.pump_model.get_state(),
+            "physiology_variation_state": (
+                self.physiology_variation_model.get_state()
+                if self.physiology_variation_model is not None
+                else None
+            ),
             "meal_queue": self.meal_queue,
             "stress_events": [event.__dict__ for event in self.stress_events],
             "critical_low_minutes": self._critical_low_minutes,
@@ -982,6 +1014,9 @@ class Simulator:
         self.input_validator.set_state(state.get("input_validator_state", {}))
         self.sensor_model.set_state(state.get("sensor_state", {}))
         self.pump_model.set_state(state.get("pump_state", {}))
+        physiology_variation_state = state.get("physiology_variation_state")
+        if self.physiology_variation_model is not None and isinstance(physiology_variation_state, dict):
+            self.physiology_variation_model.set_state(physiology_variation_state)
         self.meal_queue = state.get("meal_queue", [])
         self.stress_events = [StressEvent(**payload) for payload in state.get("stress_events", [])]
         self._critical_low_minutes = state.get("critical_low_minutes", 0)

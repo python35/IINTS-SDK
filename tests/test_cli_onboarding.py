@@ -59,7 +59,7 @@ def test_demo_writes_editable_algorithm_after_run(monkeypatch, tmp_path) -> None
     result = runner.invoke(app, ["demo", "--output-dir", str(output_dir)])
 
     assert result.exit_code == 0
-    assert captured["preset"] == "baseline_t1d"
+    assert captured["preset"] == "quickstart_meal"
     assert captured["algo"] is None
     assert (output_dir / "demo_assets" / "example_algorithm.py").is_file()
     assert "What To Do Next" in result.stdout

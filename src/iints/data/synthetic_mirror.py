@@ -160,19 +160,96 @@ def _sample_contiguous_blocks(
     *,
     n_rows: int,
     rng: np.random.Generator,
+    timestamp_column: str = "timestamp",
 ) -> pd.DataFrame:
-    block_size = min(len(source_df), max(4, min(18, len(source_df))))
+    segments = _split_contiguous_segments(source_df, timestamp_column=timestamp_column)
+    block_size = _preferred_block_rows(segments, n_rows=n_rows)
     blocks: list[pd.DataFrame] = []
     produced = 0
     while produced < n_rows:
-        if len(source_df) <= block_size:
+        eligible = [segment for segment in segments if len(segment) >= block_size]
+        population = eligible or segments
+        segment = population[int(rng.integers(0, len(population)))]
+        effective_block_size = min(block_size, len(segment), n_rows - produced)
+        if len(segment) <= effective_block_size:
             start = 0
         else:
-            start = int(rng.integers(0, len(source_df) - block_size + 1))
-        block = source_df.iloc[start : start + block_size].copy(deep=True)
+            start = int(rng.integers(0, len(segment) - effective_block_size + 1))
+        block = segment.iloc[start : start + effective_block_size].copy(deep=True)
         blocks.append(block)
         produced += len(block)
     return pd.concat(blocks, ignore_index=True).iloc[:n_rows].copy(deep=True)
+
+
+def _split_contiguous_segments(
+    source_df: pd.DataFrame,
+    *,
+    timestamp_column: str,
+) -> List[pd.DataFrame]:
+    """
+    Split rows at subject boundaries and large timestamp gaps.
+
+    Sampling across those boundaries creates impossible glucose jumps, so mirrors
+    should preserve long physiological chunks rather than stitch together short
+    snippets from unrelated moments.
+    """
+    if source_df.empty:
+        return [source_df]
+
+    grouped_frames: list[pd.DataFrame] = []
+    if "subject_id" in source_df.columns:
+        subject_groups = [frame for _, frame in source_df.groupby("subject_id", sort=False)]
+    else:
+        subject_groups = [source_df]
+
+    for frame in subject_groups:
+        ordered = frame.copy(deep=True)
+        if timestamp_column not in ordered.columns or len(ordered) < 2:
+            grouped_frames.append(ordered.reset_index(drop=True))
+            continue
+
+        timestamp_values = ordered[timestamp_column]
+        if _is_numeric_timestamp_series(timestamp_values):
+            normalized = pd.to_numeric(timestamp_values, errors="coerce")
+            deltas = normalized.diff()
+        else:
+            normalized = pd.to_datetime(timestamp_values, errors="coerce", utc=True)
+            deltas = normalized.diff().dt.total_seconds() / 60.0
+
+        positive = pd.to_numeric(deltas, errors="coerce")
+        positive = positive[positive > 0]
+        if positive.empty:
+            grouped_frames.append(ordered.reset_index(drop=True))
+            continue
+
+        expected_step = float(positive.median())
+        gap_threshold = max(expected_step * 3.0, expected_step + 1e-9)
+        boundaries = deltas.isna() | (deltas <= 0) | (deltas > gap_threshold)
+        for _, segment in ordered.groupby(boundaries.cumsum(), sort=False):
+            if not segment.empty:
+                grouped_frames.append(segment.reset_index(drop=True))
+
+    return grouped_frames or [source_df.reset_index(drop=True)]
+
+
+def _preferred_block_rows(
+    segments: List[pd.DataFrame],
+    *,
+    n_rows: int,
+) -> int:
+    """
+    Prefer long blocks so generated traces retain meal excursions and overnight drift.
+
+    The old 4-18 row sampler preserved schema but destroyed physiology by stitching
+    together 20-90 minute snippets. When enough source data exists, use up to a
+    full day of 5-minute CGM samples instead.
+    """
+    max_segment_len = max((len(segment) for segment in segments), default=0)
+    if max_segment_len <= 0:
+        return 1
+    if max_segment_len <= 18:
+        return max_segment_len
+    return min(max_segment_len, max(24, min(n_rows, 288)))
 
 
 def _is_sparse_event_column(column: str, values: pd.Series) -> bool:
@@ -301,7 +378,12 @@ def generate_synthetic_mirror(
         raise ValueError("rows must be > 0")
 
     rng = np.random.default_rng(seed)
-    synthetic = _sample_contiguous_blocks(source_df, n_rows=n_rows, rng=rng)
+    synthetic = _sample_contiguous_blocks(
+        source_df,
+        n_rows=n_rows,
+        rng=rng,
+        timestamp_column=timestamp_column,
+    )
 
     for column in synthetic.columns:
         if not pd.api.types.is_numeric_dtype(source_df[column]):

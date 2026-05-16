@@ -54,6 +54,8 @@ local/
 .mplt_test/
 .mplt_patient/
 .mplt_eucys/
+.mplt/
+data_packs/generated/
 .cache_demo/
 .cache_eucys/
 .cache/

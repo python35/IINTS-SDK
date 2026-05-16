@@ -8,12 +8,13 @@ This provides a more physiologically accurate glucose simulation than the
 default ``CustomPatientModel``, at the cost of higher computational load
 (uses ``scipy.integrate.solve_ivp``).
 
-The model tracks four state variables:
+The model tracks five state variables:
 
 * **G** — plasma glucose concentration (mg/dL)
 * **X** — remote insulin action (1/min)
 * **I** — plasma insulin concentration (mU/L)
-* **Q_gut** — gut glucose mass (mg)
+* **Q_stomach** — stomach glucose mass waiting for gastric emptying (mg)
+* **Q_gut** — intestinal glucose mass available for absorption (mg)
 
 References
 ----------
@@ -114,11 +115,12 @@ class BergmanPatientModel:
         self.carbs_on_board = 0.0
         self.meal_effect_delay = 30  # kept for API compat
 
-        # ODE state vector: [G, X, I, Q_gut]
+        # ODE state vector: [G, X, I, Q_stomach, Q_gut]
         self._state = np.array([
             initial_glucose,       # G  (mg/dL)
             0.0,                   # X  (1/min)
             self.params.Ib,        # I  (mU/L)
+            0.0,                   # Q_stomach (mg)
             0.0,                   # Q_gut (mg)
         ], dtype=np.float64)
 
@@ -131,7 +133,7 @@ class BergmanPatientModel:
     def reset(self) -> None:
         """Reset to initial conditions."""
         self._state = np.array([
-            self.initial_glucose, 0.0, self.params.Ib, 0.0,
+            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0,
         ], dtype=np.float64)
         self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
@@ -190,8 +192,9 @@ class BergmanPatientModel:
             for c in self.active_carb_intakes
         )
 
-        # --- Inject carbs into gut compartment ---
-        # Add carbs as glucose mass (mg) into Q_gut
+        # --- Inject carbs into stomach compartment ---
+        # Meals must pass through gastric emptying before intestinal
+        # absorption; direct gut injection creates impossible five-minute spikes.
         if true_carbs > 0:
             self._state[3] += true_carbs * 1000.0  # g -> mg
 
@@ -218,6 +221,7 @@ class BergmanPatientModel:
         self._state[1] = max(0.0, self._state[1])
         self._state[2] = max(0.0, self._state[2])
         self._state[3] = max(0.0, self._state[3])
+        self._state[4] = max(0.0, self._state[4])
 
         self.current_glucose = float(self._state[0])
         return self.current_glucose
@@ -239,7 +243,8 @@ class BergmanPatientModel:
             "dia_minutes": self.insulin_action_duration,
             "plasma_insulin_mU_L": float(self._state[2]),
             "remote_insulin_action": float(self._state[1]),
-            "gut_glucose_mg": float(self._state[3]),
+            "stomach_glucose_mg": float(self._state[3]),
+            "gut_glucose_mg": float(self._state[4]),
         }
 
     def get_ratio_state(self) -> Dict[str, float]:
@@ -280,7 +285,16 @@ class BergmanPatientModel:
 
     def set_state(self, state: Dict[str, Any]) -> None:
         if "ode_state" in state:
-            self._state = np.array(state["ode_state"], dtype=np.float64)
+            ode_state = np.array(state["ode_state"], dtype=np.float64)
+            # Older snapshots stored [G, X, I, Q_gut]. Preserve resume
+            # compatibility by treating that legacy gut mass as already
+            # emptied from the stomach.
+            if ode_state.size == 4:
+                ode_state = np.array(
+                    [ode_state[0], ode_state[1], ode_state[2], 0.0, ode_state[3]],
+                    dtype=np.float64,
+                )
+            self._state = ode_state
         self.current_glucose = state.get("current_glucose", self.current_glucose)
         self.insulin_on_board = state.get("insulin_on_board", self.insulin_on_board)
         self.carbs_on_board = state.get("carbs_on_board", self.carbs_on_board)
@@ -300,7 +314,7 @@ class BergmanPatientModel:
         u_insulin_mu_per_min: float,
         current_time: float,
     ) -> np.ndarray:
-        G, X, I, Q_gut = y
+        G, X, I, Q_stomach, Q_gut = y
         p = self.params
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
@@ -335,8 +349,9 @@ class BergmanPatientModel:
         secretion = p.gamma * max(G - p.h, 0.0)
         dIdt = -p.n * (I - p.Ib) + secretion + u_insulin_mu_per_min / Vi_abs
 
-        # --- dQ_gut/dt ---
-        # Q_gut decays as glucose is absorbed into plasma
-        dQ_gut_dt = -p.k_abs * Q_gut
+        # --- Meal transit compartments ---
+        gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
+        dQ_stomach_dt = -gastric_emptying_rate * Q_stomach
+        dQ_gut_dt = gastric_emptying_rate * Q_stomach - p.k_abs * Q_gut
 
-        return np.array([dGdt, dXdt, dIdt, dQ_gut_dt])
+        return np.array([dGdt, dXdt, dIdt, dQ_stomach_dt, dQ_gut_dt])

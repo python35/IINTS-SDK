@@ -201,7 +201,12 @@ def main() -> None:
     if args.input.is_file():
         files = [args.input]
     else:
-        files = sorted(args.input.rglob("*.csv"))
+        output_resolved = args.output.resolve()
+        files = sorted(
+            path
+            for path in args.input.rglob("*.csv")
+            if "processed" not in path.parts and path.resolve() != output_resolved
+        )
     if not files:
         raise SystemExit(f"No CSV files found under {args.input}")
 

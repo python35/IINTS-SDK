@@ -98,6 +98,26 @@ def test_generate_synthetic_mirror_preserves_numeric_timestamp_cadence() -> None
     assert synth["timestamp"].tolist() == list(range(0, 60, 5))
 
 
+def test_generate_synthetic_mirror_preserves_long_physiological_chunks() -> None:
+    source = pd.DataFrame(
+        {
+            "timestamp": list(range(0, 600 * 5, 5)),
+            "glucose": [100.0 + idx * 0.1 for idx in range(600)],
+            "carbs": [0.0 for _ in range(600)],
+        }
+    )
+
+    synth, _ = generate_synthetic_mirror(
+        source,
+        _contract_payload(),
+        rows=288,
+        seed=3,
+        noise_scale=0.0,
+    )
+
+    assert synth["glucose"].diff().abs().dropna().max() < 1.0
+
+
 def test_generate_synthetic_mirror_keeps_sparse_events_sparse() -> None:
     source = pd.DataFrame(
         {

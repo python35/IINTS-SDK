@@ -43,6 +43,14 @@ class TestBergmanPatientModel:
             model.update(5.0, 0.0, 0.0)
         assert model.current_glucose > 100.0, "Carbs should raise glucose"
 
+    def test_meal_absorption_has_physiological_lag(self):
+        model = BergmanPatientModel(initial_glucose=100.0)
+
+        first_step = model.update(5.0, 0.0, 50.0)
+
+        assert first_step < 115.0, "A meal should not create an immediate CGM-sized spike"
+        assert model.get_patient_state()["stomach_glucose_mg"] > 0.0
+
     def test_glucose_floor(self):
         model = BergmanPatientModel(initial_glucose=50.0)
         # Massive insulin bolus

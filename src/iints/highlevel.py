@@ -10,6 +10,7 @@ import yaml
 from iints.api.base_algorithm import InsulinAlgorithm
 from iints.core.patient.patient_factory import PatientFactory
 from iints.core.patient.profile import PatientProfile
+from iints.core.physiology_variation import EmpiricalResidualModel
 from iints.core.simulator import Simulator
 from iints.core.devices.models import SensorModel, create_sensor_model
 from iints.core.safety import SafetyConfig
@@ -97,6 +98,8 @@ def run_simulation(
     generate_report: bool = True,
     safety_config: Optional[SafetyConfig] = None,
     predictor: Optional[object] = None,
+    physiology_variation_profile: Optional[str] = None,
+    physiology_variation_scale: float = 1.0,
 ) -> Dict[str, Any]:
     """
     One-line simulation runner with audit + report + baseline comparison.
@@ -129,6 +132,14 @@ def run_simulation(
     elif patient_model_type == "auto":
         sensor_model = create_sensor_model(profile="clinical_cgm", seed=resolved_seed)
 
+    physiology_variation_model = None
+    if physiology_variation_profile is not None:
+        physiology_variation_model = EmpiricalResidualModel.from_profile_id(
+            physiology_variation_profile,
+            seed=resolved_seed,
+            scale=physiology_variation_scale,
+        )
+
     simulator = Simulator(
         patient_model=patient_model,
         algorithm=algorithm_instance,
@@ -137,6 +148,7 @@ def run_simulation(
         safety_config=effective_safety_config,
         predictor=predictor,
         sensor_model=sensor_model,
+        physiology_variation_model=physiology_variation_model,
     )
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
@@ -180,6 +192,9 @@ def run_simulation(
         "generate_report": generate_report,
         "safety_config": asdict(effective_safety_config),
         "sensor_model": sensor_model.get_state() if sensor_model else None,
+        "physiology_variation_model": (
+            physiology_variation_model.get_state() if physiology_variation_model else None
+        ),
         "predictor": _predictor_metadata(predictor),
     }
     config_path = output_path / "config.json"

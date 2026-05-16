@@ -3149,7 +3149,7 @@ def demo(
     mode: Annotated[str, typer.Option("--mode", help="Demo mode: quick or full")] = "quick",
     quick_mode: Annotated[bool, typer.Option("--quick", help="Shortcut for --mode quick")] = False,
     full_mode: Annotated[bool, typer.Option("--full", help="Shortcut for --mode full")] = False,
-    preset: Annotated[Optional[str], typer.Option(help="Optional preset override. Defaults to baseline_t1d for quick and stress_test_meal for full.")] = None,
+    preset: Annotated[Optional[str], typer.Option(help="Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.")] = None,
     seed: Annotated[int, typer.Option(help="Deterministic seed for the bundled demo")] = 42,
     compare_baselines: Annotated[bool, typer.Option(help="Include built-in baselines in the demo output")] = True,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the plan without running the demo")] = False,
@@ -3176,8 +3176,8 @@ def demo(
         console.print("[bold red]Demo mode must be 'quick' or 'full'.[/bold red]")
         raise typer.Exit(code=1)
 
-    resolved_preset = preset or ("baseline_t1d" if normalized_mode == "quick" else "stress_test_meal")
-    duration = 180 if normalized_mode == "quick" else 720
+    resolved_preset = preset or ("quickstart_meal" if normalized_mode == "quick" else "realistic_reference_day")
+    duration = 180 if normalized_mode == "quick" else 1440
     console.print(
         Panel(
             "\n".join(
