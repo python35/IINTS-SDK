@@ -134,3 +134,34 @@ def test_start_rejects_unknown_goal() -> None:
 
     assert result.exit_code == 1
     assert "Unknown goal" in result.stdout
+
+
+def test_onboard_prints_one_canonical_path(tmp_path) -> None:
+    output_dir = tmp_path / "onboarding"
+
+    result = runner.invoke(app, ["onboard", "--output-dir", str(output_dir)])
+
+    assert result.exit_code == 0
+    assert "IINTS Canonical Onboarding Flow" in result.stdout
+    assert "iints doctor --suggest" in result.stdout
+    assert "iints data realism-check" in result.stdout
+    assert "iints run-study" in result.stdout
+    assert not output_dir.exists()
+
+
+def test_onboard_run_safe_steps_dispatches(monkeypatch, tmp_path) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr("iints.cli.cli.doctor", lambda **kwargs: calls.append("doctor"))
+    monkeypatch.setattr("iints.cli.cli.demo", lambda **kwargs: calls.append("demo"))
+    monkeypatch.setattr("iints.cli.cli.import_demo", lambda **kwargs: calls.append("import-demo"))
+    monkeypatch.setattr("iints.cli.cli.data_realism_check", lambda **kwargs: calls.append("realism-check"))
+
+    result = runner.invoke(
+        app,
+        ["onboard", "--output-dir", str(tmp_path / "onboarding"), "--run-safe-steps"],
+    )
+
+    assert result.exit_code == 0
+    assert calls == ["doctor", "demo", "import-demo", "realism-check"]
+    assert "Ready For Study" in result.stdout

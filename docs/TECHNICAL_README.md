@@ -600,11 +600,18 @@ iints import-nightscout --url https://your-nightscout.example \
 
 Prefer `--api-secret-env`, `--api-secret-file`, `--token-env`, or `--token-file` over plain CLI secrets.
 
-### Tidepool Client Skeleton (Future Cloud Imports)
+### Tidepool Import
 ```bash
 export IINTS_TIDEPOOL_TOKEN="replace-me"
-iints import-tidepool --base-url https://api.tidepool.org --token-env IINTS_TIDEPOOL_TOKEN
+iints import-tidepool \
+  --base-url https://api.tidepool.org \
+  --token-env IINTS_TIDEPOOL_TOKEN \
+  --output-dir results/tidepool_import
 ```
+
+The importer resolves the current authenticated user when `--user-id` is omitted,
+fetches CGM plus meal/insulin events, converts Tidepool CGM units into the SDK's
+standard mg/dL frame, and exports both `scenario.json` and `cgm_standard.csv`.
 
 ### Demo Quickstart Workflow (Script)
 ```bash

@@ -64,7 +64,7 @@ from iints.scenarios import (
     generate_random_scenario,
 )
 from iints.data.nightscout import NightscoutConfig, import_nightscout
-from iints.data.tidepool import TidepoolClient
+from iints.data.tidepool import TidepoolConfig, import_tidepool
 from iints.data.importer import (
     export_demo_csv,
     export_standard_csv,
@@ -3444,6 +3444,87 @@ def start(
 
     console.print("[yellow]--run is only available for demo, project, and edge starter flows.[/yellow]")
     raise typer.Exit(code=1)
+
+
+@app.command(name="onboard")
+def onboard(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Root directory for the canonical onboarding outputs."),
+    ] = Path("results/onboarding"),
+    run_safe_steps: Annotated[
+        bool,
+        typer.Option("--run-safe-steps", help="Run doctor, demo, import-demo, and realism-check."),
+    ] = False,
+) -> None:
+    """
+    Show one canonical first-run path from environment check to study bundle.
+
+    The last two study steps are intentionally printed, not executed, because they
+    are the first steps where users usually want to choose their own algorithm.
+    """
+    console = Console()
+    demo_dir = output_dir / "demo"
+    import_dir = output_dir / "import_demo"
+    realism_json = output_dir / "realism_report.json"
+    realism_html = output_dir / "realism_dashboard.html"
+    protocol_dir = output_dir / "study_protocol"
+    commands = [
+        "iints doctor --suggest",
+        f"iints demo --full --output-dir {demo_dir}",
+        f"iints import-demo --output-dir {import_dir}",
+        (
+            f"iints data realism-check {import_dir / 'cgm_standard.csv'} "
+            f"--reference free_living_t1d --output-json {realism_json} --output-html {realism_html}"
+        ),
+        f"iints study-protocol --output-dir {protocol_dir}",
+        f"iints run-study --experiment {protocol_dir / 'study_experiment.yaml'}",
+    ]
+    table = Table(title="IINTS Canonical Onboarding Flow", show_header=True, header_style="bold cyan")
+    table.add_column("Step", justify="right", style="green")
+    table.add_column("Command", overflow="fold")
+    for index, command in enumerate(commands, start=1):
+        table.add_row(str(index), command)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "One path that always tells the same story:",
+                    "check the machine -> run the SDK -> validate data realism -> build a study.",
+                    "Use --run-safe-steps to execute the first four non-destructive steps now.",
+                ]
+            ),
+            title="Recommended Onboarding",
+            border_style="green",
+        )
+    )
+    console.print(table)
+
+    if not run_safe_steps:
+        return
+
+    doctor(full=False, suggest=True)
+    demo(output_dir=demo_dir, mode="full")
+    import_demo(output_dir=import_dir)
+    data_realism_check(
+        input_csv=import_dir / "cgm_standard.csv",
+        output_json=realism_json,
+        output_html=realism_html,
+        reference="free_living_t1d",
+    )
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "Safe onboarding steps completed.",
+                    f"Next: iints study-protocol --output-dir {protocol_dir}",
+                    f"Then: iints run-study --experiment {protocol_dir / 'study_experiment.yaml'}",
+                ]
+            ),
+            title="Ready For Study",
+            border_style="blue",
+        )
+    )
 
 
 @app.command(name="guide")
@@ -7013,11 +7094,16 @@ def import_nightscout_cmd(
 @app.command(name="import-tidepool")
 def import_tidepool_cmd(
     base_url: Annotated[str, typer.Option(help="Tidepool API base URL. Use https for non-local hosts.")] = "https://api.tidepool.org",
-    token: Annotated[Optional[str], typer.Option(help="Bearer token")] = None,
-    token_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Tidepool bearer token.")] = None,
-    token_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Tidepool bearer token.")] = None,
+    token: Annotated[Optional[str], typer.Option(help="Tidepool session token")] = None,
+    token_env: Annotated[Optional[str], typer.Option(help="Environment variable name containing the Tidepool session token.")] = None,
+    token_file: Annotated[Optional[Path], typer.Option(help="Path to a file containing the Tidepool session token.")] = None,
+    user_id: Annotated[Optional[str], typer.Option(help="Optional Tidepool user id. Defaults to the current authenticated user.")] = None,
+    start: Annotated[Optional[str], typer.Option(help="Optional ISO-8601 start timestamp.")] = None,
+    end: Annotated[Optional[str], typer.Option(help="Optional ISO-8601 end timestamp.")] = None,
+    output_dir: Annotated[Path, typer.Option(help="Directory for imported scenario and standard CSV.")] = Path("results/tidepool_import"),
+    scenario_name: Annotated[str, typer.Option(help="Scenario name written into scenario.json.")] = "Tidepool Import",
 ):
-    """Skeleton Tidepool client for future cloud imports."""
+    """Import Tidepool CGM, bolus, and carbohydrate events into IINTS format."""
     console = Console()
     resolved_token = _resolve_secret_option(
         console=console,
@@ -7026,13 +7112,28 @@ def import_tidepool_cmd(
         env_name=token_env,
         file_path=token_file,
     )
-    client = TidepoolClient(base_url=base_url, token=resolved_token)
     try:
-        _ = client._headers()
+        result = import_tidepool(
+            TidepoolConfig(
+                base_url=base_url,
+                token=resolved_token,
+                user_id=user_id,
+                start=start,
+                end=end,
+            ),
+            scenario_name=scenario_name,
+        )
     except Exception as exc:
-        console.print(f"[bold red]{exc}[/bold red]")
+        console.print(f"[bold red]Tidepool import failed: {exc}[/bold red]")
         raise typer.Exit(code=1)
-    console.print("[yellow]Tidepool client skeleton is initialized. Auth flow and endpoints are TODO.[/yellow]")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scenario_path = output_dir / "scenario.json"
+    data_path = output_dir / "cgm_standard.csv"
+    scenario_path.write_text(json.dumps(result.scenario, indent=2))
+    export_standard_csv(result.dataframe, data_path)
+    console.print(f"[green]Scenario saved:[/green] {scenario_path}")
+    console.print(f"[green]Standard CSV saved:[/green] {data_path}")
 
 @app.command(name="check-deps")
 def check_deps():
@@ -7279,6 +7380,10 @@ def _print_endurance_status(console: Console, status: Dict[str, Any]) -> None:
         ("Interventions", status.get("interventions")),
         ("Critical events", status.get("critical_events")),
         ("Worst glucose", status.get("worst_glucose_mgdl")),
+        ("Last checkpoint minute", status.get("last_checkpoint_minute")),
+        ("Resume count", status.get("resume_count")),
+        ("Wall elapsed seconds", status.get("wall_elapsed_seconds")),
+        ("Estimated wall remaining seconds", status.get("estimated_wall_remaining_seconds")),
         ("Updated UTC", status.get("updated_at_utc")),
     ]
     for label, value in fields:
@@ -7327,6 +7432,9 @@ def jetson_endurance_start(
     sensor_profile: Annotated[str, typer.Option(help="Sensor profile for the simulated CGM stream")] = "free_living_cgm",
     custom_profile: Annotated[Optional[Path], typer.Option(help="YAML file for --profile custom")] = None,
     time_step: Annotated[int, typer.Option(help="Simulation step size in minutes")] = 5,
+    checkpoint_interval: Annotated[int, typer.Option(help="Checkpoint interval in simulated minutes.")] = 360,
+    hardware_sample_interval: Annotated[int, typer.Option(help="Hardware telemetry interval in simulated minutes.")] = 60,
+    status_interval_steps: Annotated[int, typer.Option(help="How often to persist status and partial CSV data.")] = 25,
     resume: Annotated[bool, typer.Option(help="Resume from the latest snapshot in the output directory")] = False,
 ):
     """Run a headless Jetson endurance stress test and write publication-ready artifacts."""
@@ -7336,6 +7444,12 @@ def jetson_endurance_start(
         duration_minutes = parse_duration_to_minutes(duration)
         if time_step <= 0:
             raise typer.BadParameter("--time-step must be greater than zero")
+        if checkpoint_interval <= 0:
+            raise typer.BadParameter("--checkpoint-interval must be greater than zero")
+        if hardware_sample_interval <= 0:
+            raise typer.BadParameter("--hardware-sample-interval must be greater than zero")
+        if status_interval_steps <= 0:
+            raise typer.BadParameter("--status-interval-steps must be greater than zero")
         algorithm = _load_algorithm_instance(algo, console)
         predictor = _load_predictor_service_from_path(predictor_path, console)
         config = EnduranceConfig(
@@ -7351,6 +7465,9 @@ def jetson_endurance_start(
             sensor_profile=sensor_profile,
             custom_profile_path=str(custom_profile) if custom_profile else None,
             resume=resume,
+            checkpoint_interval_minutes=checkpoint_interval,
+            hardware_sample_interval_minutes=hardware_sample_interval,
+            status_interval_steps=status_interval_steps,
         )
         result = run_endurance_study(algorithm=algorithm, predictor=predictor, config=config)
     except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from iints.research.evaluation import forecast_error_report
+from iints.research.evaluation import (
+    feature_drift_report,
+    forecast_error_report,
+    hypoglycemia_detection_report,
+    subgroup_error_report,
+    uncertainty_reliability_report,
+)
 
 
 def test_forecast_error_report_basic_metrics() -> None:
@@ -23,3 +29,54 @@ def test_forecast_error_report_false_hypo_alarm() -> None:
     report = forecast_error_report(observed, predicted)
     assert report["false_hypo_alarm_rate_pct"] > 0
     assert report["missed_hypo_rate_pct"] > 0
+
+
+def test_hypoglycemia_detection_report_counts_and_sensitivity() -> None:
+    observed = np.array([60.0, 65.0, 110.0, 125.0], dtype=float)
+    predicted = np.array([62.0, 80.0, 68.0, 130.0], dtype=float)
+
+    report = hypoglycemia_detection_report(observed, predicted)
+
+    assert report["counts"] == {
+        "true_positive": 1,
+        "false_negative": 1,
+        "false_positive": 1,
+        "true_negative": 1,
+    }
+    assert report["sensitivity_pct"] == 50.0
+    assert report["specificity_pct"] == 50.0
+
+
+def test_uncertainty_reliability_report_bins_predictions() -> None:
+    observed = np.array([100.0, 105.0, 110.0, 115.0], dtype=float)
+    predicted = np.array([100.0, 104.0, 111.0, 130.0], dtype=float)
+    std = np.array([2.0, 3.0, 5.0, 10.0], dtype=float)
+
+    report = uncertainty_reliability_report(observed, predicted, std, bins=2)
+
+    assert report["target_coverage_pct"] == 95.0
+    assert len(report["bins"]) == 2
+    assert sum(row["count"] for row in report["bins"]) == 4
+
+
+def test_subgroup_error_report_splits_labels() -> None:
+    observed = np.array([90.0, 100.0, 190.0, 200.0], dtype=float)
+    predicted = np.array([95.0, 98.0, 175.0, 205.0], dtype=float)
+    groups = np.array(["adult", "adult", "child", "child"], dtype=object)
+
+    report = subgroup_error_report(observed, predicted, groups)
+
+    assert set(report) == {"adult", "child"}
+    assert report["adult"]["n"] == 2
+    assert "hypoglycemia_detection" in report["child"]
+
+
+def test_feature_drift_report_flags_shift_score() -> None:
+    reference = np.array([[100.0, 0.0], [110.0, 1.0], [120.0, 2.0]], dtype=float)
+    candidate = np.array([[130.0, 0.0], [140.0, 1.0], [150.0, 2.0]], dtype=float)
+
+    report = feature_drift_report(reference, candidate, feature_names=["glucose", "carbs"])
+
+    assert report["feature_count"] == 2
+    assert report["max_robust_shift_score"] is not None
+    assert report["features"][0]["feature"] == "glucose"

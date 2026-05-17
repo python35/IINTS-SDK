@@ -26,13 +26,13 @@ Before a release:
 
 ```bash
 tools/dev/sdk_check.sh full
-tools/dev/release_audit.sh 1.5.4
+tools/dev/release_audit.sh 1.5.5
 ```
 
 Or combine the release check:
 
 ```bash
-IINTS_RELEASE_VERSION=1.5.4 tools/dev/sdk_check.sh release
+IINTS_RELEASE_VERSION=1.5.5 tools/dev/sdk_check.sh release
 ```
 
 ## Maintenance Rhythm
@@ -131,7 +131,7 @@ The SDK is healthy, so the best next work is mostly maintainability:
 6. Make package entry point names machine-friendly while keeping display names in UI output.
 7. Add manual PDF rendering to CI.
 8. Update GitHub Actions when Node runtime warnings require it.
-9. Either finish Tidepool support or label it clearly as experimental.
+9. Keep Tidepool, Nightscout, and CareLink import paths covered by live-format regression tests.
 10. Keep docs task-oriented: research, edge, data certification, and maintainer paths.
 
 ## When Something Fails

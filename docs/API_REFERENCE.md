@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **156**
+Documented modules: **157**
 
 ## Package Index
 
@@ -13,7 +13,7 @@ Documented modules: **156**
 | `analysis` | 27 |
 | `api` | 4 |
 | `cli` | 3 |
-| `core` | 29 |
+| `core` | 30 |
 | `data` | 21 |
 | `demo_assets` | 1 |
 | `emulation` | 5 |
@@ -115,6 +115,7 @@ Documented modules: **156**
 - [`iints.core.patient.models`](#iintscorepatientmodels)
 - [`iints.core.patient.patient_factory`](#iintscorepatientpatient_factory)
 - [`iints.core.patient.profile`](#iintscorepatientprofile)
+- [`iints.core.physiology_variation`](#iintscorephysiology_variation)
 - [`iints.core.safety`](#iintscoresafety)
 - [`iints.core.safety.config`](#iintscoresafetyconfig)
 - [`iints.core.safety.input_validator`](#iintscoresafetyinput_validator)
@@ -264,7 +265,7 @@ Documented modules: **156**
 
 - Source: `src/iints/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
+- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
 
 ### Public Functions
 
@@ -1163,8 +1164,9 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `study_ready(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], scenario_path: Annotated[Optional[Path], typer.Option(help='Path to scenario JSON')] = None, output_dir: Annotated[Path, typer.Option(help='Directory to save outputs')] = Path('results/study_ready'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes')] = 5, seed: Annotated[Optional[int], typer.Option(help='Random seed')] = None, profile: Annotated[str, typer.Option(help='Validation profile id')] = 'research_default', predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional predictor checkpoint (.pt)')] = None, patient_config_name: Annotated[str, typer.Option(help='Patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML path')] = None, fail_on_check: Annotated[bool, typer.Option(help='Exit code 1 when validation profile fails')] = True)`
 - `init(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'my_iints_project', template: Annotated[str, typer.Option(help='Project template: research or clinical-trial')] = 'research')`
 - `quickstart(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'iints_quickstart')`
-- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where the zero-config demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: quick or full')] = 'quick', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to baseline_t1d for quick and stress_test_meal for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
+- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where the zero-config demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: quick or full')] = 'quick', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
 - `start(goal: Annotated[str, typer.Option('--goal', help='What you want to do: demo, project, study, edge, or data. Aliases like pi, research, and quickstart also work.')] = 'demo', run_now: Annotated[bool, typer.Option('--run', help='Run the safe starter action for demo, project, or edge instead of only printing the plan.')] = False, output_dir: Annotated[Path, typer.Option(help='Output directory for --goal demo.')] = Path('results/demo'), project_name: Annotated[str, typer.Option(help='Project folder name for --goal project.')] = 'iints_quickstart', edge_output_dir: Annotated[Path, typer.Option(help='Edge project folder for --goal edge.')] = Path('iints_pi_demo'), board: Annotated[str, typer.Option(help='Edge board for --goal edge: raspberry_pi or uno_q.')] = 'raspberry_pi') -> None`
+- `onboard(output_dir: Annotated[Path, typer.Option(help='Root directory for the canonical onboarding outputs.')] = Path('results/onboarding'), run_safe_steps: Annotated[bool, typer.Option('--run-safe-steps', help='Run doctor, demo, import-demo, and realism-check.')] = False) -> None`
 - `guide()`
 - `new_algo(name: Annotated[str, typer.Option(help='Name of the new algorithm')], author: Annotated[str, typer.Option(help='Author of the algorithm')], output_dir: Annotated[Path, typer.Option(help='Directory to save the new algorithm file')] = Path('.'))`
 - `presets_list()`
@@ -1221,7 +1223,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `import_wizard()`
 - `import_demo(output_dir: Annotated[Path, typer.Option(help='Output directory for scenario + CSV')] = Path('./results/demo_import'), scenario_name: Annotated[str, typer.Option(help='Scenario name')] = 'Demo CGM Scenario', export_raw: Annotated[bool, typer.Option(help='Export the raw demo CSV into output dir')] = True)`
 - `import_nightscout_cmd(url: Annotated[str, typer.Option(help='Nightscout base URL. Use https for non-local hosts.')], output_dir: Annotated[Path, typer.Option(help='Output directory for scenario + CSV')] = Path('./results/nightscout_import'), api_secret: Annotated[Optional[str], typer.Option(help='API secret (if required)')] = None, api_secret_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Nightscout API secret.')] = None, api_secret_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Nightscout API secret.')] = None, token: Annotated[Optional[str], typer.Option(help='API token (if required)')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Nightscout API token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Nightscout API token.')] = None, start: Annotated[Optional[str], typer.Option(help='Start time (ISO string)')] = None, end: Annotated[Optional[str], typer.Option(help='End time (ISO string)')] = None, limit: Annotated[Optional[int], typer.Option(help='Limit number of entries')] = None, scenario_name: Annotated[str, typer.Option(help='Scenario name')] = 'Nightscout Import')`
-- `import_tidepool_cmd(base_url: Annotated[str, typer.Option(help='Tidepool API base URL. Use https for non-local hosts.')] = 'https://api.tidepool.org', token: Annotated[Optional[str], typer.Option(help='Bearer token')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Tidepool bearer token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Tidepool bearer token.')] = None)`
+- `import_tidepool_cmd(base_url: Annotated[str, typer.Option(help='Tidepool API base URL. Use https for non-local hosts.')] = 'https://api.tidepool.org', token: Annotated[Optional[str], typer.Option(help='Tidepool session token')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Tidepool session token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Tidepool session token.')] = None, user_id: Annotated[Optional[str], typer.Option(help='Optional Tidepool user id. Defaults to the current authenticated user.')] = None, start: Annotated[Optional[str], typer.Option(help='Optional ISO-8601 start timestamp.')] = None, end: Annotated[Optional[str], typer.Option(help='Optional ISO-8601 end timestamp.')] = None, output_dir: Annotated[Path, typer.Option(help='Directory for imported scenario and standard CSV.')] = Path('results/tidepool_import'), scenario_name: Annotated[str, typer.Option(help='Scenario name written into scenario.json.')] = 'Tidepool Import')`
 - `check_deps()`
 - `algorithms_list()`
 - `algorithms_info(name: Annotated[str, typer.Argument(help='Algorithm display name')])`
@@ -1234,7 +1236,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `plugin_uninstall(name: Annotated[str, typer.Argument(help='Local plugin display name')], kind: Annotated[Optional[str], typer.Option(help='Optional kind filter')] = None, remove_file: Annotated[bool, typer.Option(help='Also delete the copied plugin file from the plugin home')] = False)`
 - `patientmodel_list()`
 - `jetson_doctor()`
-- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'auto', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
+- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'auto', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, checkpoint_interval: Annotated[int, typer.Option(help='Checkpoint interval in simulated minutes.')] = 360, hardware_sample_interval: Annotated[int, typer.Option(help='Hardware telemetry interval in simulated minutes.')] = 60, status_interval_steps: Annotated[int, typer.Option(help='How often to persist status and partial CSV data.')] = 25, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
 - `jetson_endurance_status(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')])`
 - `jetson_endurance_monitor(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], watch: Annotated[bool, typer.Option(help='Refresh while the run is active')] = False, interval_seconds: Annotated[int, typer.Option(help='Refresh interval for --watch')] = 5)`
 - `jetson_endurance_stop(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], generate_report: Annotated[bool, typer.Option(help='Ask the runner to finalize reports before stopping')] = False)`
@@ -1630,6 +1632,35 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `to_patient_config(self) -> Dict[str, Any]`
 
+## `iints.core.physiology_variation`
+
+- Source: `src/iints/core/physiology_variation.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `EmpiricalResidualProfile` | `EmpiricalResidualProfile` | No module docstring. |
+| `EmpiricalResidualModel` | `EmpiricalResidualModel` | Small additive model-discrepancy layer sampled from real CGM day residuals. |
+
+#### `EmpiricalResidualProfile` methods
+
+- `from_dict(cls, payload: dict[str, Any]) -> 'EmpiricalResidualProfile'`
+
+#### `EmpiricalResidualModel` methods
+
+- `from_profile_id(cls, profile_id: str, *, seed: int | None = None, scale: float = 1.0) -> 'EmpiricalResidualModel'`
+- `reset(self) -> None`
+- `offset_at(self, current_time_minutes: float) -> float`
+- `get_state(self) -> dict[str, Any]`
+- `set_state(self, state: dict[str, Any]) -> None`
+
+### Public Functions
+
+- `load_empirical_residual_profiles() -> list[EmpiricalResidualProfile]`
+- `get_empirical_residual_profile(profile_id: str) -> EmpiricalResidualProfile`
+
 ## `iints.core.safety`
 
 - Source: `src/iints/core/safety/__init__.py`
@@ -1757,7 +1788,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/data/__init__.py`
 - Summary: IINTS-AF Data Module Universal data ingestion and quality validation.
-- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, NightscoutConfig, import_nightscout, TidepoolClient, load_openapi_spec, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
+- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, fetch_tidepool_dataframe, import_tidepool, load_openapi_spec, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -2187,15 +2218,24 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 | Class | Signature | Summary |
 | --- | --- | --- |
-| `TidepoolClient` | `TidepoolClient` | Lightweight client skeleton based on the Tidepool OpenAPI spec. Authentication and full endpoint coverage are intentionally left open so teams can wire in their preferred auth flow. |
+| `TidepoolConfig` | `TidepoolConfig` | No module docstring. |
+| `TidepoolClient` | `TidepoolClient` | Small authenticated Tidepool Data Platform client for read-only imports. |
 
 #### `TidepoolClient` methods
 
-- `get_json(self, path: str) -> Dict[str, Any]`
+- `get_json(self, path: str, *, query: Optional[dict[str, Any]] = None) -> Any`
+- `current_user(self) -> dict[str, Any]`
+- `fetch_device_data(self, user_id: str, *, start: Optional[str] = None, end: Optional[str] = None, types: Iterable[str] = ('cbg', 'bolus', 'wizard', 'food')) -> list[dict[str, Any]]`
 
 ### Public Functions
 
+- `fetch_tidepool_dataframe(config: TidepoolConfig) -> pd.DataFrame`
+- `import_tidepool(config: TidepoolConfig, scenario_name: str = 'Tidepool Import', scenario_version: str = '1.0', carb_threshold: float = 0.1) -> ImportResult`
 - `load_openapi_spec(path: str) -> Dict[str, Any]`
+
+### Public Constants
+
+- `MMOL_L_TO_MG_DL`
 
 ## `iints.data.universal_parser`
 
@@ -2377,7 +2417,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 ### Public Functions
 
-- `run_simulation(algorithm: Union[InsulinAlgorithm, type], scenario: Optional[Union[str, Path, Dict[str, Any]]] = None, patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = 'default_patient', patient_model_type: str = 'auto', sensor_noise_std: Optional[float] = None, sensor_lag_minutes: Optional[int] = None, sensor_dropout_prob: Optional[float] = None, sensor_bias: Optional[float] = None, sensor_profile: Optional[str] = None, duration_minutes: int = 720, time_step: int = 5, seed: Optional[int] = None, output_dir: Optional[Union[str, Path]] = None, compare_baselines: bool = True, export_audit: bool = True, generate_report: bool = True, safety_config: Optional[SafetyConfig] = None, predictor: Optional[object] = None) -> Dict[str, Any]`
+- `run_simulation(algorithm: Union[InsulinAlgorithm, type], scenario: Optional[Union[str, Path, Dict[str, Any]]] = None, patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = 'default_patient', patient_model_type: str = 'auto', sensor_noise_std: Optional[float] = None, sensor_lag_minutes: Optional[int] = None, sensor_dropout_prob: Optional[float] = None, sensor_bias: Optional[float] = None, sensor_profile: Optional[str] = None, duration_minutes: int = 720, time_step: int = 5, seed: Optional[int] = None, output_dir: Optional[Union[str, Path]] = None, compare_baselines: bool = True, export_audit: bool = True, generate_report: bool = True, safety_config: Optional[SafetyConfig] = None, predictor: Optional[object] = None, physiology_variation_profile: Optional[str] = None, physiology_variation_scale: float = 1.0) -> Dict[str, Any]`
 - `run_full(algorithm: Union[InsulinAlgorithm, type], scenario: Optional[Union[str, Path, Dict[str, Any]]] = None, patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = 'default_patient', patient_model_type: str = 'auto', sensor_noise_std: Optional[float] = None, sensor_lag_minutes: Optional[int] = None, sensor_dropout_prob: Optional[float] = None, sensor_bias: Optional[float] = None, sensor_profile: Optional[str] = None, duration_minutes: int = 720, time_step: int = 5, seed: Optional[int] = None, output_dir: Optional[Union[str, Path]] = None, enable_profiling: bool = True, safety_config: Optional[SafetyConfig] = None, predictor: Optional[object] = None) -> Dict[str, Any]`
 - `run_population(algo_path: Optional[Union[str, Path]] = None, algo_class_name: Optional[str] = None, n_patients: int = 100, scenario: Optional[Union[str, Path, Dict[str, Any]]] = None, patient_config: Union[str, Path, Dict[str, Any], PatientProfile] = 'default_patient', duration_minutes: int = 720, time_step: int = 5, seed: Optional[int] = None, output_dir: Optional[Union[str, Path]] = None, max_workers: Optional[int] = None, safety_config: Optional[SafetyConfig] = None, safety_weights: Optional[Dict[str, float]] = None, patient_model_type: str = 'auto', population_cv: Optional[Dict[str, float]] = None) -> Dict[str, Any]`
 
@@ -2799,7 +2839,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/research/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry`
+- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -2885,6 +2925,10 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Functions
 
 - `forecast_error_report(observed: np.ndarray, predicted: np.ndarray, predicted_std: Optional[np.ndarray] = None) -> Dict[str, Any]`
+- `hypoglycemia_detection_report(observed: np.ndarray, predicted: np.ndarray, *, threshold_mgdl: float = 70.0) -> Dict[str, Any]`
+- `uncertainty_reliability_report(observed: np.ndarray, predicted: np.ndarray, predicted_std: np.ndarray, *, bins: int = 5, confidence: float = 0.95) -> Dict[str, Any]`
+- `subgroup_error_report(observed: np.ndarray, predicted: np.ndarray, groups: Sequence[Any] | np.ndarray, *, predicted_std: Optional[np.ndarray] = None) -> Dict[str, Dict[str, Any]]`
+- `feature_drift_report(reference_features: np.ndarray, candidate_features: np.ndarray, *, feature_names: Iterable[str]) -> Dict[str, Any]`
 
 ## `iints.research.losses`
 

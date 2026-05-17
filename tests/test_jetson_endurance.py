@@ -32,6 +32,9 @@ def _run_short_endurance(output_dir: Path):
         seed=42,
         patient_model="custom",
         sensor_profile="clinical_cgm",
+        checkpoint_interval_minutes=30,
+        hardware_sample_interval_minutes=30,
+        status_interval_steps=3,
     )
     return run_endurance_study(algorithm=ClinicalBaselineAlgorithm(), predictor=None, config=config)
 
@@ -54,6 +57,7 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     assert (output_dir / "raw" / "steps.csv").is_file()
     assert (output_dir / "raw" / "interventions.csv").is_file()
     assert (output_dir / "raw" / "critical_events.csv").is_file()
+    assert (output_dir / "raw" / "hardware_metrics.csv").is_file()
     assert (output_dir / "daily" / "day_01_summary.json").is_file()
     assert (output_dir / "final" / "test_summary.json").is_file()
     assert (output_dir / "final" / "tir_timeseries.csv").is_file()
@@ -66,7 +70,10 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     summary = json.loads((output_dir / "final" / "test_summary.json").read_text())
     assert len(steps) == 12
     assert summary["expected_steps"] == 12
+    assert summary["checkpoint_interval_minutes"] == 30
     assert 0.0 <= summary["total_tir_70_180_pct"] <= 100.0
+    assert (output_dir / "snapshots" / "snapshot_000030m.json").is_file()
+    assert (output_dir / "snapshots" / "snapshot_000060m.json").is_file()
 
 
 def test_status_and_export_helpers(tmp_path: Path) -> None:
@@ -84,6 +91,49 @@ def test_status_and_export_helpers(tmp_path: Path) -> None:
     assert "status.json" in names
     assert "raw/steps.csv" in names
     assert "final/ENDURANCE_REPORT.md" in names
+
+
+def test_resume_continues_from_latest_checkpoint(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_resume"
+    first_config = EnduranceConfig(
+        algo_path="builtin:clinical_baseline",
+        predictor_path=None,
+        duration="1h",
+        duration_minutes=parse_duration_to_minutes("1h"),
+        time_step_minutes=5,
+        output_dir=str(output_dir),
+        profile="normal",
+        seed=42,
+        patient_model="custom",
+        sensor_profile="clinical_cgm",
+        checkpoint_interval_minutes=15,
+        hardware_sample_interval_minutes=15,
+        status_interval_steps=1,
+    )
+
+    def request_stop(status: dict) -> None:
+        if status["completed_steps"] == 3:
+            (output_dir / "STOP_REQUESTED").write_text("stop", encoding="utf-8")
+
+    first = run_endurance_study(
+        algorithm=ClinicalBaselineAlgorithm(),
+        predictor=None,
+        config=first_config,
+        progress_callback=request_stop,
+    )
+    assert first["status"]["status"] == "stopped"
+    assert (output_dir / "snapshots" / "snapshot_000015m.json").is_file()
+
+    (output_dir / "STOP_REQUESTED").unlink()
+    resumed = run_endurance_study(
+        algorithm=ClinicalBaselineAlgorithm(),
+        predictor=None,
+        config=EnduranceConfig(**{**first_config.__dict__, "resume": True}),
+    )
+
+    assert resumed["status"]["status"] == "completed"
+    assert resumed["status"]["completed_steps"] == 12
+    assert resumed["status"]["resume_count"] == 1
 
 
 def test_jetson_endurance_cli_status_and_export(tmp_path: Path) -> None:

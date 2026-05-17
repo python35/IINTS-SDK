@@ -58,7 +58,13 @@ from .study_corruption import (
 from .universal_parser import UniversalParser, StandardDataPack, ParseResult
 from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
 from .nightscout import NightscoutConfig, import_nightscout
-from .tidepool import TidepoolClient, load_openapi_spec
+from .tidepool import (
+    TidepoolClient,
+    TidepoolConfig,
+    fetch_tidepool_dataframe,
+    import_tidepool,
+    load_openapi_spec,
+)
 from .contracts import (
     StreamSpec,
     FeatureSpec,
@@ -139,6 +145,9 @@ __all__ = [
     'NightscoutConfig',
     'import_nightscout',
     'TidepoolClient',
+    'TidepoolConfig',
+    'fetch_tidepool_dataframe',
+    'import_tidepool',
     'load_openapi_spec',
     'StreamSpec',
     'FeatureSpec',

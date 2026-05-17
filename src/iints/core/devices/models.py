@@ -176,8 +176,8 @@ class SensorModel:
         self._history = state.get("history", [])
 
 
-def _normalize_step_window(value: int | Tuple[int, int]) -> Tuple[int, int]:
-    if isinstance(value, tuple):
+def _normalize_step_window(value: int | Tuple[int, int] | list[int]) -> Tuple[int, int]:
+    if isinstance(value, (tuple, list)):
         start, end = int(value[0]), int(value[1])
     else:
         start = end = int(value)

@@ -18,5 +18,5 @@ tools/dev/sdk_check.sh quick
 tools/dev/sdk_check.sh edge
 tools/dev/sdk_check.sh docs
 tools/dev/sdk_check.sh full
-tools/dev/release_audit.sh 1.5.4
+tools/dev/release_audit.sh 1.5.5
 ```

@@ -19,7 +19,8 @@ For Raspberry Pi demos and realistic long-study behavior, use `iints edge long-s
 
 - headless long-run execution
 - hardware monitoring
-- daily summaries and snapshots
+- resumable checkpoints, partial CSV persistence, and daily summaries
+- periodic hardware telemetry samples during the run
 - worst-case event logs
 - publication-ready export artifacts
 
@@ -124,12 +125,13 @@ results/jetson_7day/
     steps.csv
     interventions.csv
     critical_events.csv
+    hardware_metrics.csv
   daily/
     day_01_summary.json
     day_02_summary.json
   snapshots/
-    snapshot_24h.json
-    snapshot_48h.json
+    snapshot_000360m.json
+    snapshot_000720m.json
   final/
     test_summary.json
     tir_timeseries.csv
@@ -147,6 +149,7 @@ Important files:
 - `raw/steps.csv` contains every simulation step.
 - `raw/interventions.csv` contains safety-supervisor interventions.
 - `raw/critical_events.csv` contains glucose values below 54 mg/dL.
+- `raw/hardware_metrics.csv` stores periodic thermal/CUDA probe snapshots.
 - `final/test_summary.json` contains TIR, confidence interval, failure-rate proxy, and performance metrics.
 - `final/ENDURANCE_REPORT.md` is the human-readable summary for review.
 - `final/main_figure.png` is the main glucose trace figure.
@@ -172,7 +175,10 @@ sudo systemctl enable iints-jetson-endurance
 sudo systemctl start iints-jetson-endurance
 ```
 
-The generated service uses `--resume`, so a restarted run continues from the latest snapshot when possible.
+The generated service uses `--resume`, so a restarted run continues from the
+latest checkpoint when possible. `status.json` now also records the last
+checkpoint minute, resume count, elapsed wall-clock time, and estimated wall
+time remaining.
 
 ## Scientific Claim Pattern
 

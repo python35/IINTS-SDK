@@ -262,9 +262,14 @@ iints import-nightscout --url https://your-nightscout.example \
 ```
 
 8. `import-tidepool`  
-Initial Tidepool client skeleton (auth flow is TODO).  
+Import authenticated Tidepool CGM, bolus, wizard, and food events into the same
+standard CSV + scenario format as the other data sources.  
 ```bash
-iints import-tidepool --base-url https://api.tidepool.org --token YOUR_TOKEN
+export IINTS_TIDEPOOL_TOKEN="replace-me"
+iints import-tidepool \
+  --base-url https://api.tidepool.org \
+  --token-env IINTS_TIDEPOOL_TOKEN \
+  --output-dir results/tidepool_import
 ```
 
 9. `benchmark`  
@@ -306,6 +311,24 @@ Training pipeline:
 python research/synthesize_dataset.py --runs 25 --output data/synthetic.parquet
 python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
 python research/evaluate_predictor.py --data data/synthetic.parquet --model models/predictor.pt
+```
+
+For stricter validation, evaluate on held-out external packs, emit uncertainty
+reliability plots, compare subgroups, and check feature drift against a reference
+dataset:
+
+```bash
+python research/evaluate_predictor.py \
+  --data data/validation.parquet \
+  --model models/predictor.pt \
+  --external-data azt1d=data/azt1d_validation.parquet \
+  --external-data hupa=data/hupa_validation.parquet \
+  --reference-data data/training.parquet \
+  --subgroup-column cohort \
+  --subgroup-column sex \
+  --mc-samples 50 \
+  --plots-dir results/predictor_plots \
+  --out results/predictor_eval.json
 ```
 
 OhioT1DM preparation + training:

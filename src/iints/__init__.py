@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.5.4"
+    __version__ = "1.5.5"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
@@ -74,7 +74,7 @@ from .data.importer import (
     summarize_carelink_csv,
 )
 from .data.nightscout import NightscoutConfig, import_nightscout
-from .data.tidepool import TidepoolClient, load_openapi_spec
+from .data.tidepool import TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec
 from .data.guardians import mdmp_gate, MDMPGateError
 from .data.synthetic_mirror import generate_synthetic_mirror, SyntheticMirrorArtifact
 from .data.study_corruption import AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv
@@ -249,6 +249,8 @@ __all__ = [
     "NightscoutConfig",
     "import_nightscout",
     "TidepoolClient",
+    "TidepoolConfig",
+    "import_tidepool",
     "load_openapi_spec",
     "mdmp_gate",
     "MDMPGateError",

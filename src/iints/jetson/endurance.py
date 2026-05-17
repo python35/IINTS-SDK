@@ -55,6 +55,9 @@ class EnduranceConfig:
     sensor_profile: str = "free_living_cgm"
     custom_profile_path: Optional[str] = None
     resume: bool = False
+    checkpoint_interval_minutes: int = 360
+    hardware_sample_interval_minutes: int = 60
+    status_interval_steps: int = 25
 
     @property
     def expected_steps(self) -> int:
@@ -179,6 +182,16 @@ def collect_jetson_hardware_info() -> Dict[str, Any]:
         "nvidia_smi": nvidia_smi,
         "tegrastats": tegrastats,
         "thermal_zones": thermal_zones,
+    }
+
+
+def _hardware_metric_row(info: Dict[str, Any], *, elapsed_minutes: int) -> Dict[str, Any]:
+    return {
+        "captured_at_utc": info["captured_at_utc"],
+        "elapsed_minutes": elapsed_minutes,
+        "is_jetson_like": bool(info.get("is_jetson_like")),
+        "cuda_available": bool(info.get("cuda_available")),
+        "thermal_zones_json": json.dumps(info.get("thermal_zones", [])),
     }
 
 
@@ -318,9 +331,18 @@ def _status_payload(
     completed_steps: int,
     current_record: Optional[Dict[str, Any]] = None,
     message: str = "",
+    wall_elapsed_seconds: Optional[float] = None,
+    hardware_latest: Optional[Dict[str, Any]] = None,
+    last_checkpoint_minute: Optional[int] = None,
+    resume_count: int = 0,
 ) -> Dict[str, Any]:
     progress = completed_steps / max(1, config.expected_steps)
     elapsed_minutes = completed_steps * config.time_step_minutes
+    steps_per_second = None
+    estimated_wall_remaining_seconds = None
+    if wall_elapsed_seconds is not None and wall_elapsed_seconds > 0 and completed_steps > 0:
+        steps_per_second = completed_steps / wall_elapsed_seconds
+        estimated_wall_remaining_seconds = max(0, config.expected_steps - completed_steps) / steps_per_second
     return {
         "status": status,
         "message": message,
@@ -339,6 +361,16 @@ def _status_payload(
         "interventions": None,
         "critical_events": None,
         "worst_glucose_mgdl": None,
+        "wall_elapsed_seconds": round(wall_elapsed_seconds, 3) if wall_elapsed_seconds is not None else None,
+        "steps_per_second": round(steps_per_second, 6) if steps_per_second is not None else None,
+        "estimated_wall_remaining_seconds": (
+            round(estimated_wall_remaining_seconds, 3)
+            if estimated_wall_remaining_seconds is not None
+            else None
+        ),
+        "hardware_latest": hardware_latest,
+        "last_checkpoint_minute": last_checkpoint_minute,
+        "resume_count": resume_count,
     }
 
 
@@ -492,6 +524,8 @@ def _total_summary(df: pd.DataFrame, safety_report: Dict[str, Any], config: Endu
         "critical_events_below_54": int(len(critical)),
         "supervisor_failure_rate_pct": round(float(critical_after_supervisor / max(1, len(interventions)) * 100.0), 3),
         "sensor_artifact_steps": int((df.get("sensor_status", pd.Series(dtype=str)).astype(str) != "ok").sum()) if not df.empty else 0,
+        "checkpoint_interval_minutes": config.checkpoint_interval_minutes,
+        "hardware_sample_interval_minutes": config.hardware_sample_interval_minutes,
         "performance_report": safety_report.get("performance_report", {}),
         "safety_report": safety_report,
         "completed_at_utc": utc_now_iso(),
@@ -569,6 +603,8 @@ def _write_report(output_dir: Path, summary: Dict[str, Any], daily: List[Dict[st
         f"- Critical events <54 mg/dL: `{summary['critical_events_below_54']}`",
         f"- Supervisor interventions: `{summary['supervisor_interventions']}`",
         f"- Supervisor failure rate: `{summary['supervisor_failure_rate_pct']}%`",
+        f"- Checkpoint interval: `{summary['checkpoint_interval_minutes']} minutes`",
+        f"- Hardware sample interval: `{summary['hardware_sample_interval_minutes']} minutes`",
         "",
         "## Daily Summaries",
         "",
@@ -607,6 +643,7 @@ def _write_outputs(
     supervisor_path = final_dir / "supervisor_analysis.json"
     worst_path = final_dir / "worst_case_events.json"
     figure_path = final_dir / "main_figure.png"
+    hardware_path = raw_dir / "hardware_metrics.csv"
 
     df.to_csv(steps_path, index=False)
     _interventions(df).to_csv(interventions_path, index=False)
@@ -643,11 +680,12 @@ def _write_outputs(
         "endurance_report_md": str(report_path),
         "endurance_report_pdf": str(final_dir / "ENDURANCE_REPORT.pdf"),
         "main_figure_png": str(figure_path),
+        "hardware_metrics_csv": str(hardware_path),
     }
 
 
 def _latest_snapshot(snapshot_dir: Path) -> Optional[Path]:
-    snapshots = sorted(snapshot_dir.glob("snapshot_*h.json"))
+    snapshots = sorted([*snapshot_dir.glob("snapshot_*m.json"), *snapshot_dir.glob("snapshot_*h.json")])
     return snapshots[-1] if snapshots else None
 
 
@@ -669,7 +707,10 @@ def run_endurance_study(
     raw_dir.mkdir(parents=True, exist_ok=True)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
 
-    started_at = utc_now_iso()
+    existing_status_path = output_dir / "status.json"
+    existing_status = _read_json(existing_status_path) if config.resume and existing_status_path.is_file() else {}
+    started_at = str(existing_status.get("started_at_utc") or utc_now_iso())
+    previous_wall_elapsed_seconds = float(existing_status.get("wall_elapsed_seconds") or 0.0)
     stress_events = _profile_events(config.profile, config.duration_minutes, config.custom_profile_path)
     test_config = asdict(config)
     test_config["stress_event_count"] = len(stress_events)
@@ -680,14 +721,38 @@ def run_endurance_study(
 
     simulator = _build_simulator(algorithm=algorithm, predictor=predictor, config=config, stress_events=stress_events)
     records: List[Dict[str, Any]] = []
+    hardware_records: List[Dict[str, Any]] = []
+    resume_count = int(existing_status.get("resume_count") or 0)
     latest = _latest_snapshot(snapshot_dir) if config.resume else None
     if latest is not None:
         snapshot = _read_json(latest)
         simulator.load_state(snapshot["simulator_state"])
         steps_path = raw_dir / "steps.csv"
-        if steps_path.is_file():
-            csv_records = pd.read_csv(steps_path).to_dict(orient="records")
-            records = [{str(key): value for key, value in row.items()} for row in csv_records]
+        if not steps_path.is_file():
+            raise JetsonEnduranceError(
+                f"Cannot resume from {latest.name}: raw/steps.csv is missing."
+            )
+        csv_records = pd.read_csv(steps_path).to_dict(orient="records")
+        completed_steps = int(snapshot.get("completed_steps") or len(csv_records))
+        records = [{str(key): value for key, value in row.items()} for row in csv_records[:completed_steps]]
+        resume_count += 1
+
+    hardware_path = raw_dir / "hardware_metrics.csv"
+    if config.resume and hardware_path.is_file():
+        hardware_records = [
+            {str(key): value for key, value in row.items()}
+            for row in pd.read_csv(hardware_path).to_dict(orient="records")
+        ]
+    latest_hardware = collect_jetson_hardware_info()
+    hardware_records.append(
+        _hardware_metric_row(
+            latest_hardware,
+            elapsed_minutes=len(records) * config.time_step_minutes,
+        )
+    )
+    pd.DataFrame(hardware_records).to_csv(hardware_path, index=False)
+    wall_start = time.monotonic()
+    last_checkpoint_minute = int(existing_status.get("last_checkpoint_minute") or 0)
 
     _write_json(
         output_dir / "status.json",
@@ -697,26 +762,49 @@ def run_endurance_study(
             started_at_utc=started_at,
             completed_steps=len(records),
             message="Endurance run started.",
+            wall_elapsed_seconds=0.0,
+            hardware_latest=latest_hardware,
+            last_checkpoint_minute=last_checkpoint_minute,
+            resume_count=resume_count,
         ),
     )
 
-    last_snapshot_hour = int((len(records) * config.time_step_minutes) // 60) if records else 0
     stopped_early = False
     stop_path = output_dir / "STOP_REQUESTED"
+    if not config.resume and stop_path.exists():
+        stop_path.unlink()
     for record in simulator.run_live(config.simulator_end_minutes):
         if stop_path.is_file():
             stopped_early = True
             break
         records.append(record)
         completed_steps = len(records)
-        if completed_steps % 25 == 0 or completed_steps == config.expected_steps:
+        if completed_steps % max(1, config.status_interval_steps) == 0 or completed_steps == config.expected_steps:
             partial_df = pd.DataFrame(records)
+            partial_df.to_csv(raw_dir / "steps.csv", index=False)
+            elapsed_minutes = completed_steps * config.time_step_minutes
+            if (
+                config.hardware_sample_interval_minutes > 0
+                and elapsed_minutes % config.hardware_sample_interval_minutes == 0
+            ):
+                latest_hardware = collect_jetson_hardware_info()
+                hardware_records.append(
+                    _hardware_metric_row(
+                        latest_hardware,
+                        elapsed_minutes=elapsed_minutes,
+                    )
+                )
+                pd.DataFrame(hardware_records).to_csv(hardware_path, index=False)
             status = _status_payload(
                 config=config,
                 status="running",
                 started_at_utc=started_at,
                 completed_steps=completed_steps,
                 current_record=record,
+                wall_elapsed_seconds=previous_wall_elapsed_seconds + (time.monotonic() - wall_start),
+                hardware_latest=latest_hardware,
+                last_checkpoint_minute=last_checkpoint_minute,
+                resume_count=resume_count,
             )
             glucose = _glucose_series(partial_df)
             status["tir_so_far_pct"] = round(_tir_pct(glucose), 3)
@@ -728,13 +816,17 @@ def run_endurance_study(
                 progress_callback(status)
 
         elapsed_minutes = completed_steps * config.time_step_minutes
-        current_snapshot_hour = int(elapsed_minutes // 60)
-        if elapsed_minutes >= 1440 and elapsed_minutes % 1440 == 0 and current_snapshot_hour != last_snapshot_hour:
+        if (
+            config.checkpoint_interval_minutes > 0
+            and elapsed_minutes > 0
+            and elapsed_minutes % config.checkpoint_interval_minutes == 0
+            and elapsed_minutes != last_checkpoint_minute
+        ):
             pd.DataFrame(records).to_csv(raw_dir / "steps.csv", index=False)
             state = simulator.save_state()
             state["current_time"] = int(float(record["time_minutes"]) + config.time_step_minutes)
             _write_json(
-                snapshot_dir / f"snapshot_{current_snapshot_hour}h.json",
+                snapshot_dir / f"snapshot_{elapsed_minutes:06d}m.json",
                 {
                     "captured_at_utc": utc_now_iso(),
                     "completed_steps": completed_steps,
@@ -742,7 +834,7 @@ def run_endurance_study(
                     "steps_sha256": compute_sha256(raw_dir / "steps.csv") if (raw_dir / "steps.csv").is_file() else None,
                 },
             )
-            last_snapshot_hour = current_snapshot_hour
+            last_checkpoint_minute = elapsed_minutes
 
     df = pd.DataFrame(records)
     safety_report = simulator.supervisor.get_safety_report()
@@ -759,6 +851,10 @@ def run_endurance_study(
         completed_steps=len(records),
         current_record=records[-1] if records else None,
         message="Endurance run stopped early." if stopped_early else "Endurance run completed.",
+        wall_elapsed_seconds=previous_wall_elapsed_seconds + (time.monotonic() - wall_start),
+        hardware_latest=latest_hardware,
+        last_checkpoint_minute=last_checkpoint_minute,
+        resume_count=resume_count,
     )
     summary = _read_json(Path(outputs["test_summary_json"]))
     final_status.update(

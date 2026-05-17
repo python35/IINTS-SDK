@@ -158,6 +158,30 @@ python research/evaluate_predictor.py \
   --out results/predictor_eval.json
 ```
 
+Strict validation run with external datasets, uncertainty reliability plots,
+subgroup reporting, hypo-detection sensitivity, and feature-drift checks:
+
+```bash
+python research/evaluate_predictor.py \
+  --data data/validation.parquet \
+  --model models/predictor.pt \
+  --external-data azt1d=data/azt1d_validation.parquet \
+  --external-data hupa=data/hupa_validation.parquet \
+  --reference-data data/training.parquet \
+  --subgroup-column cohort \
+  --subgroup-column sex \
+  --mc-samples 50 \
+  --plots-dir results/predictor_plots \
+  --out results/predictor_eval_strict.json
+```
+
+The JSON now includes:
+- held-out external-dataset metrics
+- hypo-detection sensitivity/specificity and missed-hypo rate
+- MC-dropout reliability bins plus calibration plots
+- subgroup metrics for each requested column
+- raw-feature drift scores against the chosen reference dataset
+
 Both training and evaluation outputs include lineage metadata:
 - `schema_id` and `schema_version`
 - dataframe fingerprint

@@ -1,6 +1,6 @@
 > "Code shouldn't be a secret when it's managing a life."
 
-**Version 1.5.4**  
+**Version 1.5.5**  
 **Research use only — not for clinical care**
 
 IINTS-AF is an open-source research platform for insulin algorithm simulation, deterministic safety supervision, dataset certification, reproducible benchmarking, and edge deployment. It exists for the people who need to inspect, test, and explain dosing logic before it ever touches a real-world device.
@@ -35,7 +35,7 @@ This manual is the long-form technical guide for the SDK. It is the right place 
 
 ## Canonical Workflows
 
-1. **First-run path:** `iints doctor` -> `iints demo` -> `iints quickstart`.
+1. **First-run path:** `iints onboard` -> `iints demo` -> `iints quickstart`.
 2. **Algorithm development path:** generate an algorithm template, run clinic-safe presets, inspect audit output, then benchmark against baselines.
 3. **Research path:** write a protocol with `iints study-protocol`, execute with `iints run-study`, analyze with `iints analyze`, compare with `iints compare-study`, and package results with `iints poster-study` or `iints eucys-results`.
 4. **Edge/demo path:** scaffold an SBC project with `iints edge setup`, then run the Pi-only Maker Faire flow with `iints makerfaire up`, `iints makerfaire autostart`, and `iints makerfaire watchdog`.

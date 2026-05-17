@@ -12,7 +12,13 @@ from .dataset import (
 from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
 from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
 from .metrics import regression_metrics, band_regression_metrics, interval_coverage_metrics
-from .evaluation import forecast_error_report
+from .evaluation import (
+    feature_drift_report,
+    forecast_error_report,
+    hypoglycemia_detection_report,
+    subgroup_error_report,
+    uncertainty_reliability_report,
+)
 from .audit import audit_subject_split_and_leakage
 from .calibration_gate import (
     ForecastCalibrationGate,
@@ -50,6 +56,10 @@ __all__ = [
     "band_regression_metrics",
     "interval_coverage_metrics",
     "forecast_error_report",
+    "hypoglycemia_detection_report",
+    "uncertainty_reliability_report",
+    "subgroup_error_report",
+    "feature_drift_report",
     "audit_subject_split_and_leakage",
     "ForecastCalibrationGate",
     "evaluate_calibration_gate",

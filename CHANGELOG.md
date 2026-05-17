@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+## v1.5.5
+
+Release date: 2026-05-17
+
+### Added
+
+- added a full Tidepool import path that exports standard CSV and scenario bundles
+- added stricter predictor validation with external datasets, subgroup reports, uncertainty reliability, hypo-detection sensitivity, and drift checks
+- added `iints onboard` as one canonical first-run path from environment check to study setup
+- added richer Jetson endurance telemetry, configurable checkpoints, partial output persistence, and safer resume support
+- added EUCYS-ready PDF bundles, a live demo flow, developer portal pages, generated API reference docs, and local plugin foundations
+- added physiological realism validation, empirical reference profiles, realism dashboards, and empirical simulator calibration tooling
+
+### Improved
+
+- made simulator traces substantially more physiologically realistic using empirical residual profiles and calibrated day presets
+- rebuilt and simplified the docs site structure, homepage, footer, and role-based navigation
+- made Raspberry Pi and UNO Q setup easier to explain and operate for demos and jury conversations
+- hardened CI, governance, versioned outputs, and runtime database cleanup
+
+### Why it matters
+
+This release joins the work since `v1.5.4` into one stronger SDK story: better real-data ingestion, more believable physiology, stricter model validation, clearer onboarding, and more credible long-running edge evidence.
+
 ## v1.5.2
 
 Release date: 2026-04-06

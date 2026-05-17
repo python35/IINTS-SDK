@@ -336,7 +336,8 @@ export IINTS_TIDEPOOL_TOKEN="replace-me"
 
 iints import-tidepool \
   --base-url https://api.tidepool.org \
-  --token-env IINTS_TIDEPOOL_TOKEN
+  --token-env IINTS_TIDEPOOL_TOKEN \
+  --output-dir results/tidepool_import
 ```
 
 Plain `--token` and `--api-secret` still work for compatibility, but the CLI now warns because those values can leak into shell history and process lists.

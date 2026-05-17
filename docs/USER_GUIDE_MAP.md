@@ -12,7 +12,7 @@ Use this page when you know what you want to achieve, but not yet which guide de
 
 | I want to... | Start here | Continue with | Main command |
 | --- | --- | --- | --- |
-| see the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints demo` |
+| see the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints onboard` |
 | understand the project without jargon | [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Getting Started](GETTING_STARTED.md) | `iints start` |
 | run a scientific benchmark | [Workflow Hub](WORKFLOWS.md) | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | `iints run-study` |
 | certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Data Certification Full Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
@@ -71,6 +71,7 @@ Developer Portal
 Run:
 
 ```bash
+iints onboard
 iints start
 iints doctor --full --suggest
 ```

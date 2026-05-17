@@ -23,6 +23,17 @@ iints start --goal edge
 iints start --goal data
 ```
 
+### `iints onboard`
+Show the one recommended path from machine check to first study bundle.
+
+```bash
+iints onboard
+iints onboard --run-safe-steps
+```
+
+The safe mode runs `doctor`, a full demo, demo-data import, and a realism check,
+then prints the two study commands you can run once you choose an algorithm.
+
 ### `iints demo`
 Zero-config first run.
 
@@ -218,11 +229,14 @@ iints jetson endurance start \
   --duration 7d \
   --output-dir results/jetson_7day \
   --profile mixed_adversarial \
-  --seed 42
+  --seed 42 \
+  --checkpoint-interval 360 \
+  --hardware-sample-interval 60
 ```
 
 ### `iints jetson endurance status`
-Show progress, current glucose, TIR so far, interventions, and critical events.
+Show progress, current glucose, TIR so far, interventions, critical events, the
+latest checkpoint, resume count, and wall-clock ETA.
 
 ### `iints jetson endurance monitor`
 Print the same status repeatedly with `--watch`.

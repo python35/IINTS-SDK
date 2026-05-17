@@ -81,15 +81,17 @@ def test_import_tidepool_reads_token_from_file(monkeypatch, tmp_path: Path) -> N
 
     seen: dict[str, str | None] = {}
 
-    class _FakeTidepoolClient:
-        def __init__(self, base_url: str, token: str | None) -> None:
-            seen["base_url"] = base_url
-            seen["token"] = token
+    def _fake_import(config, scenario_name: str):
+        seen["base_url"] = config.base_url
+        seen["token"] = config.token
+        return ImportResult(
+            dataframe=pd.DataFrame(
+                [{"timestamp": 0.0, "glucose": 123.0, "carbs": 0.0, "insulin": 0.0}]
+            ),
+            scenario={"name": scenario_name},
+        )
 
-        def _headers(self):
-            return {"Authorization": f"Bearer {seen['token']}"}
-
-    monkeypatch.setattr("iints.cli.cli.TidepoolClient", _FakeTidepoolClient)
+    monkeypatch.setattr("iints.cli.cli.import_tidepool", _fake_import)
 
     result = runner.invoke(
         app,
@@ -99,24 +101,28 @@ def test_import_tidepool_reads_token_from_file(monkeypatch, tmp_path: Path) -> N
             "https://api.tidepool.example",
             "--token-file",
             str(token_file),
+            "--output-dir",
+            str(tmp_path / "tidepool"),
         ],
     )
 
     assert result.exit_code == 0
     assert seen["base_url"] == "https://api.tidepool.example"
     assert seen["token"] == "file-token"
+    assert (tmp_path / "tidepool" / "scenario.json").is_file()
+    assert (tmp_path / "tidepool" / "cgm_standard.csv").is_file()
 
 
 def test_import_tidepool_warns_on_plain_token(monkeypatch) -> None:
-    class _FakeTidepoolClient:
-        def __init__(self, base_url: str, token: str | None) -> None:
-            self.base_url = base_url
-            self.token = token
+    def _fake_import(config, scenario_name: str):
+        return ImportResult(
+            dataframe=pd.DataFrame(
+                [{"timestamp": 0.0, "glucose": 123.0, "carbs": 0.0, "insulin": 0.0}]
+            ),
+            scenario={"name": scenario_name},
+        )
 
-        def _headers(self):
-            return {"Authorization": f"Bearer {self.token}"}
-
-    monkeypatch.setattr("iints.cli.cli.TidepoolClient", _FakeTidepoolClient)
+    monkeypatch.setattr("iints.cli.cli.import_tidepool", _fake_import)
 
     result = runner.invoke(
         app,
