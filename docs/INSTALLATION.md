@@ -387,7 +387,7 @@ Example:
 
 Use this for:
 
-- `iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py`
+- `iints run --algo algorithms/example_algorithm.py --patient-config-path patients/stable_patient.yaml --scenario-path scenarios/clinic_safe_baseline.json --duration 1440`
 - editing `algorithms/example_algorithm.py`
 - inspecting `results/`
 
@@ -420,7 +420,10 @@ python -m pip install -U "iints-sdk-python35[full,mdmp]"
 
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints run --algo algorithms/example_algorithm.py \
+  --patient-config-path patients/stable_patient.yaml \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --duration 1440
 ```
 
 ### Source repo flow

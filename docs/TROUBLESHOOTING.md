@@ -16,6 +16,15 @@ iints demo --dry-run
 iints run --dry-run --preset baseline_t1d
 ```
 
+If `pip` only offers old `0.1.x` releases, check the active interpreter first:
+
+```bash
+python --version
+python -m pip install -U "iints-sdk-python35[full,mdmp]"
+```
+
+Current SDK releases require Python `>=3.10`. A Python `3.8` virtual environment will keep resolving legacy releases and will not contain newer command groups such as `jetson`.
+
 If one of these commands already tells you what is wrong, fix that first. It is usually faster than guessing.
 
 ## Common Failures

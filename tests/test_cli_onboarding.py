@@ -2,12 +2,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
 from typer.testing import CliRunner
 
 from iints.cli.cli import app
 
 
 runner = CliRunner()
+
+
+def test_version_flag_reports_installed_sdk_version() -> None:
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert "IINTS-AF SDK" in result.stdout
 
 
 def test_run_dry_run_supports_builtin_preset(tmp_path) -> None:
@@ -22,6 +30,7 @@ def test_run_dry_run_supports_builtin_preset(tmp_path) -> None:
     assert "Dry Run Plan" in result.stdout
     assert "Clinical Baseline" in result.stdout
     assert "baseline_t1d" in result.stdout
+    assert "Physiology Preview" in result.stdout
     assert not output_dir.exists()
 
 
@@ -88,8 +97,66 @@ def test_doctor_suggest_prints_actionable_next_steps(monkeypatch) -> None:
     result = runner.invoke(app, ["doctor", "--suggest"])
 
     assert result.exit_code == 1
+    assert "SDK version" in result.stdout
+    assert "Command group: jetson" in result.stdout
     assert "Suggested Next Steps" in result.stdout
     assert "Install the main SDK stack" in result.stdout
+
+
+def test_profiles_create_supports_named_presets(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "profiles",
+            "create",
+            "--name",
+            "stable_patient",
+            "--preset",
+            "stable-demo",
+            "--output-dir",
+            str(tmp_path),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Created stable-demo profile" in result.stdout
+    payload = yaml.safe_load((tmp_path / "stable_patient.yaml").read_text(encoding="utf-8"))
+    assert payload["initial_glucose"] == 130.0
+    assert payload["glucose_decay_rate"] == 0.001
+
+
+def test_run_dry_run_warns_about_aggressive_return_rate(tmp_path) -> None:
+    patient_path = tmp_path / "patient.yaml"
+    patient_path.write_text(
+        yaml.safe_dump(
+            {
+                "basal_insulin_rate": 0.2,
+                "insulin_sensitivity": 40.0,
+                "carb_factor": 15.0,
+                "glucose_decay_rate": 0.05,
+                "initial_glucose": 130.0,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--patient-config-path",
+            str(patient_path),
+            "--patient-model",
+            "custom",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Preflight Warnings" in result.stdout
+    assert "25.0%" in result.stdout
+    assert "return-to-baseline" in result.stdout
 
 
 def test_start_prints_beginner_plan(tmp_path) -> None:

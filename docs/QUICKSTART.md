@@ -53,13 +53,17 @@ iints run --wizard
 ```bash
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints run --algo algorithms/example_algorithm.py \
+  --patient-config-path patients/stable_patient.yaml \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --duration 1440
 ```
 
 The generated project includes:
 
 - `algorithms/`
 - `scenarios/`
+- `patients/`
 - `contracts/`
 - `data/demo/`
 - `audit/`
@@ -73,6 +77,8 @@ Run the shortest recovery checks first:
 iints doctor --full --suggest
 iints run --dry-run --preset baseline_t1d
 ```
+
+The dry run now includes a no-insulin/no-meal physiology preview so you can spot suspicious patient settings before spending time on a long simulation.
 
 Then continue with:
 

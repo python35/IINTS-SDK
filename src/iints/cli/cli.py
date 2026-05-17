@@ -51,7 +51,11 @@ from iints.api.registry import (
     uninstall_local_plugin,
 )
 from iints.core.patient.patient_factory import BERGMAN_AVAILABLE, SIMGLUCOSE_AVAILABLE
-from iints.core.patient.profile import PatientProfile
+from iints.core.patient.profile import (
+    PATIENT_PROFILE_PRESETS,
+    PatientProfile,
+    get_patient_profile_preset,
+)
 from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.core.devices.models import SENSOR_PROFILES
 from iints.core.safety import SafetyConfig
@@ -247,6 +251,22 @@ app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 app.add_typer(jetson_app, name="jetson")
 jetson_app.add_typer(jetson_endurance_app, name="endurance")
+
+
+@app.callback(invoke_without_command=True)
+def app_callback(
+    ctx: typer.Context,
+    version: Annotated[
+        bool,
+        typer.Option("--version", help="Show the installed SDK version and exit.", is_eager=True),
+    ] = False,
+):
+    """IINTS-AF SDK command-line interface."""
+    if version:
+        typer.echo(f"IINTS-AF SDK {iints.__version__}")
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        typer.echo(ctx.get_help())
 
 def _load_algorithm_instance(algo: Path, console: Console) -> iints.InsulinAlgorithm:
     try:
@@ -522,11 +542,17 @@ def _print_run_summary(
     seed: int,
     wall_seconds: float,
     preset_name: Optional[str] = None,
+    termination_reason: Optional[str] = None,
 ) -> None:
+    terminated_early = bool(metrics.get("terminated_early", 0.0))
+    completed_duration = metrics.get("completed_duration_minutes", float(duration_minutes))
+    completion_ratio = metrics.get("completion_ratio_pct", 100.0)
     lines = [
         f"Algorithm: [green]{algorithm_name}[/green]",
         f"Preset: [cyan]{preset_name}[/cyan]" if preset_name else "Preset: [dim]custom[/dim]",
-        f"Duration: {duration_minutes} min",
+        f"Requested duration: {duration_minutes} min",
+        f"Completed duration: {completed_duration:.0f} min",
+        f"Completion ratio: {completion_ratio:.1f}%",
         f"Seed: {seed}",
         f"Wall time: {wall_seconds:.1f}s",
         "",
@@ -540,7 +566,15 @@ def _print_run_summary(
         f"Report: {output_dir / 'report.pdf'}",
         f"Manifest: {output_dir / 'run_manifest.json'}",
     ]
-    console.print(Panel("\n".join(lines), title="Run Complete", border_style="green"))
+    if terminated_early and termination_reason:
+        lines.insert(5, f"Reason: {termination_reason}")
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="Run Terminated Early" if terminated_early else "Run Complete",
+            border_style="yellow" if terminated_early else "green",
+        )
+    )
 
 
 def _print_dry_run_plan(
@@ -586,6 +620,121 @@ def _print_dry_run_plan(
             border_style="blue",
         )
     )
+
+
+def _first_meal_minute(stress_event_payloads: List[Dict[str, Any]]) -> Optional[int]:
+    meal_times = [
+        int(event["start_time"])
+        for event in stress_event_payloads
+        if event.get("event_type") == "meal" and event.get("start_time") is not None
+    ]
+    return min(meal_times) if meal_times else None
+
+
+def _build_physiology_preview(
+    *,
+    patient_params: Dict[str, Any],
+    patient_model_type: str,
+    stress_event_payloads: List[Dict[str, Any]],
+    duration: int,
+    time_step: int,
+) -> Dict[str, Any]:
+    first_meal = _first_meal_minute(stress_event_payloads)
+    preview_horizon = min(max(duration, 0), max(60, first_meal or 60))
+    checkpoints = sorted({0, 30, 60, *( [first_meal] if first_meal is not None else [] )})
+    checkpoints = [point for point in checkpoints if point <= preview_horizon]
+    warnings: List[str] = []
+    observations: Dict[int, float] = {}
+
+    rate = float(patient_params.get("glucose_decay_rate", 0.0))
+    return_fraction = rate * max(time_step, 0)
+    if return_fraction > 0.10:
+        warnings.append(
+            "glucose_decay_rate="
+            f"{rate:.4f} with time_step={time_step} implies a {return_fraction * 100:.1f}% "
+            "return-to-baseline step; preview this profile carefully."
+        )
+
+    try:
+        preview_patient = iints.PatientFactory.create_patient(
+            patient_type=patient_model_type,
+            **patient_params,
+        )
+        observations[0] = float(preview_patient.get_current_glucose())
+        for minute in range(time_step, preview_horizon + time_step, time_step):
+            glucose = float(
+                preview_patient.update(
+                    time_step,
+                    delivered_insulin=0.0,
+                    carb_intake=0.0,
+                    current_time=minute,
+                )
+            )
+            if minute in checkpoints:
+                observations[minute] = glucose
+    except Exception as exc:
+        warnings.append(f"Physiology preview unavailable: {exc}")
+
+    projected_values = [
+        glucose
+        for minute, glucose in observations.items()
+        if first_meal is None or minute <= first_meal
+    ]
+    if projected_values:
+        projected_minimum = min(projected_values)
+        if projected_minimum < 54.0:
+            warnings.append(
+                "No-input preview reaches severe hypoglycemia before the first meal "
+                f"({projected_minimum:.1f} mg/dL)."
+            )
+        elif projected_minimum < 70.0:
+            warnings.append(
+                "No-input preview reaches hypoglycemia before the first meal "
+                f"({projected_minimum:.1f} mg/dL)."
+            )
+
+    return {
+        "first_meal_minute": first_meal,
+        "observations": observations,
+        "warnings": warnings,
+        "preview_horizon_minutes": preview_horizon,
+    }
+
+
+def _print_physiology_preview(console: Console, preview: Dict[str, Any]) -> None:
+    observations = cast(Dict[int, float], preview.get("observations", {}))
+    first_meal = cast(Optional[int], preview.get("first_meal_minute"))
+    table = Table(title="Physiology Preview (no insulin / no meal)", show_lines=False)
+    table.add_column("Checkpoint", style="cyan")
+    table.add_column("Projected glucose", justify="right")
+    for minute in sorted(observations):
+        label = "initial" if minute == 0 else f"{minute} min"
+        if first_meal is not None and minute == first_meal:
+            label = f"first meal ({minute} min)"
+        table.add_row(label, f"{observations[minute]:.1f} mg/dL")
+    if first_meal is not None and first_meal not in observations:
+        table.add_row("first meal", f"{first_meal} min")
+    elif first_meal is None:
+        table.add_row("first meal", "none in scenario")
+    console.print(table)
+
+    warnings = cast(List[str], preview.get("warnings", []))
+    if warnings:
+        console.print(
+            Panel(
+                "\n".join(f"- {warning}" for warning in warnings),
+                title="Preflight Warnings",
+                border_style="yellow",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                "No immediate no-input hypoglycemia detected in the preview window.",
+                title="Preflight",
+                border_style="green",
+            )
+        )
 
 
 def _parse_column_mapping(items: List[str], console: Console) -> Dict[str, str]:
@@ -859,7 +1008,10 @@ def doctor(
         ("Python >= 3.10", py_ok, f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}")
     )
     if not py_ok:
-        suggestions.append("Install Python 3.10 or newer, recreate your virtual environment, then rerun `iints doctor`.")
+        suggestions.append(
+            "Install Python 3.10 or newer, recreate your virtual environment, then rerun `iints doctor`. "
+            "Older interpreters only resolve legacy PyPI releases and will miss current commands such as `jetson`."
+        )
 
     package_checks = [
         ("pandas", True, "core"),
@@ -877,6 +1029,11 @@ def doctor(
     table.add_column("Check", style="cyan")
     table.add_column("Status", style="bold")
     table.add_column("Detail", style="dim")
+
+    package_path = Path(getattr(iints, "__file__", "")).resolve().parent
+    table.add_row("SDK version", "[green]INFO[/green]", str(iints.__version__))
+    table.add_row("Python executable", "[green]INFO[/green]", sys.executable)
+    table.add_row("Install path", "[green]INFO[/green]", str(package_path))
 
     for check_name, passed, detail in required_checks:
         table.add_row(check_name, "[green]OK[/green]" if passed else "[red]FAIL[/red]", detail)
@@ -920,6 +1077,16 @@ def doctor(
         table.add_row("Validation profiles", "[red]FAIL[/red]", str(exc))
         required_checks.append(("Validation profiles", False, str(exc)))
         suggestions.append("Reinstall or update the SDK so the validation profile bundle is available again.")
+
+    command_groups = {
+        "edge": edge_app,
+        "jetson": jetson_app,
+        "profiles": profiles_app,
+        "data": data_app,
+        "ai": ai_app,
+    }
+    for group_name in sorted(command_groups):
+        table.add_row(f"Command group: {group_name}", "[green]AVAILABLE[/green]", f"`iints {group_name}`")
 
     if full:
         demo_df_ok = False
@@ -3049,6 +3216,7 @@ def quickstart(
 
     (project_path / "algorithms").mkdir(parents=True)
     (project_path / "scenarios").mkdir(parents=True)
+    (project_path / "patients").mkdir(parents=True)
     (project_path / "results").mkdir(parents=True)
     (project_path / "contracts").mkdir(parents=True)
     (project_path / "audit").mkdir(parents=True)
@@ -3076,6 +3244,12 @@ def quickstart(
         scenario_path.write_text(json.dumps(preset.get("scenario", {}), indent=2))
     except Exception as e:
         console.print(f"[yellow]Preset scenario not available: {e}[/yellow]")
+
+    stable_profile_path = project_path / "patients" / "stable_patient.yaml"
+    stable_profile = get_patient_profile_preset("stable-demo").build_profile()
+    stable_profile_path.write_text(
+        yaml.safe_dump(stable_profile.to_patient_config(), sort_keys=False)
+    )
 
     try:
         if sys.version_info >= (3, 9):
@@ -3123,7 +3297,7 @@ iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
 Run with the included scenario file:
 
 ```bash
-iints run --algo algorithms/example_algorithm.py --scenario-path scenarios/clinic_safe_baseline.json --duration 1440
+iints run --algo algorithms/example_algorithm.py --patient-config-path patients/stable_patient.yaml --scenario-path scenarios/clinic_safe_baseline.json --duration 1440
 ```
 
 Certify data with the bundled contract:
@@ -3138,7 +3312,8 @@ iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.
     console.print(
         f"Next:\n"
         f"  cd {project_name}\n"
-        "  iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py\n"
+        "  iints run --algo algorithms/example_algorithm.py --patient-config-path patients/stable_patient.yaml "
+        "--scenario-path scenarios/clinic_safe_baseline.json --duration 1440\n"
         "  iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.csv --output-json audit/certification.json"
     )
 
@@ -3983,10 +4158,29 @@ def run_wizard():
     )
 
 
+@profiles_app.command(name="presets")
+def profiles_presets():
+    """List built-in starter profile presets."""
+    table = Table(title="Patient Profile Presets")
+    table.add_column("Preset", style="cyan")
+    table.add_column("Description")
+    table.add_column("Expected Behavior")
+    for preset_name in sorted(PATIENT_PROFILE_PRESETS):
+        preset = PATIENT_PROFILE_PRESETS[preset_name]
+        table.add_row(preset.name, preset.description, preset.expected_behavior)
+    Console().print(table)
+
+
 @profiles_app.command(name="create")
 def profiles_create(
     name: Annotated[str, typer.Option(help="Profile name (file stem)")],
     output_dir: Annotated[Path, typer.Option(help="Output directory for the profile YAML")] = Path("./patient_profiles"),
+    preset: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Optional starter preset: stable-demo, stress-test, or endurance."
+        ),
+    ] = None,
     isf: Annotated[float, typer.Option(help="Insulin Sensitivity Factor (mg/dL per unit)")] = 50.0,
     icr: Annotated[float, typer.Option(help="Insulin-to-carb ratio (grams per unit)")] = 10.0,
     basal_rate: Annotated[float, typer.Option(help="Basal insulin rate (U/hr)")] = 0.8,
@@ -4000,6 +4194,41 @@ def profiles_create(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_path = output_dir / f"{name}.yaml"
 
+    try:
+        ctx = click.get_current_context(silent=True)
+    except RuntimeError:
+        ctx = None
+
+    def _uses_default(option_name: str) -> bool:
+        if ctx is None:
+            return True
+        source = ctx.get_parameter_source(option_name)
+        return source in (None, ParameterSource.DEFAULT)
+
+    preset_spec = None
+    preset_profile = None
+    if preset is not None:
+        try:
+            preset_spec = get_patient_profile_preset(preset)
+        except KeyError as exc:
+            console.print(f"[bold red]{exc}[/bold red]")
+            raise typer.Exit(code=1)
+        preset_profile = preset_spec.build_profile()
+        if _uses_default("isf"):
+            isf = preset_profile.isf
+        if _uses_default("icr"):
+            icr = preset_profile.icr
+        if _uses_default("basal_rate"):
+            basal_rate = preset_profile.basal_rate
+        if _uses_default("initial_glucose"):
+            initial_glucose = preset_profile.initial_glucose
+        if _uses_default("dawn_strength"):
+            dawn_strength = preset_profile.dawn_phenomenon_strength
+        if _uses_default("dawn_start"):
+            dawn_start = preset_profile.dawn_start_hour
+        if _uses_default("dawn_end"):
+            dawn_end = preset_profile.dawn_end_hour
+
     profile = PatientProfile(
         isf=isf,
         icr=icr,
@@ -4008,11 +4237,24 @@ def profiles_create(
         dawn_phenomenon_strength=dawn_strength,
         dawn_start_hour=dawn_start,
         dawn_end_hour=dawn_end,
+        glucose_decay_rate=(
+            preset_profile.glucose_decay_rate
+            if preset_profile is not None
+            else PatientProfile().glucose_decay_rate
+        ),
     )
+    if preset_profile is not None:
+        profile.glucose_decay_rate = preset_profile.glucose_decay_rate
+        profile.glucose_absorption_rate = preset_profile.glucose_absorption_rate
+        profile.insulin_action_duration = preset_profile.insulin_action_duration
+        profile.insulin_peak_time = preset_profile.insulin_peak_time
+        profile.meal_mismatch_epsilon = preset_profile.meal_mismatch_epsilon
     with output_path.open("w") as handle:
         yaml.safe_dump(profile.to_patient_config(), handle, sort_keys=False)
 
     console.print(f"[green]Patient profile saved:[/green] {output_path}")
+    if preset_spec is not None:
+        console.print(f"Created [cyan]{preset_spec.name}[/cyan] profile. {preset_spec.expected_behavior}")
     console.print("Use it with:")
     console.print(f"  iints run --algo algorithms/example_algorithm.py --patient-config-path {output_path}")
 
@@ -4332,6 +4574,14 @@ def run(
     else:
         scenario_display = "none"
 
+    physiology_preview = _build_physiology_preview(
+        patient_params=validated_patient_params,
+        patient_model_type=patient_model_type,
+        stress_event_payloads=stress_event_payloads,
+        duration=duration,
+        time_step=time_step,
+    )
+
     if dry_run:
         _print_dry_run_plan(
             console,
@@ -4346,11 +4596,14 @@ def run(
             seed=resolved_seed,
             preset_name=preset,
         )
+        _print_physiology_preview(console, physiology_preview)
         return
 
     console.print(f"[bold blue]Starting IINTS-AF simulation[/bold blue] - {algorithm_label}")
     console.print(f"Patient: [cyan]{patient_label}[/cyan]")
     console.print(f"Scenario: [magenta]{scenario_display}[/magenta]")
+    if physiology_preview["warnings"]:
+        _print_physiology_preview(console, physiology_preview)
 
     safety_config = _build_safety_config_from_options(
         min_glucose=safety_min_glucose,
@@ -4518,6 +4771,11 @@ def run(
         seed=resolved_seed,
         wall_seconds=time.perf_counter() - wall_start,
         preset_name=preset,
+        termination_reason=(
+            str(safety_report.get("termination_reason", {}).get("reason", ""))
+            if isinstance(safety_report.get("termination_reason"), dict)
+            else None
+        ),
     )
 
 
@@ -4600,7 +4858,18 @@ def run_full(
         predictor=predictor,
     )
 
-    console.print("[green]Run complete.[/green]")
+    safety_report = cast(Dict[str, Any], outputs.get("safety_report", {}))
+    if safety_report.get("terminated_early"):
+        termination = safety_report.get("termination_reason", {})
+        completed = termination.get("current_time_minutes", duration) if isinstance(termination, dict) else duration
+        reason = termination.get("reason", "unknown") if isinstance(termination, dict) else "unknown"
+        console.print("[yellow]Run terminated early.[/yellow]")
+        console.print(f"Requested duration: {duration} min")
+        console.print(f"Completed duration: {completed} min")
+        console.print(f"Completion ratio: {(float(completed) / max(duration, 1)) * 100.0:.1f}%")
+        console.print(f"Reason: {reason}")
+    else:
+        console.print("[green]Run complete.[/green]")
     if "results_csv" in outputs:
         console.print(f"Results CSV: {outputs['results_csv']}")
     if "report_pdf" in outputs:

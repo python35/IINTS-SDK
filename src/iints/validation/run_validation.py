@@ -202,6 +202,17 @@ def compute_run_metrics(
     metrics["supervisor_interventions"] = float(interventions)
     metrics["supervisor_interventions_per_hour"] = float(interventions) / max(duration_minutes / 60.0, 1e-6)
     metrics["terminated_early"] = 1.0 if bool(report.get("terminated_early", False)) else 0.0
+    completed_duration_minutes = float(duration_minutes)
+    if bool(report.get("terminated_early", False)):
+        termination = report.get("termination_reason", {})
+        if isinstance(termination, dict):
+            completed_duration_minutes = float(
+                termination.get("current_time_minutes", completed_duration_minutes)
+            )
+    metrics["completed_duration_minutes"] = completed_duration_minutes
+    metrics["completion_ratio_pct"] = (
+        completed_duration_minutes / max(float(duration_minutes), 1.0)
+    ) * 100.0
 
     if "supervisor_latency_ms" in working.columns:
         metrics["mean_supervisor_latency_ms"] = float(working["supervisor_latency_ms"].dropna().mean())

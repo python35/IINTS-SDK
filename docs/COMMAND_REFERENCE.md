@@ -66,6 +66,8 @@ Create a ready-to-run project folder.
 iints quickstart --project-name iints_quickstart
 ```
 
+The generated project is self-contained: it includes `patients/stable_patient.yaml`, a scenario file, and an editable starter algorithm so you can run locally without depending on packaged patient assets.
+
 ### `iints run --wizard`
 Interactive custom run builder.
 
@@ -271,6 +273,18 @@ iints doctor
 iints doctor --full --suggest
 iints doctor --smoke-run
 ```
+
+`doctor` reports the installed SDK version, active Python executable, install path, and available command groups. This is the fastest way to catch an old Python interpreter that silently resolves only legacy SDK releases.
+
+### `iints profiles`
+
+```bash
+iints profiles presets
+iints profiles create --name stable_patient --preset stable-demo
+iints profiles create --name endurance_patient --preset endurance
+```
+
+Starter presets are provided for `stable-demo`, `stress-test`, and `endurance`.
 
 ## Full Details
 

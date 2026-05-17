@@ -58,6 +58,7 @@ cd iints_quickstart
 The generated structure includes:
 - `algorithms/`
 - `scenarios/`
+- `patients/`
 - `contracts/`
 - `data/demo/`
 - `audit/`
@@ -72,7 +73,10 @@ Important:
 ## 5) Run A Baseline Simulation
 
 ```bash
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints run --algo algorithms/example_algorithm.py \
+  --patient-config-path patients/stable_patient.yaml \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --duration 1440
 ```
 
 ## 6) Certify The Run Data

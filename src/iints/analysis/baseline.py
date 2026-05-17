@@ -27,6 +27,32 @@ def compute_metrics(results_df: pd.DataFrame) -> Dict[str, float]:
     return metrics.to_dict()
 
 
+def _run_context(
+    *,
+    requested_duration_minutes: int,
+    safety_report: Dict[str, Any],
+) -> Dict[str, Any]:
+    terminated_early = bool(safety_report.get("terminated_early", False))
+    termination = safety_report.get("termination_reason", {})
+    completed_duration_minutes = requested_duration_minutes
+    termination_reason = ""
+    if isinstance(termination, dict):
+        completed_duration_minutes = int(
+            termination.get("current_time_minutes", requested_duration_minutes)
+        )
+        termination_reason = str(termination.get("reason", ""))
+    return {
+        "requested_duration_minutes": int(requested_duration_minutes),
+        "completed_duration_minutes": int(completed_duration_minutes),
+        "completion_ratio_pct": round(
+            (completed_duration_minutes / max(requested_duration_minutes, 1)) * 100.0,
+            2,
+        ),
+        "terminated_early": terminated_early,
+        "termination_reason": termination_reason,
+    }
+
+
 def run_baseline_comparison(
     patient_params: Dict[str, Any],
     stress_event_payloads: List[Dict[str, Any]],
@@ -44,6 +70,10 @@ def run_baseline_comparison(
     rows.append(
         {
             "algorithm": primary_label,
+            **_run_context(
+                requested_duration_minutes=duration,
+                safety_report=primary_safety,
+            ),
             "tir_70_180": primary_metrics.get("tir_70_180", 0.0),
             "tir_below_70": primary_metrics.get("tir_below_70", 0.0),
             "tir_above_180": primary_metrics.get("tir_above_180", 0.0),
@@ -74,6 +104,10 @@ def run_baseline_comparison(
         rows.append(
             {
                 "algorithm": label,
+                **_run_context(
+                    requested_duration_minutes=duration,
+                    safety_report=safety_report,
+                ),
                 "tir_70_180": metrics.get("tir_70_180", 0.0),
                 "tir_below_70": metrics.get("tir_below_70", 0.0),
                 "tir_above_180": metrics.get("tir_above_180", 0.0),
