@@ -36,6 +36,8 @@ def test_cli_demo_live_supports_clinical_presenter_mode(tmp_path: Path) -> None:
     guide = (tmp_path / "PRESENTER_GUIDE.md").read_text(encoding="utf-8")
     assert "pre-clinical research tool" in guide
     assert "not treatment advice" in guide
+    assert "EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf" in guide
+    assert "EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf" in guide
 
 
 def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, tmp_path: Path) -> None:

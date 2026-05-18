@@ -9,6 +9,7 @@ Use this page when you already know the workflow and need the exact source of tr
 | one public command or command family | [Command Reference](COMMAND_REFERENCE.md) |
 | advanced CLI behavior and integration details | [CLI & Advanced Reference](TECHNICAL_README.md) |
 | Python modules and public symbols | [API Reference](API_REFERENCE.md) |
+| the physiological meaning of the SDK's numbers | [Physiology Reference](PHYSIOLOGY_REFERENCE.md) |
 | subsystem boundaries and data flow | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
 | scientific justification and citations | [Evidence Base](EVIDENCE_BASE.md) |
 | a long-form printable manual | [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md) |
@@ -30,6 +31,7 @@ Use this page when you already know the workflow and need the exact source of tr
 
 ### Reviewers
 
+- [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
 - [Evidence Base](EVIDENCE_BASE.md)
 - [MDMP Specification](MDMP.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)

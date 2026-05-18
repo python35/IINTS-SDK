@@ -19,6 +19,7 @@ Use this page after your first successful run, when the question changes from â€
 ```text
 Getting Started
   -> Scientific Workflow
+  -> Physiology Reference
   -> Study Analysis
   -> Evidence Base
 ```
@@ -51,6 +52,7 @@ iints demo-live --output-dir results/live_demo
 ## Read Next
 
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+- [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
 - [AI Assistant](AI_ASSISTANT.md)

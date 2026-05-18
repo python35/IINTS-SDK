@@ -36,6 +36,8 @@ ENDURANCE_PROFILES = {
     "custom",
 }
 
+ENDURANCE_EXECUTION_MODES = {"accelerated", "wall_clock"}
+
 
 class JetsonEnduranceError(RuntimeError):
     pass
@@ -58,6 +60,8 @@ class EnduranceConfig:
     checkpoint_interval_minutes: int = 360
     hardware_sample_interval_minutes: int = 60
     status_interval_steps: int = 25
+    execution_mode: str = "accelerated"
+    research_export: bool = True
 
     @property
     def expected_steps(self) -> int:
@@ -66,6 +70,10 @@ class EnduranceConfig:
     @property
     def simulator_end_minutes(self) -> int:
         return max(0, self.duration_minutes - self.time_step_minutes)
+
+    @property
+    def wall_clock_target_seconds(self) -> int:
+        return self.duration_minutes * 60 if self.execution_mode == "wall_clock" else 0
 
 
 def utc_now_iso() -> str:
@@ -340,9 +348,16 @@ def _status_payload(
     elapsed_minutes = completed_steps * config.time_step_minutes
     steps_per_second = None
     estimated_wall_remaining_seconds = None
+    wall_clock_progress_pct = None
+    wall_clock_target_seconds = config.wall_clock_target_seconds or None
+    if config.execution_mode == "wall_clock" and wall_clock_target_seconds is not None:
+        observed_wall_elapsed = float(wall_elapsed_seconds or 0.0)
+        estimated_wall_remaining_seconds = max(0.0, wall_clock_target_seconds - observed_wall_elapsed)
+        wall_clock_progress_pct = min(100.0, observed_wall_elapsed / wall_clock_target_seconds * 100.0)
     if wall_elapsed_seconds is not None and wall_elapsed_seconds > 0 and completed_steps > 0:
         steps_per_second = completed_steps / wall_elapsed_seconds
-        estimated_wall_remaining_seconds = max(0, config.expected_steps - completed_steps) / steps_per_second
+        if config.execution_mode != "wall_clock":
+            estimated_wall_remaining_seconds = max(0, config.expected_steps - completed_steps) / steps_per_second
     return {
         "status": status,
         "message": message,
@@ -350,6 +365,7 @@ def _status_payload(
         "updated_at_utc": utc_now_iso(),
         "duration": config.duration,
         "duration_minutes": config.duration_minutes,
+        "execution_mode": config.execution_mode,
         "profile": config.profile,
         "expected_steps": config.expected_steps,
         "completed_steps": completed_steps,
@@ -362,6 +378,8 @@ def _status_payload(
         "critical_events": None,
         "worst_glucose_mgdl": None,
         "wall_elapsed_seconds": round(wall_elapsed_seconds, 3) if wall_elapsed_seconds is not None else None,
+        "wall_clock_target_seconds": wall_clock_target_seconds,
+        "wall_clock_progress_pct": round(wall_clock_progress_pct, 3) if wall_clock_progress_pct is not None else None,
         "steps_per_second": round(steps_per_second, 6) if steps_per_second is not None else None,
         "estimated_wall_remaining_seconds": (
             round(estimated_wall_remaining_seconds, 3)
@@ -512,6 +530,8 @@ def _total_summary(df: pd.DataFrame, safety_report: Dict[str, Any], config: Endu
         "status": "completed",
         "duration": config.duration,
         "duration_minutes": config.duration_minutes,
+        "execution_mode": config.execution_mode,
+        "wall_clock_target_seconds": config.wall_clock_target_seconds or None,
         "expected_steps": config.expected_steps,
         "actual_steps": int(len(df)),
         "total_tir_70_180_pct": round(p * 100.0, 3),
@@ -596,6 +616,7 @@ def _write_report(output_dir: Path, summary: Dict[str, Any], daily: List[Dict[st
         "# IINTS Jetson Endurance Report",
         "",
         f"- Duration: `{summary['duration']}` ({summary['duration_minutes']} minutes)",
+        f"- Execution mode: `{summary['execution_mode']}`",
         f"- Steps: `{summary['actual_steps']}` / `{summary['expected_steps']}`",
         f"- Total TIR 70-180: `{summary['total_tir_70_180_pct']}%`",
         f"- TIR 95% CI: `{summary['tir_95_ci_pct'][0]}%` to `{summary['tir_95_ci_pct'][1]}%`",
@@ -619,6 +640,118 @@ def _write_report(output_dir: Path, summary: Dict[str, Any], daily: List[Dict[st
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     _write_pdf(report_path, final_dir / "ENDURANCE_REPORT.pdf")
     return report_path
+
+
+def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.DataFrame) -> Dict[str, str]:
+    research_dir = output_dir / "research"
+    research_dir.mkdir(parents=True, exist_ok=True)
+
+    predictor_columns = [
+        "subject_id",
+        "segment",
+        "time_minutes",
+        "glucose_actual_mgdl",
+        "glucose_trend_mgdl_min",
+        "carb_intake_grams",
+        "carb_grams",
+        "patient_iob_units",
+        "patient_cob_grams",
+        "effective_isf",
+        "effective_icr",
+        "effective_basal_rate_u_per_hr",
+        "steps",
+        "calories",
+        "heart_rate",
+        "sleep_minutes",
+        "time_of_day_sin",
+        "time_of_day_cos",
+        "delivered_insulin_units",
+        "sensor_status",
+    ]
+    training_df = df.copy()
+    training_df["subject_id"] = f"jetson_{Path(config.output_dir).name}"
+    training_df["segment"] = 0
+    carb_source = (
+        training_df["carb_intake_grams"]
+        if "carb_intake_grams" in training_df.columns
+        else pd.Series(0.0, index=training_df.index)
+    )
+    training_df["carb_grams"] = pd.to_numeric(carb_source, errors="coerce").fillna(0.0)
+    for column in ("steps", "calories", "heart_rate", "sleep_minutes"):
+        training_df[column] = 0.0
+    day_fraction = pd.to_numeric(training_df["time_minutes"], errors="coerce").fillna(0.0) % 1440 / 1440.0
+    training_df["time_of_day_sin"] = np.sin(day_fraction * 2.0 * math.pi)
+    training_df["time_of_day_cos"] = np.cos(day_fraction * 2.0 * math.pi)
+    for column in predictor_columns:
+        if column not in training_df.columns:
+            training_df[column] = 0.0
+    training_path = research_dir / "predictor_training.csv"
+    training_df[predictor_columns].to_csv(training_path, index=False)
+
+    manifest_path = research_dir / "training_manifest.json"
+    training_manifest = {
+        "created_at_utc": utc_now_iso(),
+        "execution_mode": config.execution_mode,
+        "duration": config.duration,
+        "duration_minutes": config.duration_minutes,
+        "row_count": int(len(training_df)),
+        "subject_id": f"jetson_{Path(config.output_dir).name}",
+        "dataset_path": str(training_path),
+        "columns": predictor_columns,
+        "recommended_predictor_configs": [
+            "research/configs/predictor.yaml",
+            "research/configs/predictor_multimodal_dual_guard.yaml",
+            "research/configs/predictor_multimodal_dual_guard_preannounce.yaml",
+        ],
+        "example_training_command": (
+            "PYTHONPATH=src python3 research/train_predictor.py "
+            f"--data {training_path} "
+            "--config research/configs/predictor.yaml "
+            f"--out models/{Path(config.output_dir).name}_predictor"
+        ),
+        "ministral_training_supported": False,
+        "ministral_note": (
+            "Ministral/Ollama is currently the local explanation backend, not the trainable glucose predictor. "
+            "Use this bundle to train or fine-tune the predictor; treat Ministral outputs as review artifacts."
+        ),
+    }
+    _write_json(manifest_path, training_manifest)
+
+    readme_path = research_dir / "README.md"
+    readme_path.write_text(
+        "\n".join(
+            [
+                "# Jetson Research Bundle",
+                "",
+                "This folder turns the endurance run into a reusable research artifact.",
+                "",
+                "## Files",
+                "",
+                "- `predictor_training.csv`: rows compatible with the SDK predictor-training pipeline.",
+                "- `training_manifest.json`: lineage, columns, and a reproducible training command.",
+                "",
+                "## Important distinction",
+                "",
+                "- The trainable model in the SDK research pipeline is the **glucose predictor**.",
+                "- `Ministral` / Ollama is the **local explanation assistant**, not an online-trained controller.",
+                "- Keep acquisition and training separate so the same run is not both training data and unbiased evaluation evidence.",
+                "- A single Jetson run is one synthetic subject; combine multiple runs or external data before claiming generalization.",
+                "",
+                "## Example next step",
+                "",
+                "```bash",
+                str(training_manifest["example_training_command"]),
+                "```",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "research_training_csv": str(training_path),
+        "research_training_manifest_json": str(manifest_path),
+        "research_readme_md": str(readme_path),
+    }
 
 
 def _write_outputs(
@@ -669,7 +802,7 @@ def _write_outputs(
     _write_json(worst_path, {"events": _worst_case_events(df)})
     _write_main_figure(df, figure_path)
     report_path = _write_report(output_dir, summary, daily)
-    return {
+    outputs = {
         "steps_csv": str(steps_path),
         "interventions_csv": str(interventions_path),
         "critical_events_csv": str(critical_path),
@@ -682,6 +815,9 @@ def _write_outputs(
         "main_figure_png": str(figure_path),
         "hardware_metrics_csv": str(hardware_path),
     }
+    if config.research_export:
+        outputs.update(_write_research_outputs(output_dir, config, df))
+    return outputs
 
 
 def _latest_snapshot(snapshot_dir: Path) -> Optional[Path]:
@@ -695,9 +831,14 @@ def run_endurance_study(
     predictor: Optional[object],
     config: EnduranceConfig,
     progress_callback: Optional[Any] = None,
+    monotonic_fn: Any = time.monotonic,
+    sleep_fn: Any = time.sleep,
 ) -> Dict[str, Any]:
     if config.profile not in ENDURANCE_PROFILES:
         raise JetsonEnduranceError(f"Unknown endurance profile '{config.profile}'.")
+    if config.execution_mode not in ENDURANCE_EXECUTION_MODES:
+        valid = ", ".join(sorted(ENDURANCE_EXECUTION_MODES))
+        raise JetsonEnduranceError(f"Unknown execution mode '{config.execution_mode}'. Choose one of: {valid}.")
 
     output_dir = Path(config.output_dir)
     protocol_dir = output_dir / "protocol"
@@ -751,7 +892,7 @@ def run_endurance_study(
         )
     )
     pd.DataFrame(hardware_records).to_csv(hardware_path, index=False)
-    wall_start = time.monotonic()
+    wall_start = monotonic_fn()
     last_checkpoint_minute = int(existing_status.get("last_checkpoint_minute") or 0)
 
     _write_json(
@@ -801,7 +942,7 @@ def run_endurance_study(
                 started_at_utc=started_at,
                 completed_steps=completed_steps,
                 current_record=record,
-                wall_elapsed_seconds=previous_wall_elapsed_seconds + (time.monotonic() - wall_start),
+                wall_elapsed_seconds=previous_wall_elapsed_seconds + (monotonic_fn() - wall_start),
                 hardware_latest=latest_hardware,
                 last_checkpoint_minute=last_checkpoint_minute,
                 resume_count=resume_count,
@@ -836,6 +977,13 @@ def run_endurance_study(
             )
             last_checkpoint_minute = elapsed_minutes
 
+        if config.execution_mode == "wall_clock":
+            target_elapsed_seconds = completed_steps * config.time_step_minutes * 60
+            current_elapsed_seconds = previous_wall_elapsed_seconds + (monotonic_fn() - wall_start)
+            remaining_sleep_seconds = max(0.0, target_elapsed_seconds - current_elapsed_seconds)
+            if remaining_sleep_seconds > 0:
+                sleep_fn(remaining_sleep_seconds)
+
     df = pd.DataFrame(records)
     safety_report = simulator.supervisor.get_safety_report()
     if stopped_early:
@@ -851,7 +999,7 @@ def run_endurance_study(
         completed_steps=len(records),
         current_record=records[-1] if records else None,
         message="Endurance run stopped early." if stopped_early else "Endurance run completed.",
-        wall_elapsed_seconds=previous_wall_elapsed_seconds + (time.monotonic() - wall_start),
+        wall_elapsed_seconds=previous_wall_elapsed_seconds + (monotonic_fn() - wall_start),
         hardware_latest=latest_hardware,
         last_checkpoint_minute=last_checkpoint_minute,
         resume_count=resume_count,
@@ -907,6 +1055,7 @@ def build_endurance_service_file(
     predictor: Optional[str] = None,
     profile: str = "mixed_adversarial",
     seed: Optional[int] = None,
+    wall_clock: bool = False,
     working_directory: Optional[str] = None,
 ) -> str:
     command = [
@@ -928,6 +1077,8 @@ def build_endurance_service_file(
         command.extend(["--predictor", predictor])
     if seed is not None:
         command.extend(["--seed", str(seed)])
+    if wall_clock:
+        command.append("--wall-clock")
     workdir = working_directory or str(Path.cwd())
     return "\n".join(
         [

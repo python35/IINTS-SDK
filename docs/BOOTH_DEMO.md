@@ -129,6 +129,11 @@ iints demo-live --output-dir results/live_demo
 
 That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, prints the important code lines, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
 
+The presenter guide also points you to two ready-made physiology handouts:
+
+- `research/eucys_pack/pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf`
+- `research/eucys_pack/pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf`
+
 Use the audience mode that matches the room:
 
 ```bash

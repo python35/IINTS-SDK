@@ -1,17 +1,27 @@
 # Jetson Endurance Mode
 
-Jetson Endurance Mode turns an NVIDIA Jetson into a headless scientific stress-test machine. It is for long adversarial runs, not for dashboards or stage demos.
+Jetson Endurance Mode turns an NVIDIA Jetson into a headless scientific study machine. It now supports two deliberately different modes:
+
+- `accelerated` endurance: many simulated hours as fast as the device can compute them
+- `wall-clock` research: one simulated minute follows one real minute, so `1d` genuinely occupies about 24 hours
 
 Configure it once, let the study run, and collect one reproducible results folder at the end.
 
 ## When To Use
 
-Use this mode when you want to test safety behavior under long-running adversarial physiological scenarios:
+Use accelerated mode when you want to test safety behavior under long-running adversarial physiological scenarios:
 
 - overnight sanity checks
 - weekend stress tests
 - 7-day EUCYS-style robustness studies
 - multi-week regression studies on edge hardware
+
+Use wall-clock mode when you want to operate the Jetson as an actual research station:
+
+- a 24-hour acquisition run that really lasts 24 hours
+- repeated hardware telemetry over the same real period as the simulated study
+- a training-ready dataset export after the run
+- clean separation between data acquisition and later predictor training
 
 For Raspberry Pi demos and realistic long-study behavior, use `iints edge long-study`. Jetson Endurance Mode is more aggressive: it targets supervisor limits, sensor failures, double meals, exercise hypoglycemia, and cold-start behavior.
 
@@ -23,6 +33,7 @@ For Raspberry Pi demos and realistic long-study behavior, use `iints edge long-s
 - periodic hardware telemetry samples during the run
 - worst-case event logs
 - publication-ready export artifacts
+- a `research/` bundle with predictor-training rows and lineage metadata
 
 ## Quick Start
 
@@ -35,6 +46,19 @@ iints jetson endurance start \
   --duration 7d \
   --output-dir results/jetson_7day \
   --profile mixed_adversarial \
+  --seed 42
+```
+
+For a true one-day research run that occupies one real day:
+
+```bash
+iints jetson endurance start \
+  --algo algorithms/example_algorithm.py \
+  --predictor models/lstm_predictor.pt \
+  --duration 1d \
+  --output-dir results/jetson_research_day \
+  --profile normal \
+  --wall-clock \
   --seed 42
 ```
 
@@ -63,7 +87,14 @@ iints jetson endurance export \
 
 ## Durations
 
-Durations are converted to simulation minutes. With a 5-minute step size:
+Durations always describe the **study horizon**. The execution mode controls how quickly that horizon is traversed:
+
+| Mode | Meaning of `--duration 1d` |
+|---|---|
+| default accelerated mode | simulate 1440 minutes as fast as possible |
+| `--wall-clock` mode | spend about 24 real hours executing the 1440-minute study |
+
+With a 5-minute step size:
 
 | Duration | Steps |
 |---|---:|
@@ -140,6 +171,10 @@ results/jetson_7day/
     ENDURANCE_REPORT.md
     ENDURANCE_REPORT.pdf
     main_figure.png
+  research/
+    predictor_training.csv
+    training_manifest.json
+    README.md
 ```
 
 Important files:
@@ -153,6 +188,31 @@ Important files:
 - `final/test_summary.json` contains TIR, confidence interval, failure-rate proxy, and performance metrics.
 - `final/ENDURANCE_REPORT.md` is the human-readable summary for review.
 - `final/main_figure.png` is the main glucose trace figure.
+- `research/predictor_training.csv` is a standardized dataset slice for the glucose-predictor training pipeline.
+- `research/training_manifest.json` records lineage, columns, and a reproducible example training command.
+
+## Research Mode Versus AI Training
+
+This distinction matters:
+
+| Component | Current role |
+|---|---|
+| Jetson wall-clock mode | acquires a real-duration study bundle |
+| predictor-training pipeline | trains or fine-tunes the glucose forecasting model from exported rows |
+| Ministral / Ollama local AI | explains, reviews, and summarizes runs |
+
+The current SDK does **not** fine-tune Ministral online during the same run. That would mix acquisition, training, and evaluation in one loop and is not a clean research design. Instead, wall-clock runs now export `research/predictor_training.csv` and `research/training_manifest.json` so you can train the glucose predictor afterwards with a fully reproducible command.
+
+Example:
+
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data results/jetson_research_day/research/predictor_training.csv \
+  --config research/configs/predictor_multimodal_dual_guard.yaml \
+  --out models/jetson_research_day_predictor
+```
+
+If a future project adds Ministral fine-tuning, that should be a separate explicit pipeline with its own dataset governance and validation, not an invisible side effect of the endurance runner.
 
 ## Systemd Service
 
@@ -179,6 +239,16 @@ The generated service uses `--resume`, so a restarted run continues from the
 latest checkpoint when possible. `status.json` now also records the last
 checkpoint minute, resume count, elapsed wall-clock time, and estimated wall
 time remaining.
+
+For a real-time research service, add `--wall-clock` when generating the unit:
+
+```bash
+iints jetson endurance install-service \
+  --algo algorithms/example_algorithm.py \
+  --duration 1d \
+  --output-dir results/jetson_research_day \
+  --wall-clock
+```
 
 ## Scientific Claim Pattern
 

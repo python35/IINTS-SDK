@@ -31,7 +31,9 @@ The full benchmark report is still the primary results document. This evidence p
 | 3 | `EUCYS_01_TECHNICAL_BRIEF.pdf` | How the SDK is built |
 | 4 | `EUCYS_03_IMPACT_ETHICS_AND_MAINTENANCE.pdf` | Why the project matters and how it is governed |
 | 5 | `EUCYS_04_JURY_QA.pdf` | Fast answers during judging |
-| 6 | `research/EUCYS_REPORT.pdf` | Full benchmark results |
+| 6 | `EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf` | Standalone physiological reference for doctors and engineers |
+| 7 | `EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf` | Fast handout during a live conversation |
+| 8 | `research/EUCYS_REPORT.pdf` | Full benchmark results |
 
 ## One-Minute Project Story
 

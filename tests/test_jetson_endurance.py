@@ -65,6 +65,9 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     assert (output_dir / "final" / "worst_case_events.json").is_file()
     assert (output_dir / "final" / "ENDURANCE_REPORT.md").is_file()
     assert (output_dir / "final" / "main_figure.png").is_file()
+    assert (output_dir / "research" / "predictor_training.csv").is_file()
+    assert (output_dir / "research" / "training_manifest.json").is_file()
+    assert (output_dir / "research" / "README.md").is_file()
 
     steps = pd.read_csv(output_dir / "raw" / "steps.csv")
     summary = json.loads((output_dir / "final" / "test_summary.json").read_text())
@@ -72,8 +75,13 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     assert summary["expected_steps"] == 12
     assert summary["checkpoint_interval_minutes"] == 30
     assert 0.0 <= summary["total_tir_70_180_pct"] <= 100.0
+    assert summary["execution_mode"] == "accelerated"
     assert (output_dir / "snapshots" / "snapshot_000030m.json").is_file()
     assert (output_dir / "snapshots" / "snapshot_000060m.json").is_file()
+
+    training_manifest = json.loads((output_dir / "research" / "training_manifest.json").read_text())
+    assert training_manifest["row_count"] == 12
+    assert training_manifest["ministral_training_supported"] is False
 
 
 def test_status_and_export_helpers(tmp_path: Path) -> None:
@@ -134,6 +142,52 @@ def test_resume_continues_from_latest_checkpoint(tmp_path: Path) -> None:
     assert resumed["status"]["status"] == "completed"
     assert resumed["status"]["completed_steps"] == 12
     assert resumed["status"]["resume_count"] == 1
+
+
+def test_wall_clock_mode_paces_to_requested_duration(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_wall_clock"
+    config = EnduranceConfig(
+        algo_path="builtin:clinical_baseline",
+        predictor_path=None,
+        duration="30m",
+        duration_minutes=parse_duration_to_minutes("30m"),
+        time_step_minutes=5,
+        output_dir=str(output_dir),
+        profile="normal",
+        seed=42,
+        patient_model="custom",
+        sensor_profile="clinical_cgm",
+        checkpoint_interval_minutes=30,
+        hardware_sample_interval_minutes=30,
+        status_interval_steps=1,
+        execution_mode="wall_clock",
+    )
+
+    class FakeClock:
+        def __init__(self) -> None:
+            self.now = 0.0
+            self.sleeps: list[float] = []
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, seconds: float) -> None:
+            self.sleeps.append(seconds)
+            self.now += seconds
+
+    fake_clock = FakeClock()
+    result = run_endurance_study(
+        algorithm=ClinicalBaselineAlgorithm(),
+        predictor=None,
+        config=config,
+        monotonic_fn=fake_clock.monotonic,
+        sleep_fn=fake_clock.sleep,
+    )
+
+    assert result["status"]["execution_mode"] == "wall_clock"
+    assert result["status"]["wall_elapsed_seconds"] == 1800.0
+    assert result["status"]["wall_clock_target_seconds"] == 1800
+    assert sum(fake_clock.sleeps) == 1800.0
 
 
 def test_jetson_endurance_cli_status_and_export(tmp_path: Path) -> None:
@@ -205,3 +259,15 @@ def test_service_file_contains_resume_command() -> None:
     assert "iints jetson endurance start" in unit
     assert "--resume" in unit
     assert "--predictor models/lstm_predictor.pt" in unit
+
+
+def test_service_file_can_request_wall_clock_mode() -> None:
+    unit = build_endurance_service_file(
+        algo="algorithms/example_algorithm.py",
+        predictor=None,
+        duration="24h",
+        output_dir="results/jetson_research_day",
+        wall_clock=True,
+    )
+
+    assert "--wall-clock" in unit

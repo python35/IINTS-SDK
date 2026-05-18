@@ -5503,6 +5503,8 @@ def _demo_presenter_guide_markdown(
             "- `run_full(...)` creates reproducible run bundles.",
             "- `generate_results_poster(...)` turns the runs into one visual explanation.",
             "- `prepare_ai_ready_artifacts(...)` prepares the optional AI explanation lane.",
+            "- If physiology comes up, open `research/eucys_pack/pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf`.",
+            "- If you need a fast handout, open `research/eucys_pack/pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf`.",
             "",
             "## 5. Live sequence",
             "",
@@ -5533,6 +5535,8 @@ def _demo_presenter_guide_markdown(
                 f"- Summary JSON: `{results_dir / 'demo_summary.json'}`",
                 f"- Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
                 f"- Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
+                "- Physiology brochure: `research/eucys_pack/pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf`",
+                "- Jury physiology brief: `research/eucys_pack/pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf`",
                 "",
             ]
         )
@@ -7860,6 +7864,7 @@ def _print_endurance_status(console: Console, status: Dict[str, Any]) -> None:
     fields = [
         ("Status", status.get("status")),
         ("Duration", status.get("duration")),
+        ("Execution mode", status.get("execution_mode")),
         ("Profile", status.get("profile")),
         ("Progress", f"{float(status.get('progress_pct') or 0.0):.1f}%"),
         ("Steps", f"{status.get('completed_steps', 0)} / {status.get('expected_steps', 0)}"),
@@ -7873,6 +7878,8 @@ def _print_endurance_status(console: Console, status: Dict[str, Any]) -> None:
         ("Last checkpoint minute", status.get("last_checkpoint_minute")),
         ("Resume count", status.get("resume_count")),
         ("Wall elapsed seconds", status.get("wall_elapsed_seconds")),
+        ("Wall target seconds", status.get("wall_clock_target_seconds")),
+        ("Wall progress", status.get("wall_clock_progress_pct")),
         ("Estimated wall remaining seconds", status.get("estimated_wall_remaining_seconds")),
         ("Updated UTC", status.get("updated_at_utc")),
     ]
@@ -7925,6 +7932,20 @@ def jetson_endurance_start(
     checkpoint_interval: Annotated[int, typer.Option(help="Checkpoint interval in simulated minutes.")] = 360,
     hardware_sample_interval: Annotated[int, typer.Option(help="Hardware telemetry interval in simulated minutes.")] = 60,
     status_interval_steps: Annotated[int, typer.Option(help="How often to persist status and partial CSV data.")] = 25,
+    wall_clock: Annotated[
+        bool,
+        typer.Option(
+            "--wall-clock/--accelerated",
+            help="Use real wall-clock pacing so 1d takes an actual 24 hours instead of finishing as fast as possible.",
+        ),
+    ] = False,
+    research_export: Annotated[
+        bool,
+        typer.Option(
+            "--research-export/--no-research-export",
+            help="Write a predictor-training dataset and research manifest next to the normal endurance artifacts.",
+        ),
+    ] = True,
     resume: Annotated[bool, typer.Option(help="Resume from the latest snapshot in the output directory")] = False,
 ):
     """Run a headless Jetson endurance stress test and write publication-ready artifacts."""
@@ -7958,6 +7979,8 @@ def jetson_endurance_start(
             checkpoint_interval_minutes=checkpoint_interval,
             hardware_sample_interval_minutes=hardware_sample_interval,
             status_interval_steps=status_interval_steps,
+            execution_mode="wall_clock" if wall_clock else "accelerated",
+            research_export=research_export,
         )
         result = run_endurance_study(algorithm=algorithm, predictor=predictor, config=config)
     except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:
@@ -8043,6 +8066,13 @@ def jetson_endurance_install_service(
     predictor_path: Annotated[Optional[Path], typer.Option("--predictor", help="Optional LSTM predictor checkpoint")] = None,
     profile: Annotated[str, typer.Option(help="Endurance profile name")] = "mixed_adversarial",
     seed: Annotated[int, typer.Option(help="Deterministic simulation seed")] = 42,
+    wall_clock: Annotated[
+        bool,
+        typer.Option(
+            "--wall-clock/--accelerated",
+            help="Write a service that paces the run in real time instead of accelerated simulation time.",
+        ),
+    ] = False,
     service_path: Annotated[Optional[Path], typer.Option(help="Where to write the systemd unit file")] = None,
 ):
     """Generate a systemd service file for long Jetson endurance tests."""
@@ -8059,6 +8089,7 @@ def jetson_endurance_install_service(
             predictor=str(predictor_path) if predictor_path else None,
             profile=normalized_profile,
             seed=seed,
+            wall_clock=wall_clock,
         )
         target.write_text(unit, encoding="utf-8")
     except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:

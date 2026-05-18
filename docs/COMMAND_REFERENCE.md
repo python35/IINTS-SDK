@@ -238,6 +238,11 @@ iints jetson endurance start \
   --hardware-sample-interval 60
 ```
 
+Add `--wall-clock` when the study horizon should consume real time instead of
+finishing as fast as possible. A run such as `--duration 1d --wall-clock`
+therefore lasts about 24 real hours and writes a training-ready `research/`
+bundle next to the normal endurance outputs.
+
 ### `iints jetson endurance status`
 Show progress, current glucose, TIR so far, interventions, critical events, the
 latest checkpoint, resume count, and wall-clock ETA.
@@ -253,6 +258,7 @@ Package the complete endurance folder into a transfer-ready `.zip`.
 
 ### `iints jetson endurance install-service`
 Write a systemd service file with automatic `--resume` for multi-day Jetson runs.
+Pass `--wall-clock` here too when the generated service should preserve real-time pacing.
 
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
 

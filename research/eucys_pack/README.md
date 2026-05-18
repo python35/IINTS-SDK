@@ -11,6 +11,8 @@ This folder contains jury-facing explanation bundles for the IINTS-AF SDK. The f
 | `EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md` | `pdf/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.pdf` | Type 1 diabetes physiology, CGM metrics, realistic data requirements |
 | `EUCYS_03_IMPACT_ETHICS_AND_MAINTENANCE.md` | `pdf/EUCYS_03_IMPACT_ETHICS_AND_MAINTENANCE.pdf` | Why the SDK matters, ethics, limitations, maintenance evidence |
 | `EUCYS_04_JURY_QA.md` | `pdf/EUCYS_04_JURY_QA.pdf` | Short answers to likely judge questions |
+| `EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.md` | `pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf` | Standalone physiology brochure for doctors, engineers, and reviewers |
+| `EUCYS_06_JURY_PHYSIOLOGY_BRIEF.md` | `pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf` | Fast two-page physiology handout for live judging |
 
 ## Build
 

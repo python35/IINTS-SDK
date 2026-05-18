@@ -85,6 +85,7 @@ nav:
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
+      - Physiology Reference: PHYSIOLOGY_REFERENCE.md
       - Command Reference: COMMAND_REFERENCE.md
       - Evidence Base: EVIDENCE_BASE.md
       - MDMP Specification: MDMP.md

@@ -8,7 +8,7 @@ Use this page when you already know the SDK workflow and need to decide where it
 | --- | --- | --- |
 | a stable live digital-patient demo | Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
 | visible hardware feedback with a small bridge layer | Arduino UNO Q | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
-| accelerated stress testing over long simulated periods | NVIDIA Jetson | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
+| accelerated stress testing or real-duration wall-clock studies | NVIDIA Jetson | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
 
 ## Fastest Safe Start
 
@@ -29,6 +29,12 @@ Jetson:
 ```bash
 iints jetson doctor
 iints jetson endurance start --duration 7d --profile mixed_adversarial --output-dir results/jetson_7day
+```
+
+For a true 24-hour acquisition study instead of an accelerated stress sweep:
+
+```bash
+iints jetson endurance start --duration 1d --profile normal --wall-clock --output-dir results/jetson_research_day
 ```
 
 ## Device Routes
@@ -56,7 +62,7 @@ Edge Hardware Matrix
 ```text
 Jetson Endurance Mode
   -> doctor
-  -> endurance start
+  -> endurance start in accelerated or wall-clock mode
   -> status / monitor / export
 ```
 
