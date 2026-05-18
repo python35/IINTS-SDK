@@ -127,7 +127,17 @@ For a Zoom call or jury meeting, the easiest all-in-one command is:
 iints demo-live --output-dir results/live_demo
 ```
 
-That prints the important code lines first, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, prints the important code lines, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+
+Use the audience mode that matches the room:
+
+```bash
+iints demo-live --output-dir results/live_demo_clinical --audience clinical
+iints demo-live --output-dir results/live_demo_engineering --audience engineering
+iints demo-live --output-dir results/live_demo_jury --audience jury
+```
+
+The clinical mode emphasizes pre-clinical safety framing, the engineering mode emphasizes reproducibility and artifacts, and the jury mode keeps the story short and visual.
 
 If you specifically want to drive the repository script yourself, then run:
 

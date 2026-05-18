@@ -180,7 +180,14 @@ iints poster \
 iints demo-live --output-dir results/live_demo
 ```
 
-This is the easiest option for Zoom calls, jury meetings, or sponsor walkthroughs: it exports showable Python code, prints the key SDK calls in the terminal, runs the demo, and then tells you which poster and proof artifacts to open next.
+This is the easiest option for Zoom calls, jury meetings, or sponsor walkthroughs: it prints a short opening explanation first, exports showable Python code, runs the demo, writes `PRESENTER_GUIDE.md`, and then tells you which poster and proof artifacts to open next.
+
+If you want the opening framed for a specific audience:
+
+```bash
+iints demo-live --output-dir results/live_demo_clinical --audience clinical
+iints demo-live --output-dir results/live_demo_engineering --audience engineering
+```
 
 If you are working from the repository and want the older script-only flow, you can still use:
 

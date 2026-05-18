@@ -17,10 +17,25 @@ def test_cli_demo_live_can_prepare_code_without_running(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "IINTS Live Demo" in result.stdout
+    assert "What To Say First" in result.stdout
     assert "Code to explain on the call" in result.stdout
     assert "run_full(" in result.stdout
     assert "Prepared only" in result.stdout
     assert (tmp_path / "showable_code" / "07_live_stage_demo.py").is_file()
+    assert (tmp_path / "PRESENTER_GUIDE.md").is_file()
+
+
+def test_cli_demo_live_supports_clinical_presenter_mode(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["demo-live", "--output-dir", str(tmp_path), "--no-run", "--audience", "clinical"],
+    )
+
+    assert result.exit_code == 0
+    assert "clinical audience" in result.stdout
+    guide = (tmp_path / "PRESENTER_GUIDE.md").read_text(encoding="utf-8")
+    assert "pre-clinical research tool" in guide
+    assert "not treatment advice" in guide
 
 
 def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, tmp_path: Path) -> None:
@@ -50,5 +65,5 @@ def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, 
     assert "IINTS Live Demo Results" in result.stdout
     assert "booth_demo_poster.png" in result.stdout
     assert "Normal Run" in result.stdout
+    assert "Presenter guide updated" in result.stdout
     assert "Suggested call flow" in result.stdout
-

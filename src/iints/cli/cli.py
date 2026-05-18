@@ -5389,6 +5389,200 @@ def _live_demo_result_rows(summary: dict[str, Any], results_dir: Path) -> list[t
     return rows
 
 
+_DEMO_AUDIENCE_PROFILES: Dict[str, Dict[str, Any]] = {
+    "mixed": {
+        "label": "mixed audience",
+        "opening": (
+            "IINTS-AF is a pre-clinical SDK for testing insulin-delivery algorithms before they ever "
+            "touch a real patient."
+        ),
+        "why_it_matters": [
+            "For clinicians: it makes safety behavior visible instead of hidden in code.",
+            "For engineers: it turns one algorithm into reproducible runs, reports, and audit artifacts.",
+            "For a jury or booth visitor: it shows one clear story — simulate, stress, protect.",
+        ],
+        "closing": "The point is not one pretty graph; the point is that every decision becomes testable and explainable.",
+    },
+    "clinical": {
+        "label": "clinical audience",
+        "opening": (
+            "IINTS-AF is a pre-clinical research tool for asking a simple question: how does an insulin "
+            "algorithm behave before we would ever trust it near a patient?"
+        ),
+        "why_it_matters": [
+            "It shows glucose trajectories, hypo risk, and safety-supervisor interventions in one workflow.",
+            "It keeps the distinction clear between physiological scenarios and algorithm decisions.",
+            "It produces reports and audit trails that are readable outside the codebase.",
+        ],
+        "closing": "What you are seeing is not treatment advice; it is a safer way to inspect algorithm behavior before clinical translation.",
+    },
+    "engineering": {
+        "label": "engineering audience",
+        "opening": (
+            "IINTS-AF is a reproducible test harness for insulin algorithms: same code, same seed, same "
+            "scenario, inspectable artifacts every time."
+        ),
+        "why_it_matters": [
+            "It packages scenarios, baselines, manifests, reports, and safety logs around one algorithm call.",
+            "It makes regressions visible through repeatable stress cases instead of ad-hoc notebooks.",
+            "It gives edge hardware, AI predictors, and safety supervision one shared validation pipeline.",
+        ],
+        "closing": "The engineering value is that the demo you just saw is also a testable, replayable research bundle.",
+    },
+    "jury": {
+        "label": "jury / booth audience",
+        "opening": (
+            "Every day, an automated insulin system makes hundreds of decisions. IINTS-AF helps us test "
+            "those decisions before they matter in the real world."
+        ),
+        "why_it_matters": [
+            "First we show a normal day.",
+            "Then we make the day harder with meals and exercise.",
+            "Finally we show that a dangerous AI request can be blocked and documented.",
+        ],
+        "closing": "So the real innovation is not just automation; it is automation that can be tested, challenged, and explained.",
+    },
+}
+
+
+def _demo_audience_profile(audience: str) -> Dict[str, Any]:
+    normalized = audience.strip().lower().replace("_", "-")
+    aliases = {
+        "doctor": "clinical",
+        "doctors": "clinical",
+        "clinician": "clinical",
+        "engineer": "engineering",
+        "engineers": "engineering",
+        "booth": "jury",
+        "expo": "jury",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized not in _DEMO_AUDIENCE_PROFILES:
+        supported = ", ".join(sorted(_DEMO_AUDIENCE_PROFILES))
+        raise typer.BadParameter(f"Unknown audience '{audience}'. Choose one of: {supported}.")
+    return _DEMO_AUDIENCE_PROFILES[normalized]
+
+
+def _demo_presenter_guide_markdown(
+    *,
+    audience: str,
+    script_path: Path,
+    results_dir: Path,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    profile = _demo_audience_profile(audience)
+    lines = [
+        "# IINTS-AF Presenter Guide",
+        "",
+        f"Audience mode: **{profile['label']}**",
+        "",
+        "## 1. Opening",
+        "",
+        profile["opening"],
+        "",
+        "## 2. Why it matters",
+        "",
+    ]
+    lines.extend(f"- {item}" for item in profile["why_it_matters"])
+    lines.extend(
+        [
+            "",
+            "## 3. What to say before the live run",
+            "",
+            "In the next few minutes I will show three things:",
+            "",
+            "1. a normal controller run",
+            "2. a harder meal-and-exercise stress run",
+            "3. a deliberately unsafe request that gets blocked by the safety supervisor",
+            "",
+            "I will first show the small piece of code that defines the pipeline, then run it once, then open the generated poster and artifacts.",
+            "",
+            "## 4. Code to point at",
+            "",
+            f"- Showable script: `{script_path}`",
+            "- `run_full(...)` creates reproducible run bundles.",
+            "- `generate_results_poster(...)` turns the runs into one visual explanation.",
+            "- `prepare_ai_ready_artifacts(...)` prepares the optional AI explanation lane.",
+            "",
+            "## 5. Live sequence",
+            "",
+            "1. Read the opening line above.",
+            "2. Show the exported code preview.",
+            "3. Run `iints demo-live --run`.",
+            "4. Open the poster first.",
+            "5. If someone asks for proof, open one scenario folder and show `results.csv`, the report, and the manifest.",
+            "",
+            "## 6. How to explain the three panels",
+            "",
+            "- **Normal Run** = the control case.",
+            "- **Meal Stress Test** = the same controller under harder physiology.",
+            "- **Supervisor Override** = a bad request is blocked, logged, and made explainable.",
+            "",
+            "## 7. Closing",
+            "",
+            profile["closing"],
+            "",
+        ]
+    )
+    if summary is not None:
+        lines.extend(
+            [
+                "## 8. Results generated in this run",
+                "",
+                f"- Poster: `{summary.get('poster_png', results_dir / 'booth_demo_poster.png')}`",
+                f"- Summary JSON: `{results_dir / 'demo_summary.json'}`",
+                f"- Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
+                f"- Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
+                "",
+            ]
+        )
+        for scenario in summary.get("scenarios", []):
+            lines.append(f"- {scenario['label']}: `{scenario['output_dir']}`")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _write_demo_presenter_guide(
+    *,
+    output_dir: Path,
+    audience: str,
+    script_path: Path,
+    results_dir: Path,
+    summary: Optional[Dict[str, Any]] = None,
+) -> Path:
+    guide_path = output_dir / "PRESENTER_GUIDE.md"
+    guide_path.write_text(
+        _demo_presenter_guide_markdown(
+            audience=audience,
+            script_path=script_path,
+            results_dir=results_dir,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+    return guide_path
+
+
+def _print_demo_opening(console: Console, *, audience: str, guide_path: Path) -> None:
+    profile = _demo_audience_profile(audience)
+    lines = [profile["opening"], "", "Why this matters:"]
+    lines.extend(f"- {item}" for item in profile["why_it_matters"])
+    lines.extend(
+        [
+            "",
+            "Then show three proof points: normal control, harder physiology, and safety override.",
+            f"Presenter guide: {guide_path}",
+        ]
+    )
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title=f"0. What To Say First ({profile['label']})",
+            border_style="green",
+        )
+    )
+
+
 @app.command(name="demo-live")
 def demo_live(
     output_dir: Annotated[
@@ -5414,6 +5608,13 @@ def demo_live(
         bool,
         typer.Option("--overwrite/--no-overwrite", help="Allow replacing previously exported demo code files."),
     ] = True,
+    audience: Annotated[
+        str,
+        typer.Option(
+            "--audience",
+            help="Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.",
+        ),
+    ] = "mixed",
 ) -> None:
     """Export, show, run, and summarize one Zoom-friendly live demo flow."""
     console = Console()
@@ -5433,6 +5634,17 @@ def demo_live(
     script_path = Path(exported["script_path"])
     script_text = script_path.read_text(encoding="utf-8")
     code_to_show = script_text if full_code else _build_live_demo_code_preview(script_text)
+    try:
+        _demo_audience_profile(audience)
+    except typer.BadParameter as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+    presenter_guide = _write_demo_presenter_guide(
+        output_dir=root_dir,
+        audience=audience,
+        script_path=script_path,
+        results_dir=results_dir,
+    )
 
     console.print(
         Panel(
@@ -5447,6 +5659,7 @@ def demo_live(
             border_style="cyan",
         )
     )
+    _print_demo_opening(console, audience=audience, guide_path=presenter_guide)
     console.print(
         "[bold]1. Code to explain on the call[/bold]\n"
         "The full script is exported above; this is the shortest useful slice to talk through first."
@@ -5479,6 +5692,13 @@ def demo_live(
         raise typer.Exit(code=1)
 
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    presenter_guide = _write_demo_presenter_guide(
+        output_dir=root_dir,
+        audience=audience,
+        script_path=script_path,
+        results_dir=results_dir,
+        summary=summary,
+    )
     table = Table(title="IINTS Live Demo Results")
     table.add_column("Artifact", style="cyan")
     table.add_column("Path", overflow="fold")
@@ -5486,6 +5706,7 @@ def demo_live(
         table.add_row(label, path)
     console.print("[bold]3. Results to show next[/bold]")
     console.print(table)
+    console.print(f"[green]Presenter guide updated:[/green] {presenter_guide}")
     console.print(
         "[green]Suggested call flow:[/green] show the preview, explain `run_full(...)`, open the poster, "
         "then open one scenario folder if someone asks for proof."

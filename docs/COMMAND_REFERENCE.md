@@ -48,7 +48,7 @@ iints demo --dry-run
 ### `iints demo-live`
 One-command live presentation flow for calls, juries, and sponsor walkthroughs.
 
-It exports showable Python code, prints the key SDK calls in the terminal, runs the live demo, and lists the poster plus proof artifacts to open next.
+It exports showable Python code, prints an audience-aware opening talk track, shows the key SDK calls in the terminal, runs the live demo, writes `PRESENTER_GUIDE.md`, and lists the poster plus proof artifacts to open next.
 
 Common forms:
 
@@ -57,6 +57,8 @@ iints demo-live
 iints demo-live --output-dir results/live_demo
 iints demo-live --no-run
 iints demo-live --prepare-ai
+iints demo-live --audience clinical
+iints demo-live --audience engineering
 ```
 
 ### `iints quickstart`
