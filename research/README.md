@@ -48,6 +48,20 @@ We standardize training data to **Parquet** with at least these columns:
 - `effective_basal_rate_u_per_hr`
 - `glucose_trend_mgdl_min`
 
+If you want the strongest current real-data predictor track, blend multiple
+prepared datasets instead of training on one small cohort in isolation:
+
+```bash
+iints research blend-datasets \
+  --source azt1d=data_packs/public/azt1d/processed/azt1d_merged.csv \
+  --source hupa=data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv \
+  --output data_packs/processed/predictor_blend.csv \
+  --manifest data_packs/processed/predictor_blend_manifest.json
+```
+
+Use OhioT1DM as a held-out external benchmark whenever possible rather than
+silently mixing every source into the training set.
+
 For CGM-only datasets (no insulin/carbs), use:
 ```bash
 python research/prepare_aide_cgm.py \
@@ -218,6 +232,29 @@ PYTHONPATH=src python3 research/calibrate_simulator_realism.py \
 
 The calibrator searches plausible physiology settings, evaluates every candidate
 across multiple deterministic seeds, and ranks them by robust realism first:
+
+## Local controller-policy research
+
+Controller learning is kept separate from predictor learning. Build controller
+labels from safety-supervised simulation runs, not by pretending that a language
+model should dose insulin directly:
+
+```bash
+iints research build-control-dataset \
+  --run normal=results/jetson_research_day \
+  --run stress=results/jetson_stress_day \
+  --output data_packs/processed/controller_teacher_dataset.csv \
+  --manifest data_packs/processed/controller_teacher_manifest.json
+
+iints research train-controller \
+  --data data_packs/processed/controller_teacher_dataset.csv \
+  --output models/controller_imitation.json \
+  --metrics-output models/controller_imitation_metrics.json
+```
+
+This first controller is intentionally an auditable imitation baseline. It is
+useful for proving the research loop end to end before moving on to richer local
+policy networks and held-out closed-loop scenario evaluation.
 how many runs are `likely_realistic`, then average realism score, then distance
 from the empirical reference median. That makes the chosen preset reproducible
 and less vulnerable to one lucky-looking trace.

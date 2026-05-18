@@ -260,6 +260,17 @@ Package the complete endurance folder into a transfer-ready `.zip`.
 Write a systemd service file with automatic `--resume` for multi-day Jetson runs.
 Pass `--wall-clock` here too when the generated service should preserve real-time pacing.
 
+## Local AI Research Commands
+
+### `iints research blend-datasets`
+Blend already prepared real datasets into one source-aware predictor dataset.
+
+### `iints research build-control-dataset`
+Combine one or more run bundles into a supervised controller teacher dataset.
+
+### `iints research train-controller`
+Train the first auditable local controller baseline from safe-action labels.
+
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
 
 ### `iints makerfaire up`

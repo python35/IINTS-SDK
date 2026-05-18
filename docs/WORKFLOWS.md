@@ -53,6 +53,7 @@ iints demo-live --output-dir results/live_demo
 
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
+- [Local AI Research](LOCAL_AI_RESEARCH.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
 - [AI Assistant](AI_ASSISTANT.md)

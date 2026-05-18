@@ -173,6 +173,7 @@ results/jetson_7day/
     main_figure.png
   research/
     predictor_training.csv
+    controller_teacher_dataset.csv
     training_manifest.json
     README.md
 ```
@@ -189,6 +190,7 @@ Important files:
 - `final/ENDURANCE_REPORT.md` is the human-readable summary for review.
 - `final/main_figure.png` is the main glucose trace figure.
 - `research/predictor_training.csv` is a standardized dataset slice for the glucose-predictor training pipeline.
+- `research/controller_teacher_dataset.csv` contains safety-supervised insulin-action labels for controller-policy research.
 - `research/training_manifest.json` records lineage, columns, and a reproducible example training command.
 
 ## Research Mode Versus AI Training
@@ -210,6 +212,14 @@ PYTHONPATH=src python3 research/train_predictor.py \
   --data results/jetson_research_day/research/predictor_training.csv \
   --config research/configs/predictor_multimodal_dual_guard.yaml \
   --out models/jetson_research_day_predictor
+```
+
+Controller imitation baseline:
+
+```bash
+iints research train-controller \
+  --data results/jetson_research_day/research/controller_teacher_dataset.csv \
+  --output models/jetson_research_day_controller.json
 ```
 
 If a future project adds Ministral fine-tuning, that should be a separate explicit pipeline with its own dataset governance and validation, not an invisible side effect of the endurance runner.

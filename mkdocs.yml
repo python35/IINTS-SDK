@@ -86,6 +86,7 @@ nav:
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
       - Physiology Reference: PHYSIOLOGY_REFERENCE.md
+      - Local AI Research: LOCAL_AI_RESEARCH.md
       - Command Reference: COMMAND_REFERENCE.md
       - Evidence Base: EVIDENCE_BASE.md
       - MDMP Specification: MDMP.md

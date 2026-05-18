@@ -687,6 +687,30 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
             training_df[column] = 0.0
     training_path = research_dir / "predictor_training.csv"
     training_df[predictor_columns].to_csv(training_path, index=False)
+    controller_columns = [
+        "glucose_actual_mgdl",
+        "glucose_trend_mgdl_min",
+        "patient_iob_units",
+        "patient_cob_grams",
+        "effective_isf",
+        "effective_icr",
+        "effective_basal_rate_u_per_hr",
+        "carb_intake_grams",
+        "delivered_insulin_units",
+        "algo_recommended_insulin_units",
+        "safety_triggered",
+        "time_minutes",
+    ]
+    controller_path = research_dir / "controller_teacher_dataset.csv"
+    controller_df = df.copy()
+    for column in controller_columns:
+        if column not in controller_df.columns:
+            controller_df[column] = 0.0
+    controller_df["teacher_insulin_units"] = pd.to_numeric(
+        controller_df["delivered_insulin_units"],
+        errors="coerce",
+    ).fillna(0.0)
+    controller_df[[*controller_columns, "teacher_insulin_units"]].to_csv(controller_path, index=False)
 
     manifest_path = research_dir / "training_manifest.json"
     training_manifest = {
@@ -697,6 +721,7 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
         "row_count": int(len(training_df)),
         "subject_id": f"jetson_{Path(config.output_dir).name}",
         "dataset_path": str(training_path),
+        "controller_dataset_path": str(controller_path),
         "columns": predictor_columns,
         "recommended_predictor_configs": [
             "research/configs/predictor.yaml",
@@ -708,6 +733,11 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
             f"--data {training_path} "
             "--config research/configs/predictor.yaml "
             f"--out models/{Path(config.output_dir).name}_predictor"
+        ),
+        "example_controller_training_command": (
+            "iints research train-controller "
+            f"--data {controller_path} "
+            f"--output models/{Path(config.output_dir).name}_controller.json"
         ),
         "ministral_training_supported": False,
         "ministral_note": (
@@ -728,6 +758,7 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
                 "## Files",
                 "",
                 "- `predictor_training.csv`: rows compatible with the SDK predictor-training pipeline.",
+                "- `controller_teacher_dataset.csv`: supervised safe-action labels for controller research.",
                 "- `training_manifest.json`: lineage, columns, and a reproducible training command.",
                 "",
                 "## Important distinction",
@@ -743,12 +774,19 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
                 str(training_manifest["example_training_command"]),
                 "```",
                 "",
+                "Controller imitation baseline:",
+                "",
+                "```bash",
+                str(training_manifest["example_controller_training_command"]),
+                "```",
+                "",
             ]
         ),
         encoding="utf-8",
     )
     return {
         "research_training_csv": str(training_path),
+        "research_controller_teacher_csv": str(controller_path),
         "research_training_manifest_json": str(manifest_path),
         "research_readme_md": str(readme_path),
     }

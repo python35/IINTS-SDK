@@ -6891,6 +6891,158 @@ def research_quality(
     console.print(table)
 
 
+@research_app.command(name="blend-datasets")
+def research_blend_datasets(
+    source: Annotated[
+        List[str],
+        typer.Option(
+            "--source",
+            help="Repeatable dataset source in label=path form, for example azt1d=data/azt1d.csv.",
+        ),
+    ],
+    output: Annotated[Path, typer.Option(help="Output blended predictor dataset path")] = Path(
+        "data_packs/processed/predictor_blend.csv"
+    ),
+    manifest: Annotated[Path, typer.Option(help="Output blend manifest JSON path")] = Path(
+        "data_packs/processed/predictor_blend_manifest.json"
+    ),
+) -> None:
+    """Blend already prepared real datasets into one leakage-safe predictor dataset."""
+    console = Console()
+    if not source:
+        console.print("[bold red]At least one --source label=path value is required.[/bold red]")
+        raise typer.Exit(code=1)
+    parsed_sources: list[tuple[str, Path]] = []
+    for item in source:
+        if "=" not in item:
+            console.print(f"[bold red]Invalid --source value:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        label, raw_path = item.split("=", 1)
+        path = Path(raw_path)
+        if not label.strip() or not path.is_file():
+            console.print(f"[bold red]Invalid or missing source:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        parsed_sources.append((label.strip(), path))
+
+    from iints.research.data_blend import blend_predictor_datasets
+
+    try:
+        report = blend_predictor_datasets(parsed_sources, output_path=output, manifest_path=manifest)
+    except Exception as exc:
+        console.print(f"[bold red]Dataset blending failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Predictor Dataset Blend")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Rows", str(report["rows"]))
+    table.add_row("Subjects", str(report["subjects"]))
+    table.add_row("Output", str(output))
+    table.add_row("Manifest", str(manifest))
+    console.print(table)
+
+
+@research_app.command(name="build-control-dataset")
+def research_build_control_dataset(
+    run: Annotated[
+        List[str],
+        typer.Option(
+            "--run",
+            help="Repeatable run input in label=path form; path may contain raw/steps.csv or results.csv.",
+        ),
+    ],
+    output: Annotated[Path, typer.Option(help="Output controller teacher dataset CSV")] = Path(
+        "data_packs/processed/controller_teacher_dataset.csv"
+    ),
+    manifest: Annotated[Path, typer.Option(help="Output controller dataset manifest JSON")] = Path(
+        "data_packs/processed/controller_teacher_manifest.json"
+    ),
+) -> None:
+    """Build a supervised controller dataset from safety-supervised run bundles."""
+    console = Console()
+    if not run:
+        console.print("[bold red]At least one --run label=path value is required.[/bold red]")
+        raise typer.Exit(code=1)
+    parsed_runs: list[tuple[str, Path]] = []
+    for item in run:
+        if "=" not in item:
+            console.print(f"[bold red]Invalid --run value:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        label, raw_path = item.split("=", 1)
+        path = Path(raw_path)
+        if not label.strip() or not path.exists():
+            console.print(f"[bold red]Invalid or missing run:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        parsed_runs.append((label.strip(), path))
+
+    from iints.research.control import build_control_dataset_from_runs
+
+    try:
+        report = build_control_dataset_from_runs(parsed_runs, output_path=output, manifest_path=manifest)
+    except Exception as exc:
+        console.print(f"[bold red]Controller dataset build failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Controller Teacher Dataset")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Rows", str(report["rows"]))
+    table.add_row("Mean teacher insulin", str(report["mean_teacher_insulin_units"]))
+    table.add_row("Safety intervention rows", str(report["safety_intervention_rows"]))
+    table.add_row("Output", str(output))
+    table.add_row("Manifest", str(manifest))
+    console.print(table)
+
+
+@research_app.command(name="train-controller")
+def research_train_controller(
+    data: Annotated[Path, typer.Option(help="Controller teacher dataset CSV")],
+    output: Annotated[Path, typer.Option(help="Output local controller JSON")] = Path(
+        "models/controller_imitation.json"
+    ),
+    metrics_output: Annotated[Path, typer.Option(help="Output training metrics JSON")] = Path(
+        "models/controller_imitation_metrics.json"
+    ),
+    ridge_lambda: Annotated[float, typer.Option(help="Ridge regularization strength")] = 1e-3,
+) -> None:
+    """Train an auditable local imitation controller from supervised safe-action labels."""
+    console = Console()
+    if not data.is_file():
+        console.print(f"[bold red]Controller dataset not found:[/bold red] {data}")
+        raise typer.Exit(code=1)
+
+    from iints.research.control import (
+        save_linear_controller,
+        train_linear_imitation_controller,
+    )
+
+    try:
+        df = pd.read_csv(data)
+        model = train_linear_imitation_controller(df, ridge_lambda=ridge_lambda)
+        save_linear_controller(model, output)
+        metrics_output.parent.mkdir(parents=True, exist_ok=True)
+        metrics_output.write_text(json.dumps(model["train_metrics"], indent=2), encoding="utf-8")
+    except Exception as exc:
+        console.print(f"[bold red]Controller training failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    metrics = model["train_metrics"]
+    table = Table(title="Local Controller Training")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value")
+    table.add_row("Model", str(output))
+    table.add_row("Rows", str(metrics["rows"]))
+    table.add_row("MAE (U)", str(metrics["mae_units"]))
+    table.add_row("RMSE (U)", str(metrics["rmse_units"]))
+    table.add_row("Unsafe hypo proposals", str(metrics["unsafe_hypo_proposal_rows"]))
+    table.add_row(">5 U proposals", str(metrics["over_5u_proposal_rows"]))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] this local controller is an auditable imitation baseline, "
+        "not a clinically validated dosing system."
+    )
+
+
 @research_app.command(name="export-onnx")
 def research_export_onnx(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),

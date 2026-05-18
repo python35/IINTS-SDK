@@ -66,6 +66,7 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     assert (output_dir / "final" / "ENDURANCE_REPORT.md").is_file()
     assert (output_dir / "final" / "main_figure.png").is_file()
     assert (output_dir / "research" / "predictor_training.csv").is_file()
+    assert (output_dir / "research" / "controller_teacher_dataset.csv").is_file()
     assert (output_dir / "research" / "training_manifest.json").is_file()
     assert (output_dir / "research" / "README.md").is_file()
 
@@ -82,6 +83,7 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     training_manifest = json.loads((output_dir / "research" / "training_manifest.json").read_text())
     assert training_manifest["row_count"] == 12
     assert training_manifest["ministral_training_supported"] is False
+    assert "controller_teacher_dataset.csv" in training_manifest["controller_dataset_path"]
 
 
 def test_status_and_export_helpers(tmp_path: Path) -> None:

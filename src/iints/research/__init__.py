@@ -33,6 +33,22 @@ from .model_registry import (
     promote_registry_run,
     write_registry,
 )
+from .control import (
+    CONTROL_FEATURE_COLUMNS,
+    CONTROL_TARGET_COLUMN,
+    build_control_dataset_from_runs,
+    evaluate_controller_predictions,
+    load_linear_controller,
+    predict_linear_controller,
+    save_linear_controller,
+    summarize_control_dataset,
+    train_linear_imitation_controller,
+)
+from .data_blend import (
+    PREDICTOR_OPTIONAL_COLUMNS,
+    PREDICTOR_REQUIRED_COLUMNS,
+    blend_predictor_datasets,
+)
 
 __all__ = [
     "PredictorConfig",
@@ -70,4 +86,16 @@ __all__ = [
     "load_registry",
     "promote_registry_run",
     "write_registry",
+    "CONTROL_FEATURE_COLUMNS",
+    "CONTROL_TARGET_COLUMN",
+    "build_control_dataset_from_runs",
+    "evaluate_controller_predictions",
+    "load_linear_controller",
+    "predict_linear_controller",
+    "save_linear_controller",
+    "summarize_control_dataset",
+    "train_linear_imitation_controller",
+    "PREDICTOR_OPTIONAL_COLUMNS",
+    "PREDICTOR_REQUIRED_COLUMNS",
+    "blend_predictor_datasets",
 ]

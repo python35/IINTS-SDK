@@ -18,6 +18,7 @@ Use this page when you know what you want to achieve, but not yet which guide de
 | certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Data Certification Full Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
 | analyze a finished study | [Study Analysis](STUDY_ANALYSIS.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints study analyze` |
 | understand what the physiological numbers mean | [Physiology Reference](PHYSIOLOGY_REFERENCE.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints sources` |
+| train local AI models responsibly | [Local AI Research](LOCAL_AI_RESEARCH.md) | `research/README.md` | `iints research blend-datasets` |
 | prepare a live demo | [Booth Demo Guide](BOOTH_DEMO.md) | [Workflow Hub](WORKFLOWS.md) | `iints demo-live` |
 | deploy hardware | [Hardware Hub](HARDWARE.md) | board-specific guide | `iints edge quickstart` |
 | change SDK code | [Developer Portal](DEVELOPER_PORTAL.md) | [Contribute Safely](CONTRIBUTING_SAFELY.md) | `tools/dev/sdk_check.sh quick` |
