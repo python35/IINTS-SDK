@@ -44,10 +44,22 @@ from .control import (
     summarize_control_dataset,
     train_linear_imitation_controller,
 )
+from .neural_control import (
+    NeuralControllerConfig,
+    instantiate_neural_controller_model,
+    load_neural_controller,
+    predict_neural_controller,
+    save_neural_controller,
+    train_neural_imitation_controller,
+)
 from .data_blend import (
     PREDICTOR_OPTIONAL_COLUMNS,
     PREDICTOR_REQUIRED_COLUMNS,
     blend_predictor_datasets,
+)
+from .control_eval import (
+    DEFAULT_HELD_OUT_PRESETS,
+    evaluate_controller_factories,
 )
 
 __all__ = [
@@ -95,7 +107,15 @@ __all__ = [
     "save_linear_controller",
     "summarize_control_dataset",
     "train_linear_imitation_controller",
+    "NeuralControllerConfig",
+    "instantiate_neural_controller_model",
+    "load_neural_controller",
+    "predict_neural_controller",
+    "save_neural_controller",
+    "train_neural_imitation_controller",
     "PREDICTOR_OPTIONAL_COLUMNS",
     "PREDICTOR_REQUIRED_COLUMNS",
     "blend_predictor_datasets",
+    "DEFAULT_HELD_OUT_PRESETS",
+    "evaluate_controller_factories",
 ]

@@ -15,6 +15,7 @@ from iints.jetson.endurance import (
     parse_duration_to_minutes,
     run_endurance_study,
 )
+from iints.jetson.research_pipeline import finalize_endurance_research
 
 
 runner = CliRunner()
@@ -84,6 +85,27 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
     assert training_manifest["row_count"] == 12
     assert training_manifest["ministral_training_supported"] is False
     assert "controller_teacher_dataset.csv" in training_manifest["controller_dataset_path"]
+
+
+def test_finalize_research_writes_models_and_evaluation(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_1h"
+    _run_short_endurance(output_dir)
+
+    report = finalize_endurance_research(
+        output_dir,
+        repo_root=Path.cwd(),
+        train_predictor=False,
+        train_neural=False,
+        evaluation_presets=["hypo_prone_night"],
+        evaluation_seeds=[7],
+        evaluation_duration_minutes=60,
+    )
+
+    assert report["linear_controller"]["model_path"].endswith("linear_controller.json")
+    assert report["neural_controller"]["status"] == "skipped"
+    assert report["predictor_training"]["status"] == "skipped"
+    assert (output_dir / "research" / "RESEARCH_PIPELINE_REPORT.md").is_file()
+    assert (output_dir / "research" / "evaluation" / "CONTROL_EVALUATION_REPORT.md").is_file()
 
 
 def test_status_and_export_helpers(tmp_path: Path) -> None:
@@ -244,6 +266,29 @@ def test_jetson_endurance_cli_start_runs_short_study(tmp_path: Path) -> None:
     assert "Endurance artifacts written to" in result.stdout
     assert (output_dir / "status.json").is_file()
     assert (output_dir / "final" / "test_summary.json").is_file()
+
+
+def test_jetson_endurance_cli_finalize_research(tmp_path: Path) -> None:
+    output_dir = tmp_path / "jetson_1h"
+    _run_short_endurance(output_dir)
+
+    result = runner.invoke(
+        app,
+        [
+            "jetson",
+            "endurance",
+            "finalize-research",
+            "--output-dir",
+            str(output_dir),
+            "--skip-predictor",
+            "--skip-neural",
+            "--duration-minutes",
+            "60",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Jetson Research Finalization" in result.stdout
 
 
 def test_service_file_contains_resume_command() -> None:

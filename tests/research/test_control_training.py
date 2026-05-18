@@ -16,7 +16,15 @@ from iints.research.control import (
     save_linear_controller,
     train_linear_imitation_controller,
 )
+from iints.research.control_eval import evaluate_controller_factories
 from iints.research.data_blend import blend_predictor_datasets
+from iints.research.neural_control import (
+    NeuralControllerConfig,
+    load_neural_controller,
+    predict_neural_controller,
+    save_neural_controller,
+    train_neural_imitation_controller,
+)
 
 
 runner = CliRunner()
@@ -39,6 +47,12 @@ def _control_rows() -> pd.DataFrame:
             "safety_triggered": [False, False, False, True],
         }
     )
+
+
+def _controller_dataset_rows() -> pd.DataFrame:
+    rows = _control_rows().copy()
+    rows[CONTROL_TARGET_COLUMN] = rows["delivered_insulin_units"]
+    return rows
 
 
 def test_build_and_train_local_controller(tmp_path: Path) -> None:
@@ -137,3 +151,87 @@ def test_research_cli_builds_and_trains_controller(tmp_path: Path) -> None:
     assert train_result.exit_code == 0
     assert model_path.is_file()
     assert json.loads(metrics_path.read_text())["rows"] == 4
+
+
+def test_train_neural_controller_and_run_held_out_evaluation(tmp_path: Path) -> None:
+    __import__("pytest").importorskip("torch")
+    dataset = pd.concat([_controller_dataset_rows(), _controller_dataset_rows()], ignore_index=True)
+    checkpoint = train_neural_imitation_controller(
+        dataset,
+        config=NeuralControllerConfig(epochs=3, batch_size=4),
+    )
+    model_path = tmp_path / "controller_neural.pt"
+    save_neural_controller(checkpoint, model_path)
+    loaded = load_neural_controller(model_path)
+    predictions = predict_neural_controller(loaded, dataset)
+
+    from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
+    from iints.core.algorithms.neural_controller import ExperimentalNeuralController
+
+    evaluation = evaluate_controller_factories(
+        {
+            "clinical_baseline": ClinicalBaselineAlgorithm,
+            "neural_controller": lambda: ExperimentalNeuralController(settings={"model_path": str(model_path)}),
+        },
+        output_dir=tmp_path / "evaluation",
+        presets=["hypo_prone_night"],
+        seeds=[7],
+        duration_minutes=60,
+    )
+
+    assert len(predictions) == len(dataset)
+    assert checkpoint["validation_metrics"] is not None
+    assert (tmp_path / "evaluation" / "CONTROL_EVALUATION_REPORT.md").is_file()
+    assert "neural_controller" in evaluation["algorithms"]
+
+
+def test_research_cli_trains_neural_controller_and_evaluates(tmp_path: Path) -> None:
+    __import__("pytest").importorskip("torch")
+    dataset_path = tmp_path / "controller.csv"
+    pd.concat([_controller_dataset_rows(), _controller_dataset_rows()], ignore_index=True).to_csv(
+        dataset_path,
+        index=False,
+    )
+    model_path = tmp_path / "controller_neural.pt"
+    metrics_path = tmp_path / "controller_neural_metrics.json"
+    evaluation_dir = tmp_path / "evaluation"
+
+    train_result = runner.invoke(
+        app,
+        [
+            "research",
+            "train-neural-controller",
+            "--data",
+            str(dataset_path),
+            "--output",
+            str(model_path),
+            "--metrics-output",
+            str(metrics_path),
+            "--epochs",
+            "3",
+        ],
+    )
+    eval_result = runner.invoke(
+        app,
+        [
+            "research",
+            "evaluate-controller",
+            "--model",
+            str(model_path),
+            "--model-kind",
+            "neural",
+            "--output-dir",
+            str(evaluation_dir),
+            "--preset",
+            "hypo_prone_night",
+            "--seed",
+            "7",
+            "--duration-minutes",
+            "60",
+        ],
+    )
+
+    assert train_result.exit_code == 0
+    assert eval_result.exit_code == 0
+    assert model_path.is_file()
+    assert (evaluation_dir / "closed_loop_summary.json").is_file()

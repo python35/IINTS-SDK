@@ -256,6 +256,9 @@ Request a safe stop and optional report finalization.
 ### `iints jetson endurance export`
 Package the complete endurance folder into a transfer-ready `.zip`.
 
+### `iints jetson endurance finalize-research`
+Train post-run local research models from one endurance bundle and write a held-out closed-loop evaluation report.
+
 ### `iints jetson endurance install-service`
 Write a systemd service file with automatic `--resume` for multi-day Jetson runs.
 Pass `--wall-clock` here too when the generated service should preserve real-time pacing.
@@ -270,6 +273,12 @@ Combine one or more run bundles into a supervised controller teacher dataset.
 
 ### `iints research train-controller`
 Train the first auditable local controller baseline from safe-action labels.
+
+### `iints research train-neural-controller`
+Train the stronger PyTorch controller from the same supervised safe-action labels.
+
+### `iints research evaluate-controller`
+Compare a learned controller against the clinical baseline on held-out presets and seeds.
 
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
 

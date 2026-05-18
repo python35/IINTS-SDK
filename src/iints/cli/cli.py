@@ -1,7 +1,7 @@
 import typer  # type: ignore
 import concurrent.futures
 from pathlib import Path
-from typing import Dict, Any, Union, List, Tuple, Optional, cast
+from typing import Callable, Dict, Any, Union, List, Tuple, Optional, cast
 from dataclasses import asdict
 from typing_extensions import Annotated
 from pydantic import ValidationError
@@ -7043,6 +7043,137 @@ def research_train_controller(
     )
 
 
+@research_app.command(name="train-neural-controller")
+def research_train_neural_controller(
+    data: Annotated[Path, typer.Option(help="Controller teacher dataset CSV")],
+    output: Annotated[Path, typer.Option(help="Output neural controller checkpoint")] = Path(
+        "models/controller_neural.pt"
+    ),
+    metrics_output: Annotated[Path, typer.Option(help="Output neural controller metrics JSON")] = Path(
+        "models/controller_neural_metrics.json"
+    ),
+    epochs: Annotated[int, typer.Option(help="Training epochs")] = 120,
+    hidden_size: Annotated[
+        List[int],
+        typer.Option("--hidden-size", help="Repeatable hidden layer size, for example --hidden-size 64."),
+    ] = [],
+) -> None:
+    """Train a stronger PyTorch imitation controller from safe-action labels."""
+    console = Console()
+    if not data.is_file():
+        console.print(f"[bold red]Controller dataset not found:[/bold red] {data}")
+        raise typer.Exit(code=1)
+
+    from iints.research.neural_control import (
+        NeuralControllerConfig,
+        save_neural_controller,
+        train_neural_imitation_controller,
+    )
+
+    try:
+        df = pd.read_csv(data)
+        config = NeuralControllerConfig(
+            hidden_sizes=tuple(hidden_size) if hidden_size else (32, 16),
+            epochs=epochs,
+        )
+        checkpoint = train_neural_imitation_controller(df, config=config)
+        save_neural_controller(checkpoint, output)
+        metrics_payload = {
+            "train_metrics": checkpoint["train_metrics"],
+            "validation_metrics": checkpoint["validation_metrics"],
+            "config": checkpoint["config"],
+        }
+        metrics_output.parent.mkdir(parents=True, exist_ok=True)
+        metrics_output.write_text(json.dumps(metrics_payload, indent=2), encoding="utf-8")
+    except Exception as exc:
+        console.print(f"[bold red]Neural controller training failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    train_metrics = checkpoint["train_metrics"]
+    validation_metrics = checkpoint["validation_metrics"] or {}
+    table = Table(title="Neural Controller Training")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value")
+    table.add_row("Model", str(output))
+    table.add_row("Rows", str(train_metrics["rows"]))
+    table.add_row("Train MAE (U)", str(train_metrics["mae_units"]))
+    table.add_row("Validation MAE (U)", str(validation_metrics.get("mae_units", "n/a")))
+    table.add_row("Unsafe hypo proposals", str(validation_metrics.get("unsafe_hypo_proposal_rows", "n/a")))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] this neural controller still requires held-out closed-loop validation "
+        "and deterministic supervisor wrapping."
+    )
+
+
+@research_app.command(name="evaluate-controller")
+def research_evaluate_controller(
+    model: Annotated[Path, typer.Option(help="Controller model path")],
+    model_kind: Annotated[str, typer.Option(help="Controller type: linear or neural")] = "linear",
+    output_dir: Annotated[Path, typer.Option(help="Output evaluation directory")] = Path(
+        "results/controller_evaluation"
+    ),
+    preset: Annotated[
+        List[str],
+        typer.Option("--preset", help="Repeatable held-out preset name."),
+    ] = [],
+    seed: Annotated[
+        List[int],
+        typer.Option("--seed", help="Repeatable evaluation seed."),
+    ] = [],
+    duration_minutes: Annotated[int, typer.Option(help="Duration per closed-loop run in minutes")] = 1440,
+) -> None:
+    """Evaluate one learned controller against the clinical baseline on held-out scenarios."""
+    console = Console()
+    if not model.is_file():
+        console.print(f"[bold red]Controller model not found:[/bold red] {model}")
+        raise typer.Exit(code=1)
+    if model_kind not in {"linear", "neural"}:
+        console.print("[bold red]Invalid --model-kind. Use 'linear' or 'neural'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
+    from iints.core.algorithms.imitation_controller import ExperimentalImitationController
+    from iints.core.algorithms.neural_controller import ExperimentalNeuralController
+    from iints.research.control_eval import DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories
+
+    factories: dict[str, Callable[[], Any]] = {"clinical_baseline": ClinicalBaselineAlgorithm}
+    if model_kind == "linear":
+        factories["linear_imitation"] = lambda: ExperimentalImitationController(
+            settings={"model_path": str(model)}
+        )
+    else:
+        factories["neural_controller"] = lambda: ExperimentalNeuralController(
+            settings={"model_path": str(model)}
+        )
+    try:
+        report = evaluate_controller_factories(
+            factories,
+            output_dir=output_dir,
+            presets=preset or DEFAULT_HELD_OUT_PRESETS,
+            seeds=seed or (101, 202, 303),
+            duration_minutes=duration_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Controller evaluation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Closed-Loop Controller Evaluation")
+    table.add_column("Algorithm", style="cyan")
+    table.add_column("Mean TIR")
+    table.add_column("Mean <70")
+    table.add_column("Supervisor rate")
+    for algorithm_name, metrics in report["algorithms"].items():
+        table.add_row(
+            algorithm_name,
+            f"{metrics['mean_tir_70_180_pct']:.2f}%",
+            f"{metrics['mean_time_below_70_pct']:.2f}%",
+            f"{metrics['mean_supervisor_intervention_rate_pct']:.2f}%",
+        )
+    console.print(table)
+    console.print(f"[green]Evaluation report:[/green] {report['artifacts']['report_md']}")
+
+
 @research_app.command(name="export-onnx")
 def research_export_onnx(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),
@@ -8098,6 +8229,13 @@ def jetson_endurance_start(
             help="Write a predictor-training dataset and research manifest next to the normal endurance artifacts.",
         ),
     ] = True,
+    finalize_research: Annotated[
+        bool,
+        typer.Option(
+            "--finalize-research/--no-finalize-research",
+            help="After the endurance run, train local research models and write a held-out evaluation report.",
+        ),
+    ] = False,
     resume: Annotated[bool, typer.Option(help="Resume from the latest snapshot in the output directory")] = False,
 ):
     """Run a headless Jetson endurance stress test and write publication-ready artifacts."""
@@ -8135,12 +8273,72 @@ def jetson_endurance_start(
             research_export=research_export,
         )
         result = run_endurance_study(algorithm=algorithm, predictor=predictor, config=config)
+        research_result = None
+        if finalize_research:
+            from iints.jetson.research_pipeline import finalize_endurance_research
+
+            research_result = finalize_endurance_research(
+                output_dir,
+                repo_root=Path(__file__).resolve().parents[3],
+            )
     except (JetsonEnduranceError, ValueError, typer.BadParameter) as exc:
         console.print(f"[bold red]Jetson endurance start failed:[/bold red] {exc}")
         raise typer.Exit(code=1)
 
     _print_endurance_status(console, result["status"])
     console.print(f"[green]Endurance artifacts written to:[/green] {output_dir}")
+    if research_result is not None:
+        console.print(
+            f"[green]Research pipeline report:[/green] {research_result['artifacts']['report_md']}"
+        )
+
+
+@jetson_endurance_app.command(name="finalize-research")
+def jetson_endurance_finalize_research(
+    output_dir: Annotated[Path, typer.Option(help="Completed endurance output directory")],
+    train_predictor: Annotated[
+        bool,
+        typer.Option(
+            "--train-predictor/--skip-predictor",
+            help="Train a glucose predictor from the exported endurance dataset when enough rows are available.",
+        ),
+    ] = True,
+    train_neural: Annotated[
+        bool,
+        typer.Option(
+            "--train-neural/--skip-neural",
+            help="Train the PyTorch controller in addition to the auditable linear baseline.",
+        ),
+    ] = True,
+    duration_minutes: Annotated[
+        int,
+        typer.Option(help="Closed-loop evaluation duration per held-out run in minutes."),
+    ] = 1440,
+):
+    """Finalize one endurance bundle into trained local models and evaluation evidence."""
+    console = Console()
+    try:
+        from iints.jetson.research_pipeline import finalize_endurance_research
+
+        report = finalize_endurance_research(
+            output_dir,
+            repo_root=Path(__file__).resolve().parents[3],
+            train_predictor=train_predictor,
+            train_neural=train_neural,
+            evaluation_duration_minutes=duration_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Research finalization failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="Jetson Research Finalization")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Value")
+    table.add_row("Controller rows", str(report["controller_dataset_rows"]))
+    table.add_row("Linear model", report["linear_controller"]["model_path"])
+    table.add_row("Neural status", report["neural_controller"]["status"])
+    table.add_row("Predictor status", report["predictor_training"]["status"])
+    table.add_row("Report", report["artifacts"]["report_md"])
+    console.print(table)
 
 
 @jetson_endurance_app.command(name="status")

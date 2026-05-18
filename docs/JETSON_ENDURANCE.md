@@ -62,6 +62,18 @@ iints jetson endurance start \
   --seed 42
 ```
 
+If you want the machine to complete the full post-run research loop automatically, add `--finalize-research`:
+
+```bash
+iints jetson endurance start \
+  --algo algorithms/example_algorithm.py \
+  --duration 1d \
+  --output-dir results/jetson_research_day \
+  --profile normal \
+  --wall-clock \
+  --finalize-research
+```
+
 Check progress:
 
 ```bash
@@ -176,6 +188,16 @@ results/jetson_7day/
     controller_teacher_dataset.csv
     training_manifest.json
     README.md
+    models/
+      linear_controller.json
+      neural_controller.pt
+      predictor/
+    evaluation/
+      closed_loop_runs.csv
+      closed_loop_summary.json
+      CONTROL_EVALUATION_REPORT.md
+    research_pipeline_summary.json
+    RESEARCH_PIPELINE_REPORT.md
 ```
 
 Important files:
@@ -192,6 +214,7 @@ Important files:
 - `research/predictor_training.csv` is a standardized dataset slice for the glucose-predictor training pipeline.
 - `research/controller_teacher_dataset.csv` contains safety-supervised insulin-action labels for controller-policy research.
 - `research/training_manifest.json` records lineage, columns, and a reproducible example training command.
+- `research/RESEARCH_PIPELINE_REPORT.md` records what the automatic post-run training/evaluation step actually produced.
 
 ## Research Mode Versus AI Training
 
@@ -200,10 +223,11 @@ This distinction matters:
 | Component | Current role |
 |---|---|
 | Jetson wall-clock mode | acquires a real-duration study bundle |
+| post-run research finalizer | trains local models and evaluates them after acquisition |
 | predictor-training pipeline | trains or fine-tunes the glucose forecasting model from exported rows |
 | Ministral / Ollama local AI | explains, reviews, and summarizes runs |
 
-The current SDK does **not** fine-tune Ministral online during the same run. That would mix acquisition, training, and evaluation in one loop and is not a clean research design. Instead, wall-clock runs now export `research/predictor_training.csv` and `research/training_manifest.json` so you can train the glucose predictor afterwards with a fully reproducible command.
+The current SDK does **not** fine-tune Ministral online during the same run. That would mix language-model adaptation with physiological control research and is not a clean design. Instead, the endurance runner exports physiological datasets, and the post-run finalizer trains the relevant numeric models after acquisition is complete.
 
 Example:
 
@@ -221,6 +245,21 @@ iints research train-controller \
   --data results/jetson_research_day/research/controller_teacher_dataset.csv \
   --output models/jetson_research_day_controller.json
 ```
+
+Full post-run bundle finalization:
+
+```bash
+iints jetson endurance finalize-research \
+  --output-dir results/jetson_research_day
+```
+
+That command writes:
+
+- a linear imitation controller
+- a PyTorch neural controller
+- a predictor model when the exported time-series is long enough
+- a held-out closed-loop comparison against the clinical baseline
+- `research/RESEARCH_PIPELINE_REPORT.md`
 
 If a future project adds Ministral fine-tuning, that should be a separate explicit pipeline with its own dataset governance and validation, not an invisible side effect of the endurance runner.
 

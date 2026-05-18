@@ -255,6 +255,23 @@ iints research train-controller \
 This first controller is intentionally an auditable imitation baseline. It is
 useful for proving the research loop end to end before moving on to richer local
 policy networks and held-out closed-loop scenario evaluation.
+
+```bash
+iints research train-neural-controller \
+  --data data_packs/processed/controller_teacher_dataset.csv \
+  --output models/controller_neural.pt \
+  --metrics-output models/controller_neural_metrics.json
+
+iints research evaluate-controller \
+  --model models/controller_neural.pt \
+  --model-kind neural \
+  --output-dir results/controller_neural_eval
+```
+
+The evaluation report is intentionally closed-loop and held out: it compares
+the learned controller against the clinical baseline over unseen scenarios and
+seeds, with TIR, hypo burden, supervisor interventions, and early termination
+counts all visible together.
 how many runs are `likely_realistic`, then average realism score, then distance
 from the empirical reference median. That makes the chosen preset reproducible
 and less vulnerable to one lucky-looking trace.

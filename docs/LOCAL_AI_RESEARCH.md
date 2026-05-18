@@ -127,7 +127,52 @@ This controller is **not** presented as clinically validated. It is a baseline t
 4. run it behind the supervisor
 5. compare it against rule-based baselines
 
-## 4. What Good Research Looks Like
+When you need a stronger local model after that auditable baseline, train the PyTorch policy:
+
+```bash
+iints research train-neural-controller \
+  --data data_packs/processed/controller_teacher_dataset.csv \
+  --output models/controller_neural.pt \
+  --metrics-output models/controller_neural_metrics.json
+```
+
+Then require held-out closed-loop evidence before treating it as a serious research candidate:
+
+```bash
+iints research evaluate-controller \
+  --model models/controller_neural.pt \
+  --model-kind neural \
+  --output-dir results/controller_neural_eval
+```
+
+That report compares the learned controller with `ClinicalBaselineAlgorithm` on unseen presets such as `hypo_prone_night`, `hyper_challenge`, `pizza_paradox`, and `midnight_crash`.
+
+## 4. One-Step Jetson Research Finalization
+
+After a completed endurance run you can close the whole post-run loop in one command:
+
+```bash
+iints jetson endurance finalize-research \
+  --output-dir results/jetson_research_day
+```
+
+It will:
+
+1. train the auditable linear imitation baseline
+2. train the stronger PyTorch controller
+3. train the glucose predictor when the exported dataset is large enough
+4. run held-out closed-loop evaluation against the clinical baseline
+5. write `research/RESEARCH_PIPELINE_REPORT.md`
+
+If you want the same work to happen automatically at the end of the endurance command, add:
+
+```bash
+--finalize-research
+```
+
+to `iints jetson endurance start`.
+
+## 5. What Good Research Looks Like
 
 Before making any strong claim, require all of the following:
 
@@ -139,13 +184,11 @@ Before making any strong claim, require all of the following:
 - safety-supervisor intervention counts
 - exact run manifests and dataset manifests
 
-## 5. Next Technical Step
+The SDK now gives you both the model layer and the first evidence layer:
 
-The current policy learner is an **auditable imitation baseline**. The next stronger layer is:
+- auditable linear imitation baseline
+- stronger PyTorch neural controller
+- held-out closed-loop controller evaluation
+- automatic post-run Jetson research finalization
 
-- a PyTorch MLP or recurrent controller trained offline
-- closed-loop evaluation over held-out simulator scenarios
-- uncertainty-aware rejection or fallback to baseline control
-- formal promotion gates before any model can become a validated research candidate
-
-That is the path from "local AI exists" to "local AI has evidence."
+The next scientific step after that is not "make the model bigger"; it is stricter promotion gates, more held-out patients, and external real-data validation for every predictor claim.
