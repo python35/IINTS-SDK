@@ -18,7 +18,7 @@ Modes:
   release  Full check plus release-version audit.
 
 Environment:
-  IINTS_RELEASE_VERSION=1.5.5  Required for release mode.
+  IINTS_RELEASE_VERSION=1.5.6  Required for release mode.
 USAGE
 }
 
@@ -92,7 +92,7 @@ case "$MODE" in
     ;;
   release)
     if [[ -z "${IINTS_RELEASE_VERSION:-}" ]]; then
-      echo "Set IINTS_RELEASE_VERSION first, for example: IINTS_RELEASE_VERSION=1.5.5 tools/dev/sdk_check.sh release" >&2
+      echo "Set IINTS_RELEASE_VERSION first, for example: IINTS_RELEASE_VERSION=1.5.6 tools/dev/sdk_check.sh release" >&2
       exit 2
     fi
     run_full

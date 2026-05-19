@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## v1.5.6
+
+Release date: 2026-05-18
+
+### Added
+
+- added self-contained quickstart safety improvements, run preview diagnostics, and clearer early-termination summaries
+- added a more polished live-demo presenter flow for Zoom calls, clinicians, engineers, and expo booths
+- added detailed physiology reference materials and EUCYS-ready physiology handouts
+- added Jetson wall-clock research mode so a requested `1d` study can genuinely occupy 24 real hours
+- added local AI research tooling for controller datasets, auditable imitation policies, PyTorch neural controllers, and held-out closed-loop controller evaluation
+- added Jetson post-run research finalization with automatic model training and evaluation reports
+
+### Fixed
+
+- released the Jetson `--wall-clock` and `--finalize-research` public CLI flags that were added after `v1.5.5`
+- closed the drift between current documentation and the installable PyPI wheel
+
+### Why it matters
+
+This patch release makes the newly documented research workflow actually installable from PyPI: the package, CLI help, Jetson docs, and local-AI workflow now describe the same public feature set.
+
 ## v1.5.5
 
 Release date: 2026-05-17

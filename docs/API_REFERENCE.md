@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **157**
+Documented modules: **164**
 
 ## Package Index
 
@@ -13,19 +13,19 @@ Documented modules: **157**
 | `analysis` | 27 |
 | `api` | 4 |
 | `cli` | 3 |
-| `core` | 30 |
+| `core` | 32 |
 | `data` | 21 |
 | `demo_assets` | 1 |
 | `emulation` | 5 |
 | `highlevel` | 1 |
-| `jetson` | 2 |
+| `jetson` | 3 |
 | `learning` | 3 |
 | `live_patient` | 9 |
 | `mdmp` | 2 |
 | `metrics` | 1 |
 | `population` | 3 |
 | `presets` | 1 |
-| `research` | 10 |
+| `research` | 14 |
 | `root` | 1 |
 | `scenarios` | 3 |
 | `templates` | 5 |
@@ -102,8 +102,10 @@ Documented modules: **157**
 - [`iints.core.algorithms.discovery`](#iintscorealgorithmsdiscovery)
 - [`iints.core.algorithms.fixed_basal_bolus`](#iintscorealgorithmsfixed_basal_bolus)
 - [`iints.core.algorithms.hybrid_algorithm`](#iintscorealgorithmshybrid_algorithm)
+- [`iints.core.algorithms.imitation_controller`](#iintscorealgorithmsimitation_controller)
 - [`iints.core.algorithms.lstm_algorithm`](#iintscorealgorithmslstm_algorithm)
 - [`iints.core.algorithms.mock_algorithms`](#iintscorealgorithmsmock_algorithms)
+- [`iints.core.algorithms.neural_controller`](#iintscorealgorithmsneural_controller)
 - [`iints.core.algorithms.pid_controller`](#iintscorealgorithmspid_controller)
 - [`iints.core.algorithms.standard_pump_algo`](#iintscorealgorithmsstandard_pump_algo)
 - [`iints.core.device`](#iintscoredevice)
@@ -169,6 +171,7 @@ Documented modules: **157**
 
 - [`iints.jetson`](#iintsjetson)
 - [`iints.jetson.endurance`](#iintsjetsonendurance)
+- [`iints.jetson.research_pipeline`](#iintsjetsonresearch_pipeline)
 
 ### `learning`
 
@@ -213,11 +216,15 @@ Documented modules: **157**
 - [`iints.research.audit`](#iintsresearchaudit)
 - [`iints.research.calibration_gate`](#iintsresearchcalibration_gate)
 - [`iints.research.config`](#iintsresearchconfig)
+- [`iints.research.control`](#iintsresearchcontrol)
+- [`iints.research.control_eval`](#iintsresearchcontrol_eval)
+- [`iints.research.data_blend`](#iintsresearchdata_blend)
 - [`iints.research.dataset`](#iintsresearchdataset)
 - [`iints.research.evaluation`](#iintsresearchevaluation)
 - [`iints.research.losses`](#iintsresearchlosses)
 - [`iints.research.metrics`](#iintsresearchmetrics)
 - [`iints.research.model_registry`](#iintsresearchmodel_registry)
+- [`iints.research.neural_control`](#iintsresearchneural_control)
 - [`iints.research.predictor`](#iintsresearchpredictor)
 
 ### `root`
@@ -1213,6 +1220,11 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `research_prepare_ohio(input_dir: Annotated[Path, typer.Option(help='Root directory containing OhioT1DM patient_* folders')] = Path('data_packs/public/ohio_t1dm'), output: Annotated[Path, typer.Option(help='Output dataset path (CSV or Parquet)')] = Path('data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv'), report: Annotated[Path, typer.Option(help='Quality report output path')] = Path('data_packs/public/ohio_t1dm/quality_report.json'), time_step: Annotated[int, typer.Option(help='Expected CGM sample interval (minutes)')] = 5, max_gap_multiplier: Annotated[float, typer.Option(help='Segment-break gap multiplier')] = 2.5, dia_minutes: Annotated[float, typer.Option(help='Insulin action duration (minutes)')] = 240.0, peak_minutes: Annotated[float, typer.Option(help='IOB peak time (minutes, OpenAPS bilinear)')] = 75.0, carb_absorb_minutes: Annotated[float, typer.Option(help='Carb absorption duration (minutes)')] = 120.0, max_insulin: Annotated[float, typer.Option(help='Clip insulin units above this')] = 30.0, max_carbs: Annotated[float, typer.Option(help='Clip carb grams above this')] = 200.0, icr_default: Annotated[float, typer.Option(help='Fallback ICR (g/U)')] = 10.0, isf_default: Annotated[float, typer.Option(help='Fallback ISF (mg/dL per U)')] = 50.0, basal_default: Annotated[float, typer.Option(help='Fallback basal rate (U/hr)')] = 0.0, meal_window_min: Annotated[float, typer.Option(help='Meal→insulin matching window (minutes)')] = 30.0, isf_window_min: Annotated[float, typer.Option(help='ISF estimation window (minutes)')] = 60.0, min_meal_carbs: Annotated[float, typer.Option(help='Minimum carbs to consider a meal (g)')] = 5.0, min_bolus: Annotated[float, typer.Option(help='Minimum insulin to consider a bolus (U)')] = 0.1)`
 - `research_prepare_hupa(input_dir: Annotated[Path, typer.Option(help='Root directory containing HUPA-UCM CSV files')] = Path('data_packs/public/hupa_ucm'), output: Annotated[Path, typer.Option(help='Output dataset path (CSV or Parquet)')] = Path('data_packs/public/hupa_ucm/processed/hupa_ucm_merged.csv'), report: Annotated[Path, typer.Option(help='Quality report output path')] = Path('data_packs/public/hupa_ucm/quality_report.json'), time_step: Annotated[int, typer.Option(help='Expected CGM sample interval (minutes)')] = 5, max_gap_multiplier: Annotated[float, typer.Option(help='Segment-break gap multiplier')] = 2.5, dia_minutes: Annotated[float, typer.Option(help='Insulin action duration (minutes)')] = 240.0, peak_minutes: Annotated[float, typer.Option(help='IOB peak time (minutes, OpenAPS bilinear)')] = 75.0, carb_absorb_minutes: Annotated[float, typer.Option(help='Carb absorption duration (minutes)')] = 120.0, max_insulin: Annotated[float, typer.Option(help='Clip insulin units above this')] = 30.0, max_carbs: Annotated[float, typer.Option(help='Clip carb grams above this')] = 200.0, carb_serving_grams: Annotated[float, typer.Option(help='Carb serving size (g) for carb_input')] = 10.0, basal_is_rate: Annotated[bool, typer.Option(help='Treat basal_rate as U/hr (convert to U/step)')] = False, icr_default: Annotated[float, typer.Option(help='Fallback ICR (g/U)')] = 10.0, isf_default: Annotated[float, typer.Option(help='Fallback ISF (mg/dL per U)')] = 50.0, basal_default: Annotated[float, typer.Option(help='Fallback basal rate (U/hr)')] = 0.0, meal_window_min: Annotated[float, typer.Option(help='Meal→insulin matching window (minutes)')] = 30.0, isf_window_min: Annotated[float, typer.Option(help='ISF estimation window (minutes)')] = 60.0, min_meal_carbs: Annotated[float, typer.Option(help='Minimum carbs to consider a meal (g)')] = 5.0, min_bolus: Annotated[float, typer.Option(help='Minimum insulin to consider a bolus (U)')] = 0.1)`
 - `research_quality(report: Annotated[Path, typer.Option(help='Path to quality_report.json produced by prepare-azt1d')] = Path('data_packs/public/azt1d/quality_report.json'))`
+- `research_blend_datasets(source: Annotated[List[str], typer.Option('--source', help='Repeatable dataset source in label=path form, for example azt1d=data/azt1d.csv.')], output: Annotated[Path, typer.Option(help='Output blended predictor dataset path')] = Path('data_packs/processed/predictor_blend.csv'), manifest: Annotated[Path, typer.Option(help='Output blend manifest JSON path')] = Path('data_packs/processed/predictor_blend_manifest.json')) -> None`
+- `research_build_control_dataset(run: Annotated[List[str], typer.Option('--run', help='Repeatable run input in label=path form; path may contain raw/steps.csv or results.csv.')], output: Annotated[Path, typer.Option(help='Output controller teacher dataset CSV')] = Path('data_packs/processed/controller_teacher_dataset.csv'), manifest: Annotated[Path, typer.Option(help='Output controller dataset manifest JSON')] = Path('data_packs/processed/controller_teacher_manifest.json')) -> None`
+- `research_train_controller(data: Annotated[Path, typer.Option(help='Controller teacher dataset CSV')], output: Annotated[Path, typer.Option(help='Output local controller JSON')] = Path('models/controller_imitation.json'), metrics_output: Annotated[Path, typer.Option(help='Output training metrics JSON')] = Path('models/controller_imitation_metrics.json'), ridge_lambda: Annotated[float, typer.Option(help='Ridge regularization strength')] = 0.001) -> None`
+- `research_train_neural_controller(data: Annotated[Path, typer.Option(help='Controller teacher dataset CSV')], output: Annotated[Path, typer.Option(help='Output neural controller checkpoint')] = Path('models/controller_neural.pt'), metrics_output: Annotated[Path, typer.Option(help='Output neural controller metrics JSON')] = Path('models/controller_neural_metrics.json'), epochs: Annotated[int, typer.Option(help='Training epochs')] = 120, hidden_size: Annotated[List[int], typer.Option('--hidden-size', help='Repeatable hidden layer size, for example --hidden-size 64.')] = []) -> None`
+- `research_evaluate_controller(model: Annotated[Path, typer.Option(help='Controller model path')], model_kind: Annotated[str, typer.Option(help='Controller type: linear or neural')] = 'linear', output_dir: Annotated[Path, typer.Option(help='Output evaluation directory')] = Path('results/controller_evaluation'), preset: Annotated[List[str], typer.Option('--preset', help='Repeatable held-out preset name.')] = [], seed: Annotated[List[int], typer.Option('--seed', help='Repeatable evaluation seed.')] = [], duration_minutes: Annotated[int, typer.Option(help='Duration per closed-loop run in minutes')] = 1440) -> None`
 - `research_export_onnx(model: Annotated[Path, typer.Option(help='Predictor checkpoint (.pt)')] = Path('models/hupa_finetuned_v2/predictor.pt'), out: Annotated[Path, typer.Option(help='Output ONNX file path')] = Path('models/predictor.onnx'))`
 - `research_audit_split(data: Annotated[Path, typer.Option(help='Prepared dataset path (CSV/Parquet)')], history_steps: Annotated[int, typer.Option(help='History window length')] = 48, horizon_steps: Annotated[int, typer.Option(help='Forecast horizon length')] = 6, feature_columns_csv: Annotated[str, typer.Option(help='Comma-separated feature columns')] = 'glucose_actual_mgdl,patient_iob_units,patient_cob_grams,effective_isf,effective_icr,effective_basal_rate_u_per_hr,glucose_trend_mgdl_min', target_column: Annotated[str, typer.Option(help='Target column')] = 'glucose_actual_mgdl', subject_column: Annotated[str, typer.Option(help='Subject ID column')] = 'subject_id', segment_column: Annotated[Optional[str], typer.Option(help='Segment column (optional)')] = 'segment_id', output_json: Annotated[Optional[Path], typer.Option(help='Write audit report JSON')] = None)`
 - `research_evaluate_forecast(input_csv: Annotated[Path, typer.Option(help='CSV with observed/predicted columns')], observed_column: Annotated[str, typer.Option(help='Observed glucose column')] = 'glucose_actual_mgdl', predicted_column: Annotated[str, typer.Option(help='Predicted glucose column')] = 'predicted_glucose_ai_30min', predicted_std_column: Annotated[Optional[str], typer.Option(help='Optional prediction std column')] = 'predictor_uncertainty_std_mgdl', gate_profile: Annotated[Optional[str], typer.Option(help='Optional calibration gate profile id')] = None, gate_profiles_path: Annotated[Optional[Path], typer.Option(help='Optional calibration gate profiles YAML path')] = None, fail_on_gate: Annotated[bool, typer.Option(help='Exit code 1 when calibration gate fails')] = False, output_json: Annotated[Optional[Path], typer.Option(help='Write metrics JSON')] = None)`
@@ -1238,12 +1250,13 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `plugin_uninstall(name: Annotated[str, typer.Argument(help='Local plugin display name')], kind: Annotated[Optional[str], typer.Option(help='Optional kind filter')] = None, remove_file: Annotated[bool, typer.Option(help='Also delete the copied plugin file from the plugin home')] = False)`
 - `patientmodel_list()`
 - `jetson_doctor()`
-- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'auto', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, checkpoint_interval: Annotated[int, typer.Option(help='Checkpoint interval in simulated minutes.')] = 360, hardware_sample_interval: Annotated[int, typer.Option(help='Hardware telemetry interval in simulated minutes.')] = 60, status_interval_steps: Annotated[int, typer.Option(help='How often to persist status and partial CSV data.')] = 25, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
+- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'auto', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, checkpoint_interval: Annotated[int, typer.Option(help='Checkpoint interval in simulated minutes.')] = 360, hardware_sample_interval: Annotated[int, typer.Option(help='Hardware telemetry interval in simulated minutes.')] = 60, status_interval_steps: Annotated[int, typer.Option(help='How often to persist status and partial CSV data.')] = 25, wall_clock: Annotated[bool, typer.Option('--wall-clock/--accelerated', help='Use real wall-clock pacing so 1d takes an actual 24 hours instead of finishing as fast as possible.')] = False, research_export: Annotated[bool, typer.Option('--research-export/--no-research-export', help='Write a predictor-training dataset and research manifest next to the normal endurance artifacts.')] = True, finalize_research: Annotated[bool, typer.Option('--finalize-research/--no-finalize-research', help='After the endurance run, train local research models and write a held-out evaluation report.')] = False, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
+- `jetson_endurance_finalize_research(output_dir: Annotated[Path, typer.Option(help='Completed endurance output directory')], train_predictor: Annotated[bool, typer.Option('--train-predictor/--skip-predictor', help='Train a glucose predictor from the exported endurance dataset when enough rows are available.')] = True, train_neural: Annotated[bool, typer.Option('--train-neural/--skip-neural', help='Train the PyTorch controller in addition to the auditable linear baseline.')] = True, duration_minutes: Annotated[int, typer.Option(help='Closed-loop evaluation duration per held-out run in minutes.')] = 1440)`
 - `jetson_endurance_status(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')])`
 - `jetson_endurance_monitor(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], watch: Annotated[bool, typer.Option(help='Refresh while the run is active')] = False, interval_seconds: Annotated[int, typer.Option(help='Refresh interval for --watch')] = 5)`
 - `jetson_endurance_stop(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], generate_report: Annotated[bool, typer.Option(help='Ask the runner to finalize reports before stopping')] = False)`
 - `jetson_endurance_export(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], output: Annotated[Path, typer.Option(help='Destination zip archive')])`
-- `jetson_endurance_install_service(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], duration: Annotated[str, typer.Option(help='Duration such as 24h, 7d, 30d')] = '7d', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, service_path: Annotated[Optional[Path], typer.Option(help='Where to write the systemd unit file')] = None)`
+- `jetson_endurance_install_service(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], duration: Annotated[str, typer.Option(help='Duration such as 24h, 7d, 30d')] = '7d', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, wall_clock: Annotated[bool, typer.Option('--wall-clock/--accelerated', help='Write a service that paces the run in real time instead of accelerated simulation time.')] = False, service_path: Annotated[Optional[Path], typer.Option(help='Where to write the systemd unit file')] = None)`
 - `docs_algo(algo_path: Annotated[Path, typer.Option(help='Path to the algorithm Python file to document')])`
 - `benchmark(algo_to_benchmark: Annotated[Path, typer.Option(help='Path to the AI algorithm Python file to benchmark')], patient_configs_dir: Annotated[Path, typer.Option(help='Directory containing patient configuration YAML files')] = Path('src/iints/data/virtual_patients'), scenarios_dir: Annotated[Path, typer.Option(help='Directory containing scenario JSON files')] = Path('scenarios'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes for each run')] = 720, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Directory to save all benchmark results')] = None, seed: Annotated[Optional[int], typer.Option(help='Base seed for deterministic runs')] = None)`
 - `edge_benchmark(algo: Annotated[Path, typer.Option(help='Path to the insulin algorithm Python file used for the edge benchmark.')], output_json: Annotated[Path, typer.Option(help='Output JSON path for the hardware benchmark results.')] = Path('results/edge_benchmark.json'), patient_config: Annotated[str, typer.Option(help='Patient configuration name or YAML path.')] = 'default_patient', patient_model: Annotated[str, typer.Option('--patient-model', help='Patient model type.')] = 'auto', scenario_profile: Annotated[str, typer.Option(help='Digital patient scenario profile.')] = 'normal_day', steps: Annotated[int, typer.Option(help='Number of simulated steps used for throughput measurement.')] = 72, platform_name: Annotated[str, typer.Option('--platform', help="Platform label written into the benchmark report. Use 'auto' to detect locally.")] = 'auto', api_host: Annotated[str, typer.Option(help='Host used for the local dashboard probe.')] = '127.0.0.1', api_port: Annotated[int, typer.Option(help='Port used for the local dashboard probe.')] = 8766, seed: Annotated[Optional[int], typer.Option(help='Optional deterministic seed override.')] = None) -> None`
@@ -1393,6 +1406,21 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
+## `iints.core.algorithms.imitation_controller`
+
+- Source: `src/iints/core/algorithms/imitation_controller.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `ExperimentalImitationController` | `ExperimentalImitationController(InsulinAlgorithm)` | Research-only local policy that imitates previously supervised insulin actions. |
+
+#### `ExperimentalImitationController` methods
+
+- `predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]`
+
 ## `iints.core.algorithms.lstm_algorithm`
 
 - Source: `src/iints/core/algorithms/lstm_algorithm.py`
@@ -1433,6 +1461,21 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `get_algorithm_metadata(self) -> AlgorithmMetadata`
 - `reset(self) -> None`
+- `predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]`
+
+## `iints.core.algorithms.neural_controller`
+
+- Source: `src/iints/core/algorithms/neural_controller.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `ExperimentalNeuralController` | `ExperimentalNeuralController(InsulinAlgorithm)` | Research-only PyTorch policy trained from safety-supervised teacher actions. |
+
+#### `ExperimentalNeuralController` methods
+
 - `predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]`
 
 ## `iints.core.algorithms.pid_controller`
@@ -2460,21 +2503,32 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `expected_steps(self) -> int`
 - `simulator_end_minutes(self) -> int`
+- `wall_clock_target_seconds(self) -> int`
 
 ### Public Functions
 
 - `utc_now_iso() -> str`
 - `parse_duration_to_minutes(value: str) -> int`
 - `collect_jetson_hardware_info() -> Dict[str, Any]`
-- `run_endurance_study(*, algorithm: InsulinAlgorithm, predictor: Optional[object], config: EnduranceConfig, progress_callback: Optional[Any] = None) -> Dict[str, Any]`
+- `run_endurance_study(*, algorithm: InsulinAlgorithm, predictor: Optional[object], config: EnduranceConfig, progress_callback: Optional[Any] = None, monotonic_fn: Any = time.monotonic, sleep_fn: Any = time.sleep) -> Dict[str, Any]`
 - `load_endurance_status(output_dir: str | Path) -> Dict[str, Any]`
 - `stop_endurance_study(output_dir: str | Path, *, generate_report: bool = False) -> Dict[str, Any]`
 - `export_endurance_archive(output_dir: str | Path, output: str | Path) -> Path`
-- `build_endurance_service_file(*, algo: str, duration: str, output_dir: str, predictor: Optional[str] = None, profile: str = 'mixed_adversarial', seed: Optional[int] = None, working_directory: Optional[str] = None) -> str`
+- `build_endurance_service_file(*, algo: str, duration: str, output_dir: str, predictor: Optional[str] = None, profile: str = 'mixed_adversarial', seed: Optional[int] = None, wall_clock: bool = False, working_directory: Optional[str] = None) -> str`
 
 ### Public Constants
 
+- `ENDURANCE_EXECUTION_MODES`
 - `ENDURANCE_PROFILES`
+
+## `iints.jetson.research_pipeline`
+
+- Source: `src/iints/jetson/research_pipeline.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `finalize_endurance_research(output_dir: Path, *, repo_root: Path, train_predictor: bool = True, predictor_config_path: Path | None = None, train_neural: bool = True, evaluation_presets: Iterable[str] = DEFAULT_HELD_OUT_PRESETS, evaluation_seeds: Iterable[int] = (101, 202, 303), evaluation_duration_minutes: int = 1440) -> Dict[str, Any]`
 
 ## `iints.learning`
 
@@ -2854,7 +2908,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/research/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry`
+- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry, CONTROL_FEATURE_COLUMNS, CONTROL_TARGET_COLUMN, build_control_dataset_from_runs, evaluate_controller_predictions, load_linear_controller, predict_linear_controller, save_linear_controller, summarize_control_dataset, train_linear_imitation_controller, NeuralControllerConfig, instantiate_neural_controller_model, load_neural_controller, predict_neural_controller, save_neural_controller, train_neural_imitation_controller, PREDICTOR_OPTIONAL_COLUMNS, PREDICTOR_REQUIRED_COLUMNS, blend_predictor_datasets, DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -2899,6 +2953,53 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `history_steps(self) -> int`
 - `horizon_steps(self) -> int`
+
+## `iints.research.control`
+
+- Source: `src/iints/research/control.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `build_control_dataset_from_runs(run_dirs: Iterable[Tuple[str, Path]], *, output_path: Path, manifest_path: Path | None = None) -> Dict[str, Any]`
+- `summarize_control_dataset(df: pd.DataFrame) -> Dict[str, Any]`
+- `train_linear_imitation_controller(df: pd.DataFrame, *, ridge_lambda: float = 0.001) -> Dict[str, Any]`
+- `predict_linear_controller(model: Dict[str, Any], df: pd.DataFrame) -> np.ndarray`
+- `evaluate_controller_predictions(df: pd.DataFrame, predictions: np.ndarray) -> Dict[str, Any]`
+- `save_linear_controller(model: Dict[str, Any], path: Path) -> None`
+- `load_linear_controller(path: Path) -> Dict[str, Any]`
+
+### Public Constants
+
+- `CONTROL_FEATURE_COLUMNS`
+- `CONTROL_TARGET_COLUMN`
+
+## `iints.research.control_eval`
+
+- Source: `src/iints/research/control_eval.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `evaluate_controller_factories(factories: Dict[str, ControllerFactory], *, output_dir: Path, presets: Iterable[str] = DEFAULT_HELD_OUT_PRESETS, seeds: Iterable[int] = (101, 202, 303), duration_minutes: int = 1440, time_step_minutes: int = 5, sensor_profile: str = 'clinical_cgm') -> Dict[str, Any]`
+
+### Public Constants
+
+- `DEFAULT_HELD_OUT_PRESETS`
+
+## `iints.research.data_blend`
+
+- Source: `src/iints/research/data_blend.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `blend_predictor_datasets(sources: Iterable[Tuple[str, Path]], *, output_path: Path, manifest_path: Path | None = None) -> Dict[str, Any]`
+
+### Public Constants
+
+- `PREDICTOR_OPTIONAL_COLUMNS`
+- `PREDICTOR_REQUIRED_COLUMNS`
 
 ## `iints.research.dataset`
 
@@ -2985,6 +3086,25 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `append_registry_entry(path: Path, entry: Dict[str, Any]) -> None`
 - `list_registry(path: Path) -> List[Dict[str, Any]]`
 - `promote_registry_run(path: Path, *, run_id: str, stage: ModelStage, force: bool = False) -> PromotionResult`
+
+## `iints.research.neural_control`
+
+- Source: `src/iints/research/neural_control.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `NeuralControllerConfig` | `NeuralControllerConfig` | No module docstring. |
+
+### Public Functions
+
+- `instantiate_neural_controller_model(payload: Dict[str, Any]) -> Any`
+- `train_neural_imitation_controller(df: pd.DataFrame, *, config: NeuralControllerConfig | None = None) -> Dict[str, Any]`
+- `predict_neural_controller(payload: Dict[str, Any], df: pd.DataFrame) -> np.ndarray`
+- `save_neural_controller(payload: Dict[str, Any], path: Path) -> None`
+- `load_neural_controller(path: Path) -> Dict[str, Any]`
 
 ## `iints.research.predictor`
 

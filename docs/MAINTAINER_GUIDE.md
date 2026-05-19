@@ -26,13 +26,13 @@ Before a release:
 
 ```bash
 tools/dev/sdk_check.sh full
-tools/dev/release_audit.sh 1.5.5
+tools/dev/release_audit.sh 1.5.6
 ```
 
 Or combine the release check:
 
 ```bash
-IINTS_RELEASE_VERSION=1.5.5 tools/dev/sdk_check.sh release
+IINTS_RELEASE_VERSION=1.5.6 tools/dev/sdk_check.sh release
 ```
 
 ## Maintenance Rhythm

@@ -40,7 +40,7 @@ Use this page when you already know the workflow and need the exact source of tr
 
 ## Releases
 
-- [Latest release notes](releases/v1.5.5.md)
+- [Latest release notes](releases/v1.5.6.md)
 - [Release archive](releases/INDEX.md)
 
 ## If You Need A Route Instead

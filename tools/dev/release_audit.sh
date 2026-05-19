@@ -6,7 +6,7 @@ RAW_VERSION="${1:-}"
 
 if [[ -z "$RAW_VERSION" ]]; then
   echo "Usage: tools/dev/release_audit.sh <version>" >&2
-  echo "Example: tools/dev/release_audit.sh 1.5.5" >&2
+  echo "Example: tools/dev/release_audit.sh 1.5.6" >&2
   exit 2
 fi
 
