@@ -137,6 +137,15 @@ from iints.live_patient.uno_q import (
     run_uno_q_bridge_test,
     uno_q_bridge_environment_report,
 )
+from iints.live_patient.pico_pump import (
+    PICO_PUMP_BAUDRATE,
+    PICO_PUMP_CONFIRMATION,
+    build_pico_pump_bundle,
+    create_pico_pump_lab,
+    export_pico_pump_firmware,
+    run_pico_pump_serial_self_test,
+    upload_pico_pump_bundle,
+)
 from iints.mdmp.backend import (
     MDMP_GRADE_ORDER,
     active_mdmp_backend,
@@ -232,6 +241,7 @@ plugin_app = typer.Typer(help="Install and manage local IINTS extension plugins.
 plugin_register_app = typer.Typer(help="Register a local plugin file by extension kind.")
 patientmodel_app = typer.Typer(help="Patient model registry and extension discovery.")
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
+edge_pump_app = typer.Typer(help="Bench-only Raspberry Pi Pico pump research workflow.")
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 jetson_app = typer.Typer(help="NVIDIA Jetson headless research tooling.")
 jetson_endurance_app = typer.Typer(help="Headless long-running adversarial endurance tests.")
@@ -247,6 +257,7 @@ app.add_typer(plugin_app, name="plugin")
 plugin_app.add_typer(plugin_register_app, name="register")
 app.add_typer(patientmodel_app, name="patientmodel")
 app.add_typer(edge_app, name="edge")
+edge_app.add_typer(edge_pump_app, name="pump")
 app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 app.add_typer(jetson_app, name="jetson")
@@ -10212,6 +10223,131 @@ def edge_hardware_bridge(
     table.add_row("sketch", outputs["sketch"])
     table.add_row("readme", outputs["readme"])
     table.add_row("protocol", outputs["protocol"])
+    console.print(table)
+
+
+@edge_pump_app.command(name="init")
+def edge_pump_init(
+    output_dir: Annotated[Path, typer.Option(help="Directory where the Pico pump lab workspace should be written.")] = Path("iints_pico_pump_lab"),
+    algorithm: Annotated[Optional[Path], typer.Option(help="Optional existing SDK algorithm to copy into the lab workspace.")] = None,
+) -> None:
+    console = Console()
+    try:
+        outputs = create_pico_pump_lab(output_dir, algorithm_path=algorithm)
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump lab setup failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Pico Pump Lab")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key in ("output_dir", "algorithm", "safety_contract", "firmware_dir", "readme", "package_script"):
+        table.add_row(key, outputs[key])
+    console.print(table)
+    console.print("[yellow]Bench-only scope:[/yellow] no real insulin delivery, no animal/human use, no motor actuation.")
+
+
+@edge_pump_app.command(name="firmware")
+def edge_pump_firmware(
+    output_dir: Annotated[Path, typer.Option(help="Directory where locked Pico bench firmware should be written.")] = Path("pico_pump_firmware"),
+) -> None:
+    console = Console()
+    try:
+        outputs = export_pico_pump_firmware(output_dir)
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump firmware export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Pico Pump Bench Firmware")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key, value in outputs.items():
+        table.add_row(key, value)
+    console.print(table)
+
+
+@edge_pump_app.command(name="package")
+def edge_pump_package(
+    algorithm: Annotated[Path, typer.Option(help="SDK algorithm Python file to package for bench-only Pico testing.")],
+    output_dir: Annotated[Path, typer.Option(help="Output bundle directory.")] = Path("pico_pump_bundle"),
+    safety_contract: Annotated[Optional[Path], typer.Option(help="Optional zero-delivery safety contract JSON.")] = None,
+    label: Annotated[str, typer.Option(help="Human-readable bundle label written into the manifest.")] = "pico_pump_bench",
+) -> None:
+    console = Console()
+    try:
+        outputs = build_pico_pump_bundle(
+            algorithm,
+            output_dir,
+            safety_contract_path=safety_contract,
+            label=label,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump bundle failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Pico Pump Bench Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("output_dir", outputs["output_dir"])
+    table.add_row("algorithm", outputs["algorithm"])
+    table.add_row("algorithm_sha256", outputs["algorithm_sha256"])
+    table.add_row("safety_contract", outputs["safety_contract"])
+    table.add_row("manifest", outputs["manifest"])
+    console.print(table)
+    console.print("[green]Bundle ready for bench-only upload.[/green]")
+
+
+@edge_pump_app.command(name="upload")
+def edge_pump_upload(
+    bundle_dir: Annotated[Path, typer.Option(help="Bundle directory from `iints edge pump package`.")],
+    mount_dir: Annotated[Path, typer.Option(help="Mounted writable Pico/CircuitPython-style drive or a test folder.")],
+    bench_only_confirm: Annotated[str, typer.Option(help=f"Must be exactly: {PICO_PUMP_CONFIRMATION}")] = "",
+    write: Annotated[bool, typer.Option("--write", help="Actually copy files. Without this flag, only prints the copy plan.")] = False,
+) -> None:
+    console = Console()
+    try:
+        payload = upload_pico_pump_bundle(
+            bundle_dir,
+            mount_dir,
+            bench_only_confirmation=bench_only_confirm,
+            write=write,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump upload refused:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Pico Pump Upload Plan" if not write else "IINTS Pico Pump Upload")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("bundle_dir", payload["bundle_dir"])
+    table.add_row("mount_dir", payload["mount_dir"])
+    table.add_row("write", str(payload["write"]))
+    table.add_row("scope", str(payload["manifest"].get("scope", "-")))
+    for destination in payload["copied"] if write else payload["planned"]:
+        table.add_row("copied" if write else "planned", destination)
+    console.print(table)
+    if not write:
+        console.print("[yellow]Dry run only.[/yellow] Add --write after checking the mount path.")
+
+
+@edge_pump_app.command(name="serial-test")
+def edge_pump_serial_test(
+    port: Annotated[str, typer.Option(help="Serial port for the Pico bench firmware, for example /dev/ttyACM0 or /dev/tty.usbmodem*.")],
+    baudrate: Annotated[int, typer.Option(help="Serial baud rate used by the Pico bench firmware.")] = PICO_PUMP_BAUDRATE,
+    timeout_seconds: Annotated[float, typer.Option(help="Read timeout per command in seconds.")] = 1.5,
+) -> None:
+    console = Console()
+    try:
+        results = run_pico_pump_serial_self_test(port, baudrate=baudrate, timeout_seconds=timeout_seconds)
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump serial test failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Pico Pump Serial Test")
+    table.add_column("Command", style="cyan")
+    table.add_column("Response", overflow="fold")
+    for result in results:
+        table.add_row(str(result["command"]), str(result["response"] or "-"))
     console.print(table)
 
 

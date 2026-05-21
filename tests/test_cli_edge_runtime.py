@@ -721,3 +721,50 @@ def test_edge_doctor_explains_missing_uno_q_requirements(monkeypatch) -> None:
     assert "Install serial support with the edge extras" in doctor.stdout
     assert "USB data cable" in doctor.stdout
     assert "You can still run the Linux-side demo now" in doctor.stdout
+
+
+def test_edge_pump_cli_creates_packages_and_uploads_dry_run(tmp_path) -> None:
+    lab_dir = tmp_path / "pico_lab"
+    init_result = runner.invoke(app, ["edge", "pump", "init", "--output-dir", str(lab_dir)])
+    assert init_result.exit_code == 0
+    assert "IINTS Pico Pump Lab" in init_result.stdout
+    assert (lab_dir / "algorithms" / "pico_bench_algorithm.py").is_file()
+
+    bundle_dir = tmp_path / "pico_bundle"
+    package_result = runner.invoke(
+        app,
+        [
+            "edge",
+            "pump",
+            "package",
+            "--algorithm",
+            str(lab_dir / "algorithms" / "pico_bench_algorithm.py"),
+            "--output-dir",
+            str(bundle_dir),
+            "--safety-contract",
+            str(lab_dir / "safety_contract.json"),
+        ],
+    )
+    assert package_result.exit_code == 0
+    assert "Pico Pump Bench Bundle" in package_result.stdout
+    assert (bundle_dir / "manifest.json").is_file()
+
+    mount_dir = tmp_path / "CIRCUITPY"
+    mount_dir.mkdir()
+    upload_result = runner.invoke(
+        app,
+        [
+            "edge",
+            "pump",
+            "upload",
+            "--bundle-dir",
+            str(bundle_dir),
+            "--mount-dir",
+            str(mount_dir),
+            "--bench-only-confirm",
+            "I understand this is bench-only and not for human use",
+        ],
+    )
+    assert upload_result.exit_code == 0
+    assert "Dry run only" in upload_result.stdout
+    assert "code.py" in upload_result.stdout

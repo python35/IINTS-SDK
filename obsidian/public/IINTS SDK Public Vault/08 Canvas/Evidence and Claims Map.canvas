@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "id": "claim",
+      "type": "file",
+      "file": "07 Claims and Explanations/Claim Library.md",
+      "x": 0,
+      "y": 0,
+      "width": 380,
+      "height": 160
+    },
+    {
+      "id": "features",
+      "type": "file",
+      "file": "06 Sources and Evidence/Sources by SDK Feature.md",
+      "x": 460,
+      "y": -160,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "sources",
+      "type": "file",
+      "file": "06 Sources and Evidence/Source Library Index.md",
+      "x": 460,
+      "y": 60,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "phys",
+      "type": "file",
+      "file": "06 Sources and Evidence/Physiology and Safety Sources.md",
+      "x": 920,
+      "y": -260,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "data",
+      "type": "file",
+      "file": "06 Sources and Evidence/Dataset Source Library.md",
+      "x": 920,
+      "y": -60,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "ai",
+      "type": "file",
+      "file": "06 Sources and Evidence/Local AI and Hardware Sources.md",
+      "x": 920,
+      "y": 140,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "script",
+      "type": "file",
+      "file": "07 Claims and Explanations/Safety Boundary Script.md",
+      "x": 1380,
+      "y": -60,
+      "width": 390,
+      "height": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "claim",
+      "fromSide": "right",
+      "toNode": "features",
+      "toSide": "left"
+    },
+    {
+      "id": "e2",
+      "fromNode": "claim",
+      "fromSide": "right",
+      "toNode": "sources",
+      "toSide": "left"
+    },
+    {
+      "id": "e3",
+      "fromNode": "features",
+      "fromSide": "right",
+      "toNode": "phys",
+      "toSide": "left"
+    },
+    {
+      "id": "e4",
+      "fromNode": "sources",
+      "fromSide": "right",
+      "toNode": "data",
+      "toSide": "left"
+    },
+    {
+      "id": "e5",
+      "fromNode": "sources",
+      "fromSide": "right",
+      "toNode": "ai",
+      "toSide": "left"
+    },
+    {
+      "id": "e6",
+      "fromNode": "phys",
+      "fromSide": "right",
+      "toNode": "script",
+      "toSide": "left"
+    }
+  ]
+}

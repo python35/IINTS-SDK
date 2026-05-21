@@ -50,6 +50,7 @@ nav:
   - Home: index.md
   - Start:
       - Choose Your Path: USER_GUIDE_MAP.md
+      - Public Obsidian Vault: OBSIDIAN_PUBLIC_VAULT.md
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - 5-Minute Quickstart: QUICKSTART.md
       - Getting Started: GETTING_STARTED.md
@@ -68,6 +69,7 @@ nav:
       - Hardware Hub: HARDWARE.md
       - Edge Hardware Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
+      - Raspberry Pi Pico Pump Lab: PICO_PUMP_LAB.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
       - Jetson Endurance Mode: JETSON_ENDURANCE.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md

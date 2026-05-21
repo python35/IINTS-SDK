@@ -1,0 +1,876 @@
+# Developer CLI Guide
+
+Use this guide when you need the exact technical behavior of the CLI, including integration paths and artifact expectations.
+
+If you are new to the project, start with `docs/PLAIN_LANGUAGE_GUIDE.md` and `README.md` first.
+If you intend to modify SDK source code, start with the [Developer Portal](DEVELOPER_PORTAL.md) first so you get the architecture, maintainer, testing, and release map before diving into command details.
+
+## Environment Requirement (Important)
+
+Run all SDK commands from an active virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+```
+
+This guide assumes `.venv` is active for every command.
+
+## Who This Page Is For
+
+- Engineers integrating SDK runs into applications or CI pipelines.
+- Researchers needing exact commands and reproducible artifact expectations.
+- Technical reviewers validating run traceability and data-quality gates.
+
+## Terminology Used Consistently In This Page
+
+- `Algorithm`: insulin-dosing logic under test.
+- `Forecast model`: optional AI predictor signal (advisory only).
+- `Safety Supervisor`: deterministic safety gate enforcing hard rules.
+- `Run bundle`: output folder containing result traces + metadata + reports.
+- `MDMP`: data contract validation protocol and grading system.
+
+## Reading Structure
+
+Workflow chapters are organized with:
+- `Purpose`
+- `When to use`
+- `Commands`
+- `Output`
+
+## Documentation Site
+
+Local preview:
+
+```bash
+python3 -m pip install mkdocs mkdocs-material
+mkdocs serve
+```
+
+Static build:
+
+```bash
+mkdocs build
+```
+
+GitHub Actions deployment notes:
+- Set repository Pages source to **GitHub Actions** once in repository settings.
+- Set repository variable `ENABLE_PAGES_DEPLOY=true` to enable deploy job.
+
+## What This File Is For
+- Exact CLI commands.
+- Integration and development workflows.
+- Reproducible run artifacts and technical options.
+
+## Installation
+
+### System Requirements
+* Python 3.10+
+* Works on Windows, macOS, and Linux
+
+### From TestPyPI
+```bash
+pip install -i https://test.pypi.org/simple/ iints-sdk-python35
+```
+
+### From Source (Development)
+```bash
+git clone https://github.com/python35/IINTS-SDK.git
+cd IINTS-SDK
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python3 -m pip install -e .
+python3 -m pip install -e ".[dev]"
+```
+
+## CLI Workflow
+
+### Core Workflow Chapter A: Initialize a Project
+
+**Purpose**
+- Create a standard SDK workspace with expected folder structure.
+
+**When to use**
+- At the start of a new study, benchmark, or algorithm experiment.
+
+**Commands**
+```bash
+iints init --project-name my_research
+cd my_research
+```
+
+**Output**
+- Project folders for algorithms, scenarios, and results.
+
+### Core Workflow Chapter B: Baseline Simulation
+
+**Purpose**
+- Run a known-good baseline to verify end-to-end simulation behavior.
+
+**When to use**
+- After setup, before introducing custom algorithms.
+
+**Commands**
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+**Output**
+- Initial run bundle with `results.csv`, report PDF, and audit logs.
+
+### Core Workflow Chapter C: Study-Ready Bundle
+
+**Purpose**
+- Generate one reproducible package for review and validation.
+
+**When to use**
+- Before internal review, external sharing, or paper-support artifacts.
+
+**Commands**
+```bash
+iints study-ready \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_ready
+```
+
+**Output**
+- `results.csv`, `clinical_report.pdf`, `audit/`, `run_manifest.json`
+- `validation_report.json`, `sources_manifest.json`, `SUMMARY.md`
+
+### Core Workflow Chapter D: MDMP Data Validation
+
+**Purpose**
+- Validate dataset quality before training or evaluation.
+
+**When to use**
+- Whenever new raw CGM data is introduced into your pipeline.
+
+**Commands**
+```bash
+iints data certify-template --output-path data_contract.yaml
+iints data certify data_contract.yaml data/my_cgm.csv \
+  --output-json results/certification.json
+iints data certify-visualizer results/certification.json \
+  --output-html results/mdmp_dashboard.html
+```
+
+**Output**
+- Contract validation report, MDMP grade, fingerprints, and HTML dashboard.
+
+### Core Workflow Chapter E: CareLink / MiniMed Import
+
+**Purpose**
+- Convert Medtronic CareLink event exports into the standard IINTS timeline so users can reuse their own pump and CGM history.
+
+**When to use**
+- When a user exports a CSV from the MiniMed CareLink web app and wants to turn it into a standard CGM+carb+insulin dataset.
+
+**Commands**
+```bash
+iints import-carelink \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/imported_carelink
+
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+```
+
+**Output**
+- `cgm_standard.csv` in the universal IINTS schema
+- `scenario.json` with meal events derived from carb entries
+- `carelink_summary.json` with device metadata and import counts
+- `carelink_timeline.csv` with real timestamps preserved for personal analysis
+- `carelink_metrics.json` with personal glucose metrics
+- `carelink_dashboard.png`, `carelink_poster.png`, and `carelink_dashboard.html` for direct visual review
+- `ai/*.json` payloads so the local AI assistant can explain imported personal data
+
+**How it works**
+- Skips the CareLink metadata preamble
+- Parses the event table (`Index;Date;Time;...`)
+- Uses sensor glucose first, with SMBG fallback when needed
+- Aligns carb and bolus events onto the nearest glucose timestamp
+- Estimates basal insulin from the reported basal rate between glucose samples
+
+### Core Workflow Chapter F: AI Assistant (Ministral 3 Open-Weight via Ollama)
+
+**Purpose**
+- Generate research-only explanations, anomaly summaries, and markdown reports from validated simulation outputs.
+
+**When to use**
+- After a run is complete, or after a CareLink workbench has been generated from imported personal data.
+
+**Commands**
+```bash
+python -m pip install -e ".[full,mdmp]"
+iints ai models
+ollama pull ministral-3:8b
+iints ai local-check --model ministral-3:8b
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+iints ai prepare results/<run_id>
+iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
+```
+
+For imported personal CareLink data:
+
+```bash
+python -m pip install -e ".[full,mdmp]"
+ollama pull ministral-3:3b
+iints ai local-check --model ministral-3:3b
+iints carelink-workbench \
+  --input-csv "/path/to/CareLink export.csv" \
+  --output-dir results/personal_carelink
+iints ai report results/personal_carelink --model ministral-3:3b
+iints ai trends results/personal_carelink --model ministral-3:3b
+iints ai explain results/personal_carelink --model ministral-3:3b
+```
+
+`iints ai local-check` now runs a tiny generation smoke-test by default, so it validates real inference readiness instead of only checking model tags.
+
+Direct JSON mode is still available:
+
+```bash
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+**Output**
+- Plain-language explanation or markdown report generated from local Ministral 3 inference, either from simulation runs or imported personal glucose workspaces.
+- The command fails closed if MDMP verification does not pass.
+- The command also fails early if Ollama is reachable but the local Ministral tag is missing.
+
+**How it works**
+- `MDMPGuard` verifies the signed artifact before any LLM call is allowed.
+- `OllamaBackend` resolves common local aliases such as `ministral` to the installed Ollama tag.
+- Oversized JSON payloads are clipped automatically before prompt generation so local inference stays practical on slower hardware.
+
+**Hardware guidance**
+- `iints ai models` prints the curated local model list with RAM and VRAM recommendations.
+- Use `ministral-3:3b` for smaller laptops or CPU-only systems.
+- Use `ministral-3:8b` as the default balanced choice.
+
+### Core Workflow Chapter G: Edge Runtime On SBC
+
+**Purpose**
+- Scaffold, run, inspect, update, and export a persistent digital patient runtime on Raspberry Pi or other Linux-capable SBC hardware.
+
+**When to use**
+- When you want an always-on booth rig, classroom Pi, UNO Q hybrid runtime, or long-running edge patient setup.
+
+**Commands**
+```bash
+python -m pip install -U "iints-sdk-python35[edge,mdmp]"
+iints edge setup --output-dir iints_edge_demo --board raspberry_pi
+cd iints_edge_demo
+./run_edge_patient.sh
+iints edge status --workspace patient_runtime
+iints patient kiosk --workspace patient_runtime
+iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
+```
+
+For physical feedback on UNO Q:
+
+```bash
+iints edge hardware-bridge --board uno_q --output-dir uno_q_bridge
+```
+
+**Output**
+- generated edge scaffold with:
+  - `algorithms/example_algorithm.py`
+  - `run_edge_patient.sh`
+  - `launch_kiosk.sh`
+  - `update_edge_runtime.sh`
+  - `EDGE_SETUP.md`
+- persistent runtime workspace with:
+  - `patient_state.db`
+  - `patient_runtime_config.json`
+  - `patient.log`
+  - `live_bundle/`
+- optional export artifacts:
+  - `edge_runtime_bundle.zip`
+  - UNO Q bridge sketch + protocol notes
+
+**What this workflow gives you**
+- a lighter install profile for edge hardware
+- a kiosk-ready dashboard for Raspberry Pi Connect screen sharing
+- exported `systemd` service files for auto-restart on the device
+- a clean handoff path back to a workstation for full analysis
+
+### Core Workflow Chapter H: Poster-Ready Results Graphic
+
+**Purpose**
+- Turn one to three completed IINTS run bundles into a single poster-style PNG for jury demos, expos, or slide decks.
+
+**When to use**
+- After you already have representative runs such as a normal run, a meal stress test, and a supervisor override case.
+
+**Commands**
+```bash
+iints poster \
+  --run-dir results/normal_run \
+  --run-dir results/meal_stress \
+  --run-dir results/supervisor_override \
+  --label "Normal Run" \
+  --label "Meal Stress Test" \
+  --label "Supervisor Override" \
+  --output-path results/posters/iints_results_poster.png
+```
+
+**Output**
+- `iints_results_poster.png` with one panel per scenario
+- `iints_results_poster.json` with the poster summary metrics
+
+**What the poster includes**
+- Glucose curve for each scenario
+- Highlighted target band (`70-180 mg/dL`)
+- Meal-event markers when carbs are present in the run
+- Supervisor intervention markers when the safety layer triggered
+- Per-panel summary block with TIR, time below range, meals, and intervention count
+- Use `ministral-3:14b` only on stronger workstations with plenty of memory.
+
+### Core Workflow Chapter I: Booth / Jury Demo Bundle
+
+**Purpose**
+- Give you one public-facing command that creates a fair-ready demo with code, poster, and speaker notes.
+
+**When to use**
+- Before a science fair, jury presentation, thesis defense, expo booth, or sponsor demo.
+
+**Commands**
+```bash
+./scripts/run_booth_demo.sh
+```
+
+or
+
+```bash
+iints demo-booth --output-dir results/booth_demo
+```
+
+**Output**
+- `results/booth_demo/01_normal_run/`
+- `results/booth_demo/02_meal_stress_test/`
+- `results/booth_demo/03_supervisor_override/`
+- `results/booth_demo/booth_demo_poster.png`
+- `results/booth_demo/JURY_TALK_TRACK.md`
+- `results/booth_demo/run_commands.md`
+
+**What it demonstrates**
+- A clean control case
+- A harder stress scenario
+- A deliberately unsafe AI that gets blocked by the supervisor
+- Optional AI-ready artifacts for the safety case
+
+This is the recommended live-demo flow when you want to show the SDK clearly without manually stitching together runs and graphics.
+
+### Detailed Command Reference
+
+### Initialize a Project
+```bash
+iints init --project-name my_research
+cd my_research
+```
+
+### Quickstart Project
+```bash
+iints quickstart --project-name iints_quickstart
+cd iints_quickstart
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+### Run a Simulation
+```bash
+iints run --algo algorithms/example_algorithm.py \
+  --scenario-path scenarios/example_scenario.json \
+  --patient-config-name default_patient \
+  --seed 42
+```
+
+Each run writes a reproducible bundle to `results/<run_id>/` by default:
+- `config.json`
+- `run_metadata.json`
+- `run_manifest.json` (SHA-256 hashes for provenance)
+- `results.csv`
+- `report.pdf`
+- `audit/` and `baseline/` (when enabled)
+
+### One-Line Runner (CSV + audit + PDF + baseline + profiling)
+```bash
+iints run-full --algo algorithms/example_algorithm.py \
+  --scenario-path scenarios/example_scenario.json \
+  --patient-config-name default_patient \
+  --output-dir results/run_full
+```
+
+### One-Line Research Bundle (run + validate + sources + summary)
+```bash
+iints study-ready \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_ready
+```
+
+Creates:
+- `results.csv`, `clinical_report.pdf`, `audit/`, `run_manifest.json`
+- `validation_report.json`
+- `sources_manifest.json`
+- `SUMMARY.md`
+
+### AI Assistant Commands
+```bash
+iints ai models
+
+iints ai explain results/step.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai trends results/glucose_payload.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai anomalies results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp
+
+iints ai report results/simulation_run.json \
+  --mdmp-cert results/report.signed.mdmp \
+  --output results/ai_report.md
+```
+
+Options:
+- `--mode local` to require the local Ollama backend explicitly.
+- `--model ministral-3:8b` to pin the open local model tag.
+- `iints ai models` to inspect recommended local Mistral-family options for your hardware.
+- `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable, the local Ministral tag is installed, and a tiny real generation succeeds before a real run.
+- `--model ministral` remains supported as a friendly alias.
+- `--timeout-seconds 120` to support slower local hardware such as edge devices.
+- `--public-key <pem>` or `--trust-store <json>` to control MDMP verification.
+- `--minimum-grade research_grade` to enforce the certification floor.
+
+### Parallel Batch Runner
+```bash
+iints run-parallel --algo algorithms/example_algorithm.py \
+  --scenarios-dir scenarios \
+  --output-dir results/batch
+```
+
+### Scenario Generator
+```bash
+iints scenarios generate --name "Random Stress Test" \
+  --output-path scenarios/generated_scenario.json
+```
+
+### Validate Scenario + Patient Config
+```bash
+iints validate --scenario-path scenarios/example_scenario.json \
+  --patient-config-path src/iints/data/virtual_patients/clinic_safe_baseline.yaml
+```
+
+### Show Scientific Sources Used by the SDK
+```bash
+iints sources
+iints sources --category guideline
+iints sources --output-json results/source_manifest.json
+```
+
+### Import Real-World CGM Data
+```bash
+iints import-data --input-csv data/my_cgm.csv --output-dir results/imported
+```
+
+### Data Contract Runner (Model-Ready Gate)
+```bash
+iints data contract-template --output-path data_contract.yaml
+iints data certify data_contract.yaml data/my_cgm.csv \
+  --output-json results/certification.json
+iints data certify data_contract.yaml data/my_cgm.csv \
+  --min-mdmp-grade research_grade --fail-on-noncompliant
+iints data synthetic-mirror data/my_cgm.csv data_contract.yaml \
+  --output-csv data/synthetic_mirror.csv \
+  --output-json results/synthetic_mirror_report.json
+iints data certify-visualizer results/certification.json \
+  --output-html results/mdmp_dashboard.html
+iints data corrupt-for-study data/my_cgm.csv \
+  --output-csv results/data_corrupted.csv \
+  --mode timestamp_shift --mode missing_block --mode glucose_spikes
+```
+`iints data certify` reports:
+- `compliance_score`
+- `contract_fingerprint_sha256`
+- `dataset_fingerprint_sha256`
+- `mdmp_grade` (`draft`, `research_grade`, `clinical_grade`)
+- `certified_for_medical_research`
+
+`iints data certify-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
+
+`iints data corrupt-for-study` creates a controlled corrupted dataset plus a manifest JSON, so you can test certified-vs-uncertified claims with a documented ablation instead of ad-hoc edits.
+
+### Scientific Study Workflow
+```bash
+iints study-protocol --output-dir results/study_protocol
+iints scenarios export-study-pack --output-dir scenarios/study_pack
+
+iints analyze results/study \
+  --output-json results/study_summary.json \
+  --output-markdown results/study_summary.md \
+  --output-csv results/evidence_table.csv \
+  --output-evidence-markdown results/evidence_table.md \
+  --carelink-metrics results/personal_carelink/carelink_metrics.json
+
+iints compare-study results/study_clean results/study_corrupted \
+  --output-json results/study_comparison.json \
+  --output-markdown results/study_comparison.md
+
+iints poster-study results/study_summary.json \
+  --output-path results/study_poster.png
+
+iints run-study \
+  --algo algorithms/example_algorithm.py \
+  --output-dir results/study_bundle
+```
+
+This workflow is designed for:
+- explicit hypotheses
+- shared seeds across conditions
+- controlled corruption operators
+- descriptive statistics and effect estimates
+- failure analysis
+- optional real-world plausibility comparison using imported CareLink metrics
+
+`synthetic-mirror` generates a synthetic dataset from a validated source CSV, preserving schema and broad numeric behavior, then validates the synthetic output against the same contract.
+
+`iints data ...` is now the preferred public namespace for certification workflows. The old `iints mdmp ...` aliases remain hidden for backwards compatibility.
+
+### Study Aggregation
+```bash
+iints analyze results/study \
+  --output-json results/study_summary.json \
+  --output-markdown results/study_summary.md
+```
+This aggregates multi-run evidence such as mean TIR, supervisor interventions, baseline deltas, and certified-vs-uncertified splits.
+
+### MDMP Auto-Guardian Decorator
+```python
+import pandas as pd
+from iints import mdmp_gate
+
+@mdmp_gate("contracts/clinical_mdmp_contract.yaml", min_grade="clinical_grade")
+def train_step(df: pd.DataFrame) -> int:
+    return len(df)
+```
+You can also import from `iints.mdmp` for protocol-specific code boundaries.
+Behavior:
+- `fail_mode="raise"` (default): blocks execution with `MDMPGateError`
+- `fail_mode="warn"`: continues with `RuntimeWarning`
+- `fail_mode="log"`: continues and logs warning
+
+### Clinical-Trial Scaffold
+```bash
+iints init --project-name iints_trial --template clinical-trial
+```
+This template creates:
+- `contracts/clinical_mdmp_contract.yaml`
+- `data/demo/diabetes_cgm.csv`
+- `audit/`, `reports/`, `notebooks/`, `results/`
+
+### Import Wizard (Interactive)
+```bash
+iints import-wizard
+```
+
+### Use the Demo Data Pack
+```bash
+iints import-demo --output-dir results/demo_import
+```
+
+### Nightscout Import (Optional Dependency)
+```bash
+pip install iints-sdk-python35[nightscout]
+export IINTS_NIGHTSCOUT_TOKEN="replace-me"
+iints import-nightscout --url https://your-nightscout.example \
+  --token-env IINTS_NIGHTSCOUT_TOKEN \
+  --output-dir results/nightscout_import
+```
+
+Prefer `--api-secret-env`, `--api-secret-file`, `--token-env`, or `--token-file` over plain CLI secrets.
+
+### Tidepool Import
+```bash
+export IINTS_TIDEPOOL_TOKEN="replace-me"
+iints import-tidepool \
+  --base-url https://api.tidepool.org \
+  --token-env IINTS_TIDEPOOL_TOKEN \
+  --output-dir results/tidepool_import
+```
+
+The importer resolves the current authenticated user when `--user-id` is omitted,
+fetches CGM plus meal/insulin events, converts Tidepool CGM units into the SDK's
+standard mg/dL frame, and exports both `scenario.json` and `cgm_standard.csv`.
+
+### Demo Quickstart Workflow (Script)
+```bash
+python3 examples/demo_quickstart_flow.py
+```
+
+### Create a Patient Profile (YAML)
+```bash
+iints profiles create --name patient_john \
+  --isf 45 --icr 11 --basal-rate 0.9 --initial-glucose 130 \
+  --dawn-strength 8 --dawn-start 4 --dawn-end 8
+
+# Use it in a run:
+iints run --algo algorithms/example_algorithm.py \
+  --patient-config-path patient_profiles/patient_john.yaml
+```
+
+### Generate a Report from Results CSV
+```bash
+iints report --results-csv results/data/sim_results_example.csv \
+  --output-path results/clinical_report.pdf
+```
+
+## Research Track (AI Predictor)
+See `research/README.md` for training and evaluation scripts. The predictor is not a dosing controller; it only provides a 30-120 minute forecast signal to the Safety Supervisor.
+
+Quick start:
+```bash
+pip install iints-sdk-python35[research]
+python research/synthesize_dataset.py --runs 10 --output data/synthetic.parquet
+python research/train_predictor.py --data data/synthetic.parquet --config research/configs/predictor.yaml --out models
+```
+
+Integration:
+```python
+from iints.research import load_predictor_service
+predictor = load_predictor_service("models/predictor.pt")
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    predictor=predictor,
+    duration_minutes=720,
+)
+```
+
+### Dependency Check (Optional Torch)
+```bash
+pip install "iints[torch]"
+iints check-deps
+```
+
+## Python API
+
+### One-Line Runner
+```python
+import iints
+from iints.core.algorithms.pid_controller import PIDController
+from iints.core.patient.profile import PatientProfile
+
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/quick_run",
+)
+
+# Full bundle in one call
+outputs = iints.run_full(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/run_full",
+)
+
+# Patient profile shortcut
+profile = PatientProfile(isf=45, icr=11, basal_rate=0.9, initial_glucose=130)
+outputs = iints.run_simulation(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config=profile,
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/profile_run",
+)
+
+# SafetyConfig override
+from iints.core.safety import SafetyConfig
+safe = SafetyConfig(max_insulin_per_bolus=2.0, hypo_cutoff=80.0)
+outputs = iints.run_full(
+    algorithm=PIDController(),
+    scenario="scenarios/example_scenario.json",
+    patient_config="default_patient",
+    duration_minutes=720,
+    seed=42,
+    output_dir="results/safe_run",
+    safety_config=safe,
+)
+```
+
+### Quickstart & Demo PDF Exports
+```python
+quickstart_pdf = iints.generate_quickstart_report(
+    outputs["results"],
+    "results/quickstart/quickstart_report.pdf",
+    outputs["safety_report"],
+)
+
+demo_pdf = iints.generate_demo_report(
+    outputs["results"],
+    "results/quickstart/demo_report.pdf",
+    outputs["safety_report"],
+)
+```
+
+### Real-World Import (Python)
+```python
+import iints
+
+result = iints.scenario_from_csv(
+    "data/my_cgm.csv",
+    data_format="dexcom",
+    scenario_name="Patient A - Week 1",
+)
+
+result.dataframe.head()
+scenario = result.scenario
+```
+
+Demo data in Python:
+```python
+import iints
+
+demo_df = iints.load_demo_dataframe()
+```
+
+## Clinic-Safe Presets
+```bash
+iints presets list
+iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
+```
+
+New presets:
+* `hypo_prone_night`
+* `hyper_challenge`
+* `pizza_paradox`
+* `midnight_crash`
+
+Create a scaffold:
+```bash
+iints presets create --name custom_safe --output-dir ./presets
+```
+
+## Audit Trail + Report Bundle
+```bash
+python3 examples/audit_and_report.py
+```
+
+Notes:
+* The PDF includes top intervention reasons for explainability.
+* The simulator stops on sustained critical hypoglycemia (default: <40 mg/dL for 30 minutes).
+* When the limit is exceeded, `SimulationLimitError` is raised and the safety report marks `terminated_early`.
+
+## Metrics
+```python
+import iints.metrics as metrics
+
+gmi = metrics.calculate_gmi(results_df["glucose_actual_mgdl"])
+lbgi = metrics.calculate_lbgi(results_df["glucose_actual_mgdl"])
+```
+
+## Human-in-the-loop + Sensor/Pump Models
+```python
+from iints import SensorModel, PumpModel
+from iints.core.simulator import Simulator
+
+sensor = SensorModel(noise_std=8.0, lag_minutes=5, dropout_prob=0.02, seed=42)
+pump = PumpModel(max_units_per_step=0.25, quantization_units=0.05, dropout_prob=0.01, seed=42)
+
+def rescue_callback(ctx):
+    if ctx["glucose_actual_mgdl"] < 65:
+        return {"additional_carbs": 15, "note": "rescue carbs"}
+    return None
+
+sim = Simulator(patient_model=patient, algorithm=algo, sensor_model=sensor, pump_model=pump, on_step=rescue_callback)
+```
+
+## State Serialization (Time‑travel Debugging)
+```python
+state = sim.save_state()
+sim.load_state(state)
+```
+
+## Performance Profiling
+```python
+from iints.core.simulator import Simulator
+
+sim = Simulator(patient_model=patient, algorithm=algo, enable_profiling=True)
+results_df, safety_report = sim.run_batch(duration_minutes=1440)
+print(safety_report["performance_report"])
+```
+
+## Mock Algorithms (CI-Safe)
+```python
+from iints import ConstantDoseAlgorithm, RandomDoseAlgorithm
+```
+
+## Testing
+```bash
+pytest
+```
+
+## One-Command Dev Workflow
+```bash
+make dev
+make test
+make lint
+```
+
+## Helper Scripts
+```bash
+./scripts/run_tests.sh
+./scripts/run_lint.sh
+./scripts/run_demo.sh
+```
+
+## Tools Layout
+
+The repository separates short user-facing entrypoints from maintainer utilities:
+
+- `scripts/`: quick wrappers for common local workflows
+- `tools/ci/`: CI validation helpers
+- `tools/dev/`: local maintainer scripts
+- `tools/docs/`: manual and docs builders
+- `tools/data/`: dataset ingestion and conversion helpers
+- `tools/analysis/`: plotting and reporting utilities
+- `tools/assets/`: project branding generators
+
+Examples:
+
+```bash
+python tools/data/import_ohio.py /path/to/ohio/dataset
+python tools/analysis/attach_ai_predictions.py --results results.csv --model predictor.pt --out results_with_ai.csv
+tools/dev/dual_repo_status.sh
+tools/docs/build_manuals.sh
+```
+
+## Safety Architecture
+* **IndependentSupervisor**: deterministic safety layer that caps insulin, blocks dangerous doses, and logs interventions.
+* **InputValidator**: applies broad CGM/sensor plausibility bounds (default `40-500 mg/dL`) and rate-of-change checks before an algorithm sees a glucose value.
+* **Deterministic Audit**: every decision is logged for accountability and explainability.
+
+## Roadmap
+* February 2026: Safety Engine hardening + documentation sprint
+* March 2026: Monte Carlo population studies + edge AI benchmarking
+* March 27, 2026: Official Launch & Live Expo Demo
+
+## API Stability
+See `API_STABILITY.md` for semver and deprecation policy.

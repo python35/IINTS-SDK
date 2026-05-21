@@ -1,0 +1,15 @@
+{
+  "alwaysUpdateLinks": true,
+  "attachmentFolderPath": "_attachments",
+  "newFileLocation": "folder",
+  "newFileFolderPath": "00 Inbox",
+  "showLineNumber": false,
+  "spellcheck": true,
+  "spellcheckLanguages": [
+    "en",
+    "nl-BE"
+  ],
+  "readableLineLength": true,
+  "strictLineBreaks": false,
+  "showFrontmatter": true
+}

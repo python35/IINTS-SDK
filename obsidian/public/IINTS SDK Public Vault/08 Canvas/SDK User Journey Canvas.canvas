@@ -1,0 +1,118 @@
+{
+  "nodes": [
+    {
+      "id": "home",
+      "type": "file",
+      "file": "04 SDK User Guide/SDK User Home.md",
+      "x": 0,
+      "y": 0,
+      "width": 360,
+      "height": 150
+    },
+    {
+      "id": "first",
+      "type": "file",
+      "file": "04 SDK User Guide/User Journey - First 30 Minutes.md",
+      "x": 460,
+      "y": -220,
+      "width": 380,
+      "height": 150
+    },
+    {
+      "id": "algo",
+      "type": "file",
+      "file": "04 SDK User Guide/User Journey - Algorithm Developer.md",
+      "x": 460,
+      "y": -20,
+      "width": 380,
+      "height": 150
+    },
+    {
+      "id": "data",
+      "type": "file",
+      "file": "04 SDK User Guide/User Journey - Data Quality Researcher.md",
+      "x": 460,
+      "y": 180,
+      "width": 380,
+      "height": 150
+    },
+    {
+      "id": "edge",
+      "type": "file",
+      "file": "04 SDK User Guide/User Journey - Edge Hardware Demo.md",
+      "x": 920,
+      "y": -120,
+      "width": 380,
+      "height": 150
+    },
+    {
+      "id": "eucys",
+      "type": "file",
+      "file": "04 SDK User Guide/User Journey - EUCYS or Jury Demo.md",
+      "x": 920,
+      "y": 80,
+      "width": 380,
+      "height": 150
+    },
+    {
+      "id": "commands",
+      "type": "file",
+      "file": "04 SDK User Guide/Command Cookbook - User Edition.md",
+      "x": 1380,
+      "y": -20,
+      "width": 380,
+      "height": 150
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "home",
+      "fromSide": "right",
+      "toNode": "first",
+      "toSide": "left"
+    },
+    {
+      "id": "e2",
+      "fromNode": "home",
+      "fromSide": "right",
+      "toNode": "algo",
+      "toSide": "left"
+    },
+    {
+      "id": "e3",
+      "fromNode": "home",
+      "fromSide": "right",
+      "toNode": "data",
+      "toSide": "left"
+    },
+    {
+      "id": "e4",
+      "fromNode": "algo",
+      "fromSide": "right",
+      "toNode": "edge",
+      "toSide": "left"
+    },
+    {
+      "id": "e5",
+      "fromNode": "data",
+      "fromSide": "right",
+      "toNode": "eucys",
+      "toSide": "left"
+    },
+    {
+      "id": "e6",
+      "fromNode": "edge",
+      "fromSide": "right",
+      "toNode": "commands",
+      "toSide": "left"
+    },
+    {
+      "id": "e7",
+      "fromNode": "eucys",
+      "fromSide": "right",
+      "toNode": "commands",
+      "toSide": "left"
+    }
+  ]
+}

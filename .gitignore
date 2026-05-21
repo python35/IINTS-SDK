@@ -84,3 +84,8 @@ venv/
 # Documentation Build Output
 docssphinx/_build/
 site/
+
+# Obsidian working vaults
+obsidian/IINTS OS - Smart Vault v2/
+obsidian/IINTS_OS_Smart_Vault_v2.zip
+obsidian/public/*.zip

@@ -20,6 +20,7 @@ hide:
         <div class="home-action-row">
           <a class="home-button home-button-primary" href="./QUICKSTART/">Start in 5 minutes</a>
           <a class="home-button" href="./USER_GUIDE_MAP/">Choose your path</a>
+          <a class="home-button" href="./OBSIDIAN_PUBLIC_VAULT/">Obsidian vault</a>
           <a class="home-button" href="./DEVELOPER_PORTAL/">Developer portal</a>
         </div>
       </div>
@@ -74,6 +75,11 @@ hide:
         <span class="home-route-label">Developer</span>
         <span class="home-route-title">Change the SDK safely</span>
         <span class="home-route-body">Find architecture, generated API docs, contribution rules, and the checks required before you merge code.</span>
+      </a>
+      <a class="home-route-card" href="./OBSIDIAN_PUBLIC_VAULT/">
+        <span class="home-route-label">Knowledge vault</span>
+        <span class="home-route-title">Explore the connected project map</span>
+        <span class="home-route-body">Download the public Obsidian vault with SDK workflows, hardware notes, source evidence, demos, and glossaries.</span>
       </a>
     </div>
   </section>

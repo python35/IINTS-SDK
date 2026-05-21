@@ -1,0 +1,26 @@
+IINTS Pico Pump Bench Serial Protocol
+=====================================
+
+Scope: bench-only, non-actuating firmware.
+Baud: 115200
+Line ending: newline
+Ready banner: IINTS Pico Pump Bench firmware ready
+
+Allowed commands:
+- PING
+- STATUS
+- LOCKOUT
+
+Blocked commands:
+- DOSE
+- BOLUS
+- BASAL
+- PRIME
+
+All responses are JSON lines and include:
+- ok
+- device
+- hardware_actuation_enabled
+- locked
+
+The firmware must always report hardware_actuation_enabled=false.

@@ -1,0 +1,95 @@
+{
+  "nodes": [
+    {
+      "id": "workbench",
+      "type": "file",
+      "file": "40 Pump Hardware/Pump Workbench.md",
+      "x": 0,
+      "y": 0,
+      "width": 380,
+      "height": 160
+    },
+    {
+      "id": "workflow",
+      "type": "file",
+      "file": "05 Workflows/Workflow - Pump Lab Bench Gate.md",
+      "x": 460,
+      "y": 0,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "contract",
+      "type": "file",
+      "file": "40 Pump Hardware/Bench Safety Contract.md",
+      "x": 920,
+      "y": -200,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "protocol",
+      "type": "file",
+      "file": "40 Pump Hardware/Pico Serial Protocol.md",
+      "x": 920,
+      "y": 0,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "risk",
+      "type": "file",
+      "file": "40 Pump Hardware/Pump Risk Register.md",
+      "x": 920,
+      "y": 200,
+      "width": 390,
+      "height": 160
+    },
+    {
+      "id": "future",
+      "type": "file",
+      "file": "40 Pump Hardware/Future Real Actuator Gate.md",
+      "x": 1380,
+      "y": 0,
+      "width": 390,
+      "height": 160
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "fromNode": "workbench",
+      "fromSide": "right",
+      "toNode": "workflow",
+      "toSide": "left"
+    },
+    {
+      "id": "e2",
+      "fromNode": "workflow",
+      "fromSide": "right",
+      "toNode": "contract",
+      "toSide": "left"
+    },
+    {
+      "id": "e3",
+      "fromNode": "workflow",
+      "fromSide": "right",
+      "toNode": "protocol",
+      "toSide": "left"
+    },
+    {
+      "id": "e4",
+      "fromNode": "workflow",
+      "fromSide": "right",
+      "toNode": "risk",
+      "toSide": "left"
+    },
+    {
+      "id": "e5",
+      "fromNode": "protocol",
+      "fromSide": "right",
+      "toNode": "future",
+      "toSide": "left"
+    }
+  ]
+}

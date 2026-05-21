@@ -1,0 +1,22 @@
+/* Optional dashboard/card utilities. Pure CSS, no community plugins required. */
+.markdown-preview-view.iints-dashboard .callout {
+  box-shadow: 0 10px 28px rgba(0,0,0,0.08);
+}
+.theme-dark .markdown-preview-view.iints-dashboard .callout {
+  box-shadow: 0 12px 32px rgba(0,0,0,0.28);
+}
+.markdown-preview-view.iints-dashboard table {
+  width: 100%;
+}
+.markdown-preview-view.iints-dashboard h1::after {
+  content: "";
+  display: block;
+  width: 72px;
+  height: 4px;
+  margin-top: 12px;
+  background: linear-gradient(90deg, var(--iints-accent), var(--iints-accent-2));
+  border-radius: 999px;
+}
+.markdown-preview-view .task-list-item-checkbox {
+  border-color: var(--iints-accent);
+}

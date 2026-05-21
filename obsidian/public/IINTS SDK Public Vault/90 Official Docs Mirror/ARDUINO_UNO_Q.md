@@ -1,0 +1,540 @@
+# Arduino UNO Q Setup
+
+Use this guide when you want the Linux side of an Arduino UNO Q to run the digital-patient runtime while the STM32 side provides simple LED or buzzer feedback.
+
+This page has one preferred route. Follow that route first; use the deeper sections only when you need to debug or customize the setup.
+
+## Fastest Working Path
+
+Run this from the SDK repository root:
+
+```bash
+cd /path/to/IINTS-SDK
+python3 -m venv .venv_unoq
+source .venv_unoq/bin/activate
+python -m pip install -U pip
+python -m pip install -U -e ".[edge,mdmp]"
+hash -r
+
+iints edge quickstart --board uno_q
+cd iints_uno_q_demo
+```
+
+The quickstart command creates the project, starts the Linux-side runtime, and writes helper scripts so you do not need to memorize the longer commands.
+
+Then:
+
+1. Upload the bridge sketch with Arduino IDE:
+
+```text
+uno_q_bridge/iints_supervisor_bridge.ino
+```
+
+2. Test and run the bridge:
+
+```bash
+./test_uno_q_bridge.sh
+./run_uno_q_bridge.sh
+```
+
+3. If auto-detect sees more than one serial device, pass the port explicitly:
+
+```bash
+./test_uno_q_bridge.sh /dev/ttyACM0
+./run_uno_q_bridge.sh /dev/ttyACM0
+```
+
+If you reboot or stop the runtime later, restart it with:
+
+```bash
+./start_edge_easy.sh
+```
+
+## What Success Looks Like
+
+- `daemon_status` is `running`
+- `uno_q_bridge/iints_supervisor_bridge.ino` exists
+- the kiosk opens at `http://127.0.0.1:8765/kiosk`
+- `./test_uno_q_bridge.sh` changes the bridge outputs as expected
+
+## Why This Is The Recommended Route
+
+- it matches the current docs exactly
+- it avoids CLI version mismatch
+- it guarantees the `iints edge ...` commands are present
+
+## If You See `No such command 'edge'`
+
+If this happens:
+
+```text
+Error: No such command 'edge'
+```
+
+your installed `iints` CLI is older than the current docs.
+
+Do this instead:
+
+- install from the source tree as shown above
+- do not continue until `iints edge doctor --board uno_q` works
+
+## Security Defaults
+
+- the Linux-side dashboard stays on `127.0.0.1` unless you opt into remote binding
+- remote binding now requires both `--allow-remote-api` and a token source
+- bridge flashing and bridge testing do not require remote API exposure
+
+## Detailed Baseline Path
+
+Use these four blocks when you want the same setup with each checkpoint made explicit.
+
+!!! success "Step 1 - Install IINTS on the Linux side"
+    Recommended for UNO Q: install from the SDK repository root, not from an older global install.
+
+    ```bash
+    cd /path/to/IINTS-SDK
+    python3 -m venv .venv_unoq
+    source .venv_unoq/bin/activate
+    python -m pip install -U pip
+    python -m pip install -U -e ".[edge,mdmp]"
+    hash -r
+    ```
+
+    Success looks like:
+
+    - `iints doctor --smoke-run` works
+    - `python -c "import iints; print(iints.__version__)"` prints a version
+    - `iints edge doctor --board uno_q` explains the next fixes in plain language instead of leaving you guessing
+
+    Before you create the project, run:
+
+    ```bash
+    iints edge doctor --board uno_q
+    ```
+
+!!! info "Step 2 - Generate the UNO Q project"
+    Run:
+
+    ```bash
+    iints edge setup --output-dir iints_uno_q_demo --board uno_q
+    cd iints_uno_q_demo
+    ```
+
+    Success looks like:
+
+    - `run_edge_patient.sh` exists
+    - `uno_q_bridge/iints_supervisor_bridge.ino` exists
+    - `EDGE_SETUP.md` exists
+
+!!! tip "Step 3 - Start the Linux runtime"
+    Run:
+
+    ```bash
+    ./start_edge_easy.sh
+    iints edge status --project-dir .
+    ```
+
+    Success looks like:
+
+    - `daemon_status` is `running`
+    - the kiosk opens at `http://127.0.0.1:8765/kiosk`
+    - you can keep the dashboard local and still present it through Raspberry Pi Connect or another local screen-sharing path
+
+!!! warning "Step 4 - Flash and test the STM32 bridge"
+    Flash the sketch with Arduino IDE or:
+
+    ```bash
+    iints edge bridge-flash --project-dir . --port /dev/ttyACM0 --fqbn <your-board-fqbn>
+    ```
+
+    Then test it with:
+
+    ```bash
+    ./test_uno_q_bridge.sh /dev/ttyACM0
+    ```
+
+    Or open Serial Monitor at `115200` baud and send:
+
+    ```text
+    OK
+    OVERRIDE
+    CRITICAL
+    ```
+
+    Success looks like:
+
+    - `OK` turns the built-in status LED on
+    - `OVERRIDE` turns the red LED on
+    - `CRITICAL` turns the red LED on and chirps the buzzer
+
+Once those four blocks work, you have a real working UNO Q baseline.
+
+## What Works Today
+
+The current UNO Q path gives you:
+
+- a working Linux-side IINTS edge runtime
+- a generated STM32 sketch scaffold for the bridge side
+- a simple serial protocol for bridge testing
+- a kiosk dashboard and persistent runtime workspace
+
+Important:
+
+- the Linux runtime works out of the box
+- the STM32 sketch works as a serial target out of the box
+- the Linux runtime can forward status to the STM32 side with `iints edge bridge-run`
+
+So the first success target is:
+
+1. get the Linux runtime running
+2. flash the STM32 bridge sketch
+3. verify the bridge from the CLI
+4. run the live bridge forwarder
+
+That gives you a solid working baseline on UNO Q.
+
+## Before You Start
+
+You need:
+
+- an Arduino UNO Q with access to both the Linux side and the STM32 side
+- Python `3.10+` on the Linux side
+- Arduino IDE for flashing the STM32 sketch
+- a USB cable and a serial port that reaches the STM32 side
+
+Optional hardware for the bridge demo:
+
+- status LED: built-in `LED_BUILTIN`
+- red LED on pin `6`
+- buzzer on pin `9`
+
+Notes:
+
+- on some UNO Q boards the built-in status LED appears blue instead of green
+- the bridge latches the last state it received, so a bridge test that ends on `CRITICAL` can leave LEDs lit until you send `OK`
+
+If you do not wire an external red LED or buzzer yet, you can still complete the setup and verify the sketch through the built-in LED plus serial output.
+
+## Step 1: Install The Edge Runtime On The Linux Side
+
+For UNO Q, the safest method is to install from the SDK repository root so the CLI matches the docs.
+
+Open a terminal on the Linux side of the UNO Q and run:
+
+```bash
+cd /path/to/IINTS-SDK
+python3 -m venv .venv_unoq
+source .venv_unoq/bin/activate
+python -m pip install -U pip
+python -m pip install -U -e ".[edge,mdmp]"
+hash -r
+```
+
+Verify the install:
+
+```bash
+iints doctor --smoke-run
+python -c "import iints; print(iints.__version__, iints.__file__)"
+iints --help
+```
+
+If that succeeds, the SDK is installed correctly on the Linux side.
+
+If `iints edge` is still missing, run:
+
+```bash
+which -a iints
+```
+
+and confirm that your shell is using the `iints` binary from the virtual environment you just activated.
+
+## Step 2: Generate A UNO Q Edge Project
+
+Create the edge scaffold:
+
+```bash
+iints edge setup --output-dir iints_uno_q_demo --board uno_q
+cd iints_uno_q_demo
+```
+
+This creates:
+
+- `algorithms/example_algorithm.py`
+- `patient_runtime/patient_runtime_config.json`
+- `run_edge_patient.sh`
+- `launch_kiosk.sh`
+- `update_edge_runtime.sh`
+- `EDGE_SETUP.md`
+- `uno_q_bridge/iints_supervisor_bridge.ino`
+- `uno_q_bridge/README.md`
+- `uno_q_bridge/bridge_protocol.txt`
+
+If you only want the MCU bridge scaffold without the full edge project, you can also run:
+
+```bash
+iints edge hardware-bridge --board uno_q --output-dir uno_q_bridge
+```
+
+## Linux Runtime API Security
+
+For most UNO Q setups, keep the Linux-side dashboard local:
+
+- use the default `127.0.0.1`
+- open the browser on the device itself
+- avoid exposing the dashboard port to the LAN unless you truly need it
+
+If you do need a remote browser or tool to reach the Linux-side dashboard directly, start it with an explicit token:
+
+```bash
+export IINTS_PATIENT_API_TOKEN="replace-this-with-a-random-secret"
+
+iints patient start \
+  --algo algorithms/example_algorithm.py \
+  --workspace patient_runtime \
+  --scenario-profile normal_day \
+  --mode demo-time \
+  --speed 60x \
+  --api-host 0.0.0.0 \
+  --allow-remote-api \
+  --api-token-env IINTS_PATIENT_API_TOKEN
+```
+
+When token protection is enabled:
+
+- browser access can use `http://<host>:8765/kiosk?token=<your-token>`
+- CLI and scripted access should prefer `Authorization: Bearer <token>`
+- control endpoints still require the extra `X-IINTS-Control: 1` header
+
+Important:
+
+- this protection is for the Linux dashboard/API only
+- the STM32 serial bridge still uses the separate UNO Q bridge protocol
+
+## Step 3: Start The Linux-Side Digital Patient
+
+From inside `iints_uno_q_demo`, start the runtime:
+
+```bash
+iints edge up --project-dir .
+```
+
+In a second terminal, check status:
+
+```bash
+iints edge status --project-dir .
+```
+
+What you want to see:
+
+- `daemon_status` shows `running`
+- a dashboard URL is printed
+- the workspace contains `patient_state.db`
+
+If that works, the Linux side is ready.
+
+## Step 4: Open The Kiosk Dashboard
+
+Launch the local kiosk view:
+
+```bash
+iints edge kiosk --project-dir .
+```
+
+Or open the dashboard manually:
+
+```text
+http://127.0.0.1:8765/kiosk
+```
+
+At this point you should have a working UNO Q Linux-side demo.
+
+## Step 5: Flash The STM32 Bridge Sketch
+
+CLI method with Arduino CLI:
+
+```bash
+iints edge bridge-flash --project-dir . --port /dev/ttyACM0 --fqbn <your-board-fqbn>
+```
+
+If you prefer Arduino IDE, open this file:
+
+```text
+iints_uno_q_demo/uno_q_bridge/iints_supervisor_bridge.ino
+```
+
+Then:
+
+1. Select the correct Arduino UNO Q board target in Arduino IDE.
+2. Select the correct serial port.
+3. Upload the sketch to the STM32 side.
+4. Open Serial Monitor.
+5. Set the baud rate to `115200`.
+6. Set line ending to `Newline`.
+
+If the upload worked, you should see:
+
+```text
+IINTS UNO Q supervisor bridge ready
+```
+
+## Step 6: Verify The Bridge
+
+CLI method:
+
+```bash
+iints edge bridge-test --port /dev/ttyACM0
+```
+
+Manual method:
+
+Send these commands one by one:
+
+```text
+OK
+OVERRIDE
+CRITICAL
+```
+
+Expected behavior:
+
+- `OK`
+  - built-in status LED on
+- `OVERRIDE`
+  - red LED on
+- `CRITICAL`
+  - red LED on
+  - buzzer chirps
+
+The sketch also prints confirmations such as:
+
+```text
+STATE=OK
+STATE=OVERRIDE
+STATE=CRITICAL
+```
+
+The CLI bridge test now waits for the USB serial reset cycle and accepts the sketch acknowledgements after startup. If the response column still shows `-` but the LEDs react, the board is receiving commands and the remaining issue is the serial echo path, not the runtime or flashing path.
+
+If this works, the STM32 side is ready.
+
+## Step 7: Run The Live Bridge Forwarder
+
+Start the live status forwarder:
+
+```bash
+iints edge bridge-run --project-dir . --port /dev/ttyACM0
+```
+
+This command watches the runtime status and sends:
+
+- `OK`
+- `OVERRIDE`
+- `CRITICAL`
+
+to the STM32 side automatically.
+
+## Step 8: Day-To-Day Commands On The Linux Side
+
+Useful commands once the runtime is running:
+
+```bash
+iints edge status --project-dir .
+iints edge kiosk --project-dir .
+iints edge reset --project-dir .
+iints edge stop --project-dir .
+iints edge service --project-dir .
+iints edge bundle --project-dir . --output edge_bundle.zip
+```
+
+Use these to:
+
+- check whether the runtime is alive
+- reopen the kiosk view
+- reset to a known demo state
+- export systemd service notes
+- export the runtime bundle back to a workstation
+
+## Step 9: Optional Auto-Start
+
+If the Linux side should come back after reboot:
+
+```bash
+iints edge service --project-dir .
+```
+
+Then install the generated service:
+
+```bash
+sudo cp patient_runtime/iints-digital-patient.service /etc/systemd/system/iints-digital-patient.service
+sudo systemctl daemon-reload
+sudo systemctl enable iints-digital-patient.service
+sudo systemctl start iints-digital-patient.service
+systemctl status iints-digital-patient.service
+```
+
+## Troubleshooting
+
+### `iints` command not found
+
+Activate the virtual environment again:
+
+```bash
+source .venv/bin/activate
+```
+
+### The runtime does not start
+
+Check the workspace:
+
+```bash
+iints edge status --project-dir .
+ls patient_runtime
+```
+
+You should see `patient_state.db` after a successful start.
+
+### The dashboard does not open
+
+Open the URL manually:
+
+```text
+http://127.0.0.1:8765/dashboard
+```
+
+If that works in the browser but not through `iints edge kiosk --project-dir .`, the runtime is fine and the issue is only the browser launcher.
+
+Or use:
+
+```bash
+iints edge kiosk --project-dir .
+```
+
+### The STM32 sketch uploads, but the LED test does nothing
+
+Check these items:
+
+1. Serial Monitor baud rate is `115200`
+2. line ending is `Newline`
+3. you are sending exactly `OK`, `OVERRIDE`, or `CRITICAL`
+4. your red LED and buzzer wiring matches pin `6` and pin `9`
+5. if you use the CLI test, check that the serial port is correct
+
+### `iints edge bridge-flash` fails
+
+Check these items:
+
+1. `arduino-cli` is installed
+2. the board package for UNO Q is installed in Arduino CLI
+3. you passed the correct `--fqbn`
+4. you passed the correct `--port`
+
+### I only want a stable UNO Q demo quickly
+
+Use this order:
+
+1. get the Linux kiosk working with `iints edge up --project-dir .`
+2. flash the STM32 sketch
+3. run `iints edge bridge-test --port ...`
+4. run `iints edge bridge-run --project-dir . --port ...`
+
+That is the fastest path to a dependable Maker Faire or classroom demo.

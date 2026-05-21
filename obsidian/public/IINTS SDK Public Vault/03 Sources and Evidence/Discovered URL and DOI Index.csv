@@ -1,0 +1,132 @@
+type,value,first_file,first_line,count,contexts
+doi,10.1007/s40262-017-0510-8,docs/EVIDENCE_BASE.md,91,3,docs/EVIDENCE_BASE.md:91; src/iints/presets/evidence_sources.yaml:57; src/iints/presets/evidence_sources.yaml:58
+doi,10.1007/s40262-017-0510-8),docs/EVIDENCE_BASE.md,91,1,docs/EVIDENCE_BASE.md:91
+doi,10.1016/S2213-8587(17)30014-1,docs/EVIDENCE_BASE.md,115,3,docs/EVIDENCE_BASE.md:115; src/iints/presets/evidence_sources.yaml:105; src/iints/presets/evidence_sources.yaml:106
+doi,10.1016/S2213-8587(17)30014-1),docs/EVIDENCE_BASE.md,115,2,docs/EVIDENCE_BASE.md:115; docs/PHYSIOLOGY_REFERENCE.md:244
+doi,10.1016/S2213-8587(22)00212-1,docs/EVIDENCE_BASE.md,83,3,docs/EVIDENCE_BASE.md:83; src/iints/presets/evidence_sources.yaml:41; src/iints/presets/evidence_sources.yaml:42
+doi,10.1016/S2213-8587(22)00212-1),docs/EVIDENCE_BASE.md,83,1,docs/EVIDENCE_BASE.md:83
+doi,10.1038/s41597-023-02469-5,src/iints/data/datasets.json,39,2,src/iints/data/datasets.json:39; src/iints/data/datasets.json:40
+doi,10.1038/s41597-023-02737-4,src/iints/data/datasets.json,67,2,src/iints/data/datasets.json:67; src/iints/data/datasets.json:68
+doi,10.1038/s41597-025-05695-1,src/iints/data/datasets.json,53,2,src/iints/data/datasets.json:53; src/iints/data/datasets.json:54
+doi,10.1038/s43856-024-00476-0,docs/EVIDENCE_BASE.md,111,4,docs/EVIDENCE_BASE.md:111; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:133; src/iints/presets/evidence_sources.yaml:97; src/iints/presets/evidence_sources.yaml:98
+doi,10.1038/s43856-024-00476-0),docs/EVIDENCE_BASE.md,111,1,docs/EVIDENCE_BASE.md:111
+doi,10.1056/NEJMoa1907863,docs/EVIDENCE_BASE.md,79,3,docs/EVIDENCE_BASE.md:79; src/iints/presets/evidence_sources.yaml:33; src/iints/presets/evidence_sources.yaml:34
+doi,10.1056/NEJMoa1907863),docs/EVIDENCE_BASE.md,79,1,docs/EVIDENCE_BASE.md:79
+doi,10.1056/NEJMoa2003479,docs/emulation_references.md,34,3,docs/emulation_references.md:34; docs/EVIDENCE_BASE.md:153; src/iints/emulation/medtronic_780g.py:106
+doi,10.1056/NEJMoa2003479),docs/EVIDENCE_BASE.md,153,1,docs/EVIDENCE_BASE.md:153
+doi,10.1089/dia.2004.6.615,docs/EVIDENCE_BASE.md,99,3,docs/EVIDENCE_BASE.md:99; src/iints/presets/evidence_sources.yaml:73; src/iints/presets/evidence_sources.yaml:74
+doi,10.1089/dia.2004.6.615),docs/EVIDENCE_BASE.md,99,1,docs/EVIDENCE_BASE.md:99
+doi,10.1089/dia.2019.0226,docs/emulation_references.md,39,3,docs/emulation_references.md:39; docs/EVIDENCE_BASE.md:167; src/iints/emulation/tandem_controliq.py:108
+doi,10.1089/dia.2019.0226),docs/EVIDENCE_BASE.md,167,1,docs/EVIDENCE_BASE.md:167
+doi,10.1109/TBME.2007.893506,docs/EVIDENCE_BASE.md,103,4,docs/EVIDENCE_BASE.md:103; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:131; src/iints/presets/evidence_sources.yaml:81; src/iints/presets/evidence_sources.yaml:82
+doi,10.1109/TBME.2007.893506),docs/EVIDENCE_BASE.md,103,2,docs/EVIDENCE_BASE.md:103; docs/PHYSIOLOGY_REFERENCE.md:243
+doi,10.1111/dom.14049,docs/EVIDENCE_BASE.md,95,3,docs/EVIDENCE_BASE.md:95; src/iints/presets/evidence_sources.yaml:65; src/iints/presets/evidence_sources.yaml:66
+doi,10.1111/dom.14049),docs/EVIDENCE_BASE.md,95,1,docs/EVIDENCE_BASE.md:95
+doi,10.1152/ajpendo.1979.236.6.E667),docs/PHYSIOLOGY_REFERENCE.md,242,1,docs/PHYSIOLOGY_REFERENCE.md:242
+doi,10.1177/193229681000400404,docs/EVIDENCE_BASE.md,87,3,docs/EVIDENCE_BASE.md:87; src/iints/presets/evidence_sources.yaml:49; src/iints/presets/evidence_sources.yaml:50
+doi,10.1177/193229681000400404),docs/EVIDENCE_BASE.md,87,1,docs/EVIDENCE_BASE.md:87
+doi,10.1177/1932296818757747,docs/EVIDENCE_BASE.md,107,4,docs/EVIDENCE_BASE.md:107; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:132; src/iints/presets/evidence_sources.yaml:89; src/iints/presets/evidence_sources.yaml:90
+doi,10.1177/1932296818757747),docs/EVIDENCE_BASE.md,107,1,docs/EVIDENCE_BASE.md:107
+doi,10.17632/3hbcscwz44.1,src/iints/data/datasets.json,131,3,src/iints/data/datasets.json:131; src/iints/data/datasets.json:133; src/iints/data/datasets.json:134
+doi,10.17632/gk9m674wcx.1,research/datasheet.md,40,4,research/datasheet.md:40; src/iints/data/datasets.json:116; src/iints/data/datasets.json:118; src/iints/data/datasets.json:119
+doi,10.2337/dc26-S006,docs/EVIDENCE_BASE.md,67,4,docs/EVIDENCE_BASE.md:67; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:127; src/iints/presets/evidence_sources.yaml:9; src/iints/presets/evidence_sources.yaml:10
+doi,10.2337/dc26-S006),docs/EVIDENCE_BASE.md,67,2,docs/EVIDENCE_BASE.md:67; docs/PHYSIOLOGY_REFERENCE.md:240
+doi,10.2337/dc26-S007,docs/EVIDENCE_BASE.md,71,4,docs/EVIDENCE_BASE.md:71; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:128; src/iints/presets/evidence_sources.yaml:17; src/iints/presets/evidence_sources.yaml:18
+doi,10.2337/dc26-S007),docs/EVIDENCE_BASE.md,71,1,docs/EVIDENCE_BASE.md:71
+doi,10.2337/dci19-0028,docs/EVIDENCE_BASE.md,75,4,docs/EVIDENCE_BASE.md:75; research/eucys_pack/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md:129; src/iints/presets/evidence_sources.yaml:25; src/iints/presets/evidence_sources.yaml:26
+doi,10.2337/dci19-0028),docs/EVIDENCE_BASE.md,75,2,docs/EVIDENCE_BASE.md:75; docs/PHYSIOLOGY_REFERENCE.md:241
+doi,10.5281/zenodo.10050944,src/iints/data/datasets.json,64,3,src/iints/data/datasets.json:64; src/iints/data/datasets.json:65; src/iints/data/datasets.json:67
+doi,10.5281/zenodo.15806142,src/iints/data/datasets.json,50,3,src/iints/data/datasets.json:50; src/iints/data/datasets.json:51; src/iints/data/datasets.json:53
+doi,10.7303/syn38187184,src/iints/data/datasets.json,37,2,src/iints/data/datasets.json:37; src/iints/data/datasets.json:39
+url,http://127.0.0.1:11434,docs/AI_ASSISTANT.md,130,10,docs/AI_ASSISTANT.md:130; docs/AI_ASSISTANT.md:138; docs/AI_ASSISTANT.md:146; docs/AI_ASSISTANT.md:369; docs/INSTALLATION.md:149
+url,http://127.0.0.1:11434`,docs/AI_ASSISTANT.md,326,2,docs/AI_ASSISTANT.md:326; docs/manuals/IINTS-AF_SDK_Manual.md:160
+url,http://127.0.0.1:8765/dashboard,docs/DIGITAL_PATIENT_PI.md,265,3,docs/DIGITAL_PATIENT_PI.md:265; docs/ARDUINO_UNO_Q.md:501; docs/INSTALLATION.md:254
+url,http://127.0.0.1:8765/dashboard`,docs/BOOTH_DEMO.md,230,3,docs/BOOTH_DEMO.md:230; docs/GETTING_STARTED.md:223; docs/DIGITAL_PATIENT_PI.md:436
+url,http://127.0.0.1:8765/kiosk,docs/MAKERFAIRE_PI.md,92,3,docs/MAKERFAIRE_PI.md:92; docs/DIGITAL_PATIENT_PI.md:271; docs/ARDUINO_UNO_Q.md:346
+url,http://127.0.0.1:8765/kiosk`,docs/ARDUINO_UNO_Q.md,57,2,docs/ARDUINO_UNO_Q.md:57; docs/ARDUINO_UNO_Q.md:140
+url,http://<host,docs/DIGITAL_PATIENT_PI.md,312,3,docs/DIGITAL_PATIENT_PI.md:312; docs/ARDUINO_UNO_Q.md:304; docs/INSTALLATION.md:284
+url,http://ceur-ws.org/Vol-2675/paper2.pdf,docs/EVIDENCE_BASE.md,119,2,docs/EVIDENCE_BASE.md:119; src/iints/presets/evidence_sources.yaml:114
+url,http://{api_host,src/iints/live_patient/edge_ops.py,144,8,src/iints/live_patient/edge_ops.py:144; src/iints/live_patient/edge_ops.py:145; src/iints/live_patient/edge_ops.py:153; src/iints/live_patient/edge_ops.py:488; src/iints/live_patient/edge_ops.py:510
+url,http://{cfg.api_host,src/iints/cli/cli.py,8889,5,src/iints/cli/cli.py:8889; src/iints/cli/cli.py:9077; src/iints/cli/cli.py:9850; src/iints/cli/cli.py:9962; src/iints/cli/cli.py:10047
+url,http://{config.api_host,src/iints/live_patient/service_export.py,48,1,src/iints/live_patient/service_export.py:48
+url,http://{self.api_host,src/iints/live_patient/runtime.py,261,2,src/iints/live_patient/runtime.py:261; src/iints/live_patient/runtime.py:265
+url,https://api.tidepool.org,docs/COMPREHENSIVE_GUIDE.md,270,7,docs/COMPREHENSIVE_GUIDE.md:270; docs/API_REFERENCE.md:1240; docs/TECHNICAL_README.md:607; docs/INSTALLATION.md:338; src/iints/cli/cli.py:7884
+url,https://badge.fury.io/py/iints-sdk-python35,README.md,4,1,README.md:4
+url,https://badge.fury.io/py/iints-sdk-python35.svg,README.md,4,1,README.md:4
+url,https://clinicaltrials.gov/ct2/show/NCT03563313,docs/EVIDENCE_BASE.md,175,2,docs/EVIDENCE_BASE.md:175; src/iints/emulation/tandem_controliq.py:120
+url,https://colab.research.google.com/assets/colab-badge.svg,examples/notebooks/00_Quickstart.ipynb,13,9,examples/notebooks/00_Quickstart.ipynb:13; examples/notebooks/06_Optional_Torch_LSTM.ipynb:13; examples/notebooks/01_Presets_and_Scenarios.ipynb:13; examples/notebooks/05_Devices_and_HumanInLoop.ipynb:13; examples/notebooks/02_Safety_and_Supervisor.ipynb:13
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/00_Quickstart.ipynb,examples/notebooks/00_Quickstart.ipynb,13,2,examples/notebooks/00_Quickstart.ipynb:13; examples/notebooks/README.md:7
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/01_Presets_and_Scenarios.ipynb,examples/notebooks/01_Presets_and_Scenarios.ipynb,13,2,examples/notebooks/01_Presets_and_Scenarios.ipynb:13; examples/notebooks/README.md:9
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/02_Safety_and_Supervisor.ipynb,examples/notebooks/README.md,11,2,examples/notebooks/README.md:11; examples/notebooks/02_Safety_and_Supervisor.ipynb:13
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/03_Audit_Trail_and_Report.ipynb,examples/notebooks/README.md,13,2,examples/notebooks/README.md:13; examples/notebooks/03_Audit_Trail_and_Report.ipynb:13
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/04_Baseline_and_Metrics.ipynb,examples/notebooks/README.md,15,2,examples/notebooks/README.md:15; examples/notebooks/04_Baseline_and_Metrics.ipynb:13
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/05_Devices_and_HumanInLoop.ipynb,examples/notebooks/README.md,17,2,examples/notebooks/README.md:17; examples/notebooks/05_Devices_and_HumanInLoop.ipynb:13
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/06_Optional_Torch_LSTM.ipynb,examples/notebooks/06_Optional_Torch_LSTM.ipynb,13,2,examples/notebooks/06_Optional_Torch_LSTM.ipynb:13; examples/notebooks/README.md:19
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/07_Ablation_Supervisor.ipynb,examples/notebooks/README.md,21,2,examples/notebooks/README.md:21; examples/notebooks/07_Ablation_Supervisor.ipynb:12
+url,https://colab.research.google.com/github/python35/IINTS-SDK/blob/main/examples/notebooks/08_Data_Registry_and_Import.ipynb,examples/notebooks/README.md,23,2,examples/notebooks/README.md:23; examples/notebooks/08_Data_Registry_and_Import.ipynb:12
+url,https://data.mendeley.com/datasets/3hbcscwz44/1,src/iints/data/datasets.json,130,1,src/iints/data/datasets.json:130
+url,https://data.mendeley.com/datasets/gk9m674wcx/1,src/iints/data/datasets.json,115,1,src/iints/data/datasets.json:115
+url,https://data1.fullyjustified.net/tlextras-2022.0r0.tar,docs/manuals/.tectonic-cache/redirects/6ffe055852f8faf66c0acbe1a7fb27f87b869a90bad1204f3bf4d9683f597c7c.txt,1,1,docs/manuals/.tectonic-cache/redirects/6ffe055852f8faf66c0acbe1a7fb27f87b869a90bad1204f3bf4d9683f597c7c.txt:1
+url,https://datacatalog.med.nyu.edu/dataset/10129,src/iints/data/datasets.json,183,3,src/iints/data/datasets.json:183; src/iints/data/datasets.json:185; src/iints/data/datasets.json:186
+url,https://docs.mistral.ai/models/ministral-3-14b-25-12,docs/EVIDENCE_BASE.md,143,1,docs/EVIDENCE_BASE.md:143
+url,https://docs.mistral.ai/models/ministral-3-3b-25-12,docs/EVIDENCE_BASE.md,135,1,docs/EVIDENCE_BASE.md:135
+url,https://docs.mistral.ai/models/ministral-3-8b-25-12,docs/EVIDENCE_BASE.md,139,1,docs/EVIDENCE_BASE.md:139
+url,https://docs.ollama.com/linux,docs/EVIDENCE_BASE.md,127,1,docs/EVIDENCE_BASE.md:127
+url,https://doi.org/10.1007/s40262-017-0510-8,docs/EVIDENCE_BASE.md,91,2,docs/EVIDENCE_BASE.md:91; src/iints/presets/evidence_sources.yaml:58
+url,https://doi.org/10.1016/S2213-8587(17,docs/EVIDENCE_BASE.md,115,3,docs/EVIDENCE_BASE.md:115; docs/PHYSIOLOGY_REFERENCE.md:244; src/iints/presets/evidence_sources.yaml:106
+url,https://doi.org/10.1016/S2213-8587(22,docs/EVIDENCE_BASE.md,83,2,docs/EVIDENCE_BASE.md:83; src/iints/presets/evidence_sources.yaml:42
+url,https://doi.org/10.1038/s43856-024-00476-0,docs/EVIDENCE_BASE.md,111,2,docs/EVIDENCE_BASE.md:111; src/iints/presets/evidence_sources.yaml:98
+url,https://doi.org/10.1056/NEJMoa1907863,docs/EVIDENCE_BASE.md,79,2,docs/EVIDENCE_BASE.md:79; src/iints/presets/evidence_sources.yaml:34
+url,https://doi.org/10.1056/NEJMoa2003479,docs/EVIDENCE_BASE.md,153,2,docs/EVIDENCE_BASE.md:153; src/iints/emulation/medtronic_780g.py:106
+url,https://doi.org/10.1089/dia.2004.6.615,docs/EVIDENCE_BASE.md,99,2,docs/EVIDENCE_BASE.md:99; src/iints/presets/evidence_sources.yaml:74
+url,https://doi.org/10.1089/dia.2019.0226,docs/EVIDENCE_BASE.md,167,2,docs/EVIDENCE_BASE.md:167; src/iints/emulation/tandem_controliq.py:108
+url,https://doi.org/10.1109/TBME.2007.893506,docs/EVIDENCE_BASE.md,103,3,docs/EVIDENCE_BASE.md:103; docs/PHYSIOLOGY_REFERENCE.md:243; src/iints/presets/evidence_sources.yaml:82
+url,https://doi.org/10.1111/dom.14049,docs/EVIDENCE_BASE.md,95,2,docs/EVIDENCE_BASE.md:95; src/iints/presets/evidence_sources.yaml:66
+url,https://doi.org/10.1152/ajpendo.1979.236.6.E667,docs/PHYSIOLOGY_REFERENCE.md,242,1,docs/PHYSIOLOGY_REFERENCE.md:242
+url,https://doi.org/10.1177/193229681000400404,docs/EVIDENCE_BASE.md,87,2,docs/EVIDENCE_BASE.md:87; src/iints/presets/evidence_sources.yaml:50
+url,https://doi.org/10.1177/1932296818757747,docs/EVIDENCE_BASE.md,107,2,docs/EVIDENCE_BASE.md:107; src/iints/presets/evidence_sources.yaml:90
+url,https://doi.org/10.2337/dc26-S006,docs/EVIDENCE_BASE.md,67,3,docs/EVIDENCE_BASE.md:67; docs/PHYSIOLOGY_REFERENCE.md:240; src/iints/presets/evidence_sources.yaml:10
+url,https://doi.org/10.2337/dc26-S007,docs/EVIDENCE_BASE.md,71,2,docs/EVIDENCE_BASE.md:71; src/iints/presets/evidence_sources.yaml:18
+url,https://doi.org/10.2337/dci19-0028,docs/EVIDENCE_BASE.md,75,3,docs/EVIDENCE_BASE.md:75; docs/PHYSIOLOGY_REFERENCE.md:241; src/iints/presets/evidence_sources.yaml:26
+url,https://doi.org/10.5281/zenodo.10050944,src/iints/data/datasets.json,64,2,src/iints/data/datasets.json:64; src/iints/data/datasets.json:67
+url,https://doi.org/10.5281/zenodo.15806142,src/iints/data/datasets.json,50,2,src/iints/data/datasets.json:50; src/iints/data/datasets.json:53
+url,https://doi.org/10.7303/syn38187184,src/iints/data/datasets.json,37,2,src/iints/data/datasets.json:37; src/iints/data/datasets.json:39
+url,https://github.com/python35/IINTS-SDK,mkdocs.yml,4,3,mkdocs.yml:4; pyproject.toml:97; docs/manuals/IINTS-AF_SDK_Manual.md:1845
+url,https://github.com/python35/IINTS-SDK.git,docs/TECHNICAL_README.md,79,2,docs/TECHNICAL_README.md:79; docs/manuals/IINTS-AF_SDK_Manual.md:136
+url,https://github.com/python35/IINTS-SDK.git\,examples/notebooks/00_Quickstart.ipynb,96,9,examples/notebooks/00_Quickstart.ipynb:96; examples/notebooks/06_Optional_Torch_LSTM.ipynb:93; examples/notebooks/01_Presets_and_Scenarios.ipynb:92; examples/notebooks/05_Devices_and_HumanInLoop.ipynb:94; examples/notebooks/02_Safety_and_Supervisor.ipynb:93
+url,https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml,README.md,5,1,README.md:5
+url,https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg,README.md,5,1,README.md:5
+url,https://github.com/python35/IINTS-SDK/issues,docs/manuals/IINTS-AF_SDK_Manual.md,1846,1,docs/manuals/IINTS-AF_SDK_Manual.md:1846
+url,https://img.shields.io/badge/docs-IINTS--AF-0a66c2?style=flat,README.md,6,1,README.md:6
+url,https://img.shields.io/badge/EUCYS-2026%20Selected-gold?style=flat,README.md,3,1,README.md:3
+url,https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/AIDET1D_Public_Dataset.zip,src/iints/data/datasets.json,80,1,src/iints/data/datasets.json:80
+url,https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/PEDAP%20Public%20Dataset%20-%20Release%205%20-%202025-05-12.zip,src/iints/data/datasets.json,98,1,src/iints/data/datasets.json:98
+url,https://mistral.ai/news/mistral-3,docs/EVIDENCE_BASE.md,131,1,docs/EVIDENCE_BASE.md:131
+url,https://ollama.com/install.sh,docs/AI_ASSISTANT.md,97,3,docs/AI_ASSISTANT.md:97; docs/INSTALLATION.md:159; docs/manuals/IINTS-AF_SDK_Manual.md:151
+url,https://openaps.org/outcomes/data-commons/,src/iints/data/datasets.json,144,3,src/iints/data/datasets.json:144; src/iints/data/datasets.json:146; src/iints/data/datasets.json:147
+url,https://public.jaeb.org/datasets/,src/iints/data/datasets.json,78,6,src/iints/data/datasets.json:78; src/iints/data/datasets.json:85; src/iints/data/datasets.json:86; src/iints/data/datasets.json:96; src/iints/data/datasets.json:103
+url,https://python35.github.io/IINTS-SDK/,README.md,6,3,README.md:6; README.md:47; mkdocs.yml:3
+url,https://python35.github.io/IINTS-SDK/`,docs/PUBLIC_DOCUMENTATION.md,7,1,docs/PUBLIC_DOCUMENTATION.md:7
+url,https://python35.github.io/IINTS-SDK/COMMAND_REFERENCE/,docs/manuals/IINTS-AF_SDK_Manual.md,1840,1,docs/manuals/IINTS-AF_SDK_Manual.md:1840
+url,https://python35.github.io/IINTS-SDK/GETTING_STARTED/,docs/manuals/IINTS-AF_SDK_Manual.md,1838,1,docs/manuals/IINTS-AF_SDK_Manual.md:1838
+url,https://python35.github.io/IINTS-SDK/MAKERFAIRE_PI/,docs/manuals/IINTS-AF_SDK_Manual.md,1842,1,docs/manuals/IINTS-AF_SDK_Manual.md:1842
+url,https://python35.github.io/IINTS-SDK/QUICKSTART/,docs/manuals/IINTS-AF_SDK_Manual.md,1839,1,docs/manuals/IINTS-AF_SDK_Manual.md:1839
+url,https://python35.github.io/IINTS-SDK/SCIENTIFIC_WORKFLOW/,docs/manuals/IINTS-AF_SDK_Manual.md,1841,1,docs/manuals/IINTS-AF_SDK_Manual.md:1841
+url,https://raw.githubusercontent.com/python35/IINTS-SDK/main/img/iints_logo.png\,examples/notebooks/00_Quickstart.ipynb,9,9,examples/notebooks/00_Quickstart.ipynb:9; examples/notebooks/06_Optional_Torch_LSTM.ipynb:9; examples/notebooks/01_Presets_and_Scenarios.ipynb:9; examples/notebooks/05_Devices_and_HumanInLoop.ipynb:9; examples/notebooks/02_Safety_and_Supervisor.ipynb:9
+url,https://repository.niddk.nih.gov/,src/iints/data/datasets.json,170,3,src/iints/data/datasets.json:170; src/iints/data/datasets.json:172; src/iints/data/datasets.json:173
+url,https://test.pypi.org/simple/,docs/TECHNICAL_README.md,74,2,docs/TECHNICAL_README.md:74; examples/quickstart_benchmark.ipynb:19
+url,https://unpkg.com/mermaid@11/dist/mermaid.min.js,mkdocs.yml,42,1,mkdocs.yml:42
+url,https://webpages.charlotte.edu/rbunescu/data/ohiot1dm/OhioT1DM-dataset.html,src/iints/data/datasets.json,24,3,src/iints/data/datasets.json:24; src/iints/data/datasets.json:26; src/iints/data/datasets.json:27
+url,https://www.accessdata.fda.gov/,docs/EVIDENCE_BASE.md,157,6,docs/EVIDENCE_BASE.md:157; docs/EVIDENCE_BASE.md:171; docs/EVIDENCE_BASE.md:193; src/iints/emulation/omnipod_5.py:127; src/iints/emulation/medtronic_780g.py:112
+url,https://www.fda.gov/medical-devices/general-hospital-devices-and-supplies/infusion-pumps,docs/PICO_PUMP_LAB.md,131,1,docs/PICO_PUMP_LAB.md:131
+url,https://www.fda.gov/medical-devices/infusion-pumps/infusion-pump-software-safety-research-fda,docs/PICO_PUMP_LAB.md,130,1,docs/PICO_PUMP_LAB.md:130
+url,https://www.medtronicdiabetes.com/,docs/EVIDENCE_BASE.md,161,2,docs/EVIDENCE_BASE.md:161; src/iints/emulation/medtronic_780g.py:118
+url,https://www.omnipod.com/,docs/EVIDENCE_BASE.md,197,2,docs/EVIDENCE_BASE.md:197; src/iints/emulation/omnipod_5.py:133
+url,https://www.omnipod.com/assert-trial,docs/EVIDENCE_BASE.md,185,2,docs/EVIDENCE_BASE.md:185; src/iints/emulation/omnipod_5.py:115
+url,https://www.omnipod.com/onset-trial,docs/EVIDENCE_BASE.md,189,2,docs/EVIDENCE_BASE.md:189; src/iints/emulation/omnipod_5.py:121
+url,https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html,docs/PICO_PUMP_LAB.md,132,1,docs/PICO_PUMP_LAB.md:132
+url,https://www.tandemdiabetes.com/,docs/EVIDENCE_BASE.md,179,2,docs/EVIDENCE_BASE.md:179; src/iints/emulation/tandem_controliq.py:126
+url,https://www.tidepool.org/bigdata,src/iints/data/datasets.json,157,3,src/iints/data/datasets.json:157; src/iints/data/datasets.json:159; src/iints/data/datasets.json:160
+url,https://www.uni-kiel.de/en/eucys2026,README.md,3,1,README.md:3
+url,https://your-nightscout-site.herokuapp.com,docs/manuals/IINTS-AF_SDK_Manual.md,1033,1,docs/manuals/IINTS-AF_SDK_Manual.md:1033
+url,https://your-nightscout.example,docs/COMPREHENSIVE_GUIDE.md,260,3,docs/COMPREHENSIVE_GUIDE.md:260; docs/TECHNICAL_README.md:596; docs/INSTALLATION.md:326

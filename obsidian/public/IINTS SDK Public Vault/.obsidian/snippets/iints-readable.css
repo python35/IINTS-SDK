@@ -1,0 +1,113 @@
+/* IINTS OS readable theme - designed for BOTH light and dark mode. */
+.theme-light {
+  --iints-bg-soft: #f6f8f8;
+  --iints-bg-card: #ffffff;
+  --iints-border: #d6e0e1;
+  --iints-text: #142024;
+  --iints-muted: #4d5d64;
+  --iints-accent: #087568;
+  --iints-accent-2: #245b7d;
+  --iints-warm: #8a5b12;
+  --iints-danger: #9f312b;
+  --iints-code-bg: #eef3f3;
+  --iints-table-head: #eef5f4;
+}
+
+.theme-dark {
+  --iints-bg-soft: #182022;
+  --iints-bg-card: #20292c;
+  --iints-border: #435357;
+  --iints-text: #edf5f4;
+  --iints-muted: #b8c7c8;
+  --iints-accent: #7edbd0;
+  --iints-accent-2: #9dcaf0;
+  --iints-warm: #ffd27a;
+  --iints-danger: #ff9a92;
+  --iints-code-bg: #111719;
+  --iints-table-head: #263235;
+}
+
+body {
+  --text-normal: var(--iints-text);
+  --text-muted: var(--iints-muted);
+  --link-color: var(--iints-accent);
+  --link-color-hover: var(--iints-accent-2);
+  --h1-color: var(--iints-text);
+  --h2-color: var(--iints-accent);
+  --h3-color: var(--iints-accent-2);
+  --tag-color: var(--iints-accent);
+  --tag-background: color-mix(in srgb, var(--iints-accent) 12%, transparent);
+  --tag-background-hover: color-mix(in srgb, var(--iints-accent) 20%, transparent);
+  --blockquote-border-color: var(--iints-accent);
+}
+
+.markdown-preview-view,
+.markdown-source-view.mod-cm6 .cm-scroller {
+  line-height: 1.62;
+}
+
+.markdown-preview-view h1 {
+  font-size: 2.15em;
+  letter-spacing: -0.035em;
+  font-weight: 850;
+  border-bottom: 0;
+}
+
+.markdown-preview-view h2 {
+  margin-top: 2em;
+  font-weight: 820;
+  letter-spacing: -0.015em;
+}
+
+.markdown-preview-view h3 { font-weight: 760; }
+.internal-link { text-decoration: none !important; font-weight: 650; }
+.markdown-preview-view code,
+.markdown-source-view code {
+  background: var(--iints-code-bg);
+  color: var(--text-normal);
+  border: 1px solid var(--iints-border);
+  border-radius: 7px;
+}
+.markdown-preview-view pre code { border: 0; }
+.markdown-preview-view blockquote {
+  background: var(--iints-bg-soft);
+  border-radius: 0 12px 12px 0;
+  padding: 0.8em 1em;
+}
+.markdown-preview-view table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--iints-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.markdown-preview-view th {
+  background: var(--iints-table-head);
+  color: var(--iints-text);
+  font-weight: 800;
+}
+.markdown-preview-view td, .markdown-preview-view th { border-color: var(--iints-border); }
+.callout {
+  border-radius: 14px;
+  border-color: var(--iints-border);
+  background: color-mix(in srgb, var(--iints-bg-card) 88%, var(--iints-accent) 5%);
+}
+.callout[data-callout="warning"] { --callout-color: 230, 168, 70; }
+.callout[data-callout="danger"] { --callout-color: 235, 100, 92; }
+.callout[data-callout="success"] { --callout-color: 97, 210, 178; }
+.callout[data-callout="tip"] { --callout-color: 126, 219, 208; }
+.nav-folder-title[data-path^="02 Dashboards"],
+.nav-folder-title[data-path^="04 SDK User Guide"],
+.nav-folder-title[data-path^="06 Sources and Evidence"],
+.nav-folder-title[data-path^="05 Workflows"],
+.nav-folder-title[data-path^="07 Claims and Explanations"],
+.nav-folder-title[data-path^="08 Logs and Decisions"],
+.nav-folder-title[data-path^="11 Glossary"],
+.nav-folder-title[data-path^="14 Project OS"],
+.nav-folder-title[data-path^="13 Learning Paths"],
+.nav-folder-title[data-path^="12 Presentation Kits"],
+.nav-folder-title[data-path^="20 Official Documentation"],
+.nav-folder-title[data-path^="30 Research and EUCYS"],
+.nav-folder-title[data-path^="40 Pump Hardware"],
+.nav-folder-title[data-path^="70 Evidence and Results"],
+.nav-folder-title[data-path^="80 Source and Architecture"] { font-weight: 800; }
