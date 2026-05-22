@@ -9,6 +9,11 @@ from iints.core.patient.models import PatientModel
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 from iints.core.safety import InputValidator, SafetyConfig
+from iints.core.safety.config import (
+    SIMULATION_GLUCOSE_CEILING_MGDL,
+    SIMULATION_GLUCOSE_FLOOR_MGDL,
+    SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
+)
 from iints.core.devices.models import SensorModel, PumpModel
 from iints.core.physiology_variation import EmpiricalResidualModel
 import numpy as np
@@ -119,9 +124,9 @@ class Simulator:
         self.seed = seed
         self.safety_config = safety_config or SafetyConfig()
         self.supervisor = IndependentSupervisor(safety_config=self.safety_config)
-        # Raw physiology and CGM-facing values each need their own temporal
-        # history. Sharing one stateful validator made raw glucose compare
-        # against the previous noisy sensor sample.
+        # Keep the raw validator for older snapshots/audits, but do not apply
+        # CGM rate limits to hidden patient truth; only algorithm-facing sensor
+        # inputs are plausibility-filtered.
         self.raw_input_validator = InputValidator(safety_config=self.safety_config)
         self.input_validator = InputValidator(safety_config=self.safety_config)
         self.sensor_model = sensor_model or SensorModel(seed=seed)
@@ -161,6 +166,7 @@ class Simulator:
         self._ratio_overrides: List[Dict[str, Any]] = []
         self._base_ratio_state: Optional[Dict[str, float]] = None
         self._previous_glucose_for_trend: Optional[float] = None
+        self._glucose_trend_history: List[Tuple[float, float]] = []
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -361,10 +367,20 @@ class Simulator:
             self._input_validator_last_error = str(exc)
             self._input_validator_last_step_fail_soft = True
             fallback = active_validator.last_valid_glucose
+            incoming_value = float(glucose_value)
+            if not np.isfinite(incoming_value):
+                incoming_value = float(fallback) if fallback is not None else active_validator.min_glucose
+            if fallback is not None and active_validator.last_validation_time is not None:
+                time_delta = max(float(current_time) - float(active_validator.last_validation_time), 0.0)
+                if time_delta > 0.0:
+                    allowed_delta = active_validator.max_glucose_delta_per_5_min * (time_delta / 5.0)
+                    requested_delta = incoming_value - float(fallback)
+                    fallback = float(fallback) + float(
+                        max(-allowed_delta, min(requested_delta, allowed_delta))
+                    )
             if fallback is None:
-                fallback = float(
-                    max(active_validator.min_glucose, min(glucose_value, active_validator.max_glucose))
-                )
+                fallback = incoming_value
+            fallback = float(max(active_validator.min_glucose, min(fallback, active_validator.max_glucose)))
             self._write_audit_log(
                 {
                     "timestamp": current_time,
@@ -378,6 +394,81 @@ class Simulator:
             active_validator.last_valid_glucose = fallback
             active_validator.last_validation_time = current_time
             return fallback
+
+    def _bound_simulation_glucose(self, glucose_value: float, current_time: float) -> float:
+        """
+        Keep the hidden physiological state numerically bounded without applying
+        CGM input rate limits to the patient truth trace.
+
+        The input validator is intentionally strict for sensor values that reach
+        an algorithm. The simulated patient state can move faster during stress
+        tests, so rate-limiting it would hide the very physiology we need to
+        evaluate.
+        """
+        if not np.isfinite(glucose_value):
+            fallback = float(self.patient_model.get_current_glucose())
+            self._write_audit_log(
+                {
+                    "timestamp": current_time,
+                    "event": "simulation_glucose_non_finite",
+                    "input_value": glucose_value,
+                    "fallback_value": fallback,
+                }
+            )
+            return fallback
+        clipped = float(
+            np.clip(
+                glucose_value,
+                SIMULATION_GLUCOSE_FLOOR_MGDL,
+                SIMULATION_GLUCOSE_CEILING_MGDL,
+            )
+        )
+        if clipped != float(glucose_value):
+            self._write_audit_log(
+                {
+                    "timestamp": current_time,
+                    "event": "simulation_glucose_clipped",
+                    "input_value": glucose_value,
+                    "clipped_value": clipped,
+                }
+            )
+        return clipped
+
+    def _update_glucose_trend(self, current_time: float, glucose_value: float) -> float:
+        """
+        Estimate CGM trend with a short rolling slope instead of one noisy delta.
+
+        A single noisy 5-minute CGM drop can otherwise look like an impossible
+        30-minute hypoglycemia trajectory. A rolling 20-minute regression keeps
+        the signal responsive while avoiding startup/noise spikes.
+        """
+        self._glucose_trend_history.append((float(current_time), float(glucose_value)))
+        window_minutes = max(20.0, float(self.time_step) * 3.0)
+        cutoff = float(current_time) - window_minutes
+        self._glucose_trend_history = [
+            (t, g) for (t, g) in self._glucose_trend_history if t >= cutoff
+        ]
+        self._previous_glucose_for_trend = float(glucose_value)
+
+        if len(self._glucose_trend_history) < 3:
+            return 0.0
+
+        times = np.array([t for t, _ in self._glucose_trend_history], dtype=float)
+        values = np.array([g for _, g in self._glucose_trend_history], dtype=float)
+        if float(times[-1] - times[0]) < max(float(self.time_step) * 2.0, 10.0):
+            return 0.0
+
+        centered_time = times - float(times.mean())
+        denom = float(np.dot(centered_time, centered_time))
+        if denom <= 0.0:
+            return 0.0
+
+        slope = float(np.dot(centered_time, values - float(values.mean())) / denom)
+        max_rate = min(
+            float(getattr(self.safety_config, "glucose_rate_alarm", SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL)),
+            SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
+        )
+        return float(np.clip(slope, -max_rate, max_rate))
     def _apply_ratio_overrides(self, current_time: float) -> Dict[str, float]:
         if self._base_ratio_state is None:
             self._base_ratio_state = self.patient_model.get_ratio_state()
@@ -572,6 +663,7 @@ class Simulator:
             self._ratio_overrides = []
             self._base_ratio_state = self.patient_model.get_ratio_state()
             self._previous_glucose_for_trend = None
+            self._glucose_trend_history = []
             self._input_validator_fail_soft_count = 0
             self._input_validator_negative_insulin_clamp_count = 0
             self._input_validator_last_error = None
@@ -600,12 +692,9 @@ class Simulator:
             if self.physiology_variation_model is not None:
                 physiology_residual = self.physiology_variation_model.offset_at(float(current_time))
             actual_glucose_reading = mechanistic_glucose_reading + physiology_residual
-            # Validate the raw sensor reading
-            actual_glucose_reading = self._validate_glucose_fail_soft(
+            actual_glucose_reading = self._bound_simulation_glucose(
                 actual_glucose_reading,
                 float(current_time),
-                "sensor_raw",
-                validator=self.raw_input_validator,
             )
             sensor_reading = self.sensor_model.read(actual_glucose_reading, float(current_time))
             glucose_to_algorithm = sensor_reading.value
@@ -682,11 +771,8 @@ class Simulator:
             effective_dia = float(ratio_state.get("dia_minutes", self.patient_model.insulin_action_duration))
             effective_basal = float(ratio_state.get("basal_rate_u_per_hr", self.patient_model.basal_insulin_rate))
 
-            # Glucose trend (mg/dL per minute) based on sensor value
-            glucose_trend = 0.0
-            if self._previous_glucose_for_trend is not None:
-                glucose_trend = (glucose_to_algorithm - self._previous_glucose_for_trend) / float(self.time_step)
-            self._previous_glucose_for_trend = glucose_to_algorithm
+            # Glucose trend (mg/dL per minute) based on a short smoothed CGM window.
+            glucose_trend = self._update_glucose_trend(float(current_time), glucose_to_algorithm)
 
             predicted_glucose_heuristic = self._predict_glucose(
                 current_glucose=glucose_to_algorithm,
@@ -909,6 +995,13 @@ class Simulator:
                 current_time=float(current_time),
             )
 
+            bolus_insulin_reported = insulin_output.get("bolus_insulin")
+            if bolus_insulin_reported is None:
+                bolus_insulin_reported = (
+                    float(insulin_output.get("meal_bolus", 0.0))
+                    + float(insulin_output.get("correction_bolus", 0.0))
+                )
+
             # --- Record Data ---
             record = {
                 "time_minutes": current_time,
@@ -933,7 +1026,8 @@ class Simulator:
                 "pump_status": pump_delivery.status,
                 "pump_reason": pump_delivery.reason,
                 "basal_insulin_units": insulin_output.get("basal_insulin", 0.0),
-                "bolus_insulin_units": insulin_output.get("bolus_insulin", 0.0) + insulin_output.get("meal_bolus", 0.0), # Combine for simplicity
+                "bolus_insulin_units": bolus_insulin_reported,
+                "meal_bolus_units": insulin_output.get("meal_bolus", 0.0),
                 "correction_bolus_units": insulin_output.get("correction_bolus", 0.0),
                 "carb_intake_grams": patient_carb_intake_this_step,
                 "patient_iob_units": self.patient_model.insulin_on_board,
@@ -1003,6 +1097,7 @@ class Simulator:
             "meal_queue": self.meal_queue,
             "stress_events": [event.__dict__ for event in self.stress_events],
             "critical_low_minutes": self._critical_low_minutes,
+            "glucose_trend_history": self._glucose_trend_history,
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
@@ -1020,6 +1115,11 @@ class Simulator:
         self.meal_queue = state.get("meal_queue", [])
         self.stress_events = [StressEvent(**payload) for payload in state.get("stress_events", [])]
         self._critical_low_minutes = state.get("critical_low_minutes", 0)
+        self._glucose_trend_history = [
+            (float(item[0]), float(item[1]))
+            for item in state.get("glucose_trend_history", [])
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        ]
         self._resume_state = True
 
     def _build_performance_report(self) -> Dict[str, Any]:

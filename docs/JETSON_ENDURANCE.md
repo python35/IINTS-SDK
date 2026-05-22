@@ -261,6 +261,24 @@ That command writes:
 - a held-out closed-loop comparison against the clinical baseline
 - `research/RESEARCH_PIPELINE_REPORT.md`
 
+For a stronger research workflow across several acquisition days, use the local AI lab:
+
+```bash
+iints research local-ai-lab \
+  --run day1=results/jetson_research_day \
+  --run day2=results/jetson_research_day_2 \
+  --output-dir results/local_ai_lab
+```
+
+That command creates one combined training workspace with:
+
+- merged predictor rows for glucose forecasting
+- merged controller-teacher rows for policy learning
+- `LOCAL_AI_DATASET_CARD.json` with source lineage
+- linear and optional neural controller models
+- optional predictor training
+- held-out controller evaluation
+
 If a future project adds Ministral fine-tuning, that should be a separate explicit pipeline with its own dataset governance and validation, not an invisible side effect of the endurance runner.
 
 ## Systemd Service

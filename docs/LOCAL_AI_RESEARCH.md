@@ -172,7 +172,64 @@ If you want the same work to happen automatically at the end of the endurance co
 
 to `iints jetson endurance start`.
 
-## 5. What Good Research Looks Like
+## 5. Multi-Run Local AI Lab
+
+For actual AI research, one run should not be the whole story. The SDK now has a higher-level lab command that combines multiple completed Jetson or simulator bundles into one training workspace:
+
+```bash
+iints research local-ai-lab \
+  --run day1=results/jetson_research_day \
+  --run day2=results/jetson_research_day_2 \
+  --output-dir results/local_ai_lab
+```
+
+It writes:
+
+```text
+results/local_ai_lab/
+  datasets/
+    predictor_training.csv
+    predictor_dataset_manifest.json
+    controller_teacher_dataset.csv
+    controller_dataset_manifest.json
+    LOCAL_AI_DATASET_CARD.json
+  models/
+    linear_controller.json
+    neural_controller.pt
+    predictor/
+  evaluation/
+    CONTROL_EVALUATION_REPORT.md
+  LOCAL_AI_RESEARCH_SUMMARY.json
+  LOCAL_AI_RESEARCH_REPORT.md
+```
+
+This is the clearest workflow when you want to use long Jetson runs as training data:
+
+1. collect one or more 24h/7d research bundles
+2. merge predictor rows and controller-teacher rows with source labels
+3. train an auditable linear local controller
+4. optionally train the PyTorch neural controller
+5. optionally train the glucose predictor
+6. evaluate learned controllers on held-out scenarios
+
+For a first smoke test without heavy PyTorch/predictor work:
+
+```bash
+iints research local-ai-lab \
+  --run day1=results/jetson_research_day \
+  --output-dir results/local_ai_lab_smoke \
+  --skip-predictor \
+  --skip-neural \
+  --skip-evaluation
+```
+
+The important separation is:
+
+- `predictor_training.csv` trains a glucose forecasting model
+- `controller_teacher_dataset.csv` trains a research controller policy
+- `LOCAL_AI_DATASET_CARD.json` records lineage, row counts, sources, and research-only limits
+
+## 6. What Good Research Looks Like
 
 Before making any strong claim, require all of the following:
 

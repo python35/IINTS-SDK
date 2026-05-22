@@ -61,6 +61,10 @@ from .control_eval import (
     DEFAULT_HELD_OUT_PRESETS,
     evaluate_controller_factories,
 )
+from .local_ai import (
+    build_predictor_dataset_from_runs,
+    run_local_ai_lab,
+)
 
 __all__ = [
     "PredictorConfig",
@@ -118,4 +122,6 @@ __all__ = [
     "blend_predictor_datasets",
     "DEFAULT_HELD_OUT_PRESETS",
     "evaluate_controller_factories",
+    "build_predictor_dataset_from_runs",
+    "run_local_ai_lab",
 ]

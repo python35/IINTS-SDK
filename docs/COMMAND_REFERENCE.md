@@ -280,6 +280,10 @@ Train the stronger PyTorch controller from the same supervised safe-action label
 ### `iints research evaluate-controller`
 Compare a learned controller against the clinical baseline on held-out presets and seeds.
 
+### `iints research local-ai-lab`
+Combine completed Jetson/simulator runs into one local AI workspace:
+predictor dataset, controller-teacher dataset, dataset card, local controller models, optional predictor training, and held-out controller evaluation.
+
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
 
 ### `iints makerfaire up`

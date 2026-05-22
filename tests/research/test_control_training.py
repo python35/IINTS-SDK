@@ -81,6 +81,79 @@ def test_build_and_train_local_controller(tmp_path: Path) -> None:
     assert manifest_path.is_file()
 
 
+def test_build_control_dataset_prefers_reference_teacher_labels(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run_reference"
+    (run_dir / "raw").mkdir(parents=True)
+    rows = _control_rows()
+    rows["reference_teacher_insulin_units"] = [0.08, 2.4, 0.5, 0.0]
+    rows.to_csv(run_dir / "raw" / "steps.csv", index=False)
+    dataset_path = tmp_path / "controller.csv"
+
+    manifest = build_control_dataset_from_runs(
+        [("run_reference", run_dir)],
+        output_path=dataset_path,
+    )
+    dataset = pd.read_csv(dataset_path)
+
+    assert dataset[CONTROL_TARGET_COLUMN].tolist() == [0.08, 2.4, 0.5, 0.0]
+    assert dataset["observed_delivered_insulin_units"].tolist() == rows["delivered_insulin_units"].tolist()
+    assert manifest["teacher_source_columns"] == ["reference_teacher_insulin_units"]
+
+
+def test_local_ai_lab_builds_datasets_and_linear_model(tmp_path: Path) -> None:
+    run_dir = tmp_path / "jetson_day"
+    (run_dir / "raw").mkdir(parents=True)
+    rows = _control_rows()
+    rows["reference_teacher_insulin_units"] = [0.08, 2.4, 0.5, 0.0]
+    rows.to_csv(run_dir / "raw" / "steps.csv", index=False)
+    output_dir = tmp_path / "local_ai_lab"
+
+    from iints.research.local_ai import run_local_ai_lab
+
+    report = run_local_ai_lab(
+        [("day1", run_dir)],
+        output_dir=output_dir,
+        repo_root=Path.cwd(),
+        train_predictor=False,
+        train_neural=False,
+        evaluate=False,
+    )
+
+    assert report["predictor_dataset"]["rows"] == 4
+    assert report["controller_dataset"]["rows"] == 4
+    assert report["linear_controller"]["model_path"].endswith("linear_controller.json")
+    assert (output_dir / "datasets" / "predictor_training.csv").is_file()
+    assert (output_dir / "datasets" / "controller_teacher_dataset.csv").is_file()
+    assert (output_dir / "datasets" / "LOCAL_AI_DATASET_CARD.json").is_file()
+    assert (output_dir / "LOCAL_AI_RESEARCH_REPORT.md").is_file()
+
+
+def test_research_cli_local_ai_lab(tmp_path: Path) -> None:
+    run_dir = tmp_path / "jetson_day"
+    (run_dir / "raw").mkdir(parents=True)
+    _control_rows().to_csv(run_dir / "raw" / "steps.csv", index=False)
+    output_dir = tmp_path / "local_ai_lab"
+
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "local-ai-lab",
+            "--run",
+            f"day1={run_dir}",
+            "--output-dir",
+            str(output_dir),
+            "--skip-predictor",
+            "--skip-neural",
+            "--skip-evaluation",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Local AI Research Lab" in result.stdout
+    assert (output_dir / "models" / "linear_controller.json").is_file()
+
+
 def test_blend_predictor_datasets_prefixes_subjects(tmp_path: Path) -> None:
     base = pd.DataFrame(
         {

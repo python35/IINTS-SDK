@@ -53,7 +53,7 @@ class EnduranceConfig:
     output_dir: str
     profile: str
     seed: Optional[int]
-    patient_model: str = "auto"
+    patient_model: str = "bergman"
     sensor_profile: str = "free_living_cgm"
     custom_profile_path: Optional[str] = None
     resume: bool = False
@@ -417,6 +417,86 @@ def _tir_pct(glucose: pd.Series) -> float:
     return float(((glucose >= 70.0) & (glucose <= 180.0)).mean() * 100.0)
 
 
+def _series(df: pd.DataFrame, column: str, default: float = 0.0) -> pd.Series:
+    if column in df.columns:
+        return pd.to_numeric(df[column], errors="coerce")
+    return pd.Series(default, index=df.index, dtype=float)
+
+
+def _glucose_metrics(glucose: pd.Series) -> Dict[str, Any]:
+    clean = pd.to_numeric(glucose, errors="coerce").dropna()
+    if clean.empty:
+        return {
+            "mean_mgdl": None,
+            "min_mgdl": None,
+            "max_mgdl": None,
+            "tir_70_180_pct": 0.0,
+            "time_below_70_pct": 0.0,
+            "time_below_54_pct": 0.0,
+            "time_above_180_pct": 0.0,
+            "time_above_250_pct": 0.0,
+            "cv_pct": None,
+        }
+    mean = float(clean.mean())
+    return {
+        "mean_mgdl": round(mean, 3),
+        "min_mgdl": round(float(clean.min()), 3),
+        "max_mgdl": round(float(clean.max()), 3),
+        "tir_70_180_pct": round(_tir_pct(clean), 3),
+        "time_below_70_pct": round(float((clean < 70.0).mean() * 100.0), 3),
+        "time_below_54_pct": round(float((clean < 54.0).mean() * 100.0), 3),
+        "time_above_180_pct": round(float((clean > 180.0).mean() * 100.0), 3),
+        "time_above_250_pct": round(float((clean > 250.0).mean() * 100.0), 3),
+        "cv_pct": round(float(clean.std(ddof=0) / mean * 100.0), 3) if mean else None,
+    }
+
+
+def _physiology_quality(df: pd.DataFrame) -> Dict[str, Any]:
+    if df.empty:
+        return {"warning_count": 0, "warnings": [], "truth_metrics": _glucose_metrics(pd.Series(dtype=float))}
+
+    truth = _series(df, "glucose_actual_mgdl")
+    mechanistic = _series(df, "glucose_mechanistic_mgdl") if "glucose_mechanistic_mgdl" in df else truth
+    algo_glucose = _series(df, "glucose_to_algo_mgdl")
+    predicted = _series(df, "predicted_glucose_30min")
+    fail_soft = df.get("input_validator_fail_soft", pd.Series(False, index=df.index)).fillna(False).astype(bool)
+    safety = df.get("safety_triggered", pd.Series(False, index=df.index)).fillna(False).astype(bool)
+    sensor_status = df.get("sensor_status", pd.Series("ok", index=df.index)).astype(str)
+
+    sensor_gap = (truth - algo_glucose).abs()
+    hidden_gap = (truth - mechanistic).abs()
+    blind_hyper = (truth > 250.0) & (algo_glucose < 180.0)
+    false_hypo_like = safety & (truth >= 100.0) & (predicted < 60.0)
+    flat_truth = int((truth.diff().fillna(0.0).abs() < 1e-9).sum())
+    warnings: List[str] = []
+    if int(fail_soft.sum()) > max(3, len(df) * 0.05):
+        warnings.append("Many algorithm-facing CGM values required fail-soft validation.")
+    if int(blind_hyper.sum()) > 0:
+        warnings.append("Algorithm-facing CGM missed one or more severe hyperglycemia truth states.")
+    if int(false_hypo_like.sum()) > max(2, len(df) * 0.02):
+        warnings.append("Predicted-hypoglycemia alarms look dominated by noisy sensor trend extrapolation.")
+    if int((hidden_gap > 1.0).sum()) > 0:
+        warnings.append("Reported actual glucose diverged from the mechanistic patient trace.")
+    if flat_truth > len(df) * 0.35 and truth.nunique(dropna=True) > 1:
+        warnings.append("Truth glucose contains long flat segments; review patient model and validator settings.")
+
+    return {
+        "warning_count": len(warnings),
+        "warnings": warnings,
+        "truth_metrics": _glucose_metrics(truth),
+        "mechanistic_metrics": _glucose_metrics(mechanistic),
+        "algorithm_input_metrics": _glucose_metrics(algo_glucose),
+        "input_validator_fail_soft_rows": int(fail_soft.sum()),
+        "sensor_artifact_steps": int((sensor_status != "ok").sum()),
+        "mean_abs_truth_sensor_gap_mgdl": round(float(sensor_gap.mean()), 3),
+        "max_abs_truth_sensor_gap_mgdl": round(float(sensor_gap.max()), 3),
+        "truth_mechanistic_gap_rows": int((hidden_gap > 1.0).sum()),
+        "algorithm_blind_hyperglycemia_rows": int(blind_hyper.sum()),
+        "false_predicted_hypo_alert_rows": int(false_hypo_like.sum()),
+        "flat_truth_rows": flat_truth,
+    }
+
+
 def _hourly_summary(df: pd.DataFrame, time_step_minutes: int) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
@@ -426,18 +506,23 @@ def _hourly_summary(df: pd.DataFrame, time_step_minutes: int) -> pd.DataFrame:
     for hour, group in work.groupby("hour_index"):
         hour_index = _coerce_scalar_int(hour)
         glucose = _glucose_series(group)
+        algo_glucose = _series(group, "glucose_to_algo_mgdl").dropna()
         interventions = group.get("safety_triggered", pd.Series(dtype=bool)).fillna(False).astype(bool)
         uncertainty = pd.to_numeric(group.get("predictor_uncertainty_std_mgdl", pd.Series(dtype=float)), errors="coerce")
         latency = pd.to_numeric(group.get("algorithm_latency_ms", pd.Series(dtype=float)), errors="coerce")
+        fail_soft = group.get("input_validator_fail_soft", pd.Series(False, index=group.index)).fillna(False).astype(bool)
         rows.append(
             {
                 "hour_index": hour_index,
                 "start_minute": hour_index * 60,
                 "mean_glucose_mgdl": round(float(glucose.mean()), 3) if not glucose.empty else None,
+                "mean_algorithm_input_mgdl": round(float(algo_glucose.mean()), 3) if not algo_glucose.empty else None,
                 "tir_70_180_pct": round(_tir_pct(glucose), 3),
                 "time_below_70_pct": round(float((glucose < 70.0).mean() * 100.0), 3) if not glucose.empty else 0.0,
                 "time_above_180_pct": round(float((glucose > 180.0).mean() * 100.0), 3) if not glucose.empty else 0.0,
+                "time_above_250_pct": round(float((glucose > 250.0).mean() * 100.0), 3) if not glucose.empty else 0.0,
                 "supervisor_interventions": int(interventions.sum()),
+                "input_validator_fail_soft_rows": int(fail_soft.sum()),
                 "predictor_uncertainty_mean_mgdl": round(float(uncertainty.dropna().mean()), 3) if uncertainty.dropna().size else None,
                 "gpu_inference_latency_ms": round(float(latency.dropna().mean()), 3) if latency.dropna().size else None,
                 "step_count": int(len(group)),
@@ -457,6 +542,7 @@ def _daily_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
         day_index = _coerce_scalar_int(day)
         glucose = _glucose_series(group)
         interventions = group.get("safety_triggered", pd.Series(dtype=bool)).fillna(False).astype(bool)
+        fail_soft = group.get("input_validator_fail_soft", pd.Series(False, index=group.index)).fillna(False).astype(bool)
         critical = glucose[glucose < 54.0]
         summaries.append(
             {
@@ -468,6 +554,8 @@ def _daily_summary(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 "mean_glucose_mgdl": round(float(glucose.mean()), 3) if not glucose.empty else None,
                 "supervisor_interventions": int(interventions.sum()),
                 "supervisor_intervention_rate_pct": round(float(interventions.mean() * 100.0), 3) if len(interventions) else 0.0,
+                "input_validator_fail_soft_rows": int(fail_soft.sum()),
+                "time_above_250_pct": round(float((glucose > 250.0).mean() * 100.0), 3) if not glucose.empty else 0.0,
                 "critical_events_below_54": int(len(critical)),
             }
         )
@@ -501,12 +589,15 @@ def _worst_case_events(df: pd.DataFrame, limit: int = 10) -> List[Dict[str, Any]
     fields = [
         "time_minutes",
         "glucose_actual_mgdl",
+        "glucose_mechanistic_mgdl",
         "glucose_to_algo_mgdl",
+        "predicted_glucose_30min",
         "algo_recommended_insulin_units",
         "delivered_insulin_units",
         "safety_triggered",
         "safety_reason",
         "sensor_status",
+        "input_validator_fail_soft",
         "predictor_uncertainty_std_mgdl",
         "danger_score",
     ]
@@ -520,6 +611,7 @@ def _total_summary(df: pd.DataFrame, safety_report: Dict[str, Any], config: Endu
     glucose = _glucose_series(df)
     interventions = _interventions(df)
     critical = _critical_events(df)
+    physiology_quality = _physiology_quality(df)
     p = _tir_pct(glucose) / 100.0 if not glucose.empty else 0.0
     n = max(1, len(glucose))
     ci_half = 1.96 * math.sqrt((p * (1.0 - p)) / n) * 100.0
@@ -544,6 +636,13 @@ def _total_summary(df: pd.DataFrame, safety_report: Dict[str, Any], config: Endu
         "critical_events_below_54": int(len(critical)),
         "supervisor_failure_rate_pct": round(float(critical_after_supervisor / max(1, len(interventions)) * 100.0), 3),
         "sensor_artifact_steps": int((df.get("sensor_status", pd.Series(dtype=str)).astype(str) != "ok").sum()) if not df.empty else 0,
+        "input_validator_fail_soft_rows": physiology_quality["input_validator_fail_soft_rows"],
+        "algorithm_blind_hyperglycemia_rows": physiology_quality["algorithm_blind_hyperglycemia_rows"],
+        "false_predicted_hypo_alert_rows": physiology_quality["false_predicted_hypo_alert_rows"],
+        "mean_abs_truth_sensor_gap_mgdl": physiology_quality["mean_abs_truth_sensor_gap_mgdl"],
+        "physiology_warning_count": physiology_quality["warning_count"],
+        "physiology_warnings": physiology_quality["warnings"],
+        "physiology_quality": physiology_quality,
         "checkpoint_interval_minutes": config.checkpoint_interval_minutes,
         "hardware_sample_interval_minutes": config.hardware_sample_interval_minutes,
         "performance_report": safety_report.get("performance_report", {}),
@@ -563,9 +662,15 @@ def _write_main_figure(df: pd.DataFrame, output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     x_hours = pd.to_numeric(df["time_minutes"], errors="coerce") / 60.0
     glucose = pd.to_numeric(df["glucose_actual_mgdl"], errors="coerce")
+    algo_glucose = pd.to_numeric(df.get("glucose_to_algo_mgdl", pd.Series(dtype=float)), errors="coerce")
+    mechanistic = pd.to_numeric(df.get("glucose_mechanistic_mgdl", pd.Series(dtype=float)), errors="coerce")
     fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
     ax.axhspan(70, 180, color="#DCFCE7", alpha=0.8, label="70-180 mg/dL")
-    ax.plot(x_hours, glucose, color="#0F766E", linewidth=1.4, label="Glucose")
+    if not mechanistic.empty and not np.allclose(mechanistic.fillna(-1), glucose.fillna(-1)):
+        ax.plot(x_hours, mechanistic, color="#DC2626", linewidth=1.0, alpha=0.8, label="Mechanistic truth")
+    ax.plot(x_hours, glucose, color="#0F766E", linewidth=1.4, label="Truth glucose")
+    if not algo_glucose.empty:
+        ax.plot(x_hours, algo_glucose, color="#2563EB", linewidth=0.9, alpha=0.72, label="Algorithm input")
     interventions = _interventions(df)
     if not interventions.empty:
         ax.scatter(
@@ -612,6 +717,10 @@ def _write_pdf(markdown_path: Path, pdf_path: Path) -> None:
 def _write_report(output_dir: Path, summary: Dict[str, Any], daily: List[Dict[str, Any]]) -> Path:
     final_dir = output_dir / "final"
     report_path = final_dir / "ENDURANCE_REPORT.md"
+    physiology = summary.get("physiology_quality", {}) or {}
+    truth_metrics = physiology.get("truth_metrics", {}) or {}
+    algorithm_metrics = physiology.get("algorithm_input_metrics", {}) or {}
+    warnings = list(physiology.get("warnings", []) or [])
     lines = [
         "# IINTS Jetson Endurance Report",
         "",
@@ -621,25 +730,95 @@ def _write_report(output_dir: Path, summary: Dict[str, Any], daily: List[Dict[st
         f"- Total TIR 70-180: `{summary['total_tir_70_180_pct']}%`",
         f"- TIR 95% CI: `{summary['tir_95_ci_pct'][0]}%` to `{summary['tir_95_ci_pct'][1]}%`",
         f"- Worst glucose: `{summary['worst_glucose_mgdl']} mg/dL`",
+        f"- Max glucose: `{summary['max_glucose_mgdl']} mg/dL`",
         f"- Critical events <54 mg/dL: `{summary['critical_events_below_54']}`",
         f"- Supervisor interventions: `{summary['supervisor_interventions']}`",
         f"- Supervisor failure rate: `{summary['supervisor_failure_rate_pct']}%`",
+        f"- Input-validator fail-soft rows: `{summary.get('input_validator_fail_soft_rows', 0)}`",
+        f"- Algorithm-blind hyperglycemia rows: `{summary.get('algorithm_blind_hyperglycemia_rows', 0)}`",
+        f"- Physiology warnings: `{summary.get('physiology_warning_count', 0)}`",
         f"- Checkpoint interval: `{summary['checkpoint_interval_minutes']} minutes`",
         f"- Hardware sample interval: `{summary['hardware_sample_interval_minutes']} minutes`",
         "",
-        "## Daily Summaries",
+        "## Physiology Quality",
+        "",
+        f"- Truth TIR 70-180: `{truth_metrics.get('tir_70_180_pct', 0.0)}%`",
+        f"- Truth time >250: `{truth_metrics.get('time_above_250_pct', 0.0)}%`",
+        f"- Truth CV: `{truth_metrics.get('cv_pct', 'n/a')}%`",
+        f"- Algorithm-input TIR 70-180: `{algorithm_metrics.get('tir_70_180_pct', 0.0)}%`",
+        f"- Mean absolute truth/sensor gap: `{summary.get('mean_abs_truth_sensor_gap_mgdl', 0.0)} mg/dL`",
         "",
     ]
+    if warnings:
+        lines.extend(["### Warnings", ""])
+        lines.extend([f"- {warning}" for warning in warnings])
+        lines.append("")
+    else:
+        lines.extend(["No physiology-quality warnings were raised for this run.", ""])
+    lines.extend(["## Daily Summaries", ""])
     for day in daily:
         lines.append(
             f"- Day {day['day']}: TIR `{day['tir_70_180_pct']}%`, "
+            f">250 `{day.get('time_above_250_pct', 0.0)}%`, "
             f"worst `{day['worst_glucose_mgdl']} mg/dL`, "
             f"interventions `{day['supervisor_interventions']}`, "
+            f"fail-soft rows `{day.get('input_validator_fail_soft_rows', 0)}`, "
             f"critical events `{day['critical_events_below_54']}`"
         )
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     _write_pdf(report_path, final_dir / "ENDURANCE_REPORT.pdf")
     return report_path
+
+
+def _row_float(row: pd.Series, key: str, default: float = 0.0) -> float:
+    value = row.get(key, default)
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return default
+    return numeric if math.isfinite(numeric) else default
+
+
+def _reference_teacher_insulin(row: pd.Series, time_step_minutes: int) -> float:
+    """Conservative, auditable research label for local controller training.
+
+    This is not a clinical dosing rule. It provides a safer synthetic teacher
+    than copying weak demo-algorithm output, especially for long Jetson bundles.
+    """
+    glucose = _row_float(row, "glucose_actual_mgdl", 120.0)
+    predicted = _row_float(row, "predicted_glucose_30min", glucose)
+    trend = _row_float(row, "glucose_trend_mgdl_min", 0.0)
+    iob = max(0.0, _row_float(row, "patient_iob_units", 0.0))
+    carbs = max(0.0, _row_float(row, "carb_intake_grams", 0.0))
+    isf = max(10.0, _row_float(row, "effective_isf", 50.0))
+    icr = max(3.0, _row_float(row, "effective_icr", 12.0))
+    basal_rate = min(3.0, max(0.0, _row_float(row, "effective_basal_rate_u_per_hr", 0.0)))
+
+    basal_units = basal_rate * max(1, time_step_minutes) / 60.0
+    if glucose <= 90.0 or predicted <= 75.0 or trend <= -1.2:
+        basal_units *= 0.25
+    if glucose < 70.0 or predicted < 70.0:
+        return 0.0
+
+    meal_units = 0.0
+    if carbs > 0.0 and glucose > 90.0 and predicted > 75.0:
+        meal_units = min(carbs / icr, 4.0)
+        if trend < -0.8:
+            meal_units *= 0.5
+        if iob > 2.0:
+            meal_units *= 0.5
+
+    correction_units = 0.0
+    reference_glucose = max(glucose, predicted)
+    if reference_glucose >= 145.0 and iob < 2.5 and trend > -1.2:
+        raw_correction = (reference_glucose - 110.0) / isf
+        trend_factor = 0.5 if trend >= 0.0 else 0.25
+        correction_units = max(0.0, min(raw_correction * trend_factor, 2.5))
+
+    total = basal_units + meal_units + correction_units
+    if iob > 3.0:
+        total = min(total, 0.2)
+    return round(float(min(max(total, 0.0), 3.5)), 4)
 
 
 def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.DataFrame) -> Dict[str, str]:
@@ -651,6 +830,8 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
         "segment",
         "time_minutes",
         "glucose_actual_mgdl",
+        "glucose_to_algo_mgdl",
+        "predicted_glucose_30min",
         "glucose_trend_mgdl_min",
         "carb_intake_grams",
         "carb_grams",
@@ -666,6 +847,7 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
         "time_of_day_sin",
         "time_of_day_cos",
         "delivered_insulin_units",
+        "input_validator_fail_soft",
         "sensor_status",
     ]
     training_df = df.copy()
@@ -689,6 +871,29 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
     training_df[predictor_columns].to_csv(training_path, index=False)
     controller_columns = [
         "glucose_actual_mgdl",
+        "glucose_to_algo_mgdl",
+        "predicted_glucose_30min",
+        "glucose_trend_mgdl_min",
+        "patient_iob_units",
+        "patient_cob_grams",
+        "effective_isf",
+        "effective_icr",
+        "effective_basal_rate_u_per_hr",
+        "carb_intake_grams",
+        "observed_delivered_insulin_units",
+        "reference_teacher_insulin_units",
+        "teacher_insulin_units",
+        "algo_recommended_insulin_units",
+        "safety_triggered",
+        "input_validator_fail_soft",
+        "time_minutes",
+    ]
+    controller_path = research_dir / "controller_teacher_dataset.csv"
+    controller_df = df.copy()
+    for column in [
+        "glucose_actual_mgdl",
+        "glucose_to_algo_mgdl",
+        "predicted_glucose_30min",
         "glucose_trend_mgdl_min",
         "patient_iob_units",
         "patient_cob_grams",
@@ -699,18 +904,19 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
         "delivered_insulin_units",
         "algo_recommended_insulin_units",
         "safety_triggered",
+        "input_validator_fail_soft",
         "time_minutes",
-    ]
-    controller_path = research_dir / "controller_teacher_dataset.csv"
-    controller_df = df.copy()
-    for column in controller_columns:
+    ]:
         if column not in controller_df.columns:
             controller_df[column] = 0.0
-    controller_df["teacher_insulin_units"] = pd.to_numeric(
-        controller_df["delivered_insulin_units"],
-        errors="coerce",
+    controller_df["observed_delivered_insulin_units"] = pd.to_numeric(
+        controller_df["delivered_insulin_units"], errors="coerce"
     ).fillna(0.0)
-    controller_df[[*controller_columns, "teacher_insulin_units"]].to_csv(controller_path, index=False)
+    controller_df["reference_teacher_insulin_units"] = controller_df.apply(
+        lambda row: _reference_teacher_insulin(row, config.time_step_minutes), axis=1
+    )
+    controller_df["teacher_insulin_units"] = controller_df["reference_teacher_insulin_units"]
+    controller_df[controller_columns].to_csv(controller_path, index=False)
 
     manifest_path = research_dir / "training_manifest.json"
     training_manifest = {
@@ -739,6 +945,11 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
             f"--data {controller_path} "
             f"--output models/{Path(config.output_dir).name}_controller.json"
         ),
+        "controller_teacher_policy": "conservative_reference_v1",
+        "controller_teacher_note": (
+            "teacher_insulin_units is generated by a conservative, auditable research-only reference policy; "
+            "observed_delivered_insulin_units preserves the controller output that actually ran during acquisition."
+        ),
         "ministral_training_supported": False,
         "ministral_note": (
             "Ministral/Ollama is currently the local explanation backend, not the trainable glucose predictor. "
@@ -758,13 +969,14 @@ def _write_research_outputs(output_dir: Path, config: EnduranceConfig, df: pd.Da
                 "## Files",
                 "",
                 "- `predictor_training.csv`: rows compatible with the SDK predictor-training pipeline.",
-                "- `controller_teacher_dataset.csv`: supervised safe-action labels for controller research.",
+                "- `controller_teacher_dataset.csv`: supervised research labels with both observed delivery and a conservative reference teacher.",
                 "- `training_manifest.json`: lineage, columns, and a reproducible training command.",
                 "",
                 "## Important distinction",
                 "",
                 "- The trainable model in the SDK research pipeline is the **glucose predictor**.",
                 "- `Ministral` / Ollama is the **local explanation assistant**, not an online-trained controller.",
+                "- `teacher_insulin_units` uses `conservative_reference_v1`; it is a research label, not a medical dosing rule.",
                 "- Keep acquisition and training separate so the same run is not both training data and unbiased evaluation evidence.",
                 "- A single Jetson run is one synthetic subject; combine multiple runs or external data before claiming generalization.",
                 "",
@@ -986,10 +1198,15 @@ def run_endurance_study(
                 resume_count=resume_count,
             )
             glucose = _glucose_series(partial_df)
+            physiology = _physiology_quality(partial_df)
             status["tir_so_far_pct"] = round(_tir_pct(glucose), 3)
             status["interventions"] = int(len(_interventions(partial_df)))
             status["critical_events"] = int(len(_critical_events(partial_df)))
             status["worst_glucose_mgdl"] = round(float(glucose.min()), 3) if not glucose.empty else None
+            status["physiology_warning_count"] = physiology["warning_count"]
+            status["input_validator_fail_soft_rows"] = physiology["input_validator_fail_soft_rows"]
+            status["algorithm_blind_hyperglycemia_rows"] = physiology["algorithm_blind_hyperglycemia_rows"]
+            status["mean_abs_truth_sensor_gap_mgdl"] = physiology["mean_abs_truth_sensor_gap_mgdl"]
             _write_json(output_dir / "status.json", status)
             if progress_callback is not None:
                 progress_callback(status)
@@ -1049,6 +1266,11 @@ def run_endurance_study(
             "interventions": summary["supervisor_interventions"],
             "critical_events": summary["critical_events_below_54"],
             "worst_glucose_mgdl": summary["worst_glucose_mgdl"],
+            "physiology_warning_count": summary.get("physiology_warning_count"),
+            "input_validator_fail_soft_rows": summary.get("input_validator_fail_soft_rows"),
+            "algorithm_blind_hyperglycemia_rows": summary.get("algorithm_blind_hyperglycemia_rows"),
+            "false_predicted_hypo_alert_rows": summary.get("false_predicted_hypo_alert_rows"),
+            "mean_abs_truth_sensor_gap_mgdl": summary.get("mean_abs_truth_sensor_gap_mgdl"),
             "outputs": outputs,
         }
     )

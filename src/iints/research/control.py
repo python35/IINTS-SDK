@@ -33,13 +33,27 @@ def _resolve_steps_path(run_dir: Path) -> Path:
 def _prepare_control_frame(run_dir: Path, source_label: str) -> pd.DataFrame:
     steps_path = _resolve_steps_path(run_dir)
     df = pd.read_csv(steps_path).copy()
-    required = [*CONTROL_FEATURE_COLUMNS, "delivered_insulin_units"]
+    target_source = "delivered_insulin_units"
+    if "reference_teacher_insulin_units" in df.columns:
+        target_source = "reference_teacher_insulin_units"
+    elif CONTROL_TARGET_COLUMN in df.columns:
+        target_source = CONTROL_TARGET_COLUMN
+    required = [*CONTROL_FEATURE_COLUMNS, target_source]
     missing = [column for column in required if column not in df.columns]
     if missing:
         raise ValueError(f"{steps_path}: missing columns {missing}")
 
-    frame = df[[*CONTROL_FEATURE_COLUMNS, "delivered_insulin_units"]].copy()
-    frame[CONTROL_TARGET_COLUMN] = pd.to_numeric(frame["delivered_insulin_units"], errors="coerce").fillna(0.0)
+    frame = df[CONTROL_FEATURE_COLUMNS].copy()
+    frame[CONTROL_TARGET_COLUMN] = pd.to_numeric(df[target_source], errors="coerce").fillna(0.0)
+    if "observed_delivered_insulin_units" in df.columns:
+        frame["observed_delivered_insulin_units"] = pd.to_numeric(
+            df["observed_delivered_insulin_units"], errors="coerce"
+        ).fillna(0.0)
+    elif "delivered_insulin_units" in df.columns:
+        frame["observed_delivered_insulin_units"] = pd.to_numeric(
+            df["delivered_insulin_units"], errors="coerce"
+        ).fillna(0.0)
+    frame["teacher_source_column"] = target_source
     frame["source_run"] = source_label
     time_minutes = df["time_minutes"] if "time_minutes" in df.columns else pd.Series(0.0, index=df.index)
     frame["time_minutes"] = pd.to_numeric(time_minutes, errors="coerce").fillna(0.0)
@@ -50,7 +64,7 @@ def _prepare_control_frame(run_dir: Path, source_label: str) -> pd.DataFrame:
         df.get("algo_recommended_insulin_units", frame[CONTROL_TARGET_COLUMN]),
         errors="coerce",
     ).fillna(frame[CONTROL_TARGET_COLUMN])
-    return frame.drop(columns=["delivered_insulin_units"])
+    return frame
 
 
 def build_control_dataset_from_runs(
@@ -86,6 +100,7 @@ def summarize_control_dataset(df: pd.DataFrame) -> Dict[str, Any]:
         "max_teacher_insulin_units": round(float(target.max()), 6) if len(target) else 0.0,
         "hypo_rows_below_70": int((glucose < 70.0).sum()),
         "safety_intervention_rows": int(safety.sum()),
+        "teacher_source_columns": sorted(df.get("teacher_source_column", pd.Series(dtype=str)).dropna().unique().tolist()),
     }
 
 

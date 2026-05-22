@@ -73,18 +73,29 @@ def test_run_endurance_writes_expected_artifacts(tmp_path: Path) -> None:
 
     steps = pd.read_csv(output_dir / "raw" / "steps.csv")
     summary = json.loads((output_dir / "final" / "test_summary.json").read_text())
+    report_text = (output_dir / "final" / "ENDURANCE_REPORT.md").read_text()
     assert len(steps) == 12
     assert summary["expected_steps"] == 12
     assert summary["checkpoint_interval_minutes"] == 30
     assert 0.0 <= summary["total_tir_70_180_pct"] <= 100.0
     assert summary["execution_mode"] == "accelerated"
+    assert "physiology_quality" in summary
+    assert "input_validator_fail_soft_rows" in summary
+    assert "algorithm_blind_hyperglycemia_rows" in summary
+    assert "## Physiology Quality" in report_text
     assert (output_dir / "snapshots" / "snapshot_000030m.json").is_file()
     assert (output_dir / "snapshots" / "snapshot_000060m.json").is_file()
 
     training_manifest = json.loads((output_dir / "research" / "training_manifest.json").read_text())
     assert training_manifest["row_count"] == 12
     assert training_manifest["ministral_training_supported"] is False
+    assert training_manifest["controller_teacher_policy"] == "conservative_reference_v1"
     assert "controller_teacher_dataset.csv" in training_manifest["controller_dataset_path"]
+    controller = pd.read_csv(output_dir / "research" / "controller_teacher_dataset.csv")
+    assert "observed_delivered_insulin_units" in controller.columns
+    assert "reference_teacher_insulin_units" in controller.columns
+    assert "teacher_insulin_units" in controller.columns
+    assert controller["teacher_insulin_units"].equals(controller["reference_teacher_insulin_units"])
 
 
 def test_finalize_research_writes_models_and_evaluation(tmp_path: Path) -> None:

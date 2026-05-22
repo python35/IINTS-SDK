@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.6"
+version = "1.5.7"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -31,7 +31,7 @@ dependencies = [
     "PyYAML>=6.0.0,<7.0.0",
     "rich>=12.0.0,<16.0.0",
     "scipy>=1.9.0,<2.0.0",
-    "typer[all]>=0.9.0,<1.0.0",
+    "typer>=0.9.0,<1.0.0",
     "uvicorn>=0.30.0,<1.0.0",
 ]
 

@@ -4088,7 +4088,7 @@ def presets_create(
         f"basal_insulin_rate: {basal_insulin_rate}\n"
         f"insulin_sensitivity: {insulin_sensitivity}\n"
         f"carb_factor: {carb_factor}\n"
-        "glucose_decay_rate: 0.03\n"
+        "glucose_decay_rate: 0.003\n"
         f"initial_glucose: {initial_glucose}\n"
         "glucose_absorption_rate: 0.03\n"
         "insulin_action_duration: 300.0\n"
@@ -7185,6 +7185,96 @@ def research_evaluate_controller(
     console.print(f"[green]Evaluation report:[/green] {report['artifacts']['report_md']}")
 
 
+@research_app.command(name="local-ai-lab")
+def research_local_ai_lab(
+    run: Annotated[
+        List[str],
+        typer.Option(
+            "--run",
+            help="Repeatable run input in label=path form; path may contain a Jetson endurance bundle.",
+        ),
+    ],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for datasets, models, and reports")] = Path(
+        "results/local_ai_lab"
+    ),
+    train_predictor: Annotated[
+        bool,
+        typer.Option(
+            "--train-predictor/--skip-predictor",
+            help="Train the local glucose predictor from the generated predictor dataset.",
+        ),
+    ] = True,
+    train_neural: Annotated[
+        bool,
+        typer.Option(
+            "--train-neural/--skip-neural",
+            help="Train the PyTorch controller in addition to the auditable linear controller.",
+        ),
+    ] = True,
+    evaluate: Annotated[
+        bool,
+        typer.Option(
+            "--evaluate/--skip-evaluation",
+            help="Run held-out closed-loop evaluation after training.",
+        ),
+    ] = True,
+    predictor_config: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional predictor config YAML. Defaults to research/configs/predictor.yaml."),
+    ] = None,
+    duration_minutes: Annotated[int, typer.Option(help="Duration per held-out controller-evaluation run.")] = 1440,
+):
+    """Turn completed runs into local AI datasets, models, and evaluation evidence."""
+    console = Console()
+    if not run:
+        console.print("[bold red]At least one --run label=path value is required.[/bold red]")
+        raise typer.Exit(code=1)
+    parsed_runs: list[tuple[str, Path]] = []
+    for item in run:
+        if "=" not in item:
+            console.print(f"[bold red]Invalid --run value:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        label, raw_path = item.split("=", 1)
+        path = Path(raw_path)
+        if not label.strip() or not path.exists():
+            console.print(f"[bold red]Invalid or missing run:[/bold red] {item}")
+            raise typer.Exit(code=1)
+        parsed_runs.append((label.strip(), path))
+
+    from iints.research.local_ai import run_local_ai_lab
+
+    try:
+        report = run_local_ai_lab(
+            parsed_runs,
+            output_dir=output_dir,
+            repo_root=Path(__file__).resolve().parents[3],
+            train_predictor=train_predictor,
+            predictor_config_path=predictor_config,
+            train_neural=train_neural,
+            evaluate=evaluate,
+            evaluation_duration_minutes=duration_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Local AI lab failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Local AI Research Lab")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Predictor rows", str(report["predictor_dataset"]["rows"]))
+    table.add_row("Controller rows", str(report["controller_dataset"]["rows"]))
+    table.add_row("Linear controller", report["linear_controller"]["model_path"])
+    table.add_row("Neural status", report["neural_controller"]["status"])
+    table.add_row("Predictor status", report["predictor_training"]["status"])
+    table.add_row("Evaluation status", report["closed_loop_evaluation"]["status"])
+    table.add_row("Report", report["artifacts"]["report_md"])
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] trained artifacts are for simulator research, "
+        "not medical treatment or pump dosing."
+    )
+
+
 @research_app.command(name="export-onnx")
 def research_export_onnx(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),
@@ -8169,6 +8259,10 @@ def _print_endurance_status(console: Console, status: Dict[str, Any]) -> None:
         ("Interventions", status.get("interventions")),
         ("Critical events", status.get("critical_events")),
         ("Worst glucose", status.get("worst_glucose_mgdl")),
+        ("Physiology warnings", status.get("physiology_warning_count")),
+        ("Fail-soft rows", status.get("input_validator_fail_soft_rows")),
+        ("Blind hyperglycemia rows", status.get("algorithm_blind_hyperglycemia_rows")),
+        ("Truth/sensor gap", status.get("mean_abs_truth_sensor_gap_mgdl")),
         ("Last checkpoint minute", status.get("last_checkpoint_minute")),
         ("Resume count", status.get("resume_count")),
         ("Wall elapsed seconds", status.get("wall_elapsed_seconds")),
@@ -8219,7 +8313,7 @@ def jetson_endurance_start(
     output_dir: Annotated[Path, typer.Option(help="Output directory for the endurance study")] = Path("results/jetson_endurance"),
     profile: Annotated[str, typer.Option(help="Endurance profile name")] = "mixed_adversarial",
     seed: Annotated[int, typer.Option(help="Deterministic simulation seed")] = 42,
-    patient_model: Annotated[str, typer.Option(help="Patient model name passed to PatientFactory")] = "auto",
+    patient_model: Annotated[str, typer.Option(help="Patient model name passed to PatientFactory")] = "bergman",
     sensor_profile: Annotated[str, typer.Option(help="Sensor profile for the simulated CGM stream")] = "free_living_cgm",
     custom_profile: Annotated[Optional[Path], typer.Option(help="YAML file for --profile custom")] = None,
     time_step: Annotated[int, typer.Option(help="Simulation step size in minutes")] = 5,
