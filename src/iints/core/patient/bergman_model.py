@@ -196,7 +196,11 @@ class BergmanPatientModel:
         # Meals must pass through gastric emptying before intestinal
         # absorption; direct gut injection creates impossible five-minute spikes.
         if true_carbs > 0:
-            self._state[3] += true_carbs * 1000.0  # g -> mg
+            # Only the bioavailable fraction should enter the glucose
+            # appearance pathway; this keeps large meals from producing
+            # unrealistically sharp five-minute CGM jumps.
+            bioavailability = max(0.0, min(float(self.params.f_bio), 1.0))
+            self._state[3] += true_carbs * bioavailability * 1000.0  # g -> mg
 
         # --- Prepare exogenous insulin rate ---
         # Convert Units to mU, spread evenly over time_step (mU/min)

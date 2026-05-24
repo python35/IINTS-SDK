@@ -99,6 +99,23 @@ class TestBergmanPatientModel:
         # Higher epsilon -> more carbs -> higher glucose
         assert model_b.current_glucose > model_a.current_glucose
 
+    def test_meal_bioavailability_limits_absorbed_carbs(self):
+        model_low = BergmanPatientModel(
+            initial_glucose=100.0,
+            bergman_params=BergmanParameters(f_bio=0.6),
+        )
+        model_high = BergmanPatientModel(
+            initial_glucose=100.0,
+            bergman_params=BergmanParameters(f_bio=1.0),
+        )
+        model_low.update(5.0, 0.0, 60.0)
+        model_high.update(5.0, 0.0, 60.0)
+        for _ in range(20):
+            model_low.update(5.0, 0.0, 0.0)
+            model_high.update(5.0, 0.0, 0.0)
+
+        assert model_high.current_glucose > model_low.current_glucose
+
     def test_interface_compatibility(self):
         """Bergman should expose the same methods as CustomPatientModel."""
         model = BergmanPatientModel()
