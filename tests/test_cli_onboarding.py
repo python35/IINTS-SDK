@@ -65,13 +65,37 @@ def test_demo_writes_editable_algorithm_after_run(monkeypatch, tmp_path) -> None
     monkeypatch.setattr("iints.cli.cli.run", _fake_run)
 
     output_dir = tmp_path / "demo"
-    result = runner.invoke(app, ["demo", "--output-dir", str(output_dir)])
+    result = runner.invoke(app, ["demo", "--simulation-only", "--output-dir", str(output_dir)])
 
     assert result.exit_code == 0
     assert captured["preset"] == "quickstart_meal"
     assert captured["algo"] is None
     assert (output_dir / "demo_assets" / "example_algorithm.py").is_file()
+    assert (output_dir / "DEMO_GUIDE.md").is_file()
     assert "What To Do Next" in result.stdout
+    assert "iints demo --audience jury" in result.stdout
+
+
+def test_demo_defaults_to_live_presentation(monkeypatch, tmp_path) -> None:
+    called: dict[str, object] = {}
+
+    def _fake_demo_live(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.demo_live", _fake_demo_live)
+
+    output_dir = tmp_path / "live_demo"
+    result = runner.invoke(
+        app,
+        ["demo", "--output-dir", str(output_dir), "--dry-run", "--audience", "clinical"],
+    )
+
+    assert result.exit_code == 0
+    assert called["output_dir"] == output_dir
+    assert called["run_demo"] is False
+    assert called["audience"] == "clinical"
+    assert called["prepare_ai"] is False
+    assert called["full_code"] is False
 
 
 def test_guide_dispatches_to_demo(monkeypatch) -> None:
@@ -167,7 +191,7 @@ def test_start_prints_beginner_plan(tmp_path) -> None:
     assert result.exit_code == 0
     assert "Recommended First Step" in result.stdout
     assert "iints demo" in result.stdout
-    assert "demo_assets" in result.stdout
+    assert "cue card" in result.stdout
     assert not output_dir.exists()
 
 

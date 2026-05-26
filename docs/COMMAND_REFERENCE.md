@@ -35,20 +35,25 @@ The safe mode runs `doctor`, a full demo, demo-data import, and a realism check,
 then prints the two study commands you can run once you choose an algorithm.
 
 ### `iints demo`
-Zero-config first run.
+The main live-demo button. It exports showable code, prints the presenter story,
+runs the demo, and writes the cue card, artifact map, presenter guide, and rerun
+script.
 
 Common forms:
 
 ```bash
 iints demo
-iints demo --full
+iints demo --audience jury --output-dir results/live_demo
+iints demo --audience clinical
 iints demo --dry-run
+iints demo --simulation-only --quick
+iints demo --simulation-only --full
 ```
 
 ### `iints demo-live`
-One-command live presentation flow for calls, juries, and sponsor walkthroughs.
+Explicit alias for the same live presentation engine used by `iints demo`.
 
-It exports showable Python code, prints an audience-aware opening talk track, shows the key SDK calls in the terminal, runs the live demo, writes `PRESENTER_GUIDE.md`, and lists the poster plus proof artifacts to open next.
+It exports showable Python code, prints an audience-aware opening talk track, shows the key SDK calls in the terminal, runs the live demo, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, then lists the poster plus proof artifacts to open next.
 
 Common forms:
 

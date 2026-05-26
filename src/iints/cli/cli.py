@@ -14,6 +14,7 @@ import sys
 import json
 import platform
 import subprocess
+import shlex
 import tempfile
 import time
 import shutil
@@ -3331,21 +3332,46 @@ iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.
 
 @app.command(name="demo")
 def demo(
-    output_dir: Annotated[Path, typer.Option(help="Directory where the zero-config demo outputs should be written")] = Path("results/demo"),
-    mode: Annotated[str, typer.Option("--mode", help="Demo mode: quick or full")] = "quick",
+    output_dir: Annotated[Path, typer.Option(help="Directory where demo outputs should be written")] = Path("results/demo"),
+    mode: Annotated[str, typer.Option("--mode", help="Demo mode: live, quick, or full")] = "live",
     quick_mode: Annotated[bool, typer.Option("--quick", help="Shortcut for --mode quick")] = False,
     full_mode: Annotated[bool, typer.Option("--full", help="Shortcut for --mode full")] = False,
+    presentation_mode: Annotated[
+        bool,
+        typer.Option(
+            "--presentation/--simulation-only",
+            help="Default starts the full presentation demo; use --simulation-only for the old one-run starter simulation.",
+        ),
+    ] = True,
     preset: Annotated[Optional[str], typer.Option(help="Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.")] = None,
     seed: Annotated[int, typer.Option(help="Deterministic seed for the bundled demo")] = 42,
     compare_baselines: Annotated[bool, typer.Option(help="Include built-in baselines in the demo output")] = True,
+    audience: Annotated[
+        str,
+        typer.Option(help="Presenter framing for the live demo: mixed, clinical, engineering, or jury."),
+    ] = "jury",
+    prepare_ai: Annotated[
+        bool,
+        typer.Option("--prepare-ai/--skip-ai", help="Prepare optional local-AI artifacts during the live demo."),
+    ] = False,
+    full_code: Annotated[
+        bool,
+        typer.Option("--full-code/--preview-code", help="Print the whole exported live demo script instead of the curated preview."),
+    ] = False,
+    overwrite: Annotated[
+        bool,
+        typer.Option("--overwrite/--no-overwrite", help="Allow replacing previously exported live demo files."),
+    ] = True,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the plan without running the demo")] = False,
 ):
     """
-    Zero-config demo run for first-time users.
+    Start the show-ready IINTS demo.
 
     Examples:
       iints demo
-      iints demo --mode full
+      iints demo --audience clinical
+      iints demo --simulation-only --quick
+      iints demo --simulation-only --full
       iints demo --dry-run
     """
     console = Console()
@@ -3358,12 +3384,26 @@ def demo(
         normalized_mode = "quick"
     if full_mode:
         normalized_mode = "full"
-    if normalized_mode not in {"quick", "full"}:
-        console.print("[bold red]Demo mode must be 'quick' or 'full'.[/bold red]")
+    if not presentation_mode and normalized_mode == "live":
+        normalized_mode = "quick"
+    if normalized_mode not in {"live", "quick", "full"}:
+        console.print("[bold red]Demo mode must be 'live', 'quick', or 'full'.[/bold red]")
         raise typer.Exit(code=1)
+
+    if normalized_mode == "live":
+        demo_live(
+            output_dir=output_dir,
+            run_demo=not dry_run,
+            prepare_ai=prepare_ai,
+            full_code=full_code,
+            overwrite=overwrite,
+            audience=audience,
+        )
+        return
 
     resolved_preset = preset or ("quickstart_meal" if normalized_mode == "quick" else "realistic_reference_day")
     duration = 180 if normalized_mode == "quick" else 1440
+    live_demo_hint = "For Zoom/booth demos, use: iints demo --audience jury --output-dir results/live_demo"
     console.print(
         Panel(
             "\n".join(
@@ -3372,6 +3412,7 @@ def demo(
                     f"Preset: {resolved_preset}",
                     "Algorithm: built-in Clinical Baseline",
                     f"Output: {output_dir}",
+                    live_demo_hint,
                 ]
             ),
             title="IINTS Demo",
@@ -3427,20 +3468,86 @@ def demo(
         algo_name="DemoAlgorithm",
         author_name="IINTS Demo",
     )
+    guide_path = _write_zero_config_demo_guide(
+        output_dir=output_dir,
+        mode=normalized_mode,
+        preset=resolved_preset,
+        duration_minutes=duration,
+        seed=seed,
+        compare_baselines=compare_baselines,
+        demo_algo_path=demo_algo_path,
+    )
     console.print(
         Panel(
             "\n".join(
                 [
                     f"Editable example algorithm: {demo_algo_path}",
+                    f"Demo guide: {guide_path}",
                     "Next steps:",
                     f"1. Rerun with your own file: iints run --algo {demo_algo_path} --preset {resolved_preset}",
-                    "2. Use `iints run --wizard` if you want to tweak the patient or scenario interactively.",
+                    "2. For a call or booth, run `iints demo --audience jury --output-dir results/live_demo`.",
+                    "3. Use `iints run --wizard` if you want to tweak the patient or scenario interactively.",
                 ]
             ),
             title="What To Do Next",
             border_style="blue",
         )
     )
+
+
+def _write_zero_config_demo_guide(
+    *,
+    output_dir: Path,
+    mode: str,
+    preset: str,
+    duration_minutes: int,
+    seed: int,
+    compare_baselines: bool,
+    demo_algo_path: Path,
+) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    guide_path = output_dir / "DEMO_GUIDE.md"
+    guide_path.write_text(
+        "\n".join(
+            [
+                "# IINTS Zero-Config Demo Guide",
+                "",
+                "This folder is the simplest SDK demo: one deterministic simulation, one editable algorithm template, and a clear next command.",
+                "",
+                "## What this proves",
+                "",
+                "- The SDK can run a packaged diabetes simulation without custom setup.",
+                "- The run is reproducible because the preset, duration, and seed are fixed.",
+                "- The next experiment can swap in an editable algorithm file.",
+                "",
+                "## Run settings",
+                "",
+                f"- Mode: `{mode}`",
+                f"- Preset: `{preset}`",
+                f"- Duration: `{duration_minutes}` minutes",
+                f"- Seed: `{seed}`",
+                f"- Baseline comparison: `{compare_baselines}`",
+                f"- Editable algorithm: `{demo_algo_path}`",
+                "",
+                "## Good live-demo path",
+                "",
+                "For doctors, engineers, jury calls, or expo booths, use the more guided live mode:",
+                "",
+                "```bash",
+                "iints demo --audience jury --output-dir results/live_demo",
+                "```",
+                "",
+                "That command exports showable code, writes a presenter guide, runs three scenarios, and creates a poster.",
+                "",
+                "## Safety wording",
+                "",
+                "IINTS is a research and educational SDK. It is not a certified medical device and is not for treatment decisions.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return guide_path
 
 
 _START_GOAL_ALIASES = {
@@ -3479,15 +3586,15 @@ def _start_plan_for_goal(
 ) -> tuple[str, list[str], list[str]]:
     if goal == "demo":
         return (
-            "Run the zero-config demo first.",
+            "Run the full live demo first.",
             [
                 "iints doctor --suggest",
-                f"iints demo --output-dir {output_dir}",
+                f"iints demo --audience jury --output-dir {output_dir}",
             ],
             [
                 f"Results: {output_dir}",
-                "Editable algorithm: demo_assets/example_algorithm.py inside the demo output.",
-                "Next: iints run --wizard",
+                "Opens with the talk track, exports showable code, runs the demo, and writes a cue card.",
+                "For the old single simulation starter, use: iints demo --simulation-only --quick",
             ],
         )
     if goal == "project":
@@ -3657,7 +3764,7 @@ def onboard(
     protocol_dir = output_dir / "study_protocol"
     commands = [
         "iints doctor --suggest",
-        f"iints demo --full --output-dir {demo_dir}",
+        f"iints demo --audience jury --output-dir {demo_dir}",
         f"iints import-demo --output-dir {import_dir}",
         (
             f"iints data realism-check {import_dir / 'cgm_standard.csv'} "
@@ -5368,22 +5475,43 @@ def demo_export(
 
 def _build_live_demo_code_preview(script_text: str) -> str:
     """Return the smallest useful code slice for a live walkthrough."""
-    interesting_prefixes = (
-        "PATIENT_CONFIG =",
-        "OUTPUT_DIR =",
-        "DURATION_MINUTES =",
-        "TIME_STEP_MINUTES =",
-        "SEED =",
-        "outputs = run_full(",
-        "poster_outputs = generate_results_poster(",
-        "ai_outputs = prepare_ai_ready_artifacts(",
-    )
-    selected_lines = [
+    constants = [
         line
         for line in script_text.splitlines()
-        if line.strip().startswith(interesting_prefixes)
+        if line.strip().startswith(
+            (
+                "PATIENT_CONFIG =",
+                "OUTPUT_DIR =",
+                "DURATION_MINUTES =",
+                "TIME_STEP_MINUTES =",
+                "SEED =",
+            )
+        )
     ]
-    return "\n".join(selected_lines)
+    return "\n".join(
+        [
+            "# The knobs to point at live:",
+            *constants,
+            "",
+            "# The three SDK calls the demo proves:",
+            "outputs = run_full(",
+            "    algorithm=spec[\"algorithm_factory\"](),",
+            "    scenario=spec[\"scenario\"],",
+            "    patient_config=PATIENT_CONFIG,",
+            "    output_dir=run_dir,",
+            ")",
+            "",
+            "poster_outputs = generate_results_poster(",
+            "    run_dirs=[scenario[\"output_dir\"] for scenario in scenario_outputs],",
+            "    labels=[scenario[\"label\"] for scenario in scenario_outputs],",
+            ")",
+            "",
+            "ai_outputs = prepare_ai_ready_artifacts(",
+            "    scenario_outputs[2][\"output_dir\"],",
+            "    create_dev_mdmp_cert=True,",
+            ")",
+        ]
+    )
 
 
 def _live_demo_result_rows(summary: dict[str, Any], results_dir: Path) -> list[tuple[str, str]]:
@@ -5398,6 +5526,22 @@ def _live_demo_result_rows(summary: dict[str, Any], results_dir: Path) -> list[t
         for scenario in summary.get("scenarios", [])
     )
     return rows
+
+
+def _shell_join(parts: List[object]) -> str:
+    return " ".join(shlex.quote(str(part)) for part in parts)
+
+
+def _live_demo_run_command(script_path: Path, results_dir: Path, prepare_ai: bool) -> str:
+    return _shell_join(
+        [
+            "python",
+            script_path,
+            "--output-dir",
+            results_dir,
+            "--prepare-ai" if prepare_ai else "--skip-ai",
+        ]
+    )
 
 
 _DEMO_AUDIENCE_PROFILES: Dict[str, Dict[str, Any]] = {
@@ -5521,7 +5665,7 @@ def _demo_presenter_guide_markdown(
             "",
             "1. Read the opening line above.",
             "2. Show the exported code preview.",
-            "3. Run `iints demo-live --run`.",
+            "3. Run `iints demo`.",
             "4. Open the poster first.",
             "5. If someone asks for proof, open one scenario folder and show `results.csv`, the report, and the manifest.",
             "",
@@ -5555,6 +5699,205 @@ def _demo_presenter_guide_markdown(
             lines.append(f"- {scenario['label']}: `{scenario['output_dir']}`")
         lines.append("")
     return "\n".join(lines)
+
+
+def _demo_cue_card_markdown(
+    *,
+    audience: str,
+    script_path: Path,
+    results_dir: Path,
+    prepare_ai: bool,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    profile = _demo_audience_profile(audience)
+    run_command = _live_demo_run_command(script_path, results_dir, prepare_ai)
+    poster_path = summary.get("poster_png") if summary else results_dir / "booth_demo_poster.png"
+    supervisor_dir = None
+    if summary:
+        scenarios = summary.get("scenarios", [])
+        if len(scenarios) >= 3:
+            supervisor_dir = scenarios[2].get("output_dir")
+    lines = [
+        "# IINTS Live Demo Cue Card",
+        "",
+        "Use this as the one-page script when you are screen-sharing or standing at a booth.",
+        "",
+        "## Opening line",
+        "",
+        profile["opening"],
+        "",
+        "## 60-second flow",
+        "",
+        "1. **Say the purpose:** pre-clinical research, not treatment advice.",
+        f"2. **Show code:** `{script_path}`",
+        "3. **Point at:** `run_full(...)`, `generate_results_poster(...)`, and optional `prepare_ai_ready_artifacts(...)`.",
+        "4. **Run command:**",
+        "",
+        "```bash",
+        run_command,
+        "```",
+        "",
+        f"5. **Open poster first:** `{poster_path}`",
+        "6. **Explain panels:** normal day, harder physiology, supervisor override.",
+        "7. **If asked for proof:** open a scenario folder and show `results.csv`, report PDF, and `run_manifest.json`.",
+        "",
+        "## The sentence that makes the demo clear",
+        "",
+        "The demo is not just a graph: it is a reproducible bundle containing data, safety decisions, audit artifacts, a report, and a visual summary.",
+        "",
+        "## If something fails live",
+        "",
+        "- Do not debug silently.",
+        "- Say: \"The SDK already wrote the code and presenter guide; I can show the generated artifacts from the last run.\"",
+        f"- Open `{results_dir}` or rerun later with `iints demo --dry-run` to rehearse.",
+        "",
+        "## Safety wording",
+        "",
+        "IINTS is a research and educational SDK. It is not a certified medical device and is not for treatment decisions.",
+        "",
+    ]
+    if supervisor_dir:
+        lines.extend(
+            [
+                "## Optional local-AI explanation",
+                "",
+                "```bash",
+                f"iints ai report {supervisor_dir} --model ministral-3:3b",
+                f"iints ai review {supervisor_dir} --model ministral-3:3b",
+                f"iints ai explain {supervisor_dir} --model ministral-3:3b",
+                "```",
+                "",
+            ]
+        )
+    return "\n".join(str(line) for line in lines)
+
+
+def _demo_artifact_map_markdown(
+    *,
+    audience: str,
+    script_path: Path,
+    results_dir: Path,
+    prepare_ai: bool,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    profile = _demo_audience_profile(audience)
+    run_command = _live_demo_run_command(script_path, results_dir, prepare_ai)
+    poster_path = summary.get("poster_png") if summary else results_dir / "booth_demo_poster.png"
+    lines = [
+        "# IINTS Live Demo Artifact Map",
+        "",
+        f"Audience mode: **{profile['label']}**",
+        "",
+        "## Run command",
+        "",
+        "```bash",
+        run_command,
+        "```",
+        "",
+        "## Open in this order",
+        "",
+        f"1. Poster: `{poster_path}`",
+        f"2. Presenter guide: `{results_dir.parent / 'PRESENTER_GUIDE.md'}`",
+        f"3. Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
+        f"4. Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
+        f"5. Summary JSON: `{results_dir / 'demo_summary.json'}`",
+        "",
+        "## What each artifact proves",
+        "",
+        "- `07_live_stage_demo.py` proves the pipeline is inspectable code.",
+        "- `booth_demo_poster.png` proves the result can be explained visually.",
+        "- `results.csv` proves the raw simulation trace exists.",
+        "- `run_manifest.json` proves reproducibility metadata was written.",
+        "- The report PDF proves the run can be summarized for review.",
+        "- The AI folder, if generated, proves local AI explanation artifacts are gated behind run evidence.",
+        "",
+    ]
+    if summary:
+        lines.extend(["## Scenario folders", ""])
+        for scenario in summary.get("scenarios", []):
+            lines.extend(
+                [
+                    f"### {scenario['label']}",
+                    "",
+                    f"- Takeaway: {scenario.get('headline', 'Scenario evidence bundle')}",
+                    f"- Folder: `{scenario['output_dir']}`",
+                    f"- CSV: `{scenario.get('results_csv', Path(scenario['output_dir']) / 'results.csv')}`",
+                    f"- Report: `{scenario.get('report_pdf', Path(scenario['output_dir']) / 'report.pdf')}`",
+                    f"- Manifest: `{scenario.get('run_manifest_path', Path(scenario['output_dir']) / 'run_manifest.json')}`",
+                    "",
+                ]
+            )
+    lines.extend(
+        [
+            "## Safety wording",
+            "",
+            "IINTS is a research and educational SDK. It is not a certified medical device and is not for treatment decisions.",
+            "",
+        ]
+    )
+    return "\n".join(str(line) for line in lines)
+
+
+def _write_demo_support_files(
+    *,
+    output_dir: Path,
+    audience: str,
+    script_path: Path,
+    results_dir: Path,
+    prepare_ai: bool,
+    summary: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    cue_card_path = output_dir / "DEMO_CUE_CARD.md"
+    artifact_map_path = output_dir / "DEMO_ARTIFACTS.md"
+    run_script_path = output_dir / "RUN_LIVE_DEMO.sh"
+
+    cue_card_path.write_text(
+        _demo_cue_card_markdown(
+            audience=audience,
+            script_path=script_path,
+            results_dir=results_dir,
+            prepare_ai=prepare_ai,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+    artifact_map_path.write_text(
+        _demo_artifact_map_markdown(
+            audience=audience,
+            script_path=script_path,
+            results_dir=results_dir,
+            prepare_ai=prepare_ai,
+            summary=summary,
+        ),
+        encoding="utf-8",
+    )
+    run_script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                'cd "$(dirname "$0")"',
+                _shell_join(
+                    [
+                        "python",
+                        Path("showable_code") / script_path.name,
+                        "--output-dir",
+                        "results",
+                        "--prepare-ai" if prepare_ai else "--skip-ai",
+                    ]
+                ),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    run_script_path.chmod(0o755)
+    return {
+        "cue_card": cue_card_path,
+        "artifact_map": artifact_map_path,
+        "run_script": run_script_path,
+    }
 
 
 def _write_demo_presenter_guide(
@@ -5660,6 +6003,13 @@ def demo_live(
         script_path=script_path,
         results_dir=results_dir,
     )
+    support_files = _write_demo_support_files(
+        output_dir=root_dir,
+        audience=audience,
+        script_path=script_path,
+        results_dir=results_dir,
+        prepare_ai=prepare_ai,
+    )
 
     console.print(
         Panel(
@@ -5667,6 +6017,8 @@ def demo_live(
                 [
                     f"Showable script: {script_path}",
                     f"Results folder: {results_dir}",
+                    f"Cue card: {support_files['cue_card']}",
+                    f"Run script: {support_files['run_script']}",
                     f"AI artifacts: {'enabled' if prepare_ai else 'skipped for a faster live run'}",
                 ]
             ),
@@ -5683,7 +6035,7 @@ def demo_live(
 
     if not run_demo:
         console.print(
-            "[green]Prepared only:[/green] run the same flow later with `iints demo-live --run`."
+            "[green]Prepared only:[/green] run the same flow later with `iints demo`."
         )
         return
 
@@ -5714,14 +6066,27 @@ def demo_live(
         results_dir=results_dir,
         summary=summary,
     )
+    support_files = _write_demo_support_files(
+        output_dir=root_dir,
+        audience=audience,
+        script_path=script_path,
+        results_dir=results_dir,
+        prepare_ai=prepare_ai,
+        summary=summary,
+    )
     table = Table(title="IINTS Live Demo Results")
     table.add_column("Artifact", style="cyan")
     table.add_column("Path", overflow="fold")
     for label, path in _live_demo_result_rows(summary, results_dir):
         table.add_row(label, path)
+    table.add_row("presenter_guide", str(presenter_guide))
+    table.add_row("cue_card", str(support_files["cue_card"]))
+    table.add_row("artifact_map", str(support_files["artifact_map"]))
+    table.add_row("run_script", str(support_files["run_script"]))
     console.print("[bold]3. Results to show next[/bold]")
     console.print(table)
     console.print(f"[green]Presenter guide updated:[/green] {presenter_guide}")
+    console.print(f"[green]Cue card updated:[/green] {support_files['cue_card']}")
     console.print(
         "[green]Suggested call flow:[/green] show the preview, explain `run_full(...)`, open the poster, "
         "then open one scenario folder if someone asks for proof."

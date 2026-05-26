@@ -23,6 +23,10 @@ def test_cli_demo_live_can_prepare_code_without_running(tmp_path: Path) -> None:
     assert "Prepared only" in result.stdout
     assert (tmp_path / "showable_code" / "07_live_stage_demo.py").is_file()
     assert (tmp_path / "PRESENTER_GUIDE.md").is_file()
+    assert (tmp_path / "DEMO_CUE_CARD.md").is_file()
+    assert (tmp_path / "DEMO_ARTIFACTS.md").is_file()
+    assert (tmp_path / "RUN_LIVE_DEMO.sh").is_file()
+    assert "Cue card" in result.stdout
 
 
 def test_cli_demo_live_supports_clinical_presenter_mode(tmp_path: Path) -> None:
@@ -68,4 +72,8 @@ def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, 
     assert "booth_demo_poster.png" in result.stdout
     assert "Normal Run" in result.stdout
     assert "Presenter guide updated" in result.stdout
+    assert "Cue card updated" in result.stdout
     assert "Suggested call flow" in result.stdout
+    assert (tmp_path / "DEMO_CUE_CARD.md").is_file()
+    assert (tmp_path / "DEMO_ARTIFACTS.md").is_file()
+    assert (tmp_path / "RUN_LIVE_DEMO.sh").is_file()

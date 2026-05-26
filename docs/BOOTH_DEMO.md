@@ -124,10 +124,17 @@ What to point at first:
 For a Zoom call or jury meeting, the easiest all-in-one command is:
 
 ```bash
-iints demo-live --output-dir results/live_demo
+iints demo --output-dir results/live_demo --audience jury
 ```
 
-That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, prints the important code lines, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, prints the important code lines, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+
+Use the generated files like this:
+
+- `DEMO_CUE_CARD.md` - one-page script for a Zoom call or booth explanation.
+- `DEMO_ARTIFACTS.md` - exact files to open and what each artifact proves.
+- `RUN_LIVE_DEMO.sh` - rerun the exported demo without remembering arguments.
+- `PRESENTER_GUIDE.md` - longer audience-specific explanation and fallback plan.
 
 The presenter guide also points you to two ready-made physiology handouts:
 
@@ -137,12 +144,15 @@ The presenter guide also points you to two ready-made physiology handouts:
 Use the audience mode that matches the room:
 
 ```bash
-iints demo-live --output-dir results/live_demo_clinical --audience clinical
-iints demo-live --output-dir results/live_demo_engineering --audience engineering
-iints demo-live --output-dir results/live_demo_jury --audience jury
+iints demo --output-dir results/live_demo_clinical --audience clinical
+iints demo --output-dir results/live_demo_engineering --audience engineering
+iints demo --output-dir results/live_demo_jury --audience jury
 ```
 
 The clinical mode emphasizes pre-clinical safety framing, the engineering mode emphasizes reproducibility and artifacts, and the jury mode keeps the story short and visual.
+
+`iints demo-live` remains available as an explicit alias, but for live calls and
+booth work the intended command is simply `iints demo`.
 
 If you specifically want to drive the repository script yourself, then run:
 
