@@ -224,6 +224,10 @@ class BrandedTyperGroup(TyperGroup):
     def get_help(self, ctx):  # type: ignore[override]
         return f"{IINTS_ASCII_LOGO}\n\n{super().get_help(ctx)}"
 
+    def list_commands(self, ctx):  # type: ignore[override]
+        commands = super().list_commands(ctx)
+        return [command for command in commands if command != "mdmp"]
+
 
 app = typer.Typer(
     help=APP_HELP,
