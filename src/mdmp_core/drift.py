@@ -4,7 +4,7 @@ import csv
 import statistics
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 
 WARN_THRESHOLD = 0.05
@@ -118,13 +118,14 @@ def compute_drift(
         col_drift = ColumnDrift(column=col)
         col_worst = "ok"
 
-        for metric_name, fn in [
+        metric_functions: List[Tuple[str, Callable[[List[float]], float]]] = [
             ("mean", statistics.mean),
             ("stdev", statistics.stdev),
             ("min", min),
             ("max", max),
             ("median", statistics.median),
-        ]:
+        ]
+        for metric_name, fn in metric_functions:
             try:
                 val_b = float(fn(b))
                 val_a = float(fn(a))
