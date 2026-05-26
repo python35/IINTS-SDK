@@ -1,7 +1,7 @@
 import typer  # type: ignore
 import concurrent.futures
 from pathlib import Path
-from typing import Callable, Dict, Any, Union, List, Tuple, Optional, cast
+from typing import Callable, Dict, Any, Union, List, Tuple, Optional, Sequence, cast
 from dataclasses import asdict
 from typing_extensions import Annotated
 from pydantic import ValidationError
@@ -5540,7 +5540,7 @@ def _live_demo_result_rows(summary: dict[str, Any], results_dir: Path) -> list[t
     return rows
 
 
-def _shell_join(parts: List[object]) -> str:
+def _shell_join(parts: Sequence[object]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts)
 
 
