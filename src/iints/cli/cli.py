@@ -3362,6 +3362,13 @@ def demo(
         bool,
         typer.Option("--overwrite/--no-overwrite", help="Allow replacing previously exported live demo files."),
     ] = True,
+    stage_mode: Annotated[
+        bool,
+        typer.Option(
+            "--stage/--technical",
+            help="Default keeps the live demo audience-safe; --technical shows more raw execution detail.",
+        ),
+    ] = True,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show the plan without running the demo")] = False,
 ):
     """
@@ -3398,6 +3405,7 @@ def demo(
             full_code=full_code,
             overwrite=overwrite,
             audience=audience,
+            stage_mode=stage_mode,
         )
         return
 
@@ -5941,6 +5949,71 @@ def _print_demo_opening(console: Console, *, audience: str, guide_path: Path) ->
     )
 
 
+def _print_demo_stage_preflight(
+    console: Console,
+    *,
+    audience: str,
+    root_dir: Path,
+    script_path: Path,
+    results_dir: Path,
+    support_files: Dict[str, Path],
+    prepare_ai: bool,
+) -> None:
+    profile = _demo_audience_profile(audience)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "This is the audience-facing path: one command, one story, one evidence bundle.",
+                    "The noisy technical log is kept out of the live terminal unless something fails.",
+                    "",
+                    "Flow: purpose -> inspectable code -> live run -> poster + proof artifacts.",
+                ]
+            ),
+            title=f"IINTS Live Demo ({profile['label']})",
+            border_style="cyan",
+        )
+    )
+
+    table = Table(title="Stage Preflight", show_header=True, header_style="bold cyan")
+    table.add_column("Check", style="green")
+    table.add_column("Status")
+    table.add_row("Output folder", str(root_dir))
+    table.add_row("Showable code", str(script_path))
+    table.add_row("Cue card", str(support_files["cue_card"]))
+    table.add_row("Artifact map", str(support_files["artifact_map"]))
+    table.add_row("Live results", str(results_dir))
+    table.add_row("Local AI lane", "enabled" if prepare_ai else "skipped for a faster live run")
+    console.print(table)
+
+
+def _write_live_demo_run_log(root_dir: Path, command: List[str], completed: Any) -> Path:
+    log_path = root_dir / "DEMO_RUN_LOG.txt"
+    stdout = getattr(completed, "stdout", "") or ""
+    stderr = getattr(completed, "stderr", "") or ""
+    log_path.write_text(
+        "\n".join(
+            [
+                "IINTS live demo execution log",
+                "",
+                "Command:",
+                _shell_join(command),
+                "",
+                f"Exit code: {getattr(completed, 'returncode', 'unknown')}",
+                "",
+                "STDOUT:",
+                stdout,
+                "",
+                "STDERR:",
+                stderr,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return log_path
+
+
 @app.command(name="demo-live")
 def demo_live(
     output_dir: Annotated[
@@ -5973,8 +6046,15 @@ def demo_live(
             help="Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.",
         ),
     ] = "mixed",
+    stage_mode: Annotated[
+        bool,
+        typer.Option(
+            "--stage/--technical",
+            help="Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.",
+        ),
+    ] = True,
 ) -> None:
-    """Export, show, run, and summarize one Zoom-friendly live demo flow."""
+    """Export, show, run, and summarize one stage-friendly live demo flow."""
     console = Console()
     root_dir = output_dir.expanduser().resolve()
     code_dir = root_dir / "showable_code"
@@ -6011,21 +6091,32 @@ def demo_live(
         prepare_ai=prepare_ai,
     )
 
-    console.print(
-        Panel(
-            "\n".join(
-                [
-                    f"Showable script: {script_path}",
-                    f"Results folder: {results_dir}",
-                    f"Cue card: {support_files['cue_card']}",
-                    f"Run script: {support_files['run_script']}",
-                    f"AI artifacts: {'enabled' if prepare_ai else 'skipped for a faster live run'}",
-                ]
-            ),
-            title="IINTS Live Demo",
-            border_style="cyan",
+    if stage_mode:
+        _print_demo_stage_preflight(
+            console,
+            audience=audience,
+            root_dir=root_dir,
+            script_path=script_path,
+            results_dir=results_dir,
+            support_files=support_files,
+            prepare_ai=prepare_ai,
         )
-    )
+    else:
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        f"Showable script: {script_path}",
+                        f"Results folder: {results_dir}",
+                        f"Cue card: {support_files['cue_card']}",
+                        f"Run script: {support_files['run_script']}",
+                        f"AI artifacts: {'enabled' if prepare_ai else 'skipped for a faster live run'}",
+                    ]
+                ),
+                title="IINTS Live Demo",
+                border_style="cyan",
+            )
+        )
     _print_demo_opening(console, audience=audience, guide_path=presenter_guide)
     console.print(
         "[bold]1. Code to explain on the call[/bold]\n"
@@ -6035,7 +6126,7 @@ def demo_live(
 
     if not run_demo:
         console.print(
-            "[green]Prepared only:[/green] run the same flow later with `iints demo`."
+            "[green]Prepared only:[/green] rehearsal files are ready. For the actual call, run `iints demo`."
         )
         return
 
@@ -6047,11 +6138,46 @@ def demo_live(
     ]
     command.append("--prepare-ai" if prepare_ai else "--skip-ai")
 
-    console.print("[bold]2. Running the exported demo code[/bold]")
-    completed = subprocess.run(command, check=False)
+    if stage_mode:
+        console.print(
+            Panel(
+                "Now I run the exact script we just inspected. The terminal stays clean; the full technical log is saved for review.",
+                title="2. Live Run",
+                border_style="green",
+            )
+        )
+    else:
+        console.print("[bold]2. Running the exported demo code[/bold]")
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=stage_mode,
+        text=stage_mode,
+    )
+    run_log_path: Optional[Path] = None
+    if stage_mode:
+        run_log_path = _write_live_demo_run_log(root_dir, command, completed)
     if completed.returncode != 0:
-        console.print(f"[bold red]Live demo failed with exit code {completed.returncode}.[/bold red]")
+        if stage_mode:
+            console.print(
+                Panel(
+                    "\n".join(
+                        [
+                            f"The live run stopped with exit code {completed.returncode}.",
+                            "Do not debug on-screen. Open the already generated cue card or artifact map, then continue with the last known bundle.",
+                            f"Technical log: {run_log_path}",
+                            f"Fallback folder: {root_dir}",
+                        ]
+                    ),
+                    title="Live Demo Recovery",
+                    border_style="red",
+                )
+            )
+        else:
+            console.print(f"[bold red]Live demo failed with exit code {completed.returncode}.[/bold red]")
         raise typer.Exit(code=completed.returncode)
+    if stage_mode and run_log_path is not None:
+        console.print(f"[green]Live run finished cleanly.[/green] Technical log: {run_log_path}")
 
     summary_path = results_dir / "demo_summary.json"
     if not summary_path.is_file():
@@ -6087,6 +6213,8 @@ def demo_live(
     console.print(table)
     console.print(f"[green]Presenter guide updated:[/green] {presenter_guide}")
     console.print(f"[green]Cue card updated:[/green] {support_files['cue_card']}")
+    if run_log_path is not None:
+        console.print(f"[green]Run log saved:[/green] {run_log_path}")
     console.print(
         "[green]Suggested call flow:[/green] show the preview, explain `run_full(...)`, open the poster, "
         "then open one scenario folder if someone asks for proof."

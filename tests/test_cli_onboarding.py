@@ -96,6 +96,7 @@ def test_demo_defaults_to_live_presentation(monkeypatch, tmp_path) -> None:
     assert called["audience"] == "clinical"
     assert called["prepare_ai"] is False
     assert called["full_code"] is False
+    assert called["stage_mode"] is True
 
 
 def test_guide_dispatches_to_demo(monkeypatch) -> None:

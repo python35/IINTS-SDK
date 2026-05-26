@@ -47,7 +47,7 @@ def test_cli_demo_live_supports_clinical_presenter_mode(tmp_path: Path) -> None:
 def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, tmp_path: Path) -> None:
     calls: list[list[str]] = []
 
-    def _fake_run(command: list[str], check: bool) -> SimpleNamespace:
+    def _fake_run(command: list[str], check: bool, **kwargs) -> SimpleNamespace:
         calls.append(command)
         results_dir = Path(command[command.index("--output-dir") + 1])
         results_dir.mkdir(parents=True, exist_ok=True)
@@ -59,7 +59,7 @@ def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, 
             ],
         }
         (results_dir / "demo_summary.json").write_text(json.dumps(summary), encoding="utf-8")
-        return SimpleNamespace(returncode=0)
+        return SimpleNamespace(returncode=0, stdout="demo ok", stderr="")
 
     monkeypatch.setattr("iints.cli.cli.subprocess.run", _fake_run)
 
@@ -73,7 +73,9 @@ def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, 
     assert "Normal Run" in result.stdout
     assert "Presenter guide updated" in result.stdout
     assert "Cue card updated" in result.stdout
+    assert "Run log saved" in result.stdout
     assert "Suggested call flow" in result.stdout
     assert (tmp_path / "DEMO_CUE_CARD.md").is_file()
     assert (tmp_path / "DEMO_ARTIFACTS.md").is_file()
+    assert (tmp_path / "DEMO_RUN_LOG.txt").is_file()
     assert (tmp_path / "RUN_LIVE_DEMO.sh").is_file()

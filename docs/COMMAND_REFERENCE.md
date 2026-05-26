@@ -36,7 +36,8 @@ then prints the two study commands you can run once you choose an algorithm.
 
 ### `iints demo`
 The main live-demo button. It exports showable code, prints the presenter story,
-runs the demo, and writes the cue card, artifact map, presenter guide, and rerun
+runs the demo in audience-safe stage mode, writes a technical log off-screen,
+and produces the cue card, artifact map, presenter guide, poster, and rerun
 script.
 
 Common forms:
@@ -45,7 +46,8 @@ Common forms:
 iints demo
 iints demo --audience jury --output-dir results/live_demo
 iints demo --audience clinical
-iints demo --dry-run
+iints demo --dry-run          # rehearsal/preflight only, not the live call
+iints demo --technical        # show raw execution detail for debugging
 iints demo --simulation-only --quick
 iints demo --simulation-only --full
 ```

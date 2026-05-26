@@ -127,7 +127,11 @@ For a Zoom call or jury meeting, the easiest all-in-one command is:
 iints demo --output-dir results/live_demo --audience jury
 ```
 
-That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, prints the important code lines, runs the exported demo script, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, prints the important code lines, runs the exported demo script in clean stage mode, saves noisy execution details to `DEMO_RUN_LOG.txt`, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+
+For the actual call or booth moment, use the normal live command above. Use
+`iints demo --dry-run` only as a rehearsal/preflight before people are watching.
+If you need raw subprocess output while debugging, add `--technical`.
 
 Use the generated files like this:
 
@@ -135,6 +139,7 @@ Use the generated files like this:
 - `DEMO_ARTIFACTS.md` - exact files to open and what each artifact proves.
 - `RUN_LIVE_DEMO.sh` - rerun the exported demo without remembering arguments.
 - `PRESENTER_GUIDE.md` - longer audience-specific explanation and fallback plan.
+- `DEMO_RUN_LOG.txt` - raw execution output, kept out of the live terminal unless needed.
 
 The presenter guide also points you to two ready-made physiology handouts:
 
