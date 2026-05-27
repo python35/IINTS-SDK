@@ -119,3 +119,8 @@ mdmp_core = [
   "keys/*.pem",
   "data/conformance/vectors/*.json",
 ]
+
+[tool.coverage.run]
+omit = [
+  "src/iints/templates/default_algorithm.py",
+]
