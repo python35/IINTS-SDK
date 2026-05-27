@@ -70,6 +70,8 @@ nav:
       - Edge Hardware Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
       - Raspberry Pi Pico Pump Lab: PICO_PUMP_LAB.md
+      - Medtronic CareLink Live Bridge: MEDTRONIC_CARELINK_LIVE_BRIDGE.md
+      - Medtronic Direct Pump Transport: MEDTRONIC_DIRECT_PUMP_TRANSPORT.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
       - Jetson Endurance Mode: JETSON_ENDURANCE.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md

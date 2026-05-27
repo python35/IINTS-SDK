@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **164**
+Documented modules: **173**
 
 ## Package Index
 
@@ -14,21 +14,21 @@ Documented modules: **164**
 | `api` | 4 |
 | `cli` | 3 |
 | `core` | 32 |
-| `data` | 21 |
+| `data` | 24 |
 | `demo_assets` | 1 |
 | `emulation` | 5 |
 | `highlevel` | 1 |
 | `jetson` | 3 |
 | `learning` | 3 |
-| `live_patient` | 9 |
-| `mdmp` | 2 |
+| `live_patient` | 11 |
+| `mdmp` | 3 |
 | `metrics` | 1 |
 | `population` | 3 |
 | `presets` | 1 |
-| `research` | 14 |
+| `research` | 16 |
 | `root` | 1 |
 | `scenarios` | 3 |
-| `templates` | 5 |
+| `templates` | 6 |
 | `utils` | 5 |
 | `validation` | 6 |
 | `visualization` | 3 |
@@ -135,13 +135,16 @@ Documented modules: **164**
 - [`iints.data.column_mapper`](#iintsdatacolumn_mapper)
 - [`iints.data.contracts`](#iintsdatacontracts)
 - [`iints.data.demo`](#iintsdatademo)
+- [`iints.data.evidence`](#iintsdataevidence)
 - [`iints.data.guardians`](#iintsdataguardians)
 - [`iints.data.importer`](#iintsdataimporter)
 - [`iints.data.ingestor`](#iintsdataingestor)
 - [`iints.data.mdmp_visualizer`](#iintsdatamdmp_visualizer)
+- [`iints.data.medtronic_live`](#iintsdatamedtronic_live)
 - [`iints.data.nightscout`](#iintsdatanightscout)
 - [`iints.data.quality_checker`](#iintsdataquality_checker)
 - [`iints.data.realism_dashboard`](#iintsdatarealism_dashboard)
+- [`iints.data.realism_governance`](#iintsdatarealism_governance)
 - [`iints.data.realism_reference`](#iintsdatarealism_reference)
 - [`iints.data.realism_validator`](#iintsdatarealism_validator)
 - [`iints.data.registry`](#iintsdataregistry)
@@ -187,6 +190,8 @@ Documented modules: **164**
 - [`iints.live_patient.edge_benchmark`](#iintslive_patientedge_benchmark)
 - [`iints.live_patient.edge_ops`](#iintslive_patientedge_ops)
 - [`iints.live_patient.long_study`](#iintslive_patientlong_study)
+- [`iints.live_patient.medtronic_direct`](#iintslive_patientmedtronic_direct)
+- [`iints.live_patient.pico_pump`](#iintslive_patientpico_pump)
 - [`iints.live_patient.runtime`](#iintslive_patientruntime)
 - [`iints.live_patient.service_export`](#iintslive_patientservice_export)
 - [`iints.live_patient.uno_q`](#iintslive_patientuno_q)
@@ -195,6 +200,7 @@ Documented modules: **164**
 
 - [`iints.mdmp`](#iintsmdmp)
 - [`iints.mdmp.backend`](#iintsmdmpbackend)
+- [`iints.mdmp.eu_ai_pact`](#iintsmdmpeu_ai_pact)
 
 ### `metrics`
 
@@ -221,6 +227,8 @@ Documented modules: **164**
 - [`iints.research.data_blend`](#iintsresearchdata_blend)
 - [`iints.research.dataset`](#iintsresearchdataset)
 - [`iints.research.evaluation`](#iintsresearchevaluation)
+- [`iints.research.local_ai`](#iintsresearchlocal_ai)
+- [`iints.research.local_ai_gate`](#iintsresearchlocal_ai_gate)
 - [`iints.research.losses`](#iintsresearchlosses)
 - [`iints.research.metrics`](#iintsresearchmetrics)
 - [`iints.research.model_registry`](#iintsresearchmodel_registry)
@@ -243,6 +251,7 @@ Documented modules: **164**
 - [`iints.templates.default_algorithm`](#iintstemplatesdefault_algorithm)
 - [`iints.templates.demos`](#iintstemplatesdemos)
 - [`iints.templates.demos.live_stage_demo`](#iintstemplatesdemoslive_stage_demo)
+- [`iints.templates.pico_pump.code`](#iintstemplatespico_pumpcode)
 - [`iints.templates.scenarios`](#iintstemplatesscenarios)
 
 ### `utils`
@@ -1149,6 +1158,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 #### `BrandedTyperGroup` methods
 
 - `get_help(self, ctx)`
+- `list_commands(self, ctx)`
 
 ### Public Functions
 
@@ -1172,7 +1182,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `study_ready(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], scenario_path: Annotated[Optional[Path], typer.Option(help='Path to scenario JSON')] = None, output_dir: Annotated[Path, typer.Option(help='Directory to save outputs')] = Path('results/study_ready'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes')] = 5, seed: Annotated[Optional[int], typer.Option(help='Random seed')] = None, profile: Annotated[str, typer.Option(help='Validation profile id')] = 'research_default', predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional predictor checkpoint (.pt)')] = None, patient_config_name: Annotated[str, typer.Option(help='Patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML path')] = None, fail_on_check: Annotated[bool, typer.Option(help='Exit code 1 when validation profile fails')] = True)`
 - `init(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'my_iints_project', template: Annotated[str, typer.Option(help='Project template: research or clinical-trial')] = 'research')`
 - `quickstart(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'iints_quickstart')`
-- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where the zero-config demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: quick or full')] = 'quick', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
+- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: live, quick, or full')] = 'live', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, presentation_mode: Annotated[bool, typer.Option('--presentation/--simulation-only', help='Default starts the full presentation demo; use --simulation-only for the old one-run starter simulation.')] = True, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, audience: Annotated[str, typer.Option(help='Presenter framing for the live demo: mixed, clinical, engineering, or jury.')] = 'jury', prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the live demo.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported live demo script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported live demo files.')] = True, stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Default keeps the live demo audience-safe; --technical shows more raw execution detail.')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
 - `start(goal: Annotated[str, typer.Option('--goal', help='What you want to do: demo, project, study, edge, or data. Aliases like pi, research, and quickstart also work.')] = 'demo', run_now: Annotated[bool, typer.Option('--run', help='Run the safe starter action for demo, project, or edge instead of only printing the plan.')] = False, output_dir: Annotated[Path, typer.Option(help='Output directory for --goal demo.')] = Path('results/demo'), project_name: Annotated[str, typer.Option(help='Project folder name for --goal project.')] = 'iints_quickstart', edge_output_dir: Annotated[Path, typer.Option(help='Edge project folder for --goal edge.')] = Path('iints_pi_demo'), board: Annotated[str, typer.Option(help='Edge board for --goal edge: raspberry_pi or uno_q.')] = 'raspberry_pi') -> None`
 - `onboard(output_dir: Annotated[Path, typer.Option(help='Root directory for the canonical onboarding outputs.')] = Path('results/onboarding'), run_safe_steps: Annotated[bool, typer.Option('--run-safe-steps', help='Run doctor, demo, import-demo, and realism-check.')] = False) -> None`
 - `guide()`
@@ -1195,7 +1205,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `poster(run_dir: Annotated[List[Path], typer.Option('--run-dir', help='Run bundle directory containing results.csv. Repeat up to three times.')] = [], label: Annotated[List[str], typer.Option('--label', help='Optional poster label aligned to each --run-dir (for example: Normal Run, Meal Stress Test, Supervisor Override).')] = [], output_path: Annotated[Path, typer.Option(help='PNG output path for the poster graphic.')] = Path('./results/posters/iints_results_poster.png'), summary_output_path: Annotated[Optional[Path], typer.Option(help='Optional JSON sidecar summary path.')] = None, title: Annotated[str, typer.Option(help='Main poster headline.')] = '288 Decisions. Every Day. We Test Them All.', subtitle: Annotated[str, typer.Option(help='Supporting poster subtitle.')] = 'Three IINTS-AF scenarios showing control, stress handling, and supervisor protection.', results_root: Annotated[Path, typer.Option(help='Root folder used when no --run-dir values are supplied.')] = Path('./results'))`
 - `demo_booth(output_dir: Annotated[Path, typer.Option(help='Directory where the fair-ready demo bundle should be written.')] = Path('./results/booth_demo'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes for each booth scenario.')] = 360, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes.')] = 5, seed: Annotated[int, typer.Option(help='Deterministic random seed.')] = 42, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--no-prepare-ai', help='Prepare AI-ready artifacts for the Supervisor Override run.')] = True) -> None`
 - `demo_export(output_dir: Annotated[Path, typer.Option(help='Directory where the bundled live stage demo files should be written.')] = Path('./iints_demo'), overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow overwriting exported demo files.')] = False) -> None`
-- `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed') -> None`
+- `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed', stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.')] = True) -> None`
 - `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None)`
 - `validate(scenario_path: Annotated[Path, typer.Option(help='Path to a scenario JSON file')], patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML to validate')] = None)`
 - `data_list()`
@@ -1206,7 +1216,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `data_certify_template(output_path: Annotated[Path, typer.Option(help='Where to write the starter certification contract YAML')] = Path('data_contract.yaml'))`
 - `data_contract_run(contract_path: Annotated[Path, typer.Argument(help='Path to contract YAML')], input_csv: Annotated[Path, typer.Argument(help='Path to input CSV')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, apply_builtin_transforms: Annotated[bool, typer.Option(help='Apply built-in unit conversion transforms from the contract')] = True, fail_on_noncompliant: Annotated[bool, typer.Option(help='Exit code 1 when compliance checks fail')] = False, min_mdmp_grade: Annotated[Optional[str], typer.Option(help='Optional MDMP grade gate (draft, research_grade, clinical_grade)')] = None)`
 - `data_certify(contract_path: Annotated[Path, typer.Argument(help='Path to certification contract YAML')], input_csv: Annotated[Path, typer.Argument(help='Path to input CSV')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, apply_builtin_transforms: Annotated[bool, typer.Option(help='Apply built-in unit conversion transforms from the contract')] = True, fail_on_noncompliant: Annotated[bool, typer.Option(help='Exit code 1 when compliance checks fail')] = False, min_mdmp_grade: Annotated[Optional[str], typer.Option(help='Optional certification grade gate (draft, research_grade, clinical_grade, ai_ready)')] = None)`
-- `data_realism_check(input_csv: Annotated[Path, typer.Argument(help='Path to CSV in generic/dexcom/libre/carelink format')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, output_html: Annotated[Optional[Path], typer.Option(help='Optional output dashboard HTML path')] = None, data_format: Annotated[str, typer.Option(help='Data format preset: generic, dexcom, libre, carelink')] = 'generic', time_unit: Annotated[str, typer.Option(help='Timestamp unit for numeric timestamps: minutes or seconds')] = 'minutes', expected_interval_minutes: Annotated[int, typer.Option(help='Expected reading interval in minutes')] = 5, min_meal_grams: Annotated[float, typer.Option(help='Minimum carbs (g) that count as a meal event')] = 10.0, reference: Annotated[Optional[str], typer.Option(help='Optional realism reference profile or dataset id (for example free_living_t1d, azt1d, hupa_ucm).')] = None, min_realism_verdict: Annotated[Optional[str], typer.Option(help='Optional gate: likely_realistic or needs_review. Exit code 1 if the report is worse.')] = None, mapping: Annotated[List[str], typer.Option('--map', help='Column mapping key=value (e.g., timestamp=Time, glucose=SGV)')] = [])`
+- `data_eu_ai_pact_review(report_json: Annotated[Path, typer.Argument(help='Path to an MDMP/data certification JSON report')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output governance review JSON path')] = None, strict: Annotated[bool, typer.Option('--strict/--core-only', help='Strict checks include high-risk readiness controls; core-only checks the three AI Pact core themes.')] = True, fail_on_blocked: Annotated[bool, typer.Option(help='Exit code 1 when the governance review is blocked')] = False)`
+- `data_realism_check(input_csv: Annotated[Path, typer.Argument(help='Path to CSV in generic/dexcom/libre/carelink format')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, output_html: Annotated[Optional[Path], typer.Option(help='Optional output dashboard HTML path')] = None, data_format: Annotated[str, typer.Option(help='Data format preset: generic, dexcom, libre, carelink')] = 'generic', time_unit: Annotated[str, typer.Option(help='Timestamp unit for numeric timestamps: minutes or seconds')] = 'minutes', expected_interval_minutes: Annotated[int, typer.Option(help='Expected reading interval in minutes')] = 5, min_meal_grams: Annotated[float, typer.Option(help='Minimum carbs (g) that count as a meal event')] = 10.0, reference: Annotated[Optional[str], typer.Option(help='Optional realism reference profile or dataset id (for example free_living_t1d, azt1d, hupa_ucm).')] = None, min_realism_verdict: Annotated[Optional[str], typer.Option(help='Optional gate: likely_realistic or needs_review. Exit code 1 if the report is worse.')] = None, strict_real_data_gate: Annotated[bool, typer.Option('--strict-real-data-gate/--no-strict-real-data-gate', help='Apply the stricter evidence-readiness gate for real-data/local-AI use.')] = False, mapping: Annotated[List[str], typer.Option('--map', help='Column mapping key=value (e.g., timestamp=Time, glucose=SGV)')] = [])`
 - `data_mdmp_visualizer(report_json: Annotated[Path, typer.Argument(help='Path to contract-run JSON report')], output_html: Annotated[Path, typer.Option(help='Output HTML path')] = Path('results/mdmp_dashboard.html'), title: Annotated[str, typer.Option(help='Dashboard title')] = 'IINTS MDMP Certification Dashboard')`
 - `data_certify_visualizer(report_json: Annotated[Path, typer.Argument(help='Path to certification report JSON')], output_html: Annotated[Path, typer.Option(help='Output HTML path')] = Path('results/mdmp_dashboard.html'), title: Annotated[str, typer.Option(help='Dashboard title')] = 'IINTS Data Certification Dashboard')`
 - `data_corrupt_for_study(input_csv: Annotated[Path, typer.Argument(help='Source CSV that will be deliberately corrupted for ablation studies')], output_csv: Annotated[Path, typer.Option(help='Output CSV path for the corrupted dataset')] = Path('results/corrupted_study.csv'), mode: Annotated[List[str], typer.Option('--mode', help='Corruption mode to apply. Repeat --mode for multiple operators.')] = ['timestamp_shift'], manifest_output: Annotated[Optional[Path], typer.Option(help='Optional corruption manifest JSON path')] = None, seed: Annotated[int, typer.Option(help='Random seed for deterministic corruption')] = 42, timestamp_shift_minutes: Annotated[int, typer.Option(help='Minutes to shift timestamps for the timestamp_shift mode')] = 60, missing_fraction: Annotated[float, typer.Option(help='Fraction of rows to remove for missing_block')] = 0.1, duplicate_fraction: Annotated[float, typer.Option(help='Fraction of rows to duplicate for duplicate_rows')] = 0.05, spike_fraction: Annotated[float, typer.Option(help='Fraction of glucose rows to spike for glucose_spikes')] = 0.03, spike_magnitude_mgdl: Annotated[float, typer.Option(help='Spike magnitude in mg/dL for glucose_spikes')] = 60.0) -> None`
@@ -1225,6 +1236,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `research_train_controller(data: Annotated[Path, typer.Option(help='Controller teacher dataset CSV')], output: Annotated[Path, typer.Option(help='Output local controller JSON')] = Path('models/controller_imitation.json'), metrics_output: Annotated[Path, typer.Option(help='Output training metrics JSON')] = Path('models/controller_imitation_metrics.json'), ridge_lambda: Annotated[float, typer.Option(help='Ridge regularization strength')] = 0.001) -> None`
 - `research_train_neural_controller(data: Annotated[Path, typer.Option(help='Controller teacher dataset CSV')], output: Annotated[Path, typer.Option(help='Output neural controller checkpoint')] = Path('models/controller_neural.pt'), metrics_output: Annotated[Path, typer.Option(help='Output neural controller metrics JSON')] = Path('models/controller_neural_metrics.json'), epochs: Annotated[int, typer.Option(help='Training epochs')] = 120, hidden_size: Annotated[List[int], typer.Option('--hidden-size', help='Repeatable hidden layer size, for example --hidden-size 64.')] = []) -> None`
 - `research_evaluate_controller(model: Annotated[Path, typer.Option(help='Controller model path')], model_kind: Annotated[str, typer.Option(help='Controller type: linear or neural')] = 'linear', output_dir: Annotated[Path, typer.Option(help='Output evaluation directory')] = Path('results/controller_evaluation'), preset: Annotated[List[str], typer.Option('--preset', help='Repeatable held-out preset name.')] = [], seed: Annotated[List[int], typer.Option('--seed', help='Repeatable evaluation seed.')] = [], duration_minutes: Annotated[int, typer.Option(help='Duration per closed-loop run in minutes')] = 1440) -> None`
+- `research_local_ai_lab(run: Annotated[List[str], typer.Option('--run', help='Repeatable run input in label=path form; path may contain a Jetson endurance bundle.')], output_dir: Annotated[Path, typer.Option(help='Output directory for datasets, models, and reports')] = Path('results/local_ai_lab'), train_predictor: Annotated[bool, typer.Option('--train-predictor/--skip-predictor', help='Train the local glucose predictor from the generated predictor dataset.')] = True, train_neural: Annotated[bool, typer.Option('--train-neural/--skip-neural', help='Train the PyTorch controller in addition to the auditable linear controller.')] = True, evaluate: Annotated[bool, typer.Option('--evaluate/--skip-evaluation', help='Run held-out closed-loop evaluation after training.')] = True, predictor_config: Annotated[Optional[Path], typer.Option(help='Optional predictor config YAML. Defaults to research/configs/predictor.yaml.')] = None, duration_minutes: Annotated[int, typer.Option(help='Duration per held-out controller-evaluation run.')] = 1440)`
 - `research_export_onnx(model: Annotated[Path, typer.Option(help='Predictor checkpoint (.pt)')] = Path('models/hupa_finetuned_v2/predictor.pt'), out: Annotated[Path, typer.Option(help='Output ONNX file path')] = Path('models/predictor.onnx'))`
 - `research_audit_split(data: Annotated[Path, typer.Option(help='Prepared dataset path (CSV/Parquet)')], history_steps: Annotated[int, typer.Option(help='History window length')] = 48, horizon_steps: Annotated[int, typer.Option(help='Forecast horizon length')] = 6, feature_columns_csv: Annotated[str, typer.Option(help='Comma-separated feature columns')] = 'glucose_actual_mgdl,patient_iob_units,patient_cob_grams,effective_isf,effective_icr,effective_basal_rate_u_per_hr,glucose_trend_mgdl_min', target_column: Annotated[str, typer.Option(help='Target column')] = 'glucose_actual_mgdl', subject_column: Annotated[str, typer.Option(help='Subject ID column')] = 'subject_id', segment_column: Annotated[Optional[str], typer.Option(help='Segment column (optional)')] = 'segment_id', output_json: Annotated[Optional[Path], typer.Option(help='Write audit report JSON')] = None)`
 - `research_evaluate_forecast(input_csv: Annotated[Path, typer.Option(help='CSV with observed/predicted columns')], observed_column: Annotated[str, typer.Option(help='Observed glucose column')] = 'glucose_actual_mgdl', predicted_column: Annotated[str, typer.Option(help='Predicted glucose column')] = 'predicted_glucose_ai_30min', predicted_std_column: Annotated[Optional[str], typer.Option(help='Optional prediction std column')] = 'predictor_uncertainty_std_mgdl', gate_profile: Annotated[Optional[str], typer.Option(help='Optional calibration gate profile id')] = None, gate_profiles_path: Annotated[Optional[Path], typer.Option(help='Optional calibration gate profiles YAML path')] = None, fail_on_gate: Annotated[bool, typer.Option(help='Exit code 1 when calibration gate fails')] = False, output_json: Annotated[Optional[Path], typer.Option(help='Write metrics JSON')] = None)`
@@ -1238,6 +1250,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `import_demo(output_dir: Annotated[Path, typer.Option(help='Output directory for scenario + CSV')] = Path('./results/demo_import'), scenario_name: Annotated[str, typer.Option(help='Scenario name')] = 'Demo CGM Scenario', export_raw: Annotated[bool, typer.Option(help='Export the raw demo CSV into output dir')] = True)`
 - `import_nightscout_cmd(url: Annotated[str, typer.Option(help='Nightscout base URL. Use https for non-local hosts.')], output_dir: Annotated[Path, typer.Option(help='Output directory for scenario + CSV')] = Path('./results/nightscout_import'), api_secret: Annotated[Optional[str], typer.Option(help='API secret (if required)')] = None, api_secret_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Nightscout API secret.')] = None, api_secret_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Nightscout API secret.')] = None, token: Annotated[Optional[str], typer.Option(help='API token (if required)')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Nightscout API token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Nightscout API token.')] = None, start: Annotated[Optional[str], typer.Option(help='Start time (ISO string)')] = None, end: Annotated[Optional[str], typer.Option(help='End time (ISO string)')] = None, limit: Annotated[Optional[int], typer.Option(help='Limit number of entries')] = None, scenario_name: Annotated[str, typer.Option(help='Scenario name')] = 'Nightscout Import')`
 - `import_tidepool_cmd(base_url: Annotated[str, typer.Option(help='Tidepool API base URL. Use https for non-local hosts.')] = 'https://api.tidepool.org', token: Annotated[Optional[str], typer.Option(help='Tidepool session token')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the Tidepool session token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the Tidepool session token.')] = None, user_id: Annotated[Optional[str], typer.Option(help='Optional Tidepool user id. Defaults to the current authenticated user.')] = None, start: Annotated[Optional[str], typer.Option(help='Optional ISO-8601 start timestamp.')] = None, end: Annotated[Optional[str], typer.Option(help='Optional ISO-8601 end timestamp.')] = None, output_dir: Annotated[Path, typer.Option(help='Directory for imported scenario and standard CSV.')] = Path('results/tidepool_import'), scenario_name: Annotated[str, typer.Option(help='Scenario name written into scenario.json.')] = 'Tidepool Import')`
+- `medtronic_live_cmd(base_url: Annotated[str, typer.Option(help='Authorized Medtronic/CareLink live relay base URL. Use https for non-local hosts.')], endpoint_path: Annotated[str, typer.Option(help='Read-only JSON endpoint path on the authorized relay.')] = '/carelink/live', output_dir: Annotated[Path, typer.Option(help='Directory for live timeline, standard CSV, and latest snapshot JSON.')] = Path('./results/medtronic_live'), token: Annotated[Optional[str], typer.Option(help='Bearer token for the authorized relay.')] = None, token_env: Annotated[Optional[str], typer.Option(help='Environment variable name containing the bearer token.')] = None, token_file: Annotated[Optional[Path], typer.Option(help='Path to a file containing the bearer token.')] = None, device_id: Annotated[Optional[str], typer.Option(help='Optional pump/device id query parameter.')] = None, patient_id: Annotated[Optional[str], typer.Option(help='Optional patient id query parameter.')] = None, since: Annotated[Optional[str], typer.Option(help='Optional ISO-8601 lower-bound query parameter.')] = None, limit: Annotated[Optional[int], typer.Option(help='Optional max records query parameter.')] = None, samples: Annotated[int, typer.Option(help='Number of polling samples. Use 0 to poll until interrupted.')] = 1, poll_seconds: Annotated[float, typer.Option(help='Seconds between polling samples.')] = 30.0, source: Annotated[str, typer.Option(help='Source label written into IINTS outputs.')] = 'medtronic_carelink_live') -> None`
+- `medtronic_pump_direct_cmd(transport: Annotated[str, typer.Option(help='Direct pump transport: simulated or official-module.')] = 'simulated', official_factory: Annotated[Optional[str], typer.Option(help='Approved internal factory reference for official-module mode, e.g. package.module:create_transport.')] = None, read_only_confirm: Annotated[Optional[str], typer.Option(help='Required confirmation string for official-module hardware transport.')] = None, output_dir: Annotated[Path, typer.Option(help='Directory for pump_timeline.csv, cgm_standard.csv, and pump_latest.json.')] = Path('./results/medtronic_pump_direct'), samples: Annotated[int, typer.Option(help='Number of snapshots to read. Use 0 to poll until interrupted.')] = 1, poll_seconds: Annotated[float, typer.Option(help='Seconds between snapshots.')] = 30.0, simulated_seed: Annotated[int, typer.Option(help='Seed for simulated bench transport.')] = 42, simulated_start_glucose_mgdl: Annotated[float, typer.Option(help='Initial glucose for simulated bench transport.')] = 118.0, simulated_step_minutes: Annotated[float, typer.Option(help='Minutes advanced per simulated snapshot.')] = 5.0) -> None`
 - `check_deps()`
 - `algorithms_list()`
 - `algorithms_info(name: Annotated[str, typer.Argument(help='Algorithm display name')])`
@@ -1250,7 +1264,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `plugin_uninstall(name: Annotated[str, typer.Argument(help='Local plugin display name')], kind: Annotated[Optional[str], typer.Option(help='Optional kind filter')] = None, remove_file: Annotated[bool, typer.Option(help='Also delete the copied plugin file from the plugin home')] = False)`
 - `patientmodel_list()`
 - `jetson_doctor()`
-- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'auto', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, checkpoint_interval: Annotated[int, typer.Option(help='Checkpoint interval in simulated minutes.')] = 360, hardware_sample_interval: Annotated[int, typer.Option(help='Hardware telemetry interval in simulated minutes.')] = 60, status_interval_steps: Annotated[int, typer.Option(help='How often to persist status and partial CSV data.')] = 25, wall_clock: Annotated[bool, typer.Option('--wall-clock/--accelerated', help='Use real wall-clock pacing so 1d takes an actual 24 hours instead of finishing as fast as possible.')] = False, research_export: Annotated[bool, typer.Option('--research-export/--no-research-export', help='Write a predictor-training dataset and research manifest next to the normal endurance artifacts.')] = True, finalize_research: Annotated[bool, typer.Option('--finalize-research/--no-finalize-research', help='After the endurance run, train local research models and write a held-out evaluation report.')] = False, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
+- `jetson_endurance_start(algo: Annotated[Path, typer.Option('--algo', help='Path to an InsulinAlgorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional LSTM predictor checkpoint')] = None, duration: Annotated[str, typer.Option(help='Duration such as 1h, 24h, 7d, 30d')] = '24h', output_dir: Annotated[Path, typer.Option(help='Output directory for the endurance study')] = Path('results/jetson_endurance'), profile: Annotated[str, typer.Option(help='Endurance profile name')] = 'mixed_adversarial', seed: Annotated[int, typer.Option(help='Deterministic simulation seed')] = 42, patient_model: Annotated[str, typer.Option(help='Patient model name passed to PatientFactory')] = 'bergman', sensor_profile: Annotated[str, typer.Option(help='Sensor profile for the simulated CGM stream')] = 'free_living_cgm', custom_profile: Annotated[Optional[Path], typer.Option(help='YAML file for --profile custom')] = None, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes')] = 5, checkpoint_interval: Annotated[int, typer.Option(help='Checkpoint interval in simulated minutes.')] = 360, hardware_sample_interval: Annotated[int, typer.Option(help='Hardware telemetry interval in simulated minutes.')] = 60, status_interval_steps: Annotated[int, typer.Option(help='How often to persist status and partial CSV data.')] = 25, wall_clock: Annotated[bool, typer.Option('--wall-clock/--accelerated', help='Use real wall-clock pacing so 1d takes an actual 24 hours instead of finishing as fast as possible.')] = False, research_export: Annotated[bool, typer.Option('--research-export/--no-research-export', help='Write a predictor-training dataset and research manifest next to the normal endurance artifacts.')] = True, finalize_research: Annotated[bool, typer.Option('--finalize-research/--no-finalize-research', help='After the endurance run, train local research models and write a held-out evaluation report.')] = False, resume: Annotated[bool, typer.Option(help='Resume from the latest snapshot in the output directory')] = False)`
 - `jetson_endurance_finalize_research(output_dir: Annotated[Path, typer.Option(help='Completed endurance output directory')], train_predictor: Annotated[bool, typer.Option('--train-predictor/--skip-predictor', help='Train a glucose predictor from the exported endurance dataset when enough rows are available.')] = True, train_neural: Annotated[bool, typer.Option('--train-neural/--skip-neural', help='Train the PyTorch controller in addition to the auditable linear baseline.')] = True, duration_minutes: Annotated[int, typer.Option(help='Closed-loop evaluation duration per held-out run in minutes.')] = 1440)`
 - `jetson_endurance_status(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')])`
 - `jetson_endurance_monitor(output_dir: Annotated[Path, typer.Option(help='Endurance output directory')], watch: Annotated[bool, typer.Option(help='Refresh while the run is active')] = False, interval_seconds: Annotated[int, typer.Option(help='Refresh interval for --watch')] = 5)`
@@ -1284,6 +1298,11 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `edge_bundle(workspace: Annotated[Optional[Path], typer.Option(help='Workspace directory for the persistent digital patient state.')] = None, project_dir: Annotated[Optional[Path], typer.Option(help='Optional edge project directory created by `iints edge setup`.')] = None, workspace_name: Annotated[str, typer.Option(help='Workspace folder inside the edge project.')] = 'patient_runtime', output: Annotated[Path, typer.Option(help='ZIP archive written for workstation-side analysis.')] = Path('results/edge_runtime_bundle.zip'), include_log: Annotated[bool, typer.Option(help='Include the patient log in the archive.')] = True, include_database: Annotated[bool, typer.Option(help='Include the SQLite runtime database in the archive.')] = True) -> None`
 - `edge_update(output_script: Annotated[Path, typer.Option(help='Where to write the edge update shell script.')] = Path('update_edge_runtime.sh'), profile: Annotated[str, typer.Option(help='Install profile to upgrade: edge or full.')] = 'edge', version_pin: Annotated[Optional[str], typer.Option(help='Optional exact SDK version pin, for example 1.5.2.')] = None) -> None`
 - `edge_hardware_bridge(board: Annotated[str, typer.Option(help='Hardware bridge target. Currently supported: uno_q.')] = 'uno_q', output_dir: Annotated[Path, typer.Option(help='Directory where the hardware bridge scaffold should be written.')] = Path('uno_q_bridge')) -> None`
+- `edge_pump_init(output_dir: Annotated[Path, typer.Option(help='Directory where the Pico pump lab workspace should be written.')] = Path('iints_pico_pump_lab'), algorithm: Annotated[Optional[Path], typer.Option(help='Optional existing SDK algorithm to copy into the lab workspace.')] = None) -> None`
+- `edge_pump_firmware(output_dir: Annotated[Path, typer.Option(help='Directory where locked Pico bench firmware should be written.')] = Path('pico_pump_firmware')) -> None`
+- `edge_pump_package(algorithm: Annotated[Path, typer.Option(help='SDK algorithm Python file to package for bench-only Pico testing.')], output_dir: Annotated[Path, typer.Option(help='Output bundle directory.')] = Path('pico_pump_bundle'), safety_contract: Annotated[Optional[Path], typer.Option(help='Optional zero-delivery safety contract JSON.')] = None, label: Annotated[str, typer.Option(help='Human-readable bundle label written into the manifest.')] = 'pico_pump_bench') -> None`
+- `edge_pump_upload(bundle_dir: Annotated[Path, typer.Option(help='Bundle directory from `iints edge pump package`.')], mount_dir: Annotated[Path, typer.Option(help='Mounted writable Pico/CircuitPython-style drive or a test folder.')], bench_only_confirm: Annotated[str, typer.Option(help=f'Must be exactly: {PICO_PUMP_CONFIRMATION}')] = '', write: Annotated[bool, typer.Option('--write', help='Actually copy files. Without this flag, only prints the copy plan.')] = False) -> None`
+- `edge_pump_serial_test(port: Annotated[str, typer.Option(help='Serial port for the Pico bench firmware, for example /dev/ttyACM0 or /dev/tty.usbmodem*.')], baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the Pico bench firmware.')] = PICO_PUMP_BAUDRATE, timeout_seconds: Annotated[float, typer.Option(help='Read timeout per command in seconds.')] = 1.5) -> None`
 - `edge_bridge_test(port: Annotated[Optional[str], typer.Option(help='Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.')] = None, baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the UNO Q bridge sketch.')] = UNO_Q_BRIDGE_BAUDRATE, delay_seconds: Annotated[float, typer.Option(help='Pause between test states in seconds.')] = 0.75) -> None`
 - `edge_bridge_run(port: Annotated[Optional[str], typer.Option(help='Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.')] = None, workspace: Annotated[Optional[Path], typer.Option(help='Workspace directory for the persistent digital patient state.')] = None, project_dir: Annotated[Optional[Path], typer.Option(help='Optional edge project directory created by `iints edge setup`.')] = None, workspace_name: Annotated[str, typer.Option(help='Workspace folder inside the edge project.')] = 'patient_runtime', baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the UNO Q bridge sketch.')] = UNO_Q_BRIDGE_BAUDRATE, poll_interval: Annotated[float, typer.Option(help='Polling interval in seconds while following runtime status.')] = 1.0, once: Annotated[bool, typer.Option(help='Send the current state once and exit.')] = False, max_cycles: Annotated[Optional[int], typer.Option('--max-cycles', hidden=True)] = None) -> None`
 - `edge_bridge_flash(port: Annotated[str, typer.Option(help='Serial port used to upload the UNO Q bridge sketch.')], fqbn: Annotated[str, typer.Option(help='Arduino CLI FQBN for the UNO Q board package.')], project_dir: Annotated[Path, typer.Option(help='Edge project directory created by `iints edge setup`.')] = Path('.'), sketch_dir: Annotated[Optional[Path], typer.Option(help='Optional bridge sketch directory. Defaults to <project-dir>/uno_q_bridge.')] = None, arduino_cli: Annotated[str, typer.Option(help='Arduino CLI executable name or path.')] = 'arduino-cli') -> None`
@@ -1846,7 +1865,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/data/__init__.py`
 - Summary: IINTS-AF Data Module Universal data ingestion and quality validation.
-- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, fetch_tidepool_dataframe, import_tidepool, load_openapi_spec, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
+- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, RealDataGateProfile, RealDataGateResult, STRICT_REAL_DATA_RESEARCH_PROFILE, review_real_data_realism, rank_real_data_sources, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, fetch_tidepool_dataframe, import_tidepool, load_openapi_spec, MedtronicLiveClient, MedtronicLiveConfig, fetch_medtronic_live_dataframe, fetch_medtronic_live_timeline, import_medtronic_live, normalize_medtronic_live_payload, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -1966,6 +1985,20 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
+## `iints.data.evidence`
+
+- Source: `src/iints/data/evidence.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `rank_real_data_sources() -> List[Dict[str, Any]]`
+
+### Public Constants
+
+- `CONTROLLED_ACCESS_MARKERS`
+- `OPEN_ACCESS_MARKERS`
+
 ## `iints.data.guardians`
 
 - Source: `src/iints/data/guardians.py`
@@ -2041,6 +2074,45 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `build_mdmp_dashboard_html(report: Dict[str, Any], *, title: str = 'IINTS MDMP Certification Dashboard', generated_at_utc: Optional[str] = None) -> str`
 
+## `iints.data.medtronic_live`
+
+- Source: `src/iints/data/medtronic_live.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `MedtronicLiveConfig` | `MedtronicLiveConfig` | Configuration for an authorized read-only Medtronic/CareLink live relay. |
+| `MedtronicLiveClient` | `MedtronicLiveClient` | Small authenticated JSON client for a read-only Medtronic live data relay. |
+
+#### `MedtronicLiveClient` methods
+
+- `get_json(self, path: str, *, query: Optional[Dict[str, Any]] = None) -> Any`
+
+### Public Functions
+
+- `normalize_medtronic_live_payload(payload: Any, *, event_tolerance_minutes: float = 7.5, source: str = 'medtronic_carelink_live') -> pd.DataFrame`
+- `fetch_medtronic_live_payload(config: MedtronicLiveConfig) -> Any`
+- `fetch_medtronic_live_timeline(config: MedtronicLiveConfig) -> pd.DataFrame`
+- `medtronic_live_timeline_to_standard(timeline: pd.DataFrame, *, source: str = 'medtronic_carelink_live') -> pd.DataFrame`
+- `fetch_medtronic_live_dataframe(config: MedtronicLiveConfig) -> pd.DataFrame`
+- `import_medtronic_live(config: MedtronicLiveConfig, scenario_name: str = 'Medtronic CareLink Live Import', scenario_version: str = '1.0', carb_threshold: float = 0.1) -> ImportResult`
+- `poll_medtronic_live_timeline(config: MedtronicLiveConfig, *, samples: int = 1, poll_seconds: float = 30.0) -> Iterable[pd.DataFrame]`
+- `write_latest_medtronic_live_snapshot(timeline: pd.DataFrame, output_dir: Path) -> Dict[str, str]`
+
+### Public Constants
+
+- `CARB_KEYS`
+- `GLUCOSE_KEYS`
+- `GLUCOSE_TYPES`
+- `INSULIN_KEYS`
+- `LIST_KEYS`
+- `SINGLE_RECORD_KEYS`
+- `TIMESTAMP_KEYS`
+- `TYPE_KEYS`
+- `UNIT_KEYS`
+
 ## `iints.data.nightscout`
 
 - Source: `src/iints/data/nightscout.py`
@@ -2106,6 +2178,30 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `build_realism_dashboard_html(report: RealismReport, dataframe: pd.DataFrame, *, title: str = 'IINTS Physiological Realism Dashboard', source_label: Optional[str] = None) -> str`
 - `write_realism_dashboard(report: RealismReport, dataframe: pd.DataFrame, output_path: str | Path, *, title: str = 'IINTS Physiological Realism Dashboard', source_label: Optional[str] = None) -> Path`
+
+## `iints.data.realism_governance`
+
+- Source: `src/iints/data/realism_governance.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `RealDataGateProfile` | `RealDataGateProfile` | Strict research gate for traces used as realism evidence or AI training data. |
+| `RealDataGateResult` | `RealDataGateResult` | No module docstring. |
+
+#### `RealDataGateResult` methods
+
+- `to_dict(self) -> Dict[str, Any]`
+
+### Public Functions
+
+- `review_real_data_realism(report: RealismReport, *, profile: RealDataGateProfile = STRICT_REAL_DATA_RESEARCH_PROFILE) -> RealDataGateResult`
+
+### Public Constants
+
+- `STRICT_REAL_DATA_RESEARCH_PROFILE`
 
 ## `iints.data.realism_reference`
 
@@ -2572,7 +2668,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/live_patient/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `create_edge_bundle, export_edge_setup, summarize_edge_workspace, write_edge_update_script, render_edge_long_study_config_template, load_edge_long_study_config, run_edge_long_study, create_edge_study_snapshot, export_edge_study_archive, create_patient_app, run_edge_benchmark, export_uno_q_bridge, LivePatientDaemon, PatientRuntimeConfig, PatientRuntimeStore, get_runtime_scenario_profile, list_runtime_scenario_profiles, load_runtime_status, is_process_alive`
+- Explicit exports: `create_edge_bundle, export_edge_setup, summarize_edge_workspace, write_edge_update_script, render_edge_long_study_config_template, load_edge_long_study_config, run_edge_long_study, create_edge_study_snapshot, export_edge_study_archive, create_patient_app, run_edge_benchmark, export_uno_q_bridge, DIRECT_PUMP_READ_ONLY_CONFIRMATION, DirectPumpConfig, PumpSnapshot, SimulatedMedtronicPumpTransport, stream_direct_pump_snapshots, write_direct_pump_snapshot, LivePatientDaemon, PatientRuntimeConfig, PatientRuntimeStore, get_runtime_scenario_profile, list_runtime_scenario_profiles, load_runtime_status, is_process_alive`
 
 ### Public Functions
 
@@ -2676,6 +2772,84 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Constants
 
 - `WEEKDAY_ORDER`
+
+## `iints.live_patient.medtronic_direct`
+
+- Source: `src/iints/live_patient/medtronic_direct.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `PumpTransport` | `PumpTransport(Protocol)` | Read-only direct pump transport protocol. |
+| `PumpSnapshot` | `PumpSnapshot` | No module docstring. |
+| `DirectPumpConfig` | `DirectPumpConfig` | No module docstring. |
+| `SimulatedMedtronicPumpTransport` | `SimulatedMedtronicPumpTransport` | Bench-only direct pump transport for SDK integration testing. |
+| `OfficialModulePumpTransport` | `OfficialModulePumpTransport` | Wrapper for an approved internal Medtronic read-only transport factory. |
+
+#### `PumpTransport` methods
+
+- `connect(self) -> None`
+- `read_snapshot(self) -> 'PumpSnapshot | Mapping[str, Any]'`
+- `disconnect(self) -> None`
+
+#### `PumpSnapshot` methods
+
+- `from_mapping(cls, payload: Mapping[str, Any]) -> 'PumpSnapshot'`
+- `validate(self) -> None`
+- `to_json_dict(self) -> dict[str, Any]`
+
+#### `SimulatedMedtronicPumpTransport` methods
+
+- `connect(self) -> None`
+- `disconnect(self) -> None`
+- `read_snapshot(self) -> PumpSnapshot`
+
+#### `OfficialModulePumpTransport` methods
+
+- `connect(self) -> None`
+- `read_snapshot(self) -> PumpSnapshot | Mapping[str, Any]`
+- `disconnect(self) -> None`
+
+### Public Functions
+
+- `create_direct_pump_transport(config: DirectPumpConfig) -> PumpTransport`
+- `stream_direct_pump_snapshots(config: DirectPumpConfig, *, samples: int = 1, poll_seconds: float = 30.0) -> Iterable[PumpSnapshot]`
+- `snapshots_to_dataframes(snapshots: Iterable[PumpSnapshot]) -> tuple[pd.DataFrame, pd.DataFrame]`
+- `write_direct_pump_snapshot(snapshots: Iterable[PumpSnapshot], output_dir: str | Path) -> dict[str, str]`
+
+### Public Constants
+
+- `AUTHORIZED_IDENTITY_MODE`
+- `COMMAND_LIKE_KEYS`
+- `DIRECT_PUMP_READ_ONLY_CONFIRMATION`
+- `DIRECT_PUMP_SOURCE`
+- `DISALLOWED_IDENTITY_MODES`
+- `GLUCOSE_KEYS`
+- `TIMESTAMP_KEYS`
+
+## `iints.live_patient.pico_pump`
+
+- Source: `src/iints/live_patient/pico_pump.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `export_pico_pump_firmware(output_dir: str | Path) -> dict[str, str]`
+- `create_pico_pump_lab(output_dir: str | Path, *, algorithm_path: str | Path | None = None) -> dict[str, str]`
+- `build_pico_pump_bundle(algorithm_path: str | Path, output_dir: str | Path, *, safety_contract_path: str | Path | None = None, label: str = 'pico_pump_bench') -> dict[str, Any]`
+- `upload_pico_pump_bundle(bundle_dir: str | Path, mount_dir: str | Path, *, bench_only_confirmation: str, write: bool = False) -> dict[str, Any]`
+- `run_pico_pump_serial_self_test(port: str, *, baudrate: int = PICO_PUMP_BAUDRATE, timeout_seconds: float = 1.5) -> list[dict[str, str | None]]`
+
+### Public Constants
+
+- `BENCH_ALGORITHM_TEMPLATE`
+- `DEFAULT_PICO_PUMP_SAFETY_CONTRACT`
+- `PICO_PUMP_BAUDRATE`
+- `PICO_PUMP_CONFIRMATION`
+- `PICO_PUMP_DEVICE_ID`
+- `PICO_PUMP_READY_BANNER`
 
 ## `iints.live_patient.runtime`
 
@@ -2797,7 +2971,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/mdmp/__init__.py`
 - Summary: MDMP public API (separated namespace).
-- Explicit exports: `StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, build_mdmp_dashboard_html, MDMPValidationResult, MDMPCheckResult, BACKEND_MDMP_GRADE_ORDER, backend_mdmp_grade_meets_minimum, get_backend, is_mdmp_available, active_mdmp_backend, load_mdmp_contract, run_mdmp_validation, build_mdmp_dashboard_html_with_backend`
+- Explicit exports: `StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, build_mdmp_dashboard_html, MDMPValidationResult, MDMPCheckResult, BACKEND_MDMP_GRADE_ORDER, backend_mdmp_grade_meets_minimum, get_backend, is_mdmp_available, active_mdmp_backend, load_mdmp_contract, run_mdmp_validation, build_mdmp_dashboard_html_with_backend, CORE_AI_PACT_CONTROLS, EU_AI_PACT_CONTROL_DESCRIPTIONS, HIGH_RISK_READINESS_CONTROLS, EUAIPactReadinessResult, review_eu_ai_pact_readiness`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -2836,6 +3010,31 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `BACKEND_BUILTIN`
 - `BACKEND_MDMP`
 - `MDMP_GRADE_ORDER`
+
+## `iints.mdmp.eu_ai_pact`
+
+- Source: `src/iints/mdmp/eu_ai_pact.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `EUAIPactReadinessResult` | `EUAIPactReadinessResult` | No module docstring. |
+
+#### `EUAIPactReadinessResult` methods
+
+- `to_dict(self) -> Dict[str, Any]`
+
+### Public Functions
+
+- `review_eu_ai_pact_readiness(payload: Mapping[str, Any], *, strict: bool = True) -> EUAIPactReadinessResult`
+
+### Public Constants
+
+- `CORE_AI_PACT_CONTROLS`
+- `EU_AI_PACT_CONTROL_DESCRIPTIONS`
+- `HIGH_RISK_READINESS_CONTROLS`
 
 ## `iints.metrics`
 
@@ -2908,7 +3107,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/research/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry, CONTROL_FEATURE_COLUMNS, CONTROL_TARGET_COLUMN, build_control_dataset_from_runs, evaluate_controller_predictions, load_linear_controller, predict_linear_controller, save_linear_controller, summarize_control_dataset, train_linear_imitation_controller, NeuralControllerConfig, instantiate_neural_controller_model, load_neural_controller, predict_neural_controller, save_neural_controller, train_neural_imitation_controller, PREDICTOR_OPTIONAL_COLUMNS, PREDICTOR_REQUIRED_COLUMNS, blend_predictor_datasets, DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories`
+- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry, CONTROL_FEATURE_COLUMNS, CONTROL_TARGET_COLUMN, build_control_dataset_from_runs, evaluate_controller_predictions, load_linear_controller, predict_linear_controller, save_linear_controller, summarize_control_dataset, train_linear_imitation_controller, NeuralControllerConfig, instantiate_neural_controller_model, load_neural_controller, predict_neural_controller, save_neural_controller, train_neural_imitation_controller, PREDICTOR_OPTIONAL_COLUMNS, PREDICTOR_REQUIRED_COLUMNS, blend_predictor_datasets, DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories, DEFAULT_LOCAL_AI_SAFETY_PROFILE, LocalAIGateResult, LocalAISafetyProfile, review_closed_loop_evaluation, review_controller_training_artifacts, build_predictor_dataset_from_runs, run_local_ai_lab`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -3045,6 +3244,45 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `uncertainty_reliability_report(observed: np.ndarray, predicted: np.ndarray, predicted_std: np.ndarray, *, bins: int = 5, confidence: float = 0.95) -> Dict[str, Any]`
 - `subgroup_error_report(observed: np.ndarray, predicted: np.ndarray, groups: Sequence[Any] | np.ndarray, *, predicted_std: Optional[np.ndarray] = None) -> Dict[str, Dict[str, Any]]`
 - `feature_drift_report(reference_features: np.ndarray, candidate_features: np.ndarray, *, feature_names: Iterable[str]) -> Dict[str, Any]`
+
+## `iints.research.local_ai`
+
+- Source: `src/iints/research/local_ai.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `build_predictor_dataset_from_runs(run_dirs: Iterable[Tuple[str, Path]], *, output_path: Path, manifest_path: Path | None = None) -> Dict[str, Any]`
+- `run_local_ai_lab(run_dirs: Iterable[Tuple[str, Path]], *, output_dir: Path, repo_root: Path, train_predictor: bool = True, predictor_config_path: Path | None = None, train_neural: bool = True, evaluate: bool = True, evaluation_presets: Iterable[str] = DEFAULT_HELD_OUT_PRESETS, evaluation_seeds: Iterable[int] = (101, 202, 303), evaluation_duration_minutes: int = 1440) -> Dict[str, Any]`
+
+### Public Constants
+
+- `PREDICTOR_EXPORT_COLUMNS`
+
+## `iints.research.local_ai_gate`
+
+- Source: `src/iints/research/local_ai_gate.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `LocalAISafetyProfile` | `LocalAISafetyProfile` | No module docstring. |
+| `LocalAIGateResult` | `LocalAIGateResult` | No module docstring. |
+
+#### `LocalAIGateResult` methods
+
+- `to_dict(self) -> Dict[str, Any]`
+
+### Public Functions
+
+- `review_controller_training_artifacts(controller_summary: Dict[str, Any], *, train_metrics: Dict[str, Any] | None = None, profile: LocalAISafetyProfile = DEFAULT_LOCAL_AI_SAFETY_PROFILE) -> LocalAIGateResult`
+- `review_closed_loop_evaluation(algorithms: Dict[str, Dict[str, Any]], *, baseline_name: str = 'clinical_baseline', profile: LocalAISafetyProfile = DEFAULT_LOCAL_AI_SAFETY_PROFILE) -> LocalAIGateResult`
+
+### Public Constants
+
+- `DEFAULT_LOCAL_AI_SAFETY_PROFILE`
 
 ## `iints.research.losses`
 
@@ -3224,6 +3462,19 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `SDK_SRC`
 - `SEED`
 - `TIME_STEP_MINUTES`
+
+## `iints.templates.pico_pump.code`
+
+- Source: `src/iints/templates/pico_pump/code.py`
+- Summary: IINTS Pico Pump Bench Firmware.
+
+### Public Constants
+
+- `BOOT_TIME`
+- `DEVICE_ID`
+- `HARDWARE_ACTUATION_ENABLED`
+- `LOCKED`
+- `READY_BANNER`
 
 ## `iints.templates.scenarios`
 
