@@ -70,6 +70,11 @@ from iints.scenarios import (
 )
 from iints.data.nightscout import NightscoutConfig, import_nightscout
 from iints.data.tidepool import TidepoolConfig, import_tidepool
+from iints.data.medtronic_live import (
+    MedtronicLiveConfig,
+    poll_medtronic_live_timeline,
+    write_latest_medtronic_live_snapshot,
+)
 from iints.data.importer import (
     export_demo_csv,
     export_standard_csv,
@@ -147,6 +152,12 @@ from iints.live_patient.pico_pump import (
     export_pico_pump_firmware,
     run_pico_pump_serial_self_test,
     upload_pico_pump_bundle,
+)
+from iints.live_patient.medtronic_direct import (
+    DIRECT_PUMP_READ_ONLY_CONFIRMATION,
+    DirectPumpConfig,
+    stream_direct_pump_snapshots,
+    write_direct_pump_snapshot,
 )
 from iints.mdmp.backend import (
     MDMP_GRADE_ORDER,
@@ -8606,6 +8617,176 @@ def import_tidepool_cmd(
     export_standard_csv(result.dataframe, data_path)
     console.print(f"[green]Scenario saved:[/green] {scenario_path}")
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+
+
+@app.command(name="medtronic-live")
+def medtronic_live_cmd(
+    base_url: Annotated[
+        str,
+        typer.Option(help="Authorized Medtronic/CareLink live relay base URL. Use https for non-local hosts."),
+    ],
+    endpoint_path: Annotated[
+        str,
+        typer.Option(help="Read-only JSON endpoint path on the authorized relay."),
+    ] = "/carelink/live",
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for live timeline, standard CSV, and latest snapshot JSON."),
+    ] = Path("./results/medtronic_live"),
+    token: Annotated[Optional[str], typer.Option(help="Bearer token for the authorized relay.")] = None,
+    token_env: Annotated[
+        Optional[str],
+        typer.Option(help="Environment variable name containing the bearer token."),
+    ] = None,
+    token_file: Annotated[
+        Optional[Path],
+        typer.Option(help="Path to a file containing the bearer token."),
+    ] = None,
+    device_id: Annotated[Optional[str], typer.Option(help="Optional pump/device id query parameter.")] = None,
+    patient_id: Annotated[Optional[str], typer.Option(help="Optional patient id query parameter.")] = None,
+    since: Annotated[Optional[str], typer.Option(help="Optional ISO-8601 lower-bound query parameter.")] = None,
+    limit: Annotated[Optional[int], typer.Option(help="Optional max records query parameter.")] = None,
+    samples: Annotated[
+        int,
+        typer.Option(help="Number of polling samples. Use 0 to poll until interrupted."),
+    ] = 1,
+    poll_seconds: Annotated[float, typer.Option(help="Seconds between polling samples.")] = 30.0,
+    source: Annotated[str, typer.Option(help="Source label written into IINTS outputs.")] = "medtronic_carelink_live",
+) -> None:
+    """Poll an authorized Medtronic/CareLink live relay into IINTS standard data."""
+    console = Console()
+    resolved_token = _resolve_secret_option(
+        console=console,
+        label="token",
+        direct_value=token,
+        env_name=token_env,
+        file_path=token_file,
+    )
+    config = MedtronicLiveConfig(
+        base_url=base_url,
+        token=resolved_token,
+        endpoint_path=endpoint_path,
+        device_id=device_id,
+        patient_id=patient_id,
+        since=since,
+        limit=limit,
+        source=source,
+    )
+
+    merged = pd.DataFrame(columns=["timestamp_dt", "glucose", "carbs", "insulin", "source"])
+    try:
+        for index, timeline in enumerate(
+            poll_medtronic_live_timeline(
+                config,
+                samples=samples,
+                poll_seconds=poll_seconds,
+            ),
+            start=1,
+        ):
+            if not timeline.empty:
+                merged = (
+                    pd.concat([merged, timeline], ignore_index=True)
+                    .sort_values("timestamp_dt")
+                    .drop_duplicates("timestamp_dt", keep="last")
+                    .reset_index(drop=True)
+                )
+            outputs = write_latest_medtronic_live_snapshot(merged, output_dir)
+            latest = "no readings"
+            if not merged.empty:
+                latest_row = merged.iloc[-1]
+                latest = f"{latest_row['timestamp_dt']} | {float(latest_row['glucose']):.1f} mg/dL"
+            console.print(
+                f"[green]Medtronic live sample {index} saved:[/green] {latest} "
+                f"({len(merged)} row(s))"
+            )
+            console.print(f"  timeline: {outputs['timeline_csv']}")
+            console.print(f"  standard: {outputs['standard_csv']}")
+            console.print(f"  latest:   {outputs['latest_json']}")
+    except KeyboardInterrupt:
+        console.print("[yellow]Stopped Medtronic live polling.[/yellow]")
+    except Exception as exc:
+        console.print(f"[bold red]Medtronic live import failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="medtronic-pump-direct")
+def medtronic_pump_direct_cmd(
+    transport: Annotated[
+        str,
+        typer.Option(help="Direct pump transport: simulated or official-module."),
+    ] = "simulated",
+    official_factory: Annotated[
+        Optional[str],
+        typer.Option(
+            help="Approved internal factory reference for official-module mode, e.g. package.module:create_transport."
+        ),
+    ] = None,
+    read_only_confirm: Annotated[
+        Optional[str],
+        typer.Option(help="Required confirmation string for official-module hardware transport."),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Directory for pump_timeline.csv, cgm_standard.csv, and pump_latest.json."),
+    ] = Path("./results/medtronic_pump_direct"),
+    samples: Annotated[
+        int,
+        typer.Option(help="Number of snapshots to read. Use 0 to poll until interrupted."),
+    ] = 1,
+    poll_seconds: Annotated[float, typer.Option(help="Seconds between snapshots.")] = 30.0,
+    simulated_seed: Annotated[int, typer.Option(help="Seed for simulated bench transport.")] = 42,
+    simulated_start_glucose_mgdl: Annotated[
+        float,
+        typer.Option(help="Initial glucose for simulated bench transport."),
+    ] = 118.0,
+    simulated_step_minutes: Annotated[
+        float,
+        typer.Option(help="Minutes advanced per simulated snapshot."),
+    ] = 5.0,
+) -> None:
+    """Read pump snapshots through a direct, authorized, read-only transport."""
+    console = Console()
+    if transport == "official-module" and read_only_confirm != DIRECT_PUMP_READ_ONLY_CONFIRMATION:
+        console.print("[bold red]Official hardware transport requires explicit read-only confirmation.[/bold red]")
+        console.print(f"Pass: --read-only-confirm \"{DIRECT_PUMP_READ_ONLY_CONFIRMATION}\"")
+        raise typer.Exit(code=1)
+
+    try:
+        config = DirectPumpConfig(
+            transport=transport,
+            official_factory=official_factory,
+            simulated_seed=simulated_seed,
+            simulated_start_glucose_mgdl=simulated_start_glucose_mgdl,
+            simulated_step_minutes=simulated_step_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Direct pump configuration failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
+
+    snapshots = []
+    try:
+        for index, snapshot in enumerate(
+            stream_direct_pump_snapshots(
+                config,
+                samples=samples,
+                poll_seconds=poll_seconds,
+            ),
+            start=1,
+        ):
+            snapshots.append(snapshot)
+            outputs = write_direct_pump_snapshot(snapshots, output_dir)
+            console.print(
+                f"[green]Direct pump snapshot {index} saved:[/green] "
+                f"{snapshot.timestamp} | {snapshot.glucose_mgdl:.1f} mg/dL"
+            )
+            console.print(f"  timeline: {outputs['timeline_csv']}")
+            console.print(f"  standard: {outputs['standard_csv']}")
+            console.print(f"  latest:   {outputs['latest_json']}")
+    except KeyboardInterrupt:
+        console.print("[yellow]Stopped direct pump polling.[/yellow]")
+    except Exception as exc:
+        console.print(f"[bold red]Direct pump read failed: {exc}[/bold red]")
+        raise typer.Exit(code=1)
 
 
 @app.command(name="check-deps")

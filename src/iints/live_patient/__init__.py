@@ -21,6 +21,14 @@ from .runtime import (
     load_runtime_status,
 )
 from .uno_q import export_uno_q_bridge
+from .medtronic_direct import (
+    DIRECT_PUMP_READ_ONLY_CONFIRMATION,
+    DirectPumpConfig,
+    PumpSnapshot,
+    SimulatedMedtronicPumpTransport,
+    stream_direct_pump_snapshots,
+    write_direct_pump_snapshot,
+)
 
 
 def run_edge_benchmark(*args: Any, **kwargs: Any) -> Any:
@@ -42,6 +50,12 @@ __all__ = [
     "create_patient_app",
     "run_edge_benchmark",
     "export_uno_q_bridge",
+    "DIRECT_PUMP_READ_ONLY_CONFIRMATION",
+    "DirectPumpConfig",
+    "PumpSnapshot",
+    "SimulatedMedtronicPumpTransport",
+    "stream_direct_pump_snapshots",
+    "write_direct_pump_snapshot",
     "LivePatientDaemon",
     "PatientRuntimeConfig",
     "PatientRuntimeStore",

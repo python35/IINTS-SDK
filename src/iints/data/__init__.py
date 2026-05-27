@@ -72,6 +72,14 @@ from .tidepool import (
     import_tidepool,
     load_openapi_spec,
 )
+from .medtronic_live import (
+    MedtronicLiveClient,
+    MedtronicLiveConfig,
+    fetch_medtronic_live_dataframe,
+    fetch_medtronic_live_timeline,
+    import_medtronic_live,
+    normalize_medtronic_live_payload,
+)
 from .contracts import (
     StreamSpec,
     FeatureSpec,
@@ -161,6 +169,12 @@ __all__ = [
     'fetch_tidepool_dataframe',
     'import_tidepool',
     'load_openapi_spec',
+    'MedtronicLiveClient',
+    'MedtronicLiveConfig',
+    'fetch_medtronic_live_dataframe',
+    'fetch_medtronic_live_timeline',
+    'import_medtronic_live',
+    'normalize_medtronic_live_payload',
     'StreamSpec',
     'FeatureSpec',
     'LabelSpec',
