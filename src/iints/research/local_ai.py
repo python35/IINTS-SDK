@@ -18,6 +18,7 @@ from iints.research.control import (
     summarize_control_dataset,
     train_linear_imitation_controller,
 )
+from iints.research.local_ai_gate import review_controller_training_artifacts
 from iints.research.control_eval import (
     DEFAULT_HELD_OUT_PRESETS,
     ControllerFactory,
@@ -207,9 +208,15 @@ def _render_local_ai_report(payload: Dict[str, Any]) -> str:
         "## Validation",
         "",
         f"- Closed-loop evaluation: `{payload['closed_loop_evaluation'].get('status', 'completed')}`",
+        f"- Training safety gate: `{payload['training_safety_gate']['status']}`",
     ]
     if payload["closed_loop_evaluation"].get("artifacts"):
         lines.append(f"- Evaluation report: `{payload['closed_loop_evaluation']['artifacts']['report_md']}`")
+    if payload["closed_loop_evaluation"].get("safety_gate"):
+        lines.append(f"- Closed-loop safety gate: `{payload['closed_loop_evaluation']['safety_gate']['status']}`")
+    if payload["training_safety_gate"].get("critical_failures"):
+        lines.extend(["", "### Training Gate Critical Failures"])
+        lines.extend(f"- {item}" for item in payload["training_safety_gate"]["critical_failures"])
     lines.extend(
         [
             "",
@@ -267,6 +274,10 @@ def run_local_ai_lab(
 
     controller_df = pd.read_csv(datasets_dir / "controller_teacher_dataset.csv")
     linear_model = train_linear_imitation_controller(controller_df)
+    training_gate = review_controller_training_artifacts(
+        summarize_control_dataset(controller_df),
+        train_metrics=linear_model["train_metrics"],
+    ).to_dict()
     linear_model_path = models_dir / "linear_controller.json"
     save_linear_controller(linear_model, linear_model_path)
 
@@ -349,6 +360,7 @@ def run_local_ai_lab(
             "model_path": str(linear_model_path),
             "train_metrics": linear_model["train_metrics"],
         },
+        "training_safety_gate": training_gate,
         "neural_controller": neural_payload,
         "predictor_training": predictor_result,
         "closed_loop_evaluation": closed_loop,

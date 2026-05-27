@@ -97,6 +97,7 @@ from iints.data.realism_validator import (
     validate_realism_dataset,
     write_realism_report,
 )
+from iints.data.realism_governance import review_real_data_realism
 from iints.data.realism_dashboard import write_realism_dashboard
 from iints.demo_assets import export_live_stage_demo
 from iints.live_patient.edge_benchmark import run_edge_benchmark
@@ -6689,6 +6690,60 @@ def data_certify(
     )
 
 
+@data_app.command(name="eu-ai-pact-review")
+def data_eu_ai_pact_review(
+    report_json: Annotated[Path, typer.Argument(help="Path to an MDMP/data certification JSON report")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional output governance review JSON path")] = None,
+    strict: Annotated[
+        bool,
+        typer.Option(
+            "--strict/--core-only",
+            help="Strict checks include high-risk readiness controls; core-only checks the three AI Pact core themes.",
+        ),
+    ] = True,
+    fail_on_blocked: Annotated[bool, typer.Option(help="Exit code 1 when the governance review is blocked")] = False,
+):
+    """Review an MDMP evidence bundle against EU AI Pact-inspired governance controls."""
+    console = Console()
+    if not report_json.is_file():
+        console.print(f"[bold red]Report JSON not found: {report_json}[/bold red]")
+        raise typer.Exit(code=1)
+    try:
+        payload = json.loads(report_json.read_text(encoding="utf-8"))
+        from iints.mdmp.eu_ai_pact import review_eu_ai_pact_readiness
+
+        result = review_eu_ai_pact_readiness(payload, strict=strict)
+    except Exception as exc:
+        console.print(f"[bold red]EU AI Pact review failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="EU AI Pact Readiness")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Status", result.status)
+    table.add_row("Passed", "yes" if result.passed else "no")
+    table.add_row("Score", f"{result.score:.2f}")
+    table.add_row("Critical failures", str(len(result.critical_failures)))
+    table.add_row("Warnings", str(len(result.warnings)))
+    console.print(table)
+    if result.critical_failures:
+        console.print("[bold red]Critical failures[/bold red]")
+        for item in result.critical_failures:
+            console.print(f"- {item}")
+    if result.warnings:
+        console.print("[yellow]Warnings[/yellow]")
+        for item in result.warnings:
+            console.print(f"- {item}")
+    console.print(f"[dim]{result.disclaimer}[/dim]")
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(result.to_dict(), indent=2), encoding="utf-8")
+        console.print(f"[green]EU AI Pact review written:[/green] {output_json}")
+    if fail_on_blocked and result.status == "blocked":
+        raise typer.Exit(code=1)
+
+
 @data_app.command(name="realism-check")
 def data_realism_check(
     input_csv: Annotated[Path, typer.Argument(help="Path to CSV in generic/dexcom/libre/carelink format")],
@@ -6708,6 +6763,13 @@ def data_realism_check(
         Optional[str],
         typer.Option(help="Optional gate: likely_realistic or needs_review. Exit code 1 if the report is worse."),
     ] = None,
+    strict_real_data_gate: Annotated[
+        bool,
+        typer.Option(
+            "--strict-real-data-gate/--no-strict-real-data-gate",
+            help="Apply the stricter evidence-readiness gate for real-data/local-AI use.",
+        ),
+    ] = False,
     mapping: Annotated[List[str], typer.Option("--map", help="Column mapping key=value (e.g., timestamp=Time, glucose=SGV)")] = [],
 ):
     """Judge whether a CGM trace looks physiologically plausible for research/demo use."""
@@ -6767,8 +6829,32 @@ def data_realism_check(
     console.print(checks_table)
     console.print(report.summary)
 
+    strict_gate_payload: Optional[Dict[str, Any]] = None
+    if strict_real_data_gate:
+        gate = review_real_data_realism(report)
+        strict_gate_payload = gate.to_dict()
+        gate_table = Table(title="Strict Real-Data Gate", show_header=True, header_style="bold cyan")
+        gate_table.add_column("Field", style="green")
+        gate_table.add_column("Value")
+        gate_table.add_row("Status", gate.status)
+        gate_table.add_row("Passed", "yes" if gate.passed else "no")
+        gate_table.add_row("Score", f"{gate.score:.2f}")
+        gate_table.add_row("Critical failures", str(len(gate.critical_failures)))
+        gate_table.add_row("Warnings", str(len(gate.warnings)))
+        console.print(gate_table)
+        if gate.critical_failures:
+            console.print("[bold red]Strict gate blockers[/bold red]")
+            for item in gate.critical_failures:
+                console.print(f"- {item}")
+
     if output_json is not None:
-        write_realism_report(report, output_json)
+        if strict_gate_payload is None:
+            write_realism_report(report, output_json)
+        else:
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            payload = report.to_dict()
+            payload["strict_real_data_gate"] = strict_gate_payload
+            output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         console.print(f"[green]Realism report written:[/green] {output_json}")
     if output_html is not None:
         write_realism_dashboard(
@@ -6792,6 +6878,9 @@ def data_realism_check(
                 f"[bold red]Realism gate failed:[/bold red] got {report.verdict}, requires at least {normalized}"
             )
             raise typer.Exit(code=1)
+    if strict_real_data_gate and strict_gate_payload is not None and not strict_gate_payload["passed"]:
+        console.print("[bold red]Strict real-data gate failed.[/bold red]")
+        raise typer.Exit(code=1)
 
 
 @data_app.command(name="mdmp-visualizer", hidden=True, deprecated=True)
@@ -7679,6 +7768,11 @@ def research_evaluate_controller(
             f"{metrics['mean_supervisor_intervention_rate_pct']:.2f}%",
         )
     console.print(table)
+    if report.get("safety_gate"):
+        console.print(
+            f"[yellow]Safety gate:[/yellow] {report['safety_gate']['status']} "
+            f"(passed={report['safety_gate']['passed']})"
+        )
     console.print(f"[green]Evaluation report:[/green] {report['artifacts']['report_md']}")
 
 
@@ -7764,6 +7858,9 @@ def research_local_ai_lab(
     table.add_row("Neural status", report["neural_controller"]["status"])
     table.add_row("Predictor status", report["predictor_training"]["status"])
     table.add_row("Evaluation status", report["closed_loop_evaluation"]["status"])
+    table.add_row("Training gate", report["training_safety_gate"]["status"])
+    if report["closed_loop_evaluation"].get("safety_gate"):
+        table.add_row("Closed-loop gate", report["closed_loop_evaluation"]["safety_gate"]["status"])
     table.add_row("Report", report["artifacts"]["report_md"])
     console.print(table)
     console.print(
@@ -8509,6 +8606,7 @@ def import_tidepool_cmd(
     export_standard_csv(result.dataframe, data_path)
     console.print(f"[green]Scenario saved:[/green] {scenario_path}")
     console.print(f"[green]Standard CSV saved:[/green] {data_path}")
+
 
 @app.command(name="check-deps")
 def check_deps():

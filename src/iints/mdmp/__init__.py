@@ -41,6 +41,13 @@ from .backend import (
     run_mdmp_validation,
     build_mdmp_dashboard_html as build_mdmp_dashboard_html_with_backend,
 )
+from .eu_ai_pact import (
+    CORE_AI_PACT_CONTROLS,
+    EU_AI_PACT_CONTROL_DESCRIPTIONS,
+    HIGH_RISK_READINESS_CONTROLS,
+    EUAIPactReadinessResult,
+    review_eu_ai_pact_readiness,
+)
 
 __all__ = [
     "StreamSpec",
@@ -75,4 +82,9 @@ __all__ = [
     "load_mdmp_contract",
     "run_mdmp_validation",
     "build_mdmp_dashboard_html_with_backend",
+    "CORE_AI_PACT_CONTROLS",
+    "EU_AI_PACT_CONTROL_DESCRIPTIONS",
+    "HIGH_RISK_READINESS_CONTROLS",
+    "EUAIPactReadinessResult",
+    "review_eu_ai_pact_readiness",
 ]

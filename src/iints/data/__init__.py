@@ -31,6 +31,13 @@ from .realism_validator import (
     validate_realism_dataset,
     write_realism_report,
 )
+from .realism_governance import (
+    RealDataGateProfile,
+    RealDataGateResult,
+    STRICT_REAL_DATA_RESEARCH_PROFILE,
+    review_real_data_realism,
+)
+from .evidence import rank_real_data_sources
 from .realism_reference import (
     ReferenceBand,
     ReferenceComparison,
@@ -119,6 +126,11 @@ __all__ = [
     'validate_realism_csv',
     'validate_realism_dataset',
     'write_realism_report',
+    'RealDataGateProfile',
+    'RealDataGateResult',
+    'STRICT_REAL_DATA_RESEARCH_PROFILE',
+    'review_real_data_realism',
+    'rank_real_data_sources',
     'ReferenceBand',
     'ReferenceComparison',
     'RealismReferenceProfile',

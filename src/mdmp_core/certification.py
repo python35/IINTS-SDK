@@ -32,6 +32,9 @@ def create_certificate(
         "consent_verified": report.get("consent_verified"),
         "schema_version": report.get("schema_version"),
         "protocol_version": report.get("protocol_version"),
+        "governance_profile": report.get("governance_profile"),
+        "eu_ai_pact_readiness": report.get("eu_ai_pact_readiness"),
+        "intended_use": report.get("intended_use", "research_only"),
     }
     signature = sha256(json.dumps(base, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     base["signature_sha256"] = signature

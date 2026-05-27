@@ -88,10 +88,13 @@ nav:
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
       - Physiology Reference: PHYSIOLOGY_REFERENCE.md
+      - Real-Data Realism Gate: REAL_DATA_REALISM.md
       - Local AI Research: LOCAL_AI_RESEARCH.md
+      - Local AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
       - Command Reference: COMMAND_REFERENCE.md
       - Evidence Base: EVIDENCE_BASE.md
       - MDMP Specification: MDMP.md
+      - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md
       - Emulation Notes: emulation_references.md
       - Documentation By Role: DOCUMENTATION_INDEX.md
       - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md

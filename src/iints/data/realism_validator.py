@@ -719,6 +719,7 @@ def validate_realism_dataset(
         "tir_70_180_pct": _round_or_none(clinical.tir_70_180),
         "tir_above_180_pct": _round_or_none(clinical.tir_above_180),
         "tir_below_70_pct": _round_or_none(clinical.tir_below_70),
+        "tir_below_54_pct": _round_or_none(clinical.tir_below_54),
         "min_glucose_mgdl": _round_or_none(float(df["glucose"].min())),
         "max_glucose_mgdl": _round_or_none(float(df["glucose"].max())),
         "glucose_range_mgdl": _round_or_none(float(df["glucose"].max() - df["glucose"].min())),

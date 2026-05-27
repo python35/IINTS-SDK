@@ -61,6 +61,13 @@ from .control_eval import (
     DEFAULT_HELD_OUT_PRESETS,
     evaluate_controller_factories,
 )
+from .local_ai_gate import (
+    DEFAULT_LOCAL_AI_SAFETY_PROFILE,
+    LocalAIGateResult,
+    LocalAISafetyProfile,
+    review_closed_loop_evaluation,
+    review_controller_training_artifacts,
+)
 from .local_ai import (
     build_predictor_dataset_from_runs,
     run_local_ai_lab,
@@ -122,6 +129,11 @@ __all__ = [
     "blend_predictor_datasets",
     "DEFAULT_HELD_OUT_PRESETS",
     "evaluate_controller_factories",
+    "DEFAULT_LOCAL_AI_SAFETY_PROFILE",
+    "LocalAIGateResult",
+    "LocalAISafetyProfile",
+    "review_closed_loop_evaluation",
+    "review_controller_training_artifacts",
     "build_predictor_dataset_from_runs",
     "run_local_ai_lab",
 ]

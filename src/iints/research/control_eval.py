@@ -13,6 +13,7 @@ from iints.core.patient.patient_factory import PatientFactory
 from iints.core.simulator import Simulator
 from iints.presets import get_preset
 from iints.validation import build_stress_events, load_patient_config_by_name
+from .local_ai_gate import review_closed_loop_evaluation
 
 
 DEFAULT_HELD_OUT_PRESETS = (
@@ -153,7 +154,7 @@ def _summarize_runs(run_df: pd.DataFrame) -> Dict[str, Any]:
     return summary
 
 
-def _render_markdown_report(summary: Dict[str, Any], run_df: pd.DataFrame) -> str:
+def _render_markdown_report(summary: Dict[str, Any], run_df: pd.DataFrame, safety_gate: Dict[str, Any]) -> str:
     lines = [
         "# Closed-Loop Controller Evaluation",
         "",
@@ -187,6 +188,22 @@ def _render_markdown_report(summary: Dict[str, Any], run_df: pd.DataFrame) -> st
             f"{row['tir_70_180_pct']:.2f} | {row['time_below_70_pct']:.2f} | {row['time_below_54_pct']:.2f} | "
             f"{int(row['supervisor_interventions'])} | {row['completion_pct']:.2f} |"
         )
+    lines.extend(
+        [
+            "",
+            "## Safety Gate",
+            "",
+            f"- Status: `{safety_gate['status']}`",
+            f"- Passed: `{safety_gate['passed']}`",
+            f"- Score: `{safety_gate['score']}`",
+        ]
+    )
+    if safety_gate.get("critical_failures"):
+        lines.extend(["", "### Critical Failures"])
+        lines.extend(f"- {item}" for item in safety_gate["critical_failures"])
+    if safety_gate.get("warnings"):
+        lines.extend(["", "### Warnings"])
+        lines.extend(f"- {item}" for item in safety_gate["warnings"])
     lines.extend(
         [
             "",
@@ -235,6 +252,7 @@ def evaluate_controller_factories(
 
     run_df = pd.DataFrame(rows)
     summary = _summarize_runs(run_df)
+    safety_gate = review_closed_loop_evaluation(summary).to_dict()
     output_dir.mkdir(parents=True, exist_ok=True)
     runs_path = output_dir / "closed_loop_runs.csv"
     summary_path = output_dir / "closed_loop_summary.json"
@@ -247,6 +265,7 @@ def evaluate_controller_factories(
         "time_step_minutes": time_step_minutes,
         "sensor_profile": sensor_profile,
         "algorithms": summary,
+        "safety_gate": safety_gate,
         "artifacts": {
             "runs_csv": str(runs_path),
             "summary_json": str(summary_path),
@@ -254,5 +273,5 @@ def evaluate_controller_factories(
         },
     }
     summary_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    report_path.write_text(_render_markdown_report(summary, run_df), encoding="utf-8")
+    report_path.write_text(_render_markdown_report(summary, run_df, safety_gate), encoding="utf-8")
     return payload

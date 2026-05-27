@@ -139,3 +139,26 @@ def test_data_realism_check_cli_writes_html_dashboard(tmp_path) -> None:
     content = output_html.read_text()
     assert "Reference Envelope" in content
     assert "Free-Living T1D Daily Envelope" in content
+
+
+def test_data_realism_check_cli_can_write_strict_gate_payload(tmp_path) -> None:
+    input_csv = tmp_path / "demo.csv"
+    output_json = tmp_path / "strict_realism.json"
+    load_demo_dataframe().to_csv(input_csv, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "data",
+            "realism-check",
+            str(input_csv),
+            "--output-json",
+            str(output_json),
+            "--strict-real-data-gate",
+        ],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(output_json.read_text())
+    assert payload["strict_real_data_gate"]["status"] == "blocked"
+    assert any("No empirical reference profile" in item for item in payload["strict_real_data_gate"]["critical_failures"])
