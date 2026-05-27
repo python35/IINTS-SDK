@@ -39,6 +39,7 @@ from iints.cli.patient_cli import app as patient_app
 from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.eucys_results import generate_eucys_results_bundle
+from iints.analysis.evidence_bundle import build_evidence_bundle
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
 from iints.analysis.study_experiment import load_study_experiment_config
 from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
@@ -147,6 +148,7 @@ from iints.live_patient.uno_q import (
 from iints.live_patient.pico_pump import (
     PICO_PUMP_BAUDRATE,
     PICO_PUMP_CONFIRMATION,
+    bench_test_pico_pump_bundle,
     build_pico_pump_bundle,
     create_pico_pump_lab,
     export_pico_pump_firmware,
@@ -198,6 +200,7 @@ from iints.validation import (
     validate_patient_config_dict,
     validate_scenario_dict,
 )
+from iints.validation.run_doctor import inspect_run_setup
 
 
 def _require_reports_feature(console: Console, module_path: str, attribute: str, feature_name: str):
@@ -252,6 +255,7 @@ presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 data_app = typer.Typer(help="Data import, certification, and public data packs.")
 mdmp_app = typer.Typer(help="Legacy MDMP namespace kept for backwards compatibility.")
+evidence_app = typer.Typer(help="Build public research evidence bundles from SDK runs.")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
 plugin_app = typer.Typer(help="Install and manage local IINTS extension plugins.")
@@ -259,6 +263,7 @@ plugin_register_app = typer.Typer(help="Register a local plugin file by extensio
 patientmodel_app = typer.Typer(help="Patient model registry and extension discovery.")
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
 edge_pump_app = typer.Typer(help="Bench-only Raspberry Pi Pico pump research workflow.")
+pump_app = typer.Typer(help="Top-level bench-only Pico pump workflow: compile, bench-test, upload.")
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 jetson_app = typer.Typer(help="NVIDIA Jetson headless research tooling.")
 jetson_endurance_app = typer.Typer(help="Headless long-running adversarial endurance tests.")
@@ -268,6 +273,7 @@ app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
 app.add_typer(mdmp_app, name="mdmp", hidden=True, deprecated=True)
 app.add_typer(ai_app, name="ai")
+app.add_typer(evidence_app, name="evidence")
 app.add_typer(scenarios_app, name="scenarios")
 app.add_typer(algorithms_app, name="algorithms")
 app.add_typer(plugin_app, name="plugin")
@@ -275,6 +281,7 @@ plugin_app.add_typer(plugin_register_app, name="register")
 app.add_typer(patientmodel_app, name="patientmodel")
 app.add_typer(edge_app, name="edge")
 edge_app.add_typer(edge_pump_app, name="pump")
+app.add_typer(pump_app, name="pump")
 app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 app.add_typer(jetson_app, name="jetson")
@@ -1108,7 +1115,9 @@ def doctor(
 
     command_groups = {
         "edge": edge_app,
+        "evidence": evidence_app,
         "jetson": jetson_app,
+        "pump": pump_app,
         "profiles": profiles_app,
         "data": data_app,
         "ai": ai_app,
@@ -1189,6 +1198,90 @@ def doctor(
             console.print(Panel("Everything essential looks healthy. A good next command is `iints demo`.", title="Suggested Next Steps", border_style="green"))
     if not all(passed for _, passed, _ in required_checks):
         raise typer.Exit(code=1)
+
+
+@app.command(name="run-doctor")
+def run_doctor(
+    algo: Annotated[Optional[Path], typer.Option(help="Algorithm Python file to inspect.")] = None,
+    patient_config_path: Annotated[Optional[Path], typer.Option(help="Patient YAML used for the run.")] = None,
+    scenario_path: Annotated[
+        Optional[Path],
+        typer.Option("--scenario-path", "--scenario", help="Scenario JSON used for the run."),
+    ] = None,
+    duration: Annotated[int, typer.Option(help="Requested duration in minutes.")] = 1440,
+    time_step: Annotated[int, typer.Option(help="Simulation time step in minutes.")] = 5,
+    output_dir: Annotated[Optional[Path], typer.Option(help="Output directory to preflight.")] = None,
+    patient_config_name: Annotated[str, typer.Option(help="Packaged patient profile name, if not using a YAML path.")] = "default_patient",
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional JSON report path.")] = None,
+    fail_on_warning: Annotated[bool, typer.Option(help="Exit with code 1 when any warning is found.")] = False,
+) -> None:
+    """Preflight a patient/scenario/algorithm combination before running it."""
+
+    console = Console()
+    report = inspect_run_setup(
+        algo_path=algo,
+        patient_config_path=patient_config_path,
+        scenario_path=scenario_path,
+        duration_minutes=duration,
+        time_step_minutes=time_step,
+        output_dir=output_dir,
+        patient_config_name=patient_config_name,
+    )
+    payload = report.to_dict()
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    table = Table(title=f"IINTS Run Doctor: {report.status.upper()}")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Message", overflow="fold")
+    for check in report.checks:
+        style = {"pass": "[green]PASS[/green]", "warning": "[yellow]WARN[/yellow]", "fail": "[red]FAIL[/red]"}[
+            check.status
+        ]
+        detail = check.message
+        if check.details:
+            detail += f" {json.dumps(check.details, default=str)}"
+        table.add_row(check.name, style, detail)
+    console.print(table)
+    if output_json is not None:
+        console.print(f"[green]Run doctor JSON:[/green] {output_json}")
+    if report.failed or (fail_on_warning and report.warned):
+        raise typer.Exit(code=1)
+
+
+@evidence_app.command(name="build")
+def evidence_build(
+    run: Annotated[
+        List[str],
+        typer.Option("--run", help="Repeatable run input in label=path form, for example normal=results/normal."),
+    ],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the evidence bundle.")] = Path(
+        "results/evidence_bundle"
+    ),
+    title: Annotated[str, typer.Option(help="Human-readable bundle title.")] = "IINTS Research Evidence Bundle",
+    local_ai_dir: Annotated[Optional[Path], typer.Option(help="Optional local AI lab output directory.")] = None,
+    pump_bundle_dir: Annotated[Optional[Path], typer.Option(help="Optional Pico pump bundle directory.")] = None,
+) -> None:
+    """Build a public, research-only evidence folder from completed SDK runs."""
+
+    console = Console()
+    try:
+        parsed_runs = _parse_labeled_paths(run, option_name="--run")
+        payload = build_evidence_bundle(
+            parsed_runs,
+            output_dir=output_dir,
+            title=title,
+            local_ai_dir=local_ai_dir,
+            pump_bundle_dir=pump_bundle_dir,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Evidence bundle failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    _print_evidence_artifacts(console, payload)
+    console.print("[yellow]Scope:[/yellow] research and education only; not clinical evidence.")
 
 
 @app.command(name="validation-profiles")
@@ -3370,6 +3463,10 @@ def demo(
         bool,
         typer.Option("--prepare-ai/--skip-ai", help="Prepare optional local-AI artifacts during the live demo."),
     ] = False,
+    build_evidence: Annotated[
+        bool,
+        typer.Option("--evidence/--no-evidence", help="Build a public research evidence bundle after the demo."),
+    ] = True,
     full_code: Annotated[
         bool,
         typer.Option("--full-code/--preview-code", help="Print the whole exported live demo script instead of the curated preview."),
@@ -3422,6 +3519,7 @@ def demo(
             overwrite=overwrite,
             audience=audience,
             stage_mode=stage_mode,
+            build_evidence=build_evidence,
         )
         return
 
@@ -3486,6 +3584,14 @@ def demo(
 
     if dry_run:
         return
+
+    if build_evidence:
+        evidence_payload = build_evidence_bundle(
+            [(normalized_mode, output_dir)],
+            output_dir=output_dir / "evidence_bundle",
+            title=f"IINTS {normalized_mode.title()} Demo Evidence Bundle",
+        )
+        _print_evidence_artifacts(console, evidence_payload)
 
     demo_algo_path = _write_default_algorithm_template(
         output_dir / "demo_assets" / "example_algorithm.py",
@@ -5556,6 +5662,44 @@ def _shell_join(parts: Sequence[object]) -> str:
     return " ".join(shlex.quote(str(part)) for part in parts)
 
 
+def _parse_labeled_paths(items: Sequence[str], *, option_name: str) -> List[Tuple[str, Path]]:
+    parsed: List[Tuple[str, Path]] = []
+    for item in items:
+        if "=" not in item:
+            raise typer.BadParameter(f"{option_name} values must use label=path form: {item}")
+        label, raw_path = item.split("=", 1)
+        label = label.strip()
+        path = Path(raw_path).expanduser()
+        if not label:
+            raise typer.BadParameter(f"{option_name} label cannot be empty: {item}")
+        if not path.exists():
+            raise typer.BadParameter(f"{option_name} path does not exist: {path}")
+        parsed.append((label, path))
+    return parsed
+
+
+def _live_demo_run_dirs(summary: Dict[str, Any]) -> List[Tuple[str, Path]]:
+    runs: List[Tuple[str, Path]] = []
+    for index, scenario in enumerate(summary.get("scenarios", []), start=1):
+        if not isinstance(scenario, dict):
+            continue
+        output = scenario.get("output_dir")
+        if not output:
+            continue
+        label = str(scenario.get("label") or f"scenario_{index}")
+        runs.append((label, Path(str(output))))
+    return runs
+
+
+def _print_evidence_artifacts(console: Console, payload: Dict[str, Any]) -> None:
+    table = Table(title="IINTS Evidence Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for label, path in (payload.get("artifacts") or {}).items():
+        table.add_row(label, str(path))
+    console.print(table)
+
+
 def _live_demo_run_command(script_path: Path, results_dir: Path, prepare_ai: bool) -> str:
     return _shell_join(
         [
@@ -5692,6 +5836,7 @@ def _demo_presenter_guide_markdown(
             "3. Run `iints demo`.",
             "4. Open the poster first.",
             "5. If someone asks for proof, open one scenario folder and show `results.csv`, the report, and the manifest.",
+            "6. If someone asks for the public evidence pack, open `evidence_bundle/README.md` and `MODEL_CARD.md`.",
             "",
             "## 6. How to explain the three panels",
             "",
@@ -5712,6 +5857,7 @@ def _demo_presenter_guide_markdown(
                 "",
                 f"- Poster: `{summary.get('poster_png', results_dir / 'booth_demo_poster.png')}`",
                 f"- Summary JSON: `{results_dir / 'demo_summary.json'}`",
+                f"- Evidence bundle: `{results_dir.parent / 'evidence_bundle'}`",
                 f"- Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
                 f"- Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
                 "- Physiology brochure: `research/eucys_pack/pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf`",
@@ -5763,7 +5909,7 @@ def _demo_cue_card_markdown(
         "",
         f"5. **Open poster first:** `{poster_path}`",
         "6. **Explain panels:** normal day, harder physiology, supervisor override.",
-        "7. **If asked for proof:** open a scenario folder and show `results.csv`, report PDF, and `run_manifest.json`.",
+        "7. **If asked for proof:** open `evidence_bundle/README.md`, then one scenario folder with `results.csv`, report PDF, and `run_manifest.json`.",
         "",
         "## The sentence that makes the demo clear",
         "",
@@ -5824,7 +5970,8 @@ def _demo_artifact_map_markdown(
         f"2. Presenter guide: `{results_dir.parent / 'PRESENTER_GUIDE.md'}`",
         f"3. Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
         f"4. Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
-        f"5. Summary JSON: `{results_dir / 'demo_summary.json'}`",
+        f"5. Evidence bundle: `{results_dir.parent / 'evidence_bundle'}`",
+        f"6. Summary JSON: `{results_dir / 'demo_summary.json'}`",
         "",
         "## What each artifact proves",
         "",
@@ -5832,6 +5979,7 @@ def _demo_artifact_map_markdown(
         "- `booth_demo_poster.png` proves the result can be explained visually.",
         "- `results.csv` proves the raw simulation trace exists.",
         "- `run_manifest.json` proves reproducibility metadata was written.",
+        "- `evidence_bundle/` proves the public proof folder can be reviewed without rerunning the demo.",
         "- The report PDF proves the run can be summarized for review.",
         "- The AI folder, if generated, proves local AI explanation artifacts are gated behind run evidence.",
         "",
@@ -6069,6 +6217,10 @@ def demo_live(
             help="Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.",
         ),
     ] = True,
+    build_evidence: Annotated[
+        bool,
+        typer.Option("--evidence/--no-evidence", help="Build a public research evidence bundle after the live run."),
+    ] = True,
 ) -> None:
     """Export, show, run, and summarize one stage-friendly live demo flow."""
     console = Console()
@@ -6221,6 +6373,17 @@ def demo_live(
     table.add_column("Path", overflow="fold")
     for label, path in _live_demo_result_rows(summary, results_dir):
         table.add_row(label, path)
+    evidence_payload: Optional[Dict[str, Any]] = None
+    if build_evidence:
+        try:
+            evidence_payload = build_evidence_bundle(
+                _live_demo_run_dirs(summary),
+                output_dir=root_dir / "evidence_bundle",
+                title="IINTS Live Demo Evidence Bundle",
+            )
+            table.add_row("evidence_bundle", str(root_dir / "evidence_bundle"))
+        except Exception as exc:
+            table.add_row("evidence_bundle_warning", f"Could not build evidence bundle: {exc}")
     table.add_row("presenter_guide", str(presenter_guide))
     table.add_row("cue_card", str(support_files["cue_card"]))
     table.add_row("artifact_map", str(support_files["artifact_map"]))
@@ -6229,6 +6392,8 @@ def demo_live(
     console.print(table)
     console.print(f"[green]Presenter guide updated:[/green] {presenter_guide}")
     console.print(f"[green]Cue card updated:[/green] {support_files['cue_card']}")
+    if evidence_payload is not None:
+        _print_evidence_artifacts(console, evidence_payload)
     if run_log_path is not None:
         console.print(f"[green]Run log saved:[/green] {run_log_path}")
     console.print(
@@ -7787,6 +7952,7 @@ def research_evaluate_controller(
     console.print(f"[green]Evaluation report:[/green] {report['artifacts']['report_md']}")
 
 
+@research_app.command(name="train-local-ai")
 @research_app.command(name="local-ai-lab")
 def research_local_ai_lab(
     run: Annotated[
@@ -11219,6 +11385,92 @@ def edge_pump_serial_test(
     for result in results:
         table.add_row(str(result["command"]), str(result["response"] or "-"))
     console.print(table)
+
+
+@pump_app.command(name="init")
+def pump_init(
+    output_dir: Annotated[Path, typer.Option(help="Directory where the Pico pump lab workspace should be written.")] = Path("iints_pico_pump_lab"),
+    algorithm: Annotated[Optional[Path], typer.Option(help="Optional existing SDK algorithm to copy into the lab workspace.")] = None,
+) -> None:
+    """Create the bench-only Pico pump lab workspace."""
+
+    edge_pump_init(output_dir=output_dir, algorithm=algorithm)
+
+
+@pump_app.command(name="compile")
+def pump_compile(
+    algorithm: Annotated[Path, typer.Option(help="SDK algorithm Python file to compile/package for bench-only Pico testing.")],
+    output_dir: Annotated[Path, typer.Option(help="Output bundle directory.")] = Path("pico_pump_bundle"),
+    safety_contract: Annotated[Optional[Path], typer.Option(help="Optional zero-delivery safety contract JSON.")] = None,
+    label: Annotated[str, typer.Option(help="Human-readable bundle label written into the manifest.")] = "pico_pump_bench",
+) -> None:
+    """Compile/package a simulated SDK algorithm into a bench-only Pico bundle."""
+
+    edge_pump_package(algorithm=algorithm, output_dir=output_dir, safety_contract=safety_contract, label=label)
+
+
+@pump_app.command(name="bench-test")
+def pump_bench_test(
+    bundle_dir: Annotated[Path, typer.Option(help="Bundle directory from `iints pump compile`.")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional JSON report path.")] = None,
+    port: Annotated[Optional[str], typer.Option(help="Optional Pico serial port for an additional non-actuating smoke test.")] = None,
+    baudrate: Annotated[int, typer.Option(help="Serial baud rate used by the Pico bench firmware.")] = PICO_PUMP_BAUDRATE,
+    timeout_seconds: Annotated[float, typer.Option(help="Read timeout per serial command in seconds.")] = 1.5,
+) -> None:
+    """Validate a Pico pump bundle before upload and optionally run serial lockout checks."""
+
+    console = Console()
+    try:
+        report = bench_test_pico_pump_bundle(bundle_dir)
+        if port:
+            report["serial_self_test"] = run_pico_pump_serial_self_test(
+                port,
+                baudrate=baudrate,
+                timeout_seconds=timeout_seconds,
+            )
+    except Exception as exc:
+        console.print(f"[bold red]Pico pump bench test failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    if output_json is not None:
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    table = Table(title="IINTS Pico Pump Bench Test")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status", style="bold")
+    table.add_column("Message", overflow="fold")
+    for check in report["checks"]:
+        table.add_row(
+            str(check["name"]),
+            "[green]PASS[/green]" if check["passed"] else "[red]FAIL[/red]",
+            str(check["message"]),
+        )
+    if report.get("serial_self_test"):
+        for result in report["serial_self_test"]:
+            table.add_row(f"serial:{result['command']}", "[green]INFO[/green]", str(result.get("response") or "-"))
+    console.print(table)
+    if output_json is not None:
+        console.print(f"[green]Bench report JSON:[/green] {output_json}")
+    if not report["passed"]:
+        raise typer.Exit(code=1)
+
+
+@pump_app.command(name="upload")
+def pump_upload(
+    bundle_dir: Annotated[Path, typer.Option(help="Bundle directory from `iints pump compile`.")],
+    mount_dir: Annotated[Path, typer.Option(help="Mounted writable Pico/CircuitPython-style drive or a test folder.")],
+    bench_only_confirm: Annotated[str, typer.Option(help=f"Must be exactly: {PICO_PUMP_CONFIRMATION}")] = "",
+    write: Annotated[bool, typer.Option("--write", help="Actually copy files. Without this flag, only prints the copy plan.")] = False,
+) -> None:
+    """Upload a bench-only Pico bundle after confirmation."""
+
+    edge_pump_upload(
+        bundle_dir=bundle_dir,
+        mount_dir=mount_dir,
+        bench_only_confirm=bench_only_confirm,
+        write=write,
+    )
 
 
 @edge_app.command(name="bridge-test")

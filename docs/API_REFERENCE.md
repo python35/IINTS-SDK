@@ -3,14 +3,14 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **173**
+Documented modules: **175**
 
 ## Package Index
 
 | Package | Modules |
 | --- | ---: |
 | `ai` | 11 |
-| `analysis` | 27 |
+| `analysis` | 28 |
 | `api` | 4 |
 | `cli` | 3 |
 | `core` | 32 |
@@ -30,7 +30,7 @@ Documented modules: **173**
 | `scenarios` | 3 |
 | `templates` | 6 |
 | `utils` | 5 |
-| `validation` | 6 |
+| `validation` | 7 |
 | `visualization` | 3 |
 
 ## Module Index
@@ -63,6 +63,7 @@ Documented modules: **173**
 - [`iints.analysis.edge_efficiency`](#iintsanalysisedge_efficiency)
 - [`iints.analysis.edge_performance_monitor`](#iintsanalysisedge_performance_monitor)
 - [`iints.analysis.eucys_results`](#iintsanalysiseucys_results)
+- [`iints.analysis.evidence_bundle`](#iintsanalysisevidence_bundle)
 - [`iints.analysis.explainability`](#iintsanalysisexplainability)
 - [`iints.analysis.explainable_ai`](#iintsanalysisexplainable_ai)
 - [`iints.analysis.hardware_benchmark`](#iintsanalysishardware_benchmark)
@@ -267,6 +268,7 @@ Documented modules: **173**
 - [`iints.validation`](#iintsvalidation)
 - [`iints.validation.golden`](#iintsvalidationgolden)
 - [`iints.validation.replay`](#iintsvalidationreplay)
+- [`iints.validation.run_doctor`](#iintsvalidationrun_doctor)
 - [`iints.validation.run_validation`](#iintsvalidationrun_validation)
 - [`iints.validation.safety_contract`](#iintsvalidationsafety_contract)
 - [`iints.validation.schemas`](#iintsvalidationschemas)
@@ -479,7 +481,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/analysis/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `analyze_run_directory, analyze_study_directory, build_booth_demo, build_carelink_workbench, ClinicalMetricsCalculator, ClinicalMetricsResult, ClinicalReportGenerator, compute_metrics, compare_studies, build_eucys_abstract_draft_markdown, build_eucys_filled_abstract_markdown, build_eucys_jury_qa_markdown, build_eucys_limitations_and_ethics_markdown, build_eucys_poster_outline_markdown, generate_eucys_main_figure, resolve_profile_specs, generate_eucys_results_bundle, generate_results_poster, generate_study_poster, build_algorithm_registry, build_study_design_payload, build_study_protocol_payload, build_study_experiment_template, render_study_protocol_markdown, render_study_experiment_yaml, write_study_protocol_bundle, load_study_experiment_config, load_study_summary, quality_badges_for_metrics, run_baseline_comparison, StudyAlgorithmSpec, StudyArmSpec, StudyComparison, StudyDesignPayload, StudyExperimentConfig, StudyMatrixRow, StudyProfileSpec, StudyRunSummary, StudySummary, write_baseline_comparison`
+- Explicit exports: `analyze_run_directory, analyze_study_directory, build_booth_demo, build_carelink_workbench, build_evidence_bundle, ClinicalMetricsCalculator, ClinicalMetricsResult, ClinicalReportGenerator, EVIDENCE_SCOPE, compute_metrics, compare_studies, build_eucys_abstract_draft_markdown, build_eucys_filled_abstract_markdown, build_eucys_jury_qa_markdown, build_eucys_limitations_and_ethics_markdown, build_eucys_poster_outline_markdown, generate_eucys_main_figure, resolve_profile_specs, generate_eucys_results_bundle, generate_results_poster, generate_study_poster, build_algorithm_registry, build_study_design_payload, build_study_protocol_payload, build_study_experiment_template, render_study_protocol_markdown, render_study_experiment_yaml, write_study_protocol_bundle, load_study_experiment_config, load_study_summary, quality_badges_for_metrics, run_baseline_comparison, StudyAlgorithmSpec, StudyArmSpec, StudyComparison, StudyDesignPayload, StudyExperimentConfig, StudyMatrixRow, StudyProfileSpec, StudyRunSummary, StudySummary, write_baseline_comparison`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -697,6 +699,29 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Constants
 
 - `EUCYS_ARM_LAYOUT`
+
+## `iints.analysis.evidence_bundle`
+
+- Source: `src/iints/analysis/evidence_bundle.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `EvidenceRun` | `EvidenceRun` | No module docstring. |
+
+#### `EvidenceRun` methods
+
+- `to_dict(self) -> Dict[str, Any]`
+
+### Public Functions
+
+- `build_evidence_bundle(run_dirs: Iterable[tuple[str, Path]], *, output_dir: Path, title: str = 'IINTS Research Evidence Bundle', local_ai_dir: Optional[Path] = None, pump_bundle_dir: Optional[Path] = None) -> Dict[str, Any]`
+
+### Public Constants
+
+- `EVIDENCE_SCOPE`
 
 ## `iints.analysis.explainability`
 
@@ -1165,6 +1190,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `app_callback(ctx: typer.Context, version: Annotated[bool, typer.Option('--version', help='Show the installed SDK version and exit.', is_eager=True)] = False)`
 - `evaluate(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], population: Annotated[int, typer.Option(help='Number of virtual patients to simulate')] = 100, patient_config_name: Annotated[str, typer.Option('--patient-config', help='Base patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option('--patient-config-path', help='Path to base patient config YAML')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario', help='Path to scenario JSON')] = None, duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Time step in minutes')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory')] = None, max_workers: Annotated[Optional[int], typer.Option(help='Max parallel workers (default: all cores)')] = None, seed: Annotated[Optional[int], typer.Option(help='Random seed for reproducibility')] = None, patient_model: Annotated[str, typer.Option('--patient-model', help='Patient model: auto, bergman, custom, simglucose')] = 'auto')`
 - `doctor(smoke_run: Annotated[bool, typer.Option(help='Run a short deterministic smoke simulation')] = False, smoke_duration: Annotated[int, typer.Option(help='Smoke simulation duration in minutes')] = 30, full: Annotated[bool, typer.Option('--full', help='Run extra environment checks that help beginners debug setup issues')] = False, suggest: Annotated[bool, typer.Option('--suggest', help='Print concrete next commands based on what doctor finds')] = False)`
+- `run_doctor(algo: Annotated[Optional[Path], typer.Option(help='Algorithm Python file to inspect.')] = None, patient_config_path: Annotated[Optional[Path], typer.Option(help='Patient YAML used for the run.')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario-path', '--scenario', help='Scenario JSON used for the run.')] = None, duration: Annotated[int, typer.Option(help='Requested duration in minutes.')] = 1440, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes.')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory to preflight.')] = None, patient_config_name: Annotated[str, typer.Option(help='Packaged patient profile name, if not using a YAML path.')] = 'default_patient', output_json: Annotated[Optional[Path], typer.Option(help='Optional JSON report path.')] = None, fail_on_warning: Annotated[bool, typer.Option(help='Exit with code 1 when any warning is found.')] = False) -> None`
+- `evidence_build(run: Annotated[List[str], typer.Option('--run', help='Repeatable run input in label=path form, for example normal=results/normal.')], output_dir: Annotated[Path, typer.Option(help='Output directory for the evidence bundle.')] = Path('results/evidence_bundle'), title: Annotated[str, typer.Option(help='Human-readable bundle title.')] = 'IINTS Research Evidence Bundle', local_ai_dir: Annotated[Optional[Path], typer.Option(help='Optional local AI lab output directory.')] = None, pump_bundle_dir: Annotated[Optional[Path], typer.Option(help='Optional Pico pump bundle directory.')] = None) -> None`
 - `validation_profiles(profiles_path: Annotated[Optional[Path], typer.Option(help='Optional custom profiles YAML')] = None)`
 - `replay_check(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional predictor checkpoint (.pt)')] = None, patient_config_name: Annotated[str, typer.Option(help='Patient config name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option(help='Patient config YAML path')] = None, scenario_path: Annotated[Optional[Path], typer.Option(help='Path to scenario JSON')] = None, duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 240, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes')] = 5, seed: Annotated[int, typer.Option(help='Deterministic seed')] = 42, repeats: Annotated[int, typer.Option(help='Replay runs to compare')] = 2, output_json: Annotated[Optional[Path], typer.Option(help='Optional output JSON path')] = None, fail_on_mismatch: Annotated[bool, typer.Option(help='Exit code 1 if replay mismatch is detected')] = True)`
 - `golden_benchmark(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional predictor checkpoint (.pt)')] = None, pack_path: Annotated[Optional[Path], typer.Option(help='Optional golden benchmark YAML path')] = None, output_dir: Annotated[Optional[Path], typer.Option(help='Optional output directory for benchmark runs')] = None, seed: Annotated[int, typer.Option(help='Random seed')] = 42, duration_override: Annotated[Optional[int], typer.Option(help='Optional duration override (minutes)')] = None, output_json: Annotated[Optional[Path], typer.Option(help='Write benchmark report JSON')] = None, fail_on_check: Annotated[bool, typer.Option(help='Exit code 1 when any scenario fails')] = True)`
@@ -1182,7 +1209,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `study_ready(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], scenario_path: Annotated[Optional[Path], typer.Option(help='Path to scenario JSON')] = None, output_dir: Annotated[Path, typer.Option(help='Directory to save outputs')] = Path('results/study_ready'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes')] = 5, seed: Annotated[Optional[int], typer.Option(help='Random seed')] = None, profile: Annotated[str, typer.Option(help='Validation profile id')] = 'research_default', predictor_path: Annotated[Optional[Path], typer.Option('--predictor', help='Optional predictor checkpoint (.pt)')] = None, patient_config_name: Annotated[str, typer.Option(help='Patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML path')] = None, fail_on_check: Annotated[bool, typer.Option(help='Exit code 1 when validation profile fails')] = True)`
 - `init(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'my_iints_project', template: Annotated[str, typer.Option(help='Project template: research or clinical-trial')] = 'research')`
 - `quickstart(project_name: Annotated[str, typer.Option(help='Name of the project directory')] = 'iints_quickstart')`
-- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: live, quick, or full')] = 'live', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, presentation_mode: Annotated[bool, typer.Option('--presentation/--simulation-only', help='Default starts the full presentation demo; use --simulation-only for the old one-run starter simulation.')] = True, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, audience: Annotated[str, typer.Option(help='Presenter framing for the live demo: mixed, clinical, engineering, or jury.')] = 'jury', prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the live demo.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported live demo script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported live demo files.')] = True, stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Default keeps the live demo audience-safe; --technical shows more raw execution detail.')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
+- `demo(output_dir: Annotated[Path, typer.Option(help='Directory where demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: live, quick, or full')] = 'live', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, presentation_mode: Annotated[bool, typer.Option('--presentation/--simulation-only', help='Default starts the full presentation demo; use --simulation-only for the old one-run starter simulation.')] = True, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, audience: Annotated[str, typer.Option(help='Presenter framing for the live demo: mixed, clinical, engineering, or jury.')] = 'jury', prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the live demo.')] = False, build_evidence: Annotated[bool, typer.Option('--evidence/--no-evidence', help='Build a public research evidence bundle after the demo.')] = True, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported live demo script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported live demo files.')] = True, stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Default keeps the live demo audience-safe; --technical shows more raw execution detail.')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
 - `start(goal: Annotated[str, typer.Option('--goal', help='What you want to do: demo, project, study, edge, or data. Aliases like pi, research, and quickstart also work.')] = 'demo', run_now: Annotated[bool, typer.Option('--run', help='Run the safe starter action for demo, project, or edge instead of only printing the plan.')] = False, output_dir: Annotated[Path, typer.Option(help='Output directory for --goal demo.')] = Path('results/demo'), project_name: Annotated[str, typer.Option(help='Project folder name for --goal project.')] = 'iints_quickstart', edge_output_dir: Annotated[Path, typer.Option(help='Edge project folder for --goal edge.')] = Path('iints_pi_demo'), board: Annotated[str, typer.Option(help='Edge board for --goal edge: raspberry_pi or uno_q.')] = 'raspberry_pi') -> None`
 - `onboard(output_dir: Annotated[Path, typer.Option(help='Root directory for the canonical onboarding outputs.')] = Path('results/onboarding'), run_safe_steps: Annotated[bool, typer.Option('--run-safe-steps', help='Run doctor, demo, import-demo, and realism-check.')] = False) -> None`
 - `guide()`
@@ -1205,7 +1232,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `poster(run_dir: Annotated[List[Path], typer.Option('--run-dir', help='Run bundle directory containing results.csv. Repeat up to three times.')] = [], label: Annotated[List[str], typer.Option('--label', help='Optional poster label aligned to each --run-dir (for example: Normal Run, Meal Stress Test, Supervisor Override).')] = [], output_path: Annotated[Path, typer.Option(help='PNG output path for the poster graphic.')] = Path('./results/posters/iints_results_poster.png'), summary_output_path: Annotated[Optional[Path], typer.Option(help='Optional JSON sidecar summary path.')] = None, title: Annotated[str, typer.Option(help='Main poster headline.')] = '288 Decisions. Every Day. We Test Them All.', subtitle: Annotated[str, typer.Option(help='Supporting poster subtitle.')] = 'Three IINTS-AF scenarios showing control, stress handling, and supervisor protection.', results_root: Annotated[Path, typer.Option(help='Root folder used when no --run-dir values are supplied.')] = Path('./results'))`
 - `demo_booth(output_dir: Annotated[Path, typer.Option(help='Directory where the fair-ready demo bundle should be written.')] = Path('./results/booth_demo'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes for each booth scenario.')] = 360, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes.')] = 5, seed: Annotated[int, typer.Option(help='Deterministic random seed.')] = 42, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--no-prepare-ai', help='Prepare AI-ready artifacts for the Supervisor Override run.')] = True) -> None`
 - `demo_export(output_dir: Annotated[Path, typer.Option(help='Directory where the bundled live stage demo files should be written.')] = Path('./iints_demo'), overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow overwriting exported demo files.')] = False) -> None`
-- `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed', stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.')] = True) -> None`
+- `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed', stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.')] = True, build_evidence: Annotated[bool, typer.Option('--evidence/--no-evidence', help='Build a public research evidence bundle after the live run.')] = True) -> None`
 - `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None)`
 - `validate(scenario_path: Annotated[Path, typer.Option(help='Path to a scenario JSON file')], patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML to validate')] = None)`
 - `data_list()`
@@ -1303,6 +1330,10 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `edge_pump_package(algorithm: Annotated[Path, typer.Option(help='SDK algorithm Python file to package for bench-only Pico testing.')], output_dir: Annotated[Path, typer.Option(help='Output bundle directory.')] = Path('pico_pump_bundle'), safety_contract: Annotated[Optional[Path], typer.Option(help='Optional zero-delivery safety contract JSON.')] = None, label: Annotated[str, typer.Option(help='Human-readable bundle label written into the manifest.')] = 'pico_pump_bench') -> None`
 - `edge_pump_upload(bundle_dir: Annotated[Path, typer.Option(help='Bundle directory from `iints edge pump package`.')], mount_dir: Annotated[Path, typer.Option(help='Mounted writable Pico/CircuitPython-style drive or a test folder.')], bench_only_confirm: Annotated[str, typer.Option(help=f'Must be exactly: {PICO_PUMP_CONFIRMATION}')] = '', write: Annotated[bool, typer.Option('--write', help='Actually copy files. Without this flag, only prints the copy plan.')] = False) -> None`
 - `edge_pump_serial_test(port: Annotated[str, typer.Option(help='Serial port for the Pico bench firmware, for example /dev/ttyACM0 or /dev/tty.usbmodem*.')], baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the Pico bench firmware.')] = PICO_PUMP_BAUDRATE, timeout_seconds: Annotated[float, typer.Option(help='Read timeout per command in seconds.')] = 1.5) -> None`
+- `pump_init(output_dir: Annotated[Path, typer.Option(help='Directory where the Pico pump lab workspace should be written.')] = Path('iints_pico_pump_lab'), algorithm: Annotated[Optional[Path], typer.Option(help='Optional existing SDK algorithm to copy into the lab workspace.')] = None) -> None`
+- `pump_compile(algorithm: Annotated[Path, typer.Option(help='SDK algorithm Python file to compile/package for bench-only Pico testing.')], output_dir: Annotated[Path, typer.Option(help='Output bundle directory.')] = Path('pico_pump_bundle'), safety_contract: Annotated[Optional[Path], typer.Option(help='Optional zero-delivery safety contract JSON.')] = None, label: Annotated[str, typer.Option(help='Human-readable bundle label written into the manifest.')] = 'pico_pump_bench') -> None`
+- `pump_bench_test(bundle_dir: Annotated[Path, typer.Option(help='Bundle directory from `iints pump compile`.')], output_json: Annotated[Optional[Path], typer.Option(help='Optional JSON report path.')] = None, port: Annotated[Optional[str], typer.Option(help='Optional Pico serial port for an additional non-actuating smoke test.')] = None, baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the Pico bench firmware.')] = PICO_PUMP_BAUDRATE, timeout_seconds: Annotated[float, typer.Option(help='Read timeout per serial command in seconds.')] = 1.5) -> None`
+- `pump_upload(bundle_dir: Annotated[Path, typer.Option(help='Bundle directory from `iints pump compile`.')], mount_dir: Annotated[Path, typer.Option(help='Mounted writable Pico/CircuitPython-style drive or a test folder.')], bench_only_confirm: Annotated[str, typer.Option(help=f'Must be exactly: {PICO_PUMP_CONFIRMATION}')] = '', write: Annotated[bool, typer.Option('--write', help='Actually copy files. Without this flag, only prints the copy plan.')] = False) -> None`
 - `edge_bridge_test(port: Annotated[Optional[str], typer.Option(help='Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.')] = None, baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the UNO Q bridge sketch.')] = UNO_Q_BRIDGE_BAUDRATE, delay_seconds: Annotated[float, typer.Option(help='Pause between test states in seconds.')] = 0.75) -> None`
 - `edge_bridge_run(port: Annotated[Optional[str], typer.Option(help='Serial port for the UNO Q STM32 side. Use `auto` or omit it if exactly one port is connected.')] = None, workspace: Annotated[Optional[Path], typer.Option(help='Workspace directory for the persistent digital patient state.')] = None, project_dir: Annotated[Optional[Path], typer.Option(help='Optional edge project directory created by `iints edge setup`.')] = None, workspace_name: Annotated[str, typer.Option(help='Workspace folder inside the edge project.')] = 'patient_runtime', baudrate: Annotated[int, typer.Option(help='Serial baud rate used by the UNO Q bridge sketch.')] = UNO_Q_BRIDGE_BAUDRATE, poll_interval: Annotated[float, typer.Option(help='Polling interval in seconds while following runtime status.')] = 1.0, once: Annotated[bool, typer.Option(help='Send the current state once and exit.')] = False, max_cycles: Annotated[Optional[int], typer.Option('--max-cycles', hidden=True)] = None) -> None`
 - `edge_bridge_flash(port: Annotated[str, typer.Option(help='Serial port used to upload the UNO Q bridge sketch.')], fqbn: Annotated[str, typer.Option(help='Arduino CLI FQBN for the UNO Q board package.')], project_dir: Annotated[Path, typer.Option(help='Edge project directory created by `iints edge setup`.')] = Path('.'), sketch_dir: Annotated[Optional[Path], typer.Option(help='Optional bridge sketch directory. Defaults to <project-dir>/uno_q_bridge.')] = None, arduino_cli: Annotated[str, typer.Option(help='Arduino CLI executable name or path.')] = 'arduino-cli') -> None`
@@ -2668,7 +2699,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/live_patient/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `create_edge_bundle, export_edge_setup, summarize_edge_workspace, write_edge_update_script, render_edge_long_study_config_template, load_edge_long_study_config, run_edge_long_study, create_edge_study_snapshot, export_edge_study_archive, create_patient_app, run_edge_benchmark, export_uno_q_bridge, DIRECT_PUMP_READ_ONLY_CONFIRMATION, DirectPumpConfig, PumpSnapshot, SimulatedMedtronicPumpTransport, stream_direct_pump_snapshots, write_direct_pump_snapshot, LivePatientDaemon, PatientRuntimeConfig, PatientRuntimeStore, get_runtime_scenario_profile, list_runtime_scenario_profiles, load_runtime_status, is_process_alive`
+- Explicit exports: `create_edge_bundle, export_edge_setup, summarize_edge_workspace, write_edge_update_script, render_edge_long_study_config_template, load_edge_long_study_config, run_edge_long_study, create_edge_study_snapshot, export_edge_study_archive, create_patient_app, run_edge_benchmark, export_uno_q_bridge, DIRECT_PUMP_READ_ONLY_CONFIRMATION, DirectPumpConfig, PumpSnapshot, SimulatedMedtronicPumpTransport, stream_direct_pump_snapshots, write_direct_pump_snapshot, bench_test_pico_pump_bundle, build_pico_pump_bundle, create_pico_pump_lab, LivePatientDaemon, PatientRuntimeConfig, PatientRuntimeStore, get_runtime_scenario_profile, list_runtime_scenario_profiles, load_runtime_status, is_process_alive`
 
 ### Public Functions
 
@@ -2839,6 +2870,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `export_pico_pump_firmware(output_dir: str | Path) -> dict[str, str]`
 - `create_pico_pump_lab(output_dir: str | Path, *, algorithm_path: str | Path | None = None) -> dict[str, str]`
 - `build_pico_pump_bundle(algorithm_path: str | Path, output_dir: str | Path, *, safety_contract_path: str | Path | None = None, label: str = 'pico_pump_bench') -> dict[str, Any]`
+- `bench_test_pico_pump_bundle(bundle_dir: str | Path) -> dict[str, Any]`
 - `upload_pico_pump_bundle(bundle_dir: str | Path, mount_dir: str | Path, *, bench_only_confirmation: str, write: bool = False) -> dict[str, Any]`
 - `run_pico_pump_serial_self_test(port: str, *, baudrate: int = PICO_PUMP_BAUDRATE, timeout_seconds: float = 1.5) -> list[dict[str, str | None]]`
 
@@ -3616,6 +3648,32 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `NON_DETERMINISTIC_COLUMNS`
 - `NON_DETERMINISTIC_REPORT_KEYS`
+
+## `iints.validation.run_doctor`
+
+- Source: `src/iints/validation/run_doctor.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `RunDoctorCheck` | `RunDoctorCheck` | No module docstring. |
+| `RunDoctorReport` | `RunDoctorReport` | No module docstring. |
+
+#### `RunDoctorCheck` methods
+
+- `to_dict(self) -> Dict[str, Any]`
+
+#### `RunDoctorReport` methods
+
+- `failed(self) -> bool`
+- `warned(self) -> bool`
+- `to_dict(self) -> Dict[str, Any]`
+
+### Public Functions
+
+- `inspect_run_setup(*, algo_path: Optional[Path] = None, patient_config_path: Optional[Path] = None, scenario_path: Optional[Path] = None, duration_minutes: int = 1440, time_step_minutes: int = 5, output_dir: Optional[Path] = None, patient_config_name: Optional[str] = None) -> RunDoctorReport`
 
 ## `iints.validation.run_validation`
 

@@ -311,6 +311,71 @@ def _load_bundle_manifest(bundle_dir: Path) -> dict[str, Any]:
     return payload
 
 
+def bench_test_pico_pump_bundle(bundle_dir: str | Path) -> dict[str, Any]:
+    """Validate a Pico pump bundle before any board upload is attempted."""
+
+    source = Path(bundle_dir).expanduser().resolve()
+    if not source.is_dir():
+        raise FileNotFoundError(f"Bundle directory not found: {source}")
+    manifest = _load_bundle_manifest(source)
+    checks: list[dict[str, Any]] = []
+
+    def add_check(name: str, passed: bool, message: str, **details: Any) -> None:
+        checks.append({"name": name, "passed": passed, "message": message, "details": details})
+
+    algorithm_path = source / str(manifest.get("algorithm_file", "algorithm.py"))
+    firmware_path = source / str(manifest.get("firmware_entrypoint", "firmware/code.py"))
+    contract_path = source / str(manifest.get("safety_contract", "safety_contract.json"))
+    manifest_path = source / "manifest.json"
+
+    add_check("manifest", manifest_path.is_file(), "Manifest file is present.", path=str(manifest_path))
+    add_check("algorithm", algorithm_path.is_file(), "Algorithm source snapshot is present.", path=str(algorithm_path))
+    add_check("firmware", firmware_path.is_file(), "Locked Pico firmware entrypoint is present.", path=str(firmware_path))
+    add_check("safety_contract", contract_path.is_file(), "Zero-delivery safety contract is present.", path=str(contract_path))
+
+    if algorithm_path.is_file():
+        observed_hash = _sha256_file(algorithm_path)
+        expected_hash = str(manifest.get("algorithm_sha256", ""))
+        add_check(
+            "algorithm_sha256",
+            bool(expected_hash) and observed_hash == expected_hash,
+            "Algorithm source hash matches the manifest.",
+            expected=expected_hash,
+            observed=observed_hash,
+        )
+
+    if contract_path.is_file():
+        try:
+            contract = json.loads(contract_path.read_text(encoding="utf-8"))
+            _validate_bench_contract(contract)
+            add_check("contract_lockout", True, "Safety contract keeps hardware actuation locked out.")
+        except Exception as exc:
+            add_check("contract_lockout", False, "Safety contract failed lockout validation.", error=str(exc))
+
+    add_check(
+        "scope",
+        manifest.get("scope") == "bench_only_not_for_human_or_animal_use",
+        "Manifest declares bench-only scope.",
+        scope=manifest.get("scope"),
+    )
+
+    passed = all(check["passed"] for check in checks)
+    report = {
+        "passed": passed,
+        "bundle_dir": str(source),
+        "scope": "bench_only_not_for_human_or_animal_use",
+        "manifest": manifest,
+        "checks": checks,
+        "required_next_step": (
+            "Run serial-test after upload and keep the hardware disconnected from insulin or people."
+            if passed
+            else "Fix the failing bundle checks before upload."
+        ),
+    }
+    _write_json(source / "bench_test_report.json", report)
+    return report
+
+
 def upload_pico_pump_bundle(
     bundle_dir: str | Path,
     mount_dir: str | Path,

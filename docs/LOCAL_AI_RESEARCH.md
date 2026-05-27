@@ -177,7 +177,7 @@ to `iints jetson endurance start`.
 For actual AI research, one run should not be the whole story. The SDK now has a higher-level lab command that combines multiple completed Jetson or simulator bundles into one training workspace:
 
 ```bash
-iints research local-ai-lab \
+iints research train-local-ai \
   --run day1=results/jetson_research_day \
   --run day2=results/jetson_research_day_2 \
   --output-dir results/local_ai_lab
@@ -215,7 +215,7 @@ This is the clearest workflow when you want to use long Jetson runs as training 
 For a first smoke test without heavy PyTorch/predictor work:
 
 ```bash
-iints research local-ai-lab \
+iints research train-local-ai \
   --run day1=results/jetson_research_day \
   --output-dir results/local_ai_lab_smoke \
   --skip-predictor \
@@ -229,7 +229,28 @@ The important separation is:
 - `controller_teacher_dataset.csv` trains a research controller policy
 - `LOCAL_AI_DATASET_CARD.json` records lineage, row counts, sources, and research-only limits
 
-## 6. What Good Research Looks Like
+The older command name `iints research local-ai-lab` remains available, but `train-local-ai` is the clearest command for new users.
+
+## 6. Publish The Research Evidence
+
+After training, attach the run folders and local AI lab to one evidence bundle:
+
+```bash
+iints evidence build \
+  --run day1=results/jetson_research_day \
+  --run day2=results/jetson_research_day_2 \
+  --local-ai-dir results/local_ai_lab \
+  --output-dir results/local_ai_evidence
+```
+
+This writes:
+
+- `README.md` with run-level glucose metrics
+- `MODEL_CARD.md` with research-only use, non-use, and safety gate status
+- `evidence_summary.json` for machine-readable review
+- `run_index.csv` for quick comparison tables
+
+## 7. What Good Research Looks Like
 
 Before making any strong claim, require all of the following:
 

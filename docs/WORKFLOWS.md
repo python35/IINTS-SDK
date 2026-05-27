@@ -8,6 +8,7 @@ Use this page after your first successful run, when the question changes from â€
 | --- | --- | --- |
 | compare algorithms in a reproducible study | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | protocol bundle, study runs, comparisons |
 | summarize a completed batch of runs | [Study Analysis](STUDY_ANALYSIS.md) | aggregate metrics, evidence table, poster-ready figures |
+| build a public proof folder | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) | model card, run cards, copied manifests, CSV index |
 | prove whether input data is trustworthy | [MDMP Quickstart](MDMP_QUICKSTART.md) | certification JSON, dashboard, trust grade |
 | explain validated outputs locally | [AI Assistant](AI_ASSISTANT.md) | guarded summaries and review notes |
 | present the SDK live | [Booth Demo Guide](BOOTH_DEMO.md) | showable code, poster, talk track |
@@ -44,9 +45,11 @@ Booth Demo Guide
 
 ```bash
 iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
+iints run-doctor --algo algorithms/example_algorithm.py --patient-config-path patients/stable_patient.yaml --scenario-path scenarios/clinic_safe_baseline.json
+iints evidence build --run demo=results/study_ready --output-dir results/evidence_bundle
 iints data certify contracts/clinical_mdmp_contract.yaml data/my_trace.csv --output-json results/certification.json
 iints ai report results/<run_id>
-iints demo-live --output-dir results/live_demo
+iints demo --output-dir results/live_demo --audience jury
 ```
 
 ## Read Next
@@ -54,6 +57,7 @@ iints demo-live --output-dir results/live_demo
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
 - [Local AI Research](LOCAL_AI_RESEARCH.md)
+- [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
 - [AI Assistant](AI_ASSISTANT.md)

@@ -38,7 +38,8 @@ then prints the two study commands you can run once you choose an algorithm.
 The main live-demo button. It exports showable code, prints the presenter story,
 runs the demo in audience-safe stage mode, writes a technical log off-screen,
 and produces the cue card, artifact map, presenter guide, poster, and rerun
-script.
+script. By default it also builds `evidence_bundle/` with a public README,
+model card, run index, and copied proof artifacts.
 
 Common forms:
 
@@ -47,6 +48,7 @@ iints demo
 iints demo --audience jury --output-dir results/live_demo
 iints demo --audience clinical
 iints demo --dry-run          # rehearsal/preflight only, not the live call
+iints demo --no-evidence      # fast rehearsal without the public proof bundle
 iints demo --technical        # show raw execution detail for debugging
 iints demo --simulation-only --quick
 iints demo --simulation-only --full
@@ -291,7 +293,75 @@ Compare a learned controller against the clinical baseline on held-out presets a
 Combine completed Jetson/simulator runs into one local AI workspace:
 predictor dataset, controller-teacher dataset, dataset card, local controller models, optional predictor training, and held-out controller evaluation.
 
+### `iints research train-local-ai`
+Friendly alias for the same local AI workspace command. Prefer this name in new demos and docs:
+
+```bash
+iints research train-local-ai \
+  --run day1=results/jetson_research_day \
+  --output-dir results/local_ai_lab
+```
+
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
+
+## Evidence Commands
+
+### `iints run-doctor`
+Preflight an algorithm, patient YAML, scenario JSON, duration, time step, and output folder before a long run:
+
+```bash
+iints run-doctor \
+  --algo algorithms/example_algorithm.py \
+  --patient-config-path patients/stable_patient.yaml \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --duration 1440 \
+  --time-step 5
+```
+
+It catches missing files, validation errors, aggressive glucose drift, likely pre-meal hypoglycemia, and output path problems.
+
+### `iints evidence build`
+Build a public research evidence bundle from one or more completed runs:
+
+```bash
+iints evidence build \
+  --run normal=results/live_demo/results/01_normal_run \
+  --run stress=results/live_demo/results/02_meal_stress \
+  --output-dir results/live_demo/evidence_bundle
+```
+
+Optional inputs:
+
+- `--local-ai-dir results/local_ai_lab`
+- `--pump-bundle-dir bundles/pico_bench_bundle`
+
+## Pico Pump Bench Commands
+
+### `iints pump init`
+Create a bench-only Pico pump lab workspace.
+
+### `iints pump compile`
+Package a simulated SDK algorithm with locked, non-actuating Pico firmware:
+
+```bash
+iints pump compile \
+  --algorithm algorithms/pico_bench_algorithm.py \
+  --output-dir bundles/pico_bench_bundle
+```
+
+### `iints pump bench-test`
+Validate the bundle before upload:
+
+```bash
+iints pump bench-test \
+  --bundle-dir bundles/pico_bench_bundle \
+  --output-json bundles/pico_bench_bundle/bench_test_report.json
+```
+
+### `iints pump upload`
+Copy the locked bundle to a writable Pico/CircuitPython-style drive after explicit bench-only confirmation.
+
+## Maker Faire Commands
 
 ### `iints makerfaire up`
 Start the Pi booth flow.

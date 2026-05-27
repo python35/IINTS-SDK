@@ -40,6 +40,7 @@ from .eucys_results import (
     generate_eucys_main_figure,
     generate_eucys_results_bundle,
 )
+from .evidence_bundle import EVIDENCE_SCOPE, build_evidence_bundle
 
 
 def _missing_reports_dependency(feature: str, exc: Exception) -> None:
@@ -100,9 +101,11 @@ __all__ = [
     "analyze_study_directory",
     "build_booth_demo",
     "build_carelink_workbench",
+    "build_evidence_bundle",
     "ClinicalMetricsCalculator",
     "ClinicalMetricsResult",
     "ClinicalReportGenerator",
+    "EVIDENCE_SCOPE",
     "compute_metrics",
     "compare_studies",
     "build_eucys_abstract_draft_markdown",

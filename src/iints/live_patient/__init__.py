@@ -29,6 +29,7 @@ from .medtronic_direct import (
     stream_direct_pump_snapshots,
     write_direct_pump_snapshot,
 )
+from .pico_pump import bench_test_pico_pump_bundle, build_pico_pump_bundle, create_pico_pump_lab
 
 
 def run_edge_benchmark(*args: Any, **kwargs: Any) -> Any:
@@ -56,6 +57,9 @@ __all__ = [
     "SimulatedMedtronicPumpTransport",
     "stream_direct_pump_snapshots",
     "write_direct_pump_snapshot",
+    "bench_test_pico_pump_bundle",
+    "build_pico_pump_bundle",
+    "create_pico_pump_lab",
     "LivePatientDaemon",
     "PatientRuntimeConfig",
     "PatientRuntimeStore",

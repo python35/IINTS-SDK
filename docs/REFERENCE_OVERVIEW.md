@@ -11,6 +11,7 @@ Use this page when you already know the workflow and need the exact source of tr
 | Python modules and public symbols | [API Reference](API_REFERENCE.md) |
 | the physiological meaning of the SDK's numbers | [Physiology Reference](PHYSIOLOGY_REFERENCE.md) |
 | how to train local predictor and controller models | [Local AI Research](LOCAL_AI_RESEARCH.md) |
+| how to package public reproducibility evidence | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) |
 | subsystem boundaries and data flow | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
 | scientific justification and citations | [Evidence Base](EVIDENCE_BASE.md) |
 | a long-form printable manual | [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md) |
@@ -34,6 +35,7 @@ Use this page when you already know the workflow and need the exact source of tr
 
 - [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
 - [Local AI Research](LOCAL_AI_RESEARCH.md)
+- [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
 - [Evidence Base](EVIDENCE_BASE.md)
 - [MDMP Specification](MDMP.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)

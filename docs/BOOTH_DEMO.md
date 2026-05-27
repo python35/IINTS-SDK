@@ -129,6 +129,19 @@ iints demo --output-dir results/live_demo --audience jury
 
 That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, prints the important code lines, runs the exported demo script in clean stage mode, saves noisy execution details to `DEMO_RUN_LOG.txt`, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
 
+It also builds a public research evidence folder by default:
+
+```text
+results/live_demo/evidence_bundle/
+  README.md
+  MODEL_CARD.md
+  evidence_summary.json
+  run_index.csv
+  runs/
+```
+
+Use `--no-evidence` only for a quick rehearsal. For doctors, engineers, juries, and booth visitors, keep the evidence bundle enabled so you can show that the poster comes from reproducible run folders.
+
 For the actual call or booth moment, use the normal live command above. Use
 `iints demo --dry-run` only as a rehearsal/preflight before people are watching.
 If you need raw subprocess output while debugging, add `--technical`.

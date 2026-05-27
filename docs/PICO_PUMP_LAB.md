@@ -22,7 +22,7 @@ The FDA notes that infusion pump software controls important safety functions an
 ## Create A Lab
 
 ```bash
-iints edge pump init --output-dir iints_pico_pump_lab
+iints pump init --output-dir iints_pico_pump_lab
 cd iints_pico_pump_lab
 ```
 
@@ -61,7 +61,7 @@ iints validate-run \
 ## Package A Bench Bundle
 
 ```bash
-iints edge pump package \
+iints pump compile \
   --algorithm algorithms/pico_bench_algorithm.py \
   --output-dir bundles/pico_bench_bundle \
   --safety-contract safety_contract.json
@@ -76,12 +76,33 @@ The bundle contains:
 | `safety_contract.json` | Contract with `hardware_actuation_enabled=false` |
 | `manifest.json` | Hashes, creation time, target, and upload confirmation |
 
+## Bench-Test Before Upload
+
+```bash
+iints pump bench-test \
+  --bundle-dir bundles/pico_bench_bundle \
+  --output-json bundles/pico_bench_bundle/bench_test_report.json
+```
+
+This checks:
+
+| Check | Meaning |
+| --- | --- |
+| manifest | Bundle metadata exists and targets `raspberry_pi_pico_bench` |
+| algorithm | Algorithm source snapshot is present |
+| firmware | Locked non-actuating firmware is present |
+| safety_contract | Zero-delivery contract is present |
+| algorithm_sha256 | Algorithm hash matches the manifest |
+| contract_lockout | `hardware_actuation_enabled=false` and dose limits remain zero |
+
+Optionally add `--port /dev/ttyACM0` after upload to run the serial `PING`, `STATUS`, and `LOCKOUT` smoke test.
+
 ## Upload To A Pico-Style Board
 
 First do a dry run:
 
 ```bash
-iints edge pump upload \
+iints pump upload \
   --bundle-dir bundles/pico_bench_bundle \
   --mount-dir /Volumes/CIRCUITPY \
   --bench-only-confirm "I understand this is bench-only and not for human use"
@@ -90,7 +111,7 @@ iints edge pump upload \
 If the copy plan is correct, run the write:
 
 ```bash
-iints edge pump upload \
+iints pump upload \
   --bundle-dir bundles/pico_bench_bundle \
   --mount-dir /Volumes/CIRCUITPY \
   --bench-only-confirm "I understand this is bench-only and not for human use" \
