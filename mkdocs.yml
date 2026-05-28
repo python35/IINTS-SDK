@@ -53,6 +53,7 @@ nav:
       - Public Obsidian Vault: OBSIDIAN_PUBLIC_VAULT.md
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - 5-Minute Quickstart: QUICKSTART.md
+      - Command Cheatsheet: CLI_CHEATSHEET.md
       - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md
       - Troubleshooting: TROUBLESHOOTING.md
@@ -92,9 +93,11 @@ nav:
       - Reference Hub: REFERENCE_OVERVIEW.md
       - Physiology Reference: PHYSIOLOGY_REFERENCE.md
       - Real-Data Realism Gate: REAL_DATA_REALISM.md
+      - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
       - Local AI Research: LOCAL_AI_RESEARCH.md
       - Local AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
       - Command Reference: COMMAND_REFERENCE.md
+      - Complete Source Library: SOURCE_LIBRARY.md
       - Evidence Base: EVIDENCE_BASE.md
       - MDMP Specification: MDMP.md
       - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md

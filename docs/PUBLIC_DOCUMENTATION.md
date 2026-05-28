@@ -119,6 +119,7 @@ Use the CLI to discover and access datasets:
 ```bash
 iints data list
 iints data info <dataset_id>
+iints data research-plan --output-dir data_packs/research_dataset_plan
 iints data fetch <dataset_id> --output-dir data_packs/<dataset_id>
 iints data realism-check data/my_trace.csv --reference free_living_t1d --output-html results/realism_dashboard.html
 ```
@@ -127,6 +128,9 @@ Recommended starting points:
 - `ohio_t1dm` for a trusted CGM + insulin + meal benchmark.
 - `diatrend` when you need a larger controlled-access pump/CGM cohort.
 - `t1d_uom` when you need meal macronutrients, activity, and sleep together.
+- `dclp3_idcl` and `jaeb_loop` for closed-loop / AID external validation after schema conversion.
+- `t1dexi` and `t1dexip` for exercise-aware glucose research.
+- `metabonet` and `glucose_ml` as benchmark maps for cross-dataset design.
 - `t1d_granada` for large longitudinal glucose-only population work.
 - `azt1d` or `hupa_ucm` when you want meal + insulin data that is already supported in the current prep commands.
 

@@ -6,6 +6,7 @@ Use this page when you already know the workflow and need the exact source of tr
 
 | If you need... | Use |
 | --- | --- |
+| the fastest list of practical commands | [Command Cheatsheet](CLI_CHEATSHEET.md) |
 | one public command or command family | [Command Reference](COMMAND_REFERENCE.md) |
 | advanced CLI behavior and integration details | [CLI & Advanced Reference](TECHNICAL_README.md) |
 | Python modules and public symbols | [API Reference](API_REFERENCE.md) |
@@ -13,7 +14,7 @@ Use this page when you already know the workflow and need the exact source of tr
 | how to train local predictor and controller models | [Local AI Research](LOCAL_AI_RESEARCH.md) |
 | how to package public reproducibility evidence | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) |
 | subsystem boundaries and data flow | [Visual Architecture](ARCHITECTURE_OVERVIEW.md) |
-| scientific justification and citations | [Evidence Base](EVIDENCE_BASE.md) |
+| scientific justification and citations | [Complete Source Library](SOURCE_LIBRARY.md) and [Evidence Base](EVIDENCE_BASE.md) |
 | a long-form printable manual | [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md) |
 
 ## By Audience
@@ -21,6 +22,7 @@ Use this page when you already know the workflow and need the exact source of tr
 ### Users
 
 - [Command Reference](COMMAND_REFERENCE.md)
+- [Command Cheatsheet](CLI_CHEATSHEET.md)
 - [Manual Overview](OFFICIAL_MANUAL.md)
 - [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md)
 
@@ -36,6 +38,7 @@ Use this page when you already know the workflow and need the exact source of tr
 - [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
 - [Local AI Research](LOCAL_AI_RESEARCH.md)
 - [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
+- [Complete Source Library](SOURCE_LIBRARY.md)
 - [Evidence Base](EVIDENCE_BASE.md)
 - [MDMP Specification](MDMP.md)
 - [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)

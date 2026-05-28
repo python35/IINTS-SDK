@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **175**
+Documented modules: **176**
 
 ## Package Index
 
@@ -14,7 +14,7 @@ Documented modules: **175**
 | `api` | 4 |
 | `cli` | 3 |
 | `core` | 32 |
-| `data` | 24 |
+| `data` | 25 |
 | `demo_assets` | 1 |
 | `emulation` | 5 |
 | `highlevel` | 1 |
@@ -149,6 +149,7 @@ Documented modules: **175**
 - [`iints.data.realism_reference`](#iintsdatarealism_reference)
 - [`iints.data.realism_validator`](#iintsdatarealism_validator)
 - [`iints.data.registry`](#iintsdataregistry)
+- [`iints.data.research_catalog`](#iintsdataresearch_catalog)
 - [`iints.data.runner`](#iintsdatarunner)
 - [`iints.data.study_corruption`](#iintsdatastudy_corruption)
 - [`iints.data.synthetic_mirror`](#iintsdatasynthetic_mirror)
@@ -283,7 +284,7 @@ Documented modules: **175**
 
 - Source: `src/iints/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
+- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_agp_report, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
 
 ### Public Functions
 
@@ -293,6 +294,7 @@ Documented modules: **175**
 - `generate_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
 - `generate_quickstart_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
 - `generate_demo_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
+- `generate_agp_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None, subject_name: str = 'Research simulation', summary_json_path: Optional[str] = None) -> Optional[str]`
 
 ## `iints.ai`
 
@@ -843,6 +845,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 #### `ClinicalReportGenerator` methods
 
+- `generate_agp_pdf(self, simulation_data: pd.DataFrame, output_path: str, *, title: str = 'IINTS Research AGP-Style Report', subject_name: str = 'Research simulation', safety_report: Optional[Dict[str, Any]] = None, target_low: float = 70.0, target_high: float = 180.0, summary_json_path: Optional[str] = None) -> str`
 - `export_plots(self, simulation_data: pd.DataFrame, output_dir: str) -> Dict[str, str]`
 - `generate_pdf(self, simulation_data: pd.DataFrame, safety_report: Dict[str, Any], output_path: str, title: str = 'IINTS-AF Clinical Report') -> str`
 - `generate_demo_pdf(self, simulation_data: pd.DataFrame, safety_report: Dict[str, Any], output_path: str, title: str = 'IINTS-AF Demo Report') -> str`
@@ -1233,12 +1236,13 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `demo_booth(output_dir: Annotated[Path, typer.Option(help='Directory where the fair-ready demo bundle should be written.')] = Path('./results/booth_demo'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes for each booth scenario.')] = 360, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes.')] = 5, seed: Annotated[int, typer.Option(help='Deterministic random seed.')] = 42, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--no-prepare-ai', help='Prepare AI-ready artifacts for the Supervisor Override run.')] = True) -> None`
 - `demo_export(output_dir: Annotated[Path, typer.Option(help='Directory where the bundled live stage demo files should be written.')] = Path('./iints_demo'), overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow overwriting exported demo files.')] = False) -> None`
 - `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed', stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.')] = True, build_evidence: Annotated[bool, typer.Option('--evidence/--no-evidence', help='Build a public research evidence bundle after the live run.')] = True) -> None`
-- `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None)`
+- `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None, style: Annotated[str, typer.Option(help='Report style: standard or agp')] = 'standard', subject_name: Annotated[str, typer.Option(help='Subject/run label shown on AGP-style reports')] = 'Research simulation', summary_json_path: Annotated[Optional[Path], typer.Option(help='Optional AGP summary JSON output path')] = None)`
 - `validate(scenario_path: Annotated[Path, typer.Option(help='Path to a scenario JSON file')], patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML to validate')] = None)`
 - `data_list()`
 - `data_info(dataset_id: Annotated[str, typer.Argument(help='Dataset id (see `iints data list`)')])`
 - `data_cite(dataset_id: Annotated[str, typer.Argument(help='Dataset id (see `iints data list`)')])`
 - `data_fetch(dataset_id: Annotated[str, typer.Argument(help='Dataset id (see `iints data list`)')], output_dir: Annotated[Optional[Path], typer.Option(help='Output directory (default: data_packs/official/<id>)')] = None, extract: Annotated[bool, typer.Option(help='Extract zip files if present')] = True, verify: Annotated[bool, typer.Option(help='Verify pinned SHA-256 hashes and emit SHA256SUMS.txt. Public sources without published hashes now require --no-verify.')] = True)`
+- `data_research_plan(output_dir: Annotated[Path, typer.Option(help='Output folder for the dataset acquisition plan and source matrix.')] = Path('data_packs/research_dataset_plan'), dataset: Annotated[List[str], typer.Option('--dataset', help='Optional dataset id to include. Repeat for a custom subset; default includes the full curated IINTS research list.')] = []) -> None`
 - `data_contract_template(output_path: Annotated[Path, typer.Option(help='Where to write the starter contract YAML')] = Path('data_contract.yaml'))`
 - `data_certify_template(output_path: Annotated[Path, typer.Option(help='Where to write the starter certification contract YAML')] = Path('data_contract.yaml'))`
 - `data_contract_run(contract_path: Annotated[Path, typer.Argument(help='Path to contract YAML')], input_csv: Annotated[Path, typer.Argument(help='Path to input CSV')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, apply_builtin_transforms: Annotated[bool, typer.Option(help='Apply built-in unit conversion transforms from the contract')] = True, fail_on_noncompliant: Annotated[bool, typer.Option(help='Exit code 1 when compliance checks fail')] = False, min_mdmp_grade: Annotated[Optional[str], typer.Option(help='Optional MDMP grade gate (draft, research_grade, clinical_grade)')] = None)`
@@ -1896,7 +1900,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/data/__init__.py`
 - Summary: IINTS-AF Data Module Universal data ingestion and quality validation.
-- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, RealDataGateProfile, RealDataGateResult, STRICT_REAL_DATA_RESEARCH_PROFILE, review_real_data_realism, rank_real_data_sources, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, fetch_tidepool_dataframe, import_tidepool, load_openapi_spec, MedtronicLiveClient, MedtronicLiveConfig, fetch_medtronic_live_dataframe, fetch_medtronic_live_timeline, import_medtronic_live, normalize_medtronic_live_payload, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
+- Explicit exports: `DataAdapter, ColumnMapper, ColumnMapping, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, DataQualityChecker, QualityReport, DataGap, DataAnomaly, REALISM_VERDICT_ORDER, MealResponse, RealismCheck, RealismReport, realism_verdict_meets_minimum, validate_realism_csv, validate_realism_dataset, write_realism_report, RealDataGateProfile, RealDataGateResult, STRICT_REAL_DATA_RESEARCH_PROFILE, review_real_data_realism, rank_real_data_sources, ReferenceBand, ReferenceComparison, RealismReferenceProfile, get_realism_reference, list_realism_reference_ids, load_realism_reference_registry, build_realism_dashboard_html, write_realism_dashboard, certify_csv, certify_dataset, render_certification_dashboard, write_certification_dashboard, write_certification_report, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, UniversalParser, StandardDataPack, ParseResult, load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset, DEFAULT_RESEARCH_DATASET_IDS, build_research_dataset_matrix, resolve_research_dataset_entries, write_research_dataset_plan, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, fetch_tidepool_dataframe, import_tidepool, load_openapi_spec, MedtronicLiveClient, MedtronicLiveConfig, fetch_medtronic_live_dataframe, fetch_medtronic_live_timeline, import_medtronic_live, normalize_medtronic_live_payload, StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, build_mdmp_dashboard_html, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -2324,6 +2328,22 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `get_dataset(dataset_id: str) -> Dict[str, Any]`
 - `list_dataset_ids() -> List[str]`
 - `fetch_dataset(dataset_id: str, output_dir: Path, extract: bool = True, verify: bool = True) -> List[Path]`
+
+## `iints.data.research_catalog`
+
+- Source: `src/iints/data/research_catalog.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `resolve_research_dataset_entries(dataset_ids: Sequence[str] | None = None) -> list[Dict[str, Any]]`
+- `build_research_dataset_matrix(dataset_ids: Sequence[str] | None = None) -> list[dict[str, Any]]`
+- `write_research_dataset_plan(output_dir: Path, dataset_ids: Sequence[str] | None = None) -> dict[str, Any]`
+
+### Public Constants
+
+- `DEFAULT_RESEARCH_DATASET_IDS`
+- `TASK_COLUMNS`
 
 ## `iints.data.runner`
 

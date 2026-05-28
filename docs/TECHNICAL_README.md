@@ -635,6 +635,15 @@ iints report --results-csv results/data/sim_results_example.csv \
   --output-path results/clinical_report.pdf
 ```
 
+AGP-style research report:
+
+```bash
+iints report --results-csv results/data/sim_results_example.csv \
+  --style agp \
+  --subject-name "simulation run" \
+  --bundle-dir results/agp_report
+```
+
 ## Research Track (AI Predictor)
 See `research/README.md` for training and evaluation scripts. The predictor is not a dosing controller; it only provides a 30-120 minute forecast signal to the Safety Supervisor.
 

@@ -6409,11 +6409,18 @@ def report(
     safety_report_path: Annotated[Optional[Path], typer.Option(help="Optional safety report JSON path")] = None,
     audit_output_dir: Annotated[Optional[Path], typer.Option(help="Optional audit output directory")] = None,
     bundle_dir: Annotated[Optional[Path], typer.Option(help="If set, write PDF + plots + audit into this folder")] = None,
+    style: Annotated[str, typer.Option(help="Report style: standard or agp")] = "standard",
+    subject_name: Annotated[str, typer.Option(help="Subject/run label shown on AGP-style reports")] = "Research simulation",
+    summary_json_path: Annotated[Optional[Path], typer.Option(help="Optional AGP summary JSON output path")] = None,
 ):
-    """Generate a clinical PDF report (and optional audit summary) from a results CSV."""
+    """Generate a research PDF report (standard or AGP-style) from a results CSV."""
     console = Console()
     if not results_csv.is_file():
         console.print(f"[bold red]Error: Results file '{results_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+    style = style.strip().lower()
+    if style not in {"standard", "agp"}:
+        console.print("[bold red]Error: --style must be either 'standard' or 'agp'.[/bold red]")
         raise typer.Exit(code=1)
 
     results_df = pd.read_csv(results_csv)
@@ -6426,16 +6433,30 @@ def report(
 
     if bundle_dir:
         bundle_dir.mkdir(parents=True, exist_ok=True)
-        output_path = bundle_dir / "clinical_report.pdf"
+        output_path = bundle_dir / ("agp_report.pdf" if style == "agp" else "clinical_report.pdf")
         audit_output_dir = bundle_dir / "audit"
+        if style == "agp" and summary_json_path is None:
+            summary_json_path = bundle_dir / "agp_summary.json"
         plots_dir = bundle_dir / "plots"
-        _require_reports_feature(console, "iints.analysis.reporting", "ClinicalReportGenerator", "Clinical PDF reporting")
-        generator = iints.ClinicalReportGenerator()
-        generator.export_plots(results_df, str(plots_dir))
+        if style == "standard":
+            _require_reports_feature(console, "iints.analysis.reporting", "ClinicalReportGenerator", "Clinical PDF reporting")
+            generator = iints.ClinicalReportGenerator()
+            generator.export_plots(results_df, str(plots_dir))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _require_reports_feature(console, "iints.analysis.reporting", "ClinicalReportGenerator", "Clinical PDF reporting")
-    iints.generate_report(results_df, str(output_path), safety_report)
+    if style == "agp":
+        iints.generate_agp_report(
+            results_df,
+            str(output_path),
+            safety_report=safety_report,
+            subject_name=subject_name,
+            summary_json_path=str(summary_json_path) if summary_json_path else None,
+        )
+    else:
+        iints.generate_report(results_df, str(output_path), safety_report)
     console.print(f"PDF report saved to: [link=file://{output_path}]{output_path}[/link]")
+    if summary_json_path and style == "agp":
+        console.print(f"AGP summary saved to: [link=file://{summary_json_path}]{summary_json_path}[/link]")
 
     if audit_output_dir:
         audit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -6620,6 +6641,48 @@ def data_fetch(
     except DatasetFetchError as e:
         console.print(f"[bold red]{e}[/bold red]")
         raise typer.Exit(code=1)
+
+
+@data_app.command(name="research-plan")
+def data_research_plan(
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Output folder for the dataset acquisition plan and source matrix."),
+    ] = Path("data_packs/research_dataset_plan"),
+    dataset: Annotated[
+        List[str],
+        typer.Option(
+            "--dataset",
+            help="Optional dataset id to include. Repeat for a custom subset; default includes the full curated IINTS research list.",
+        ),
+    ] = [],
+) -> None:
+    """Write a research-ready acquisition plan for diabetes AI datasets."""
+    console = Console()
+    try:
+        from iints.data.research_catalog import write_research_dataset_plan
+
+        manifest = write_research_dataset_plan(output_dir=output_dir, dataset_ids=dataset or None)
+    except DatasetRegistryError as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
+    except Exception as exc:
+        console.print(f"[bold red]Could not write research dataset plan:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Diabetes Research Dataset Plan")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Datasets", str(manifest["dataset_count"]))
+    table.add_row("Plan", manifest["outputs"]["plan_md"])
+    table.add_row("Matrix", manifest["outputs"]["matrix_csv"])
+    table.add_row("Registry snapshot", manifest["outputs"]["snapshot_json"])
+    table.add_row("Citations", manifest["outputs"]["citations_bib"])
+    console.print(table)
+    console.print(
+        "[yellow]Research boundary:[/yellow] these datasets support simulation and AI research only; "
+        "they are not evidence for real insulin dosing."
+    )
 
 
 def _resolve_secret_option(

@@ -4,6 +4,8 @@ Use this page when you know the task and want the public command family quickly,
 
 **Read before:** [Choose Your Path](USER_GUIDE_MAP.md) if you are not sure which command family you need.
 
+**Need the shortest practical list?** Use the [Command Cheatsheet](CLI_CHEATSHEET.md).
+
 **Read next:** [Technical Reference](TECHNICAL_README.md) for deeper integration details.
 
 ## Beginner-Friendly Entry Points
@@ -180,6 +182,15 @@ Show public data packs.
 ### `iints data fetch`
 Fetch a pack into a local directory.
 
+### `iints data research-plan`
+Generate the curated diabetes dataset acquisition plan for local AI research.
+
+```bash
+iints data research-plan --output-dir data_packs/research_dataset_plan
+```
+
+Use `--dataset <id>` repeatedly to generate a focused plan for a subset.
+
 ### `iints data certify`
 Run data certification.
 
@@ -334,6 +345,19 @@ Optional inputs:
 
 - `--local-ai-dir results/local_ai_lab`
 - `--pump-bundle-dir bundles/pico_bench_bundle`
+
+### `iints report --style agp`
+Generate an AGP-style research PDF from a dense simulation or CGM CSV:
+
+```bash
+iints report \
+  --results-csv results/one_day/results.csv \
+  --style agp \
+  --subject-name "stable demo run" \
+  --bundle-dir results/one_day/agp_report
+```
+
+This writes `agp_report.pdf` plus `agp_summary.json`. The layout includes glucose statistics, time-in-ranges, an AGP-style modal-day percentile plot, and daily glucose profiles.
 
 ## Pico Pump Bench Commands
 

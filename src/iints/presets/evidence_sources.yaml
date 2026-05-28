@@ -113,3 +113,11 @@ sources:
     doi: ""
     url: "http://ceur-ws.org/Vol-2675/paper2.pdf"
     rationale: "Primary public dataset used for subject-level predictor training and evaluation."
+  - id: idc_2025_agp_report_overview
+    category: consensus
+    component: agp_style_reporting
+    title: "Guide to Understanding the Ambulatory Glucose Profile (AGP) Report"
+    citation: "HealthPartners Institute / International Diabetes Center. Guide to Understanding the Ambulatory Glucose Profile (AGP) Report. 2025."
+    doi: ""
+    url: "https://www.healthpartners.com/institute/wp-content/uploads/2025/05/Ambulatory-Glucose-Profile-Report-Overview.pdf"
+    rationale: "Reference for AGP-style report layout: time-in-ranges, glucose metrics, modal-day percentile profile, and daily glucose profiles."

@@ -64,6 +64,12 @@ from .study_corruption import (
 )
 from .universal_parser import UniversalParser, StandardDataPack, ParseResult
 from .registry import load_dataset_registry, get_dataset, list_dataset_ids, fetch_dataset
+from .research_catalog import (
+    DEFAULT_RESEARCH_DATASET_IDS,
+    build_research_dataset_matrix,
+    resolve_research_dataset_entries,
+    write_research_dataset_plan,
+)
 from .nightscout import NightscoutConfig, import_nightscout
 from .tidepool import (
     TidepoolClient,
@@ -162,6 +168,10 @@ __all__ = [
     'get_dataset',
     'list_dataset_ids',
     'fetch_dataset',
+    'DEFAULT_RESEARCH_DATASET_IDS',
+    'build_research_dataset_matrix',
+    'resolve_research_dataset_entries',
+    'write_research_dataset_plan',
     'NightscoutConfig',
     'import_nightscout',
     'TidepoolClient',

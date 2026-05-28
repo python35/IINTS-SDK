@@ -9,6 +9,8 @@ Scope:
 
 Use `iints sources` to print the packaged source manifest from the installed SDK.
 
+For the full public source index, including dataset registry sources and documentation-only implementation references, see [Complete Source Library](SOURCE_LIBRARY.md).
+
 ## How To Read This Legend
 
 There are two source buckets in this project:
@@ -57,6 +59,7 @@ That split is intentional:
 | Simulator realism/validation framing | Align in-silico model evaluation with accepted simulator literature | `visentin_2018_uvapadova`, `mujahid_2024_generative_t1d_simulator` |
 | Exercise stress scenarios | Use consensus guidance for exercise-related glucose behavior | `riddell_2017_exercise_consensus` |
 | Forecast training data provenance | Use publicly documented dataset references | `marling_2020_ohiot1dm` |
+| AGP-style research reports | Present dense glucose traces with time-in-ranges, modal-day percentile bands, and daily profiles | `idc_2025_agp_report_overview`, `attd_2019_time_in_range` |
 | Local AI setup and model selection docs | Keep Ollama and open Mistral setup instructions grounded in official docs | `ollama_linux_install`, `mistral_2025_ministral_3_announcement`, `mistral_2025_ministral_3_3b`, `mistral_2025_ministral_3_8b`, `mistral_2025_ministral_3_14b` |
 | Device emulation notes | Provide best-effort references behind 780G / Control-IQ / Omnipod 5 approximations | `bergenstal_2020_780g`, `fda_k193510_780g`, `medtronic_780g_user_guide`, `brown_2019_control_iq_dtt`, `fda_k191289_control_iq`, `idcl_nct03563313`, `control_iq_user_guide`, `assert_omnipod_5`, `onset_omnipod_5`, `fda_k203467_omnipod5`, `omnipod5_user_guide` |
 
@@ -117,6 +120,10 @@ That split is intentional:
 14. `marling_2020_ohiot1dm`
     Marling C, Bunescu R. *The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020*. CEUR Workshop Proceedings.  
     Paper: [ceur-ws.org/Vol-2675/paper2.pdf](http://ceur-ws.org/Vol-2675/paper2.pdf)
+
+15. `idc_2025_agp_report_overview`
+    HealthPartners Institute / International Diabetes Center. *Guide to Understanding the Ambulatory Glucose Profile (AGP) Report*. 2025.  
+    PDF: [healthpartners.com](https://www.healthpartners.com/institute/wp-content/uploads/2025/05/Ambulatory-Glucose-Profile-Report-Overview.pdf)
 
 ## Documentation-Only Local AI Setup Sources
 

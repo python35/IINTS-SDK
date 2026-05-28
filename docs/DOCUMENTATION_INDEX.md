@@ -8,10 +8,11 @@ Start in this order:
 
 1. [Choose Your Path](USER_GUIDE_MAP.md)
 2. [Quickstart](QUICKSTART.md)
-3. [Getting Started](GETTING_STARTED.md)
-4. [Installation](INSTALLATION.md)
-5. [Troubleshooting](TROUBLESHOOTING.md)
-6. [Command Reference](COMMAND_REFERENCE.md)
+3. [Command Cheatsheet](CLI_CHEATSHEET.md)
+4. [Getting Started](GETTING_STARTED.md)
+5. [Installation](INSTALLATION.md)
+6. [Troubleshooting](TROUBLESHOOTING.md)
+7. [Command Reference](COMMAND_REFERENCE.md)
 
 Beginner-friendly CLI entry points:
 - `iints start`
@@ -27,9 +28,11 @@ Go here first:
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
 - [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
+- [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md)
 - [Local AI Research](LOCAL_AI_RESEARCH.md)
 - [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
 - [MDMP Quickstart](MDMP_QUICKSTART.md)
+- [Complete Source Library](SOURCE_LIBRARY.md)
 - [Evidence Base](EVIDENCE_BASE.md)
 - [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md)
 
@@ -48,6 +51,7 @@ Start here:
 
 Read:
 - [Reference Hub](REFERENCE_OVERVIEW.md)
+- [Command Cheatsheet](CLI_CHEATSHEET.md)
 - [Command Reference](COMMAND_REFERENCE.md)
 - [CLI & Advanced Reference](TECHNICAL_README.md)
 

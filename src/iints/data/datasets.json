@@ -185,5 +185,244 @@
       "text": "NYU Data Catalog. T1D Exchange Clinic Registry. Accessed 2026-02-16. https://datacatalog.med.nyu.edu/dataset/10129",
       "bibtex": "@misc{t1d_exchange_registry, title={T1D Exchange Clinic Registry}, author={NYU Data Catalog}, note={Accessed 2026-02-16}, url={https://datacatalog.med.nyu.edu/dataset/10129}}"
     }
+  },
+  {
+    "id": "d1namo",
+    "name": "D1NAMO Open Dataset",
+    "source": "Zenodo / AISLab HES-SO",
+    "access": "manual",
+    "license": "Creative Commons Attribution Share Alike 4.0 International (CC BY-SA 4.0)",
+    "description": "Large open multimodal dataset for non-invasive type 1 diabetes research, distributed as a 10.2 GB Zenodo archive.",
+    "landing_page": "https://zenodo.org/records/1421616",
+    "download_urls": [
+      "https://zenodo.org/records/1421616/files/D1NAMO.tgz?download=1"
+    ],
+    "doi": "10.5281/zenodo.1421616",
+    "sha256": null,
+    "sha256_note": "Zenodo record publishes an MD5 for D1NAMO.tgz but not a pinned SHA-256; use --no-verify only after recording a local checksum.",
+    "modalities": [
+      "glucose",
+      "wearable physiology",
+      "food/activity context",
+      "multimodal raw signals"
+    ],
+    "ai_tasks": [
+      "multimodal glucose forecasting",
+      "wearable signal research",
+      "domain adaptation"
+    ],
+    "iints_status": "catalogued_manual_preparation_needed",
+    "recommended_use": "Exploratory multimodal feature research after local checksum and manual schema review.",
+    "recommended_prep_command": "iints import-data --input-csv <extracted_cgm_csv> --output-dir data_packs/public/d1namo/standard --data-format generic",
+    "limitations": [
+      "Very large archive; not suitable for quick demos or Jetson download over weak networks.",
+      "Requires manual inspection before model training because files are not in the IINTS standard schema."
+    ],
+    "citation": {
+      "text": "Dubosson F, Ranvier J-E, Bromuri S, Calbimonte J-P, Ruiz J, Schumacher M. The open D1NAMO dataset: A multi-modal dataset for research on non-invasive type 1 diabetes management. Zenodo, 2018. doi:10.5281/zenodo.1421616",
+      "bibtex": "@dataset{dubosson2018d1namo, title={The open D1NAMO dataset: A multi-modal dataset for research on non-invasive type 1 diabetes management}, author={Dubosson, Fabien and Ranvier, Jean-Eudes and Bromuri, Stefano and Calbimonte, Jean-Paul and Ruiz, Juan and Schumacher, Michael}, year={2018}, publisher={Zenodo}, doi={10.5281/zenodo.1421616}}"
+    }
+  },
+  {
+    "id": "t1dexi",
+    "name": "Type 1 Diabetes Exercise Initiative (T1DEXI)",
+    "source": "Jaeb Center / Vivli / Public Study Websites",
+    "access": "manual",
+    "license": "Public dataset terms / Vivli or Jaeb access terms apply",
+    "description": "Real-world type 1 diabetes exercise dataset with CGM, insulin, food, heart-rate/activity and exercise-session context.",
+    "landing_page": "https://public.jaeb.org/datasets/diabetes",
+    "doi": "10.25934/PR00008428",
+    "modalities": [
+      "CGM",
+      "insulin",
+      "carbohydrates",
+      "exercise sessions",
+      "heart rate/activity"
+    ],
+    "ai_tasks": [
+      "exercise-aware glucose forecasting",
+      "hypoglycemia-risk prediction",
+      "context-aware controller evaluation"
+    ],
+    "iints_status": "catalogued_manual_preparation_needed",
+    "recommended_use": "Primary external dataset for exercise and activity stress testing of local AI models.",
+    "recommended_prep_command": "iints import-data --input-csv <t1dexi_cgm_or_export_csv> --output-dir data_packs/public/t1dexi/standard --data-format generic",
+    "limitations": [
+      "Access and file structure may depend on the approved download path.",
+      "Do not mix adult and pediatric cohorts without cohort labels and subject-level splits."
+    ],
+    "citation": {
+      "text": "Type 1 Diabetes Exercise Initiative (T1DEXI). Public Study Websites / Jaeb Center for Health Research. doi:10.25934/PR00008428",
+      "bibtex": "@misc{t1dexi_public, title={Type 1 Diabetes EXercise Initiative: The Effect of Exercise on Glycemic Control in Type 1 Diabetes Study}, author={Jaeb Center for Health Research}, doi={10.25934/PR00008428}, url={https://public.jaeb.org/datasets/diabetes}}"
+    }
+  },
+  {
+    "id": "t1dexip",
+    "name": "Type 1 Diabetes Exercise Initiative Pediatric Study (T1DexiP)",
+    "source": "Jaeb Center / Public Study Websites",
+    "access": "manual",
+    "license": "Public dataset terms / Jaeb access terms apply",
+    "description": "Pediatric exercise-focused companion dataset with CGM and activity context for youth with type 1 diabetes.",
+    "landing_page": "https://public.jaeb.org/datasets/diabetes",
+    "doi": "10.25934/PR00008429",
+    "modalities": [
+      "CGM",
+      "insulin",
+      "carbohydrates",
+      "exercise sessions",
+      "pediatric cohort metadata"
+    ],
+    "ai_tasks": [
+      "pediatric exercise response analysis",
+      "cohort generalization checks",
+      "stress-scenario design"
+    ],
+    "iints_status": "catalogued_manual_preparation_needed",
+    "recommended_use": "Hold-out pediatric generalization dataset, not a direct training replacement for adult cohorts.",
+    "recommended_prep_command": "iints import-data --input-csv <t1dexip_cgm_or_export_csv> --output-dir data_packs/public/t1dexip/standard --data-format generic",
+    "limitations": [
+      "Pediatric data should be analyzed separately from adult data.",
+      "Requires strict cohort labeling and leakage-safe splits."
+    ],
+    "citation": {
+      "text": "Type 1 Diabetes Exercise Initiative Pediatric Study (T1DexiP). Public Study Websites / Jaeb Center for Health Research. doi:10.25934/PR00008429",
+      "bibtex": "@misc{t1dexip_public, title={Type 1 Diabetes EXercise Initiative Pediatric Study}, author={Jaeb Center for Health Research}, doi={10.25934/PR00008429}, url={https://public.jaeb.org/datasets/diabetes}}"
+    }
+  },
+  {
+    "id": "dclp3_idcl",
+    "name": "International Diabetes Closed Loop Trial (DCLP3 / iDCL)",
+    "source": "NIDDK Central Repository / Jaeb Center",
+    "access": "public-download",
+    "license": "Public dataset terms; repository and Jaeb conditions apply",
+    "description": "Closed-loop Control-IQ pivotal study dataset with CGM, insulin-pump, and clinical-study context for type 1 diabetes algorithm benchmarking.",
+    "landing_page": "https://repository.niddk.nih.gov/studies/dclp3/",
+    "download_urls": [
+      "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/DCLP3%20Public%20Dataset%20-%20Release%203%20-%202022-08-04.zip"
+    ],
+    "sha256": null,
+    "sha256_note": "Source page does not publish a pinned SHA-256; fetch with --no-verify only after recording local provenance.",
+    "modalities": [
+      "CGM",
+      "insulin pump",
+      "closed-loop mode",
+      "clinical trial arm"
+    ],
+    "ai_tasks": [
+      "closed-loop benchmark validation",
+      "algorithm comparison",
+      "external safety stress tests"
+    ],
+    "iints_status": "catalogued_downloadable_manual_preparation_needed",
+    "recommended_use": "External validation and benchmark-style comparisons after conversion to the IINTS standard schema.",
+    "recommended_prep_command": "iints import-data --input-csv <dclp3_export_csv> --output-dir data_packs/public/dclp3_idcl/standard --data-format generic",
+    "limitations": [
+      "Clinical-trial conditions are not equivalent to free-living user-generated data.",
+      "Respect trial-arm labels and avoid leakage across subjects."
+    ],
+    "citation": {
+      "text": "The International Diabetes Closed Loop (iDCL) Trial: Clinical Acceptance of the Artificial Pancreas (DCLP3). NIDDK Central Repository / Jaeb public dataset, Release 3, 2022-08-04.",
+      "bibtex": "@misc{dclp3_idcl_public, title={The International Diabetes Closed Loop (iDCL) Trial: Clinical Acceptance of the Artificial Pancreas (DCLP3)}, author={NIDDK Central Repository and Jaeb Center for Health Research}, year={2022}, url={https://repository.niddk.nih.gov/studies/dclp3/}}"
+    }
+  },
+  {
+    "id": "jaeb_loop",
+    "name": "Loop Observational Study Public Dataset",
+    "source": "Jaeb Center / Public Study Websites",
+    "access": "public-download",
+    "license": "Public dataset terms / Jaeb access terms apply",
+    "description": "Observational real-world dataset from people using the Loop automated insulin delivery system.",
+    "landing_page": "https://public.jaeb.org/datasets/diabetes",
+    "download_urls": [
+      "https://live-jchrpublicdatasets.s3.amazonaws.com/Diabetes/Public%20Datasets/Loop%20study%20public%20dataset%202023-01-31.zip"
+    ],
+    "sha256": null,
+    "sha256_note": "Source page does not publish a pinned SHA-256; fetch with --no-verify only after recording local provenance.",
+    "modalities": [
+      "CGM",
+      "insulin pump",
+      "AID system context",
+      "real-world longitudinal data"
+    ],
+    "ai_tasks": [
+      "real-world AID comparison",
+      "policy imitation research",
+      "generalization stress tests"
+    ],
+    "iints_status": "catalogued_downloadable_manual_preparation_needed",
+    "recommended_use": "External real-world AID validation after local schema conversion and subject-level splitting.",
+    "recommended_prep_command": "iints import-data --input-csv <loop_export_csv> --output-dir data_packs/public/jaeb_loop/standard --data-format generic",
+    "limitations": [
+      "Large real-world files may need preprocessing on a laptop before Jetson use.",
+      "Use as an external validation source rather than as the only training source."
+    ],
+    "citation": {
+      "text": "An Observational Study of Individuals with Type 1 Diabetes Using the Loop System for Automated Insulin Delivery. Jaeb Center Public Study Websites, public dataset 2023-01-31.",
+      "bibtex": "@misc{jaeb_loop_public, title={An Observational Study of Individuals with Type 1 Diabetes Using the Loop System for Automated Insulin Delivery}, author={Jaeb Center for Health Research}, year={2023}, url={https://public.jaeb.org/datasets/diabetes}}"
+    }
+  },
+  {
+    "id": "metabonet",
+    "name": "MetaboNet Consolidated T1D Dataset",
+    "source": "MetaboNet / arXiv",
+    "access": "mixed",
+    "license": "Mixed: public subset plus DUA-governed sources; check each component dataset",
+    "description": "Consolidated T1D management resource combining datasets with overlapping CGM and insulin pump dosing records into a standardized format.",
+    "landing_page": "https://metabo-net.org/",
+    "doi": "10.48550/arXiv.2601.11505",
+    "modalities": [
+      "CGM",
+      "insulin pump",
+      "carbohydrates",
+      "physical activity where available",
+      "standardized multi-dataset format"
+    ],
+    "ai_tasks": [
+      "large-scale glucose forecasting",
+      "cross-dataset generalization",
+      "external benchmark design"
+    ],
+    "iints_status": "catalogued_external_standardization_source",
+    "recommended_use": "Best long-term target for broad external validation once local access and terms are documented.",
+    "recommended_prep_command": "Use MetaboNet's provided conversion pipeline, then map the exported time-series columns into IINTS with iints import-data or iints research blend-datasets.",
+    "limitations": [
+      "Not all components are unrestricted; keep source dataset lineage and access terms in model cards.",
+      "Do not treat a consolidated benchmark as independent evidence if its source datasets overlap with training data."
+    ],
+    "citation": {
+      "text": "Wolff MK, Calhoun P, Aiello EM, Qin Y, Royston SF. MetaboNet: The Largest Publicly Available Consolidated Dataset for Type 1 Diabetes Management. arXiv:2601.11505, 2026.",
+      "bibtex": "@misc{wolff2026metabonet, title={MetaboNet: The Largest Publicly Available Consolidated Dataset for Type 1 Diabetes Management}, author={Wolff, Miriam K. and Calhoun, Peter and Aiello, Eleonora Maria and Qin, Yao and Royston, Sam F.}, year={2026}, eprint={2601.11505}, archivePrefix={arXiv}, primaryClass={cs.LG}, doi={10.48550/arXiv.2601.11505}}"
+    }
+  },
+  {
+    "id": "glucose_ml",
+    "name": "Glucose-ML Dataset Collection",
+    "source": "arXiv / Glucose-ML authors",
+    "access": "collection",
+    "license": "Collection of third-party datasets; license and access depend on each linked dataset",
+    "description": "Benchmark-oriented collection of longitudinal diabetes datasets intended to guide robust AI development and short-term glucose prediction comparisons.",
+    "landing_page": "https://arxiv.org/abs/2507.14077",
+    "doi": "10.48550/arXiv.2507.14077",
+    "modalities": [
+      "CGM",
+      "longitudinal diabetes datasets",
+      "benchmark metadata"
+    ],
+    "ai_tasks": [
+      "dataset selection",
+      "robustness benchmarking",
+      "cross-dataset comparison"
+    ],
+    "iints_status": "catalogued_benchmark_collection",
+    "recommended_use": "Use as a research map to choose external datasets and benchmark protocols; do not treat it as one homogeneous training set.",
+    "recommended_prep_command": "Use iints data research-plan to select concrete source datasets, then prepare each dataset separately before iints research blend-datasets.",
+    "limitations": [
+      "It is a collection/reference, not a single standardized raw data file.",
+      "Each component dataset needs separate provenance, license, and leakage checks."
+    ],
+    "citation": {
+      "text": "Prioleau T, Lu B, Cui Y. Glucose-ML: A collection of longitudinal diabetes datasets for development of robust AI solutions. arXiv:2507.14077, 2025.",
+      "bibtex": "@misc{prioleau2025glucoseml, title={Glucose-ML: A collection of longitudinal diabetes datasets for development of robust AI solutions}, author={Prioleau, Temiloluwa and Lu, Baiying and Cui, Yanjun}, year={2025}, eprint={2507.14077}, archivePrefix={arXiv}, primaryClass={cs.AI}, doi={10.48550/arXiv.2507.14077}}"
+    }
   }
 ]

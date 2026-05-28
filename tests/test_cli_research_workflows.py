@@ -155,3 +155,33 @@ def test_research_train_local_ai_alias_is_available() -> None:
 
     assert result.exit_code == 0
     assert "--run" in result.stdout
+
+
+def test_report_command_generates_agp_style_bundle(tmp_path) -> None:
+    results_csv = tmp_path / "results.csv"
+    bundle_dir = tmp_path / "report_bundle"
+    pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 24 * 60, 5)),
+            "glucose_actual_mgdl": [110.0 + (idx % 48) * 1.8 for idx in range(288)],
+        }
+    ).to_csv(results_csv, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "report",
+            "--results-csv",
+            str(results_csv),
+            "--bundle-dir",
+            str(bundle_dir),
+            "--style",
+            "agp",
+            "--subject-name",
+            "CLI demo",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (bundle_dir / "agp_report.pdf").is_file()
+    assert (bundle_dir / "agp_summary.json").is_file()

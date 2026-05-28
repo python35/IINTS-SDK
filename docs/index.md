@@ -1,152 +1,70 @@
----
-hide:
-  - toc
----
+# IINTS-AF SDK Documentation
 
-<div class="home-shell">
-  <section class="home-hero">
-    <div class="home-brand-row">
-      <img src="assets/iints-mark.png" alt="IINTS-AF logo" class="home-brand-mark">
-      <span>IINTS-AF SDK</span>
-    </div>
-    <div class="home-hero-grid">
-      <div class="home-hero-copy">
-        <p class="home-kicker">Safety-first insulin algorithm research</p>
-        <h1>Documentation that starts with what you need to do.</h1>
-        <p class="home-lead">
-          IINTS-AF helps you simulate virtual patients, validate glucose data,
-          study insulin algorithms, and package evidence that other people can inspect.
-        </p>
-        <div class="home-action-row">
-          <a class="home-button home-button-primary" href="./QUICKSTART/">Start in 5 minutes</a>
-          <a class="home-button" href="./USER_GUIDE_MAP/">Choose your path</a>
-          <a class="home-button" href="./OBSIDIAN_PUBLIC_VAULT/">Obsidian vault</a>
-          <a class="home-button" href="./DEVELOPER_PORTAL/">Developer portal</a>
-        </div>
-      </div>
-      <div class="home-summary-panel" aria-label="What the SDK covers">
-        <div class="home-summary-item">
-          <span class="home-summary-label">Simulate</span>
-          <strong>Virtual-patient runs</strong>
-        </div>
-        <div class="home-summary-item">
-          <span class="home-summary-label">Validate</span>
-          <strong>MDMP + realism checks</strong>
-        </div>
-        <div class="home-summary-item">
-          <span class="home-summary-label">Deploy</span>
-          <strong>Pi, UNO Q, Jetson</strong>
-        </div>
-        <div class="home-summary-item">
-          <span class="home-summary-label">Explain</span>
-          <strong>Reports + audit trails</strong>
-        </div>
-      </div>
-    </div>
-  </section>
+IINTS-AF is a research and education SDK for insulin-algorithm simulation, glucose-data quality review, local AI experiments, and bench-only hardware workflows.
 
-  <section class="home-section">
-    <div class="home-section-head">
-      <h2>Pick The Route That Matches You</h2>
-      <p>Do not read the whole site from top to bottom. Start from the job you have today.</p>
-    </div>
-    <div class="home-route-grid">
-      <a class="home-route-card" href="./QUICKSTART/">
-        <span class="home-route-label">New here</span>
-        <span class="home-route-title">Get one successful run</span>
-        <span class="home-route-body">Install the SDK, verify the environment, and run the first demo without learning every subsystem first.</span>
-      </a>
-      <a class="home-route-card" href="./WORKFLOWS/">
-        <span class="home-route-label">Researcher</span>
-        <span class="home-route-title">Run a defensible study</span>
-        <span class="home-route-body">Move from scenario design to comparisons, plots, reports, and evidence you can hand to a reviewer.</span>
-      </a>
-      <a class="home-route-card" href="./MDMP_QUICKSTART/">
-        <span class="home-route-label">Data quality</span>
-        <span class="home-route-title">Check whether data is trustworthy</span>
-        <span class="home-route-body">Certify datasets, inspect realism, and keep claims linked to provenance instead of pretty-looking curves.</span>
-      </a>
-      <a class="home-route-card" href="./HARDWARE/">
-        <span class="home-route-label">Hardware</span>
-        <span class="home-route-title">Deploy on an edge device</span>
-        <span class="home-route-body">Choose between Raspberry Pi, Arduino UNO Q, or Jetson and follow the simplest path for that board.</span>
-      </a>
-      <a class="home-route-card" href="./DEVELOPER_PORTAL/">
-        <span class="home-route-label">Developer</span>
-        <span class="home-route-title">Change the SDK safely</span>
-        <span class="home-route-body">Find architecture, generated API docs, contribution rules, and the checks required before you merge code.</span>
-      </a>
-      <a class="home-route-card" href="./OBSIDIAN_PUBLIC_VAULT/">
-        <span class="home-route-label">Knowledge vault</span>
-        <span class="home-route-title">Explore the connected project map</span>
-        <span class="home-route-body">Download the public Obsidian vault with SDK workflows, hardware notes, source evidence, demos, and glossaries.</span>
-      </a>
-    </div>
-  </section>
+!!! warning "Scope"
+    IINTS-AF is not a medical device, does not provide clinical dosing advice, and is not intended for real insulin delivery. Use it for simulation, teaching, benchmarking, documentation, and controlled bench research.
 
-  <section class="home-section">
-    <div class="home-section-head">
-      <h2>The Core Workflow</h2>
-      <p>Most SDK work is the same four-step story.</p>
-    </div>
-    <div class="home-flow-grid">
-      <div class="home-flow-step">
-        <span>01</span>
-        <strong>Configure</strong>
-        <p>Choose a patient, scenario, algorithm, and seed.</p>
-      </div>
-      <div class="home-flow-step">
-        <span>02</span>
-        <strong>Run</strong>
-        <p>Generate a reproducible simulation bundle.</p>
-      </div>
-      <div class="home-flow-step">
-        <span>03</span>
-        <strong>Validate</strong>
-        <p>Check data quality, safety, and realism.</p>
-      </div>
-      <div class="home-flow-step">
-        <span>04</span>
-        <strong>Review</strong>
-        <p>Inspect reports, manifests, plots, and audit trails.</p>
-      </div>
-    </div>
-  </section>
+## Start Here
 
-  <section class="home-section">
-    <div class="home-section-head">
-      <h2>Three Useful Starting Points</h2>
-      <p>If you are unsure where to begin, these are the safest bets.</p>
-    </div>
-    <div class="home-card-grid">
-      <a class="home-card" href="./GETTING_STARTED/">
-        <span class="home-card-title">Getting Started</span>
-        <span class="home-card-body">The shortest reliable route from installation to a full run bundle.</span>
-      </a>
-      <a class="home-card" href="./COMMAND_REFERENCE/">
-        <span class="home-card-title">Command Reference</span>
-        <span class="home-card-body">A compact CLI map when you already know the result you want.</span>
-      </a>
-      <a class="home-card" href="./REFERENCE_OVERVIEW/">
-        <span class="home-card-title">Reference Hub</span>
-        <span class="home-card-body">Manuals, evidence, API docs, commands, and release history in one place.</span>
-      </a>
-    </div>
-  </section>
+| Need | Page | Command |
+| --- | --- | --- |
+| Install and verify the SDK | [Quickstart](QUICKSTART.md) | `iints doctor --smoke-run` |
+| Choose the right workflow | [Choose Your Path](USER_GUIDE_MAP.md) | `iints guide` |
+| Look up practical commands | [Command Cheatsheet](CLI_CHEATSHEET.md) | `iints --help` |
+| Prepare a live demonstration | [Booth Demo & Presentation](BOOTH_DEMO.md) | `iints demo` |
+| Understand sources and assumptions | [Complete Source Library](SOURCE_LIBRARY.md) | `iints sources` |
+| Work with hardware | [Hardware Hub](HARDWARE.md) | `iints edge doctor` |
 
-  <section class="home-section home-command-section">
-    <div class="home-section-head">
-      <h2>First Commands</h2>
-      <p>The smallest useful sequence for a fresh machine.</p>
-    </div>
-    <pre class="home-command"><code>python3 -m venv .venv
+## What The SDK Covers
+
+| Area | What it does | Main pages |
+| --- | --- | --- |
+| Simulation | Runs virtual-patient scenarios with algorithms, safety supervision, and reproducible outputs | [Getting Started](GETTING_STARTED.md), [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| Data quality | Imports CGM/pump data, checks realism, and creates MDMP-style certification artifacts | [MDMP Quickstart](MDMP_QUICKSTART.md), [Real-Data Realism Gate](REAL_DATA_REALISM.md) |
+| Research datasets | Tracks public and request-gated diabetes datasets for local AI research | [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md), [Local AI Research](LOCAL_AI_RESEARCH.md) |
+| Reports | Generates run reports, evidence bundles, posters, and AGP-style research glucose summaries | [Research Evidence Bundle](EVIDENCE_BUNDLE.md), [Command Reference](COMMAND_REFERENCE.md) |
+| Edge hardware | Supports Raspberry Pi, Jetson endurance runs, and bench-only Pico/UNO workflows | [Hardware Hub](HARDWARE.md), [Jetson Endurance Mode](JETSON_ENDURANCE.md), [Raspberry Pi Pico Pump Lab](PICO_PUMP_LAB.md) |
+| Development | Documents architecture, API symbols, contribution checks, and release maintenance | [Developer Portal](DEVELOPER_PORTAL.md), [API Reference](API_REFERENCE.md), [Maintainer Guide](MAINTAINER_GUIDE.md) |
+
+## Core Workflow
+
+1. Configure a patient, scenario, algorithm, seed, and safety settings.
+2. Run a simulation or long study and preserve the output bundle.
+3. Validate results with realism, safety, and reproducibility checks.
+4. Package evidence through reports, manifests, plots, and citations.
+
+## First Commands
+
+```bash
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[full,mdmp]"
+python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge]"
 
 iints doctor --smoke-run
-iints demo</code></pre>
-  </section>
+iints demo --audience jury --output-dir results/live_demo
+```
 
-  <p class="home-scope"><strong>Scope:</strong> research use only. IINTS-AF is not a medical device and does not provide clinical dosing advice.</p>
-</div>
+For source-install testing from the latest GitHub version:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge] @ git+https://github.com/python35/IINTS-SDK.git"
+```
+
+## What To Read Next
+
+| If you are... | Read next |
+| --- | --- |
+| A first-time user | [Quickstart](QUICKSTART.md) then [Getting Started](GETTING_STARTED.md) |
+| Preparing for a jury or booth demo | [Booth Demo & Presentation](BOOTH_DEMO.md) then [Command Cheatsheet](CLI_CHEATSHEET.md) |
+| Training local AI models | [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) then [Local AI Research](LOCAL_AI_RESEARCH.md) |
+| Reviewing evidence | [Complete Source Library](SOURCE_LIBRARY.md) then [Research Evidence Bundle](EVIDENCE_BUNDLE.md) |
+| Building hardware demos | [Hardware Hub](HARDWARE.md) then the board-specific guide |
+| Maintaining the SDK | [Developer Portal](DEVELOPER_PORTAL.md) then [Contribute Safely](CONTRIBUTING_SAFELY.md) |
+
+## Project Boundary
+
+IINTS-AF is useful for asking research questions such as whether a simulation is reproducible, whether a glucose trace is plausible, whether a controller behaves safely in a virtual patient, and whether a demo can be explained transparently.
+
+It is not proof that an insulin algorithm is clinically safe. Any real-world medical use would require clinical validation, regulatory review, cybersecurity review, hardware verification, and qualified medical oversight outside the scope of this SDK.

@@ -6,7 +6,7 @@ Use this page when you know what you want to achieve, but not yet which guide de
 
 1. [Quickstart](QUICKSTART.md) - prove the SDK works on your machine.
 2. [Getting Started](GETTING_STARTED.md) - make your first complete run bundle.
-3. [Workflow Hub](WORKFLOWS.md) - continue into research, data, AI, or demo work.
+3. [Command Cheatsheet](CLI_CHEATSHEET.md) - keep the practical commands next to you.
 
 ## Choose By Goal
 
@@ -22,7 +22,7 @@ Use this page when you know what you want to achieve, but not yet which guide de
 | prepare a live demo | [Booth Demo Guide](BOOTH_DEMO.md) | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) | `iints demo` |
 | deploy hardware | [Hardware Hub](HARDWARE.md) | board-specific guide | `iints edge quickstart` |
 | change SDK code | [Developer Portal](DEVELOPER_PORTAL.md) | [Contribute Safely](CONTRIBUTING_SAFELY.md) | `tools/dev/sdk_check.sh quick` |
-| look up a command fast | [Command Reference](COMMAND_REFERENCE.md) | [Reference Hub](REFERENCE_OVERVIEW.md) | `iints --help` |
+| look up a command fast | [Command Cheatsheet](CLI_CHEATSHEET.md) | [Command Reference](COMMAND_REFERENCE.md) | `iints --help` |
 
 ## Choose By Role
 

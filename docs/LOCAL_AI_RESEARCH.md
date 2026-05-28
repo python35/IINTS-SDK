@@ -17,11 +17,22 @@ Do **not** confuse them:
 
 ## Recommended Data Strategy
 
+Start by generating the dataset acquisition plan:
+
+```bash
+iints data research-plan --output-dir data_packs/research_dataset_plan
+```
+
+The full source map lives in [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md).
+
 | Dataset family | Best current role | Why |
 | --- | --- | --- |
 | AZT1D | primary multimodal predictor training | real AID-system data with detailed bolus variables |
 | HUPA-UCM | multimodal predictor training and subgroup analysis | CGM, insulin, carbs, steps, calories, heart rate, sleep |
 | OhioT1DM | external held-out benchmark | widely used T1D forecasting benchmark with CGM, insulin, meals, exercise, and life events |
+| DCLP3/iDCL and Loop | closed-loop / AID external validation | useful for benchmark-style comparisons after schema conversion |
+| T1DEXI / T1DexiP | exercise-aware stress testing | captures exercise context that ordinary meal-only scenarios miss |
+| MetaboNet / Glucose-ML | dataset-selection references | useful for cross-dataset benchmark design and source discovery |
 | Jetson / simulator teacher runs | controller-policy imitation data | gives exact safe-action labels under known scenarios |
 
 The scientific split is intentional:

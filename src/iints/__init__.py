@@ -211,6 +211,27 @@ def generate_demo_report(
         title="IINTS-AF Demo Report",
     )
 
+def generate_agp_report(
+    simulation_results: 'pd.DataFrame',
+    output_path: Optional[str] = None,
+    safety_report: Optional[dict] = None,
+    subject_name: str = "Research simulation",
+    summary_json_path: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Generate an AGP-style research PDF report from dense CGM/simulation data.
+    """
+    if output_path is None:
+        return None
+    generator = ClinicalReportGenerator()
+    return generator.generate_agp_pdf(
+        simulation_results,
+        output_path,
+        subject_name=subject_name,
+        safety_report=safety_report or {},
+        summary_json_path=summary_json_path,
+    )
+
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`
 __all__ = [
     # API
@@ -287,6 +308,7 @@ __all__ = [
     "generate_report",
     "generate_quickstart_report",
     "generate_demo_report",
+    "generate_agp_report",
     "generate_results_poster",
     # High-level API
     "run_simulation",
