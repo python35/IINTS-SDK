@@ -15,6 +15,7 @@ from iints.core.simulator import Simulator
 from iints.core.devices.models import SensorModel, create_sensor_model
 from iints.core.safety import SafetyConfig
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
+from iints.analysis.run_quality import write_run_quality_artifacts
 from iints.validation import (
     build_stress_events,
     load_scenario,
@@ -220,6 +221,14 @@ def run_simulation(
             output_path / "baseline",
         )
 
+    quality_outputs = write_run_quality_artifacts(
+        results_df,
+        output_path,
+        run_label=run_id,
+        safety_report=safety_report,
+    )
+    outputs["quality_artifacts"] = quality_outputs
+
     if generate_report:
         report_path = output_path / "clinical_report.pdf"
         generator = _get_clinical_report_generator()()
@@ -247,6 +256,17 @@ def run_simulation(
         manifest_files["baseline_csv"] = Path(baseline_files.get("csv", ""))
     if "profiling_path" in outputs:
         manifest_files["profiling"] = Path(outputs["profiling_path"])
+    quality_outputs = outputs.get("quality_artifacts", {})
+    if isinstance(quality_outputs, dict):
+        for manifest_key, output_key in {
+            "realism_report": "realism_report_json",
+            "realism_dashboard": "realism_dashboard_html",
+            "safety_visualizer": "safety_visualizer_html",
+            "safety_visualizer_json": "safety_visualizer_json",
+        }.items():
+            output_value = quality_outputs.get(output_key)
+            if output_value:
+                manifest_files[manifest_key] = Path(str(output_value))
 
     run_manifest = build_run_manifest(output_path, manifest_files)
     run_manifest_path = output_path / "run_manifest.json"
@@ -377,6 +397,14 @@ def run_full(
     outputs["audit"] = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
     outputs["baseline_files"] = write_baseline_comparison(comparison, output_path / "baseline")
 
+    quality_outputs = write_run_quality_artifacts(
+        results_df,
+        output_path,
+        run_label=run_id,
+        safety_report=safety_report,
+    )
+    outputs["quality_artifacts"] = quality_outputs
+
     report_path = output_path / "clinical_report.pdf"
     generator = _get_clinical_report_generator()()
     generator.generate_pdf(results_df, safety_report, str(report_path))
@@ -402,6 +430,17 @@ def run_full(
         manifest_files["baseline_csv"] = Path(baseline_files.get("csv", ""))
     if "profiling_path" in outputs:
         manifest_files["profiling"] = Path(outputs["profiling_path"])
+    quality_outputs = outputs.get("quality_artifacts", {})
+    if isinstance(quality_outputs, dict):
+        for manifest_key, output_key in {
+            "realism_report": "realism_report_json",
+            "realism_dashboard": "realism_dashboard_html",
+            "safety_visualizer": "safety_visualizer_html",
+            "safety_visualizer_json": "safety_visualizer_json",
+        }.items():
+            output_value = quality_outputs.get(output_key)
+            if output_value:
+                manifest_files[manifest_key] = Path(str(output_value))
 
     run_manifest = build_run_manifest(output_path, manifest_files)
     run_manifest_path = output_path / "run_manifest.json"

@@ -393,6 +393,38 @@ class ClinicalReportGenerator:
 
         return str(output_file)
 
+    def export_agp_assets(
+        self,
+        simulation_data: pd.DataFrame,
+        output_dir: str,
+        *,
+        subject_name: str = "Research simulation",
+        target_low: float = 70.0,
+        target_high: float = 180.0,
+        summary_json_path: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """Export AGP-style PNGs and summary JSON without creating a PDF."""
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        df = self._prepare_agp_frame(simulation_data)
+        summary = self._agp_summary(df, target_low=target_low, target_high=target_high)
+        summary["subject_name"] = subject_name
+
+        agp_plot = output_path / "agp_profile.png"
+        daily_plot = output_path / "daily_profiles.png"
+        summary_file = Path(summary_json_path) if summary_json_path else output_path / "agp_summary.json"
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+
+        self._plot_agp_profile(df, agp_plot, target_low=target_low, target_high=target_high)
+        self._plot_daily_profiles(df, daily_plot, target_low=target_low, target_high=target_high)
+        summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+        return {
+            "agp_profile_png": str(agp_plot),
+            "daily_profiles_png": str(daily_plot),
+            "summary_json": str(summary_file),
+        }
+
     def export_plots(self, simulation_data: pd.DataFrame, output_dir: str) -> Dict[str, str]:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)

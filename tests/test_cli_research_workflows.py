@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 from typer.testing import CliRunner
 
+from iints.analysis.run_quality import write_run_quality_artifacts
 from iints.cli.cli import app
 
 
@@ -114,6 +115,64 @@ def test_evidence_build_creates_public_bundle(tmp_path) -> None:
     assert (output_dir / "MODEL_CARD.md").is_file()
     assert (output_dir / "evidence_summary.json").is_file()
     assert (output_dir / "run_index.csv").is_file()
+
+
+def test_safety_visualize_writes_html_and_json(tmp_path) -> None:
+    results_csv = tmp_path / "results.csv"
+    pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10, 15],
+            "glucose_actual_mgdl": [120.0, 118.0, 62.0, 65.0],
+            "algo_recommended_insulin_units": [0.0, 0.5, 1.0, 0.0],
+            "delivered_insulin_units": [0.0, 0.5, 0.0, 0.0],
+            "safety_triggered": [False, False, True, False],
+            "safety_reason": ["", "", "hypoglycemia risk", ""],
+        }
+    ).to_csv(results_csv, index=False)
+
+    output_html = tmp_path / "safety.html"
+    output_json = tmp_path / "safety.json"
+    result = runner.invoke(
+        app,
+        [
+            "safety-visualize",
+            "--results-csv",
+            str(results_csv),
+            "--output-html",
+            str(output_html),
+            "--output-json",
+            str(output_json),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_html.is_file()
+    assert output_json.is_file()
+    summary = json.loads(output_json.read_text())
+    assert summary["intervention_count"] == 1
+    assert "hypoglycemia risk" in summary["top_reasons"]
+
+
+def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> None:
+    df = pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 1440, 5)),
+            "glucose_actual_mgdl": [120.0 + (idx % 48) * 0.8 for idx in range(288)],
+            "carb_intake_grams": [45.0 if idx in {18, 84, 156} else 0.0 for idx in range(288)],
+            "algo_recommended_insulin_units": [0.4 if idx in {18, 84, 156} else 0.0 for idx in range(288)],
+            "delivered_insulin_units": [0.4 if idx in {18, 84, 156} else 0.0 for idx in range(288)],
+            "safety_triggered": [False for _ in range(288)],
+            "safety_reason": ["" for _ in range(288)],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(df, tmp_path, run_label="quality-test", safety_report={})
+
+    assert Path(outputs["realism_report_json"]).is_file()
+    assert Path(outputs["realism_dashboard_html"]).is_file()
+    assert Path(outputs["safety_visualizer_html"]).is_file()
+    assert Path(outputs["safety_visualizer_json"]).is_file()
+    assert "verdict" in outputs["realism_review"]
 
 
 def test_top_level_pump_compile_and_bench_test(tmp_path) -> None:

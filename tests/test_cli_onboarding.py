@@ -18,6 +18,16 @@ def test_version_flag_reports_installed_sdk_version() -> None:
     assert "IINTS-AF SDK" in result.stdout
 
 
+def test_update_dry_run_prints_current_environment_command() -> None:
+    result = runner.invoke(app, ["update", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "IINTS SDK updater" in result.stdout
+    assert "python" in result.stdout.lower()
+    assert "pip install -U" in result.stdout
+    assert "iints-sdk-python35[full,mdmp,research,edge]" in result.stdout
+
+
 def test_run_dry_run_supports_builtin_preset(tmp_path) -> None:
     output_dir = tmp_path / "demo_run"
 

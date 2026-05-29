@@ -3,14 +3,14 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **176**
+Documented modules: **178**
 
 ## Package Index
 
 | Package | Modules |
 | --- | ---: |
 | `ai` | 11 |
-| `analysis` | 28 |
+| `analysis` | 30 |
 | `api` | 4 |
 | `cli` | 3 |
 | `core` | 32 |
@@ -71,7 +71,9 @@ Documented modules: **176**
 - [`iints.analysis.population_report`](#iintsanalysispopulation_report)
 - [`iints.analysis.poster`](#iintsanalysisposter)
 - [`iints.analysis.reporting`](#iintsanalysisreporting)
+- [`iints.analysis.run_quality`](#iintsanalysisrun_quality)
 - [`iints.analysis.safety_index`](#iintsanalysissafety_index)
+- [`iints.analysis.safety_visualizer`](#iintsanalysissafety_visualizer)
 - [`iints.analysis.sensor_filtering`](#iintsanalysissensor_filtering)
 - [`iints.analysis.study_analysis`](#iintsanalysisstudy_analysis)
 - [`iints.analysis.study_engine`](#iintsanalysisstudy_engine)
@@ -284,7 +286,7 @@ Documented modules: **176**
 
 - Source: `src/iints/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_agp_report, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
+- Explicit exports: `InsulinAlgorithm, AlgorithmInput, AlgorithmResult, AlgorithmMetadata, WhyLogEntry, Simulator, StressEvent, PatientModel, DeviceManager, PatientFactory, PatientProfile, SimulationLimitError, SafetySupervisor, SafetyConfig, SensorModel, PumpModel, SENSOR_PROFILES, create_sensor_model, StandardPumpAlgorithm, ConstantDoseAlgorithm, RandomDoseAlgorithm, RunawayAIAlgorithm, StackingAIAlgorithm, DataIngestor, ImportResult, export_demo_csv, export_standard_csv, guess_column_mapping, import_carelink_csv, import_carelink_timeline, import_cgm_csv, import_cgm_dataframe, load_carelink_event_log, load_demo_dataframe, scenario_from_csv, scenario_from_dataframe, summarize_carelink_csv, NightscoutConfig, import_nightscout, TidepoolClient, TidepoolConfig, import_tidepool, load_openapi_spec, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, AVAILABLE_STUDY_CORRUPTIONS, apply_study_corruptions, write_corrupted_study_csv, generate_benchmark_metrics, build_booth_demo, build_carelink_workbench, build_study_protocol_payload, render_study_protocol_markdown, write_study_protocol_bundle, ClinicalReportGenerator, EnergyEstimate, estimate_energy_per_decision, AIResponse, IINTSAssistant, MDMPGuard, create_edge_bundle, export_edge_setup, LivePatientDaemon, PatientRuntimeConfig, create_patient_app, export_uno_q_bridge, get_runtime_scenario_profile, list_runtime_scenario_profiles, run_edge_benchmark, summarize_edge_workspace, write_edge_update_script, generate_report, generate_quickstart_report, generate_demo_report, generate_agp_report, generate_agp_assets, generate_results_poster, run_simulation, run_full, run_population, ScenarioGeneratorConfig, generate_random_scenario, PopulationGenerator, PopulationConfig, ParameterDistribution, PopulationRunner, PopulationResult, PatientResult, BergmanPatientModel`
 
 ### Public Functions
 
@@ -295,6 +297,7 @@ Documented modules: **176**
 - `generate_quickstart_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
 - `generate_demo_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
 - `generate_agp_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None, subject_name: str = 'Research simulation', summary_json_path: Optional[str] = None) -> Optional[str]`
+- `generate_agp_assets(simulation_results: 'pd.DataFrame', output_dir: Optional[str] = None, subject_name: str = 'Research simulation', summary_json_path: Optional[str] = None) -> Optional[dict]`
 
 ## `iints.ai`
 
@@ -846,9 +849,20 @@ No public classes, functions, or all-caps constants are declared directly in thi
 #### `ClinicalReportGenerator` methods
 
 - `generate_agp_pdf(self, simulation_data: pd.DataFrame, output_path: str, *, title: str = 'IINTS Research AGP-Style Report', subject_name: str = 'Research simulation', safety_report: Optional[Dict[str, Any]] = None, target_low: float = 70.0, target_high: float = 180.0, summary_json_path: Optional[str] = None) -> str`
+- `export_agp_assets(self, simulation_data: pd.DataFrame, output_dir: str, *, subject_name: str = 'Research simulation', target_low: float = 70.0, target_high: float = 180.0, summary_json_path: Optional[str] = None) -> Dict[str, str]`
 - `export_plots(self, simulation_data: pd.DataFrame, output_dir: str) -> Dict[str, str]`
 - `generate_pdf(self, simulation_data: pd.DataFrame, safety_report: Dict[str, Any], output_path: str, title: str = 'IINTS-AF Clinical Report') -> str`
 - `generate_demo_pdf(self, simulation_data: pd.DataFrame, safety_report: Dict[str, Any], output_path: str, title: str = 'IINTS-AF Demo Report') -> str`
+
+## `iints.analysis.run_quality`
+
+- Source: `src/iints/analysis/run_quality.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `standardize_simulation_for_realism(results_df: pd.DataFrame) -> pd.DataFrame`
+- `write_run_quality_artifacts(results_df: pd.DataFrame, output_dir: str | Path, *, run_label: Optional[str] = None, safety_report: Optional[Dict[str, Any]] = None, realism_reference: str = 'free_living_t1d') -> Dict[str, Any]`
 
 ## `iints.analysis.safety_index`
 
@@ -874,6 +888,17 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `DEFAULT_WEIGHTS`
 - `NORM_SCALES`
+
+## `iints.analysis.safety_visualizer`
+
+- Source: `src/iints/analysis/safety_visualizer.py`
+- Summary: No module docstring.
+
+### Public Functions
+
+- `summarize_safety_trace(results_df: pd.DataFrame, safety_report: Optional[Dict[str, Any]] = None) -> Dict[str, Any]`
+- `build_safety_visualizer_html(results_df: pd.DataFrame, safety_report: Optional[Dict[str, Any]] = None, *, title: str = 'IINTS Safety Contract Visualizer') -> str`
+- `write_safety_visualizer(results_df: pd.DataFrame, output_html: str | Path, *, output_json: str | Path | None = None, safety_report: Optional[Dict[str, Any]] = None, title: str = 'IINTS Safety Contract Visualizer') -> Dict[str, str]`
 
 ## `iints.analysis.sensor_filtering`
 
@@ -1193,6 +1218,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `app_callback(ctx: typer.Context, version: Annotated[bool, typer.Option('--version', help='Show the installed SDK version and exit.', is_eager=True)] = False)`
 - `evaluate(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], population: Annotated[int, typer.Option(help='Number of virtual patients to simulate')] = 100, patient_config_name: Annotated[str, typer.Option('--patient-config', help='Base patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option('--patient-config-path', help='Path to base patient config YAML')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario', help='Path to scenario JSON')] = None, duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Time step in minutes')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory')] = None, max_workers: Annotated[Optional[int], typer.Option(help='Max parallel workers (default: all cores)')] = None, seed: Annotated[Optional[int], typer.Option(help='Random seed for reproducibility')] = None, patient_model: Annotated[str, typer.Option('--patient-model', help='Patient model: auto, bergman, custom, simglucose')] = 'auto')`
 - `doctor(smoke_run: Annotated[bool, typer.Option(help='Run a short deterministic smoke simulation')] = False, smoke_duration: Annotated[int, typer.Option(help='Smoke simulation duration in minutes')] = 30, full: Annotated[bool, typer.Option('--full', help='Run extra environment checks that help beginners debug setup issues')] = False, suggest: Annotated[bool, typer.Option('--suggest', help='Print concrete next commands based on what doctor finds')] = False)`
+- `update_sdk(source: Annotated[str, typer.Option(help='Update source: pypi or github.')] = 'pypi', install_extras: Annotated[str, typer.Option('--extras', help='Comma-separated extras to install, e.g. full,mdmp,research,edge. Use empty string for none.')] = 'full,mdmp,research,edge', github_ref: Annotated[str, typer.Option('--github-ref', help='Git ref used with --source github.')] = 'main', user: Annotated[bool, typer.Option('--user/--no-user', help='Pass --user to pip for user-site installs.')] = False, pre: Annotated[bool, typer.Option('--pre/--no-pre', help='Allow pre-release versions.')] = False, upgrade_pip: Annotated[bool, typer.Option('--upgrade-pip/--no-upgrade-pip', help='Upgrade pip before installing IINTS.')] = False, dry_run: Annotated[bool, typer.Option('--dry-run', help='Print the pip command without executing it.')] = False, yes: Annotated[bool, typer.Option('--yes', '-y', help='Run without asking for confirmation.')] = False) -> None`
 - `run_doctor(algo: Annotated[Optional[Path], typer.Option(help='Algorithm Python file to inspect.')] = None, patient_config_path: Annotated[Optional[Path], typer.Option(help='Patient YAML used for the run.')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario-path', '--scenario', help='Scenario JSON used for the run.')] = None, duration: Annotated[int, typer.Option(help='Requested duration in minutes.')] = 1440, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes.')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory to preflight.')] = None, patient_config_name: Annotated[str, typer.Option(help='Packaged patient profile name, if not using a YAML path.')] = 'default_patient', output_json: Annotated[Optional[Path], typer.Option(help='Optional JSON report path.')] = None, fail_on_warning: Annotated[bool, typer.Option(help='Exit with code 1 when any warning is found.')] = False) -> None`
 - `evidence_build(run: Annotated[List[str], typer.Option('--run', help='Repeatable run input in label=path form, for example normal=results/normal.')], output_dir: Annotated[Path, typer.Option(help='Output directory for the evidence bundle.')] = Path('results/evidence_bundle'), title: Annotated[str, typer.Option(help='Human-readable bundle title.')] = 'IINTS Research Evidence Bundle', local_ai_dir: Annotated[Optional[Path], typer.Option(help='Optional local AI lab output directory.')] = None, pump_bundle_dir: Annotated[Optional[Path], typer.Option(help='Optional Pico pump bundle directory.')] = None) -> None`
 - `validation_profiles(profiles_path: Annotated[Optional[Path], typer.Option(help='Optional custom profiles YAML')] = None)`
@@ -1236,7 +1262,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `demo_booth(output_dir: Annotated[Path, typer.Option(help='Directory where the fair-ready demo bundle should be written.')] = Path('./results/booth_demo'), duration: Annotated[int, typer.Option(help='Simulation duration in minutes for each booth scenario.')] = 360, time_step: Annotated[int, typer.Option(help='Simulation step size in minutes.')] = 5, seed: Annotated[int, typer.Option(help='Deterministic random seed.')] = 42, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--no-prepare-ai', help='Prepare AI-ready artifacts for the Supervisor Override run.')] = True) -> None`
 - `demo_export(output_dir: Annotated[Path, typer.Option(help='Directory where the bundled live stage demo files should be written.')] = Path('./iints_demo'), overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow overwriting exported demo files.')] = False) -> None`
 - `demo_live(output_dir: Annotated[Path, typer.Option(help='Root directory for the exported code and generated live-demo results.')] = Path('./results/live_demo'), run_demo: Annotated[bool, typer.Option('--run/--no-run', help='Run the exported demo after showing the code preview.')] = True, prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the demo run.')] = False, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported demo code files.')] = True, audience: Annotated[str, typer.Option('--audience', help='Presenter framing: mixed, clinical, engineering, or jury. Aliases like doctor and engineer also work.')] = 'mixed', stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Stage mode hides noisy subprocess logs and prints a clean audience-facing flow.')] = True, build_evidence: Annotated[bool, typer.Option('--evidence/--no-evidence', help='Build a public research evidence bundle after the live run.')] = True) -> None`
-- `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None, style: Annotated[str, typer.Option(help='Report style: standard or agp')] = 'standard', subject_name: Annotated[str, typer.Option(help='Subject/run label shown on AGP-style reports')] = 'Research simulation', summary_json_path: Annotated[Optional[Path], typer.Option(help='Optional AGP summary JSON output path')] = None)`
+- `report(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_path: Annotated[Path, typer.Option(help='Output PDF path')] = Path('./results/clinical_report.pdf'), safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, audit_output_dir: Annotated[Optional[Path], typer.Option(help='Optional audit output directory')] = None, bundle_dir: Annotated[Optional[Path], typer.Option(help='If set, write PDF + plots + audit into this folder')] = None, style: Annotated[str, typer.Option(help='Report style: standard or agp')] = 'standard', subject_name: Annotated[str, typer.Option(help='Subject/run label shown on AGP-style reports')] = 'Research simulation', summary_json_path: Annotated[Optional[Path], typer.Option(help='Optional AGP summary JSON output path')] = None, agp_png: Annotated[bool, typer.Option('--png/--no-png', help='For AGP reports, export agp_profile.png and daily_profiles.png.')] = False)`
+- `safety_visualize(results_csv: Annotated[Path, typer.Option(help='Path to a simulation results CSV')], output_html: Annotated[Path, typer.Option(help='Output standalone HTML visualizer path')] = Path('./results/safety_visualizer.html'), output_json: Annotated[Optional[Path], typer.Option(help='Optional machine-readable JSON summary path')] = None, safety_report_path: Annotated[Optional[Path], typer.Option(help='Optional safety report JSON path')] = None, title: Annotated[str, typer.Option(help='HTML page title')] = 'IINTS Safety Contract Visualizer') -> None`
 - `validate(scenario_path: Annotated[Path, typer.Option(help='Path to a scenario JSON file')], patient_config_path: Annotated[Optional[Path], typer.Option(help='Optional patient config YAML to validate')] = None)`
 - `data_list()`
 - `data_info(dataset_id: Annotated[str, typer.Argument(help='Dataset id (see `iints data list`)')])`

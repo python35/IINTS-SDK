@@ -36,10 +36,16 @@ from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
-from iints.analysis import build_booth_demo, build_carelink_workbench, generate_study_poster
+from iints.analysis import (
+    build_booth_demo,
+    build_carelink_workbench,
+    generate_study_poster,
+)
 from iints.analysis.baseline import run_baseline_comparison, write_baseline_comparison
 from iints.analysis.eucys_results import generate_eucys_results_bundle
 from iints.analysis.evidence_bundle import build_evidence_bundle
+from iints.analysis.run_quality import write_run_quality_artifacts
+from iints.analysis.safety_visualizer import write_safety_visualizer
 from iints.analysis.study_analysis import analyze_study_directory, compare_studies, load_study_summary
 from iints.analysis.study_experiment import load_study_experiment_config
 from iints.analysis.study_engine import DEFAULT_PROFILE_SET, build_study_design_payload, slugify_study_token
@@ -1198,6 +1204,99 @@ def doctor(
             console.print(Panel("Everything essential looks healthy. A good next command is `iints demo`.", title="Suggested Next Steps", border_style="green"))
     if not all(passed for _, passed, _ in required_checks):
         raise typer.Exit(code=1)
+
+
+@app.command(name="update")
+def update_sdk(
+    source: Annotated[
+        str,
+        typer.Option(help="Update source: pypi or github."),
+    ] = "pypi",
+    install_extras: Annotated[
+        str,
+        typer.Option("--extras", help="Comma-separated extras to install, e.g. full,mdmp,research,edge. Use empty string for none."),
+    ] = "full,mdmp,research,edge",
+    github_ref: Annotated[
+        str,
+        typer.Option("--github-ref", help="Git ref used with --source github."),
+    ] = "main",
+    user: Annotated[
+        bool,
+        typer.Option("--user/--no-user", help="Pass --user to pip for user-site installs."),
+    ] = False,
+    pre: Annotated[
+        bool,
+        typer.Option("--pre/--no-pre", help="Allow pre-release versions."),
+    ] = False,
+    upgrade_pip: Annotated[
+        bool,
+        typer.Option("--upgrade-pip/--no-upgrade-pip", help="Upgrade pip before installing IINTS."),
+    ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Print the pip command without executing it."),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Run without asking for confirmation."),
+    ] = False,
+) -> None:
+    """Update the current IINTS SDK environment to the newest release."""
+    console = Console()
+    normalized_source = source.strip().lower()
+    if normalized_source not in {"pypi", "github"}:
+        console.print("[bold red]Error: --source must be either 'pypi' or 'github'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    extra_tokens = [token.strip() for token in install_extras.split(",") if token.strip()]
+    extras_suffix = f"[{','.join(extra_tokens)}]" if extra_tokens else ""
+    if normalized_source == "github":
+        package_spec = (
+            f"iints-sdk-python35{extras_suffix} @ "
+            f"git+https://github.com/python35/IINTS-SDK.git@{github_ref.strip() or 'main'}"
+        )
+    else:
+        package_spec = f"iints-sdk-python35{extras_suffix}"
+
+    install_cmd = [sys.executable, "-m", "pip", "install", "-U"]
+    if pre:
+        install_cmd.append("--pre")
+    if user:
+        install_cmd.append("--user")
+    install_cmd.append(package_spec)
+
+    pip_cmd = [sys.executable, "-m", "pip", "install", "-U", "pip"]
+    console.print("[bold]IINTS SDK updater[/bold]")
+    console.print(f"Current SDK version: [cyan]{getattr(iints, '__version__', 'unknown')}[/cyan]")
+    console.print(f"Python executable: [cyan]{sys.executable}[/cyan]")
+    console.print(f"Install extras: [cyan]{','.join(extra_tokens) if extra_tokens else 'none'}[/cyan]")
+    if upgrade_pip:
+        console.print("pip upgrade command:")
+        console.print(shlex.join(pip_cmd), markup=False)
+    console.print("SDK update command:")
+    console.print(shlex.join(install_cmd), markup=False)
+
+    if dry_run:
+        console.print("[yellow]Dry run only; no packages were changed.[/yellow]")
+        return
+
+    if not yes and not typer.confirm("Update this Python environment now?"):
+        console.print("Update cancelled.")
+        return
+
+    if upgrade_pip:
+        pip_result = subprocess.run(pip_cmd, check=False)
+        if pip_result.returncode != 0:
+            console.print("[bold red]pip upgrade failed; SDK update was not attempted.[/bold red]")
+            raise typer.Exit(code=pip_result.returncode)
+
+    result = subprocess.run(install_cmd, check=False)
+    if result.returncode != 0:
+        console.print("[bold red]IINTS update failed.[/bold red]")
+        raise typer.Exit(code=result.returncode)
+
+    console.print("[bold green]IINTS update completed.[/bold green]")
+    console.print("Run [cyan]hash -r[/cyan] or restart your terminal, then check [cyan]iints --version[/cyan].")
 
 
 @app.command(name="run-doctor")
@@ -4278,6 +4377,19 @@ def presets_run(
     report_path = output_dir / "report.pdf"
     iints.generate_report(results_df, str(report_path), safety_report)
     console.print(f"PDF report saved to: {report_path}")
+    quality_outputs = write_run_quality_artifacts(
+        results_df,
+        output_dir,
+        run_label=run_id,
+        safety_report=safety_report,
+    )
+    if quality_outputs.get("realism_review"):
+        realism_review = quality_outputs["realism_review"]
+        console.print(
+            "[green]Realism review:[/green] "
+            f"{realism_review.get('verdict')} (score {float(realism_review.get('realism_score', 0.0)):.2f})"
+        )
+    console.print(f"Safety visualizer: {quality_outputs.get('safety_visualizer_html')}")
 
     manifest_files = {
         "config": config_path,
@@ -4291,6 +4403,15 @@ def presets_run(
     audit_summary_path = output_dir / "audit" / "audit_summary.json"
     if audit_summary_path.exists():
         manifest_files["audit_summary"] = audit_summary_path
+    for manifest_key, output_key in {
+        "realism_report": "realism_report_json",
+        "realism_dashboard": "realism_dashboard_html",
+        "safety_visualizer": "safety_visualizer_html",
+        "safety_visualizer_json": "safety_visualizer_json",
+    }.items():
+        output_value = quality_outputs.get(output_key)
+        if output_value:
+            manifest_files[manifest_key] = Path(str(output_value))
     run_manifest = build_run_manifest(output_dir, manifest_files)
     run_manifest_path = output_dir / "run_manifest.json"
     write_json(run_manifest_path, run_manifest)
@@ -4883,6 +5004,7 @@ def run(
             effective_safety_config.critical_glucose_duration_minutes = int(preset_payload["critical_glucose_duration_minutes"])
 
     output_dir = resolve_output_dir(output_dir, run_id)
+    quality_outputs: Dict[str, Any] = {}
 
     with _run_progress(console) as progress:
         total_steps = 6 + (1 if compare_baselines else 0)
@@ -4990,6 +5112,12 @@ def run(
 
         report_output_path = output_dir / "report.pdf"
         iints.generate_report(simulation_results_df, str(report_output_path), safety_report)
+        quality_outputs = write_run_quality_artifacts(
+            simulation_results_df,
+            output_dir,
+            run_label=run_id,
+            safety_report=safety_report,
+        )
 
         manifest_files = {
             "config": config_path,
@@ -5000,6 +5128,15 @@ def run(
         if compare_baselines:
             manifest_files["baseline_json"] = output_dir / "baseline" / "baseline_comparison.json"
             manifest_files["baseline_csv"] = output_dir / "baseline" / "baseline_comparison.csv"
+        for manifest_key, output_key in {
+            "realism_report": "realism_report_json",
+            "realism_dashboard": "realism_dashboard_html",
+            "safety_visualizer": "safety_visualizer_html",
+            "safety_visualizer_json": "safety_visualizer_json",
+        }.items():
+            output_value = quality_outputs.get(output_key)
+            if output_value:
+                manifest_files[manifest_key] = Path(str(output_value))
         run_manifest = build_run_manifest(output_dir, manifest_files)
         run_manifest_path = output_dir / "run_manifest.json"
         write_json(run_manifest_path, run_manifest)
@@ -5008,6 +5145,14 @@ def run(
     console.print(f"Using compute device: [blue]{device}[/blue]")
     if baseline_paths is not None:
         console.print(f"Baseline comparison saved to: {baseline_paths}")
+    if quality_outputs.get("realism_review"):
+        realism_review = quality_outputs["realism_review"]
+        console.print(
+            "[green]Realism review:[/green] "
+            f"{realism_review.get('verdict')} (score {float(realism_review.get('realism_score', 0.0)):.2f})"
+        )
+    if quality_outputs.get("safety_visualizer_html"):
+        console.print(f"Safety visualizer: {quality_outputs.get('safety_visualizer_html')}")
     console.print(f"Run metadata: {run_metadata_path}")
     console.print(f"Run manifest: {run_manifest_path}")
     _print_run_summary(
@@ -6412,6 +6557,10 @@ def report(
     style: Annotated[str, typer.Option(help="Report style: standard or agp")] = "standard",
     subject_name: Annotated[str, typer.Option(help="Subject/run label shown on AGP-style reports")] = "Research simulation",
     summary_json_path: Annotated[Optional[Path], typer.Option(help="Optional AGP summary JSON output path")] = None,
+    agp_png: Annotated[
+        bool,
+        typer.Option("--png/--no-png", help="For AGP reports, export agp_profile.png and daily_profiles.png."),
+    ] = False,
 ):
     """Generate a research PDF report (standard or AGP-style) from a results CSV."""
     console = Console()
@@ -6457,6 +6606,16 @@ def report(
     console.print(f"PDF report saved to: [link=file://{output_path}]{output_path}[/link]")
     if summary_json_path and style == "agp":
         console.print(f"AGP summary saved to: [link=file://{summary_json_path}]{summary_json_path}[/link]")
+    if style == "agp" and (agp_png or bundle_dir is not None):
+        asset_dir = (bundle_dir / "agp_assets") if bundle_dir else (output_path.parent / "agp_assets")
+        asset_paths = iints.generate_agp_assets(
+            results_df,
+            str(asset_dir),
+            subject_name=subject_name,
+            summary_json_path=str(summary_json_path) if summary_json_path else None,
+        )
+        if asset_paths:
+            console.print(f"AGP PNG assets saved to: [link=file://{asset_dir}]{asset_dir}[/link]")
 
     if audit_output_dir:
         audit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -6489,6 +6648,48 @@ def report(
         }
         summary_path.write_text(json.dumps(summary, indent=2))
         console.print(f"Audit exports saved to: {audit_output_dir}")
+
+
+@app.command(name="safety-visualize")
+def safety_visualize(
+    results_csv: Annotated[Path, typer.Option(help="Path to a simulation results CSV")],
+    output_html: Annotated[
+        Path,
+        typer.Option(help="Output standalone HTML visualizer path"),
+    ] = Path("./results/safety_visualizer.html"),
+    output_json: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional machine-readable JSON summary path"),
+    ] = None,
+    safety_report_path: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional safety report JSON path"),
+    ] = None,
+    title: Annotated[str, typer.Option(help="HTML page title")] = "IINTS Safety Contract Visualizer",
+) -> None:
+    """Create a reviewer-facing safety visualizer from one results CSV."""
+    console = Console()
+    if not results_csv.is_file():
+        console.print(f"[bold red]Error: Results file '{results_csv}' not found.[/bold red]")
+        raise typer.Exit(code=1)
+    safety_report: Dict[str, Any] = {}
+    if safety_report_path:
+        if not safety_report_path.is_file():
+            console.print(f"[bold red]Error: Safety report file '{safety_report_path}' not found.[/bold red]")
+            raise typer.Exit(code=1)
+        safety_report = json.loads(safety_report_path.read_text())
+
+    results_df = pd.read_csv(results_csv)
+    outputs = write_safety_visualizer(
+        results_df,
+        output_html,
+        output_json=output_json,
+        safety_report=safety_report,
+        title=title,
+    )
+    console.print(f"Safety visualizer HTML: [link=file://{outputs['html']}]{outputs['html']}[/link]")
+    if outputs.get("json"):
+        console.print(f"Safety visualizer JSON: [link=file://{outputs['json']}]{outputs['json']}[/link]")
 
 
 @app.command()

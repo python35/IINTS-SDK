@@ -84,6 +84,20 @@ The generated project is self-contained: it includes `patients/stable_patient.ya
 ### `iints run --wizard`
 Interactive custom run builder.
 
+### `iints update`
+Update the current Python environment to the newest SDK release.
+
+Common forms:
+
+```bash
+iints update
+iints update --dry-run
+iints update --source github --yes
+iints update --extras full,mdmp,research,edge
+```
+
+The command prints the exact `python -m pip install -U ...` invocation before it changes anything. Use `--dry-run` during a live demo setup check.
+
 ## Core Simulation Commands
 
 ### `iints run`
@@ -353,11 +367,24 @@ Generate an AGP-style research PDF from a dense simulation or CGM CSV:
 iints report \
   --results-csv results/one_day/results.csv \
   --style agp \
+  --png \
   --subject-name "stable demo run" \
   --bundle-dir results/one_day/agp_report
 ```
 
-This writes `agp_report.pdf` plus `agp_summary.json`. The layout includes glucose statistics, time-in-ranges, an AGP-style modal-day percentile plot, and daily glucose profiles.
+This writes `agp_report.pdf`, `agp_summary.json`, `agp_assets/agp_profile.png`, and `agp_assets/daily_profiles.png`. The layout includes glucose statistics, time-in-ranges, an AGP-style modal-day percentile plot, and daily glucose profiles.
+
+### `iints safety-visualize`
+Create a standalone HTML safety visualizer from a run CSV:
+
+```bash
+iints safety-visualize \
+  --results-csv results/one_day/results.csv \
+  --output-html results/one_day/safety_visualizer.html \
+  --output-json results/one_day/safety_visualizer.json
+```
+
+Normal `iints run`, `iints presets run`, `run_full(...)`, and `run_simulation(...)` already create `realism_report.json`, `realism_dashboard.html`, `safety_visualizer.html`, and `safety_visualizer.json` inside the run bundle.
 
 ## Pico Pump Bench Commands
 

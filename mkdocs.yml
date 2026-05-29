@@ -52,6 +52,7 @@ nav:
       - Choose Your Path: USER_GUIDE_MAP.md
       - Public Obsidian Vault: OBSIDIAN_PUBLIC_VAULT.md
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
+      - Project Boundaries: PROJECT_BOUNDARIES.md
       - 5-Minute Quickstart: QUICKSTART.md
       - Command Cheatsheet: CLI_CHEATSHEET.md
       - Getting Started: GETTING_STARTED.md
@@ -107,9 +108,12 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.8): releases/v1.5.8.md
+      - Latest (v1.5.9): releases/v1.5.9.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.8: releases/v1.5.8.md
+          - v1.5.7: releases/v1.5.7.md
+          - v1.5.6: releases/v1.5.6.md
           - v1.5.5: releases/v1.5.5.md
           - v1.5.4: releases/v1.5.4.md
           - v1.5.3: releases/v1.5.3.md

@@ -1,0 +1,91 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import pandas as pd
+
+from iints.analysis.safety_visualizer import write_safety_visualizer
+from iints.data.realism_dashboard import write_realism_dashboard
+from iints.data.realism_validator import validate_realism_dataset, write_realism_report
+
+
+def _series_or_default(df: pd.DataFrame, column: str, default: float = 0.0) -> pd.Series:
+    if column not in df.columns:
+        return pd.Series([default] * len(df), index=df.index, dtype=float)
+    return pd.to_numeric(df[column], errors="coerce").fillna(default).astype(float)
+
+
+def standardize_simulation_for_realism(results_df: pd.DataFrame) -> pd.DataFrame:
+    """Convert an IINTS results CSV into the generic realism-check schema."""
+    if "glucose_actual_mgdl" not in results_df.columns:
+        raise ValueError("Realism scoring requires a glucose_actual_mgdl column.")
+
+    frame = pd.DataFrame(index=results_df.index)
+    frame["timestamp"] = _series_or_default(results_df, "time_minutes")
+    frame["glucose"] = _series_or_default(results_df, "glucose_actual_mgdl")
+    frame["carbs"] = _series_or_default(results_df, "carb_intake_grams")
+    frame["insulin"] = _series_or_default(results_df, "delivered_insulin_units")
+    return frame
+
+
+def write_run_quality_artifacts(
+    results_df: pd.DataFrame,
+    output_dir: str | Path,
+    *,
+    run_label: Optional[str] = None,
+    safety_report: Optional[Dict[str, Any]] = None,
+    realism_reference: str = "free_living_t1d",
+) -> Dict[str, Any]:
+    """Write reviewer-facing quality artifacts for one run.
+
+    The artifacts are intentionally non-blocking: if realism scoring cannot run
+    because a CSV is incomplete, the simulation still completes and a warning is
+    returned to the caller.
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    label = run_label or output_path.name
+    outputs: Dict[str, Any] = {}
+
+    try:
+        realism_frame = standardize_simulation_for_realism(results_df)
+        realism_report = validate_realism_dataset(realism_frame, reference=realism_reference)
+        realism_json = output_path / "realism_report.json"
+        realism_html = output_path / "realism_dashboard.html"
+        write_realism_report(realism_report, realism_json)
+        write_realism_dashboard(
+            realism_report,
+            realism_frame,
+            realism_html,
+            title="IINTS Run Realism Review",
+            source_label=label,
+        )
+        realism_summary = {
+            "verdict": realism_report.verdict,
+            "realism_score": realism_report.realism_score,
+            "summary": realism_report.summary,
+            "reference": realism_reference,
+        }
+        if safety_report is not None:
+            safety_report["realism_review"] = realism_summary
+        outputs.update(
+            {
+                "realism_report_json": str(realism_json),
+                "realism_dashboard_html": str(realism_html),
+                "realism_review": realism_summary,
+            }
+        )
+    except Exception as exc:
+        outputs["realism_warning"] = str(exc)
+
+    safety_outputs = write_safety_visualizer(
+        results_df,
+        output_path / "safety_visualizer.html",
+        output_json=output_path / "safety_visualizer.json",
+        safety_report=safety_report,
+        title="IINTS Safety Contract Visualizer",
+    )
+    outputs["safety_visualizer_html"] = safety_outputs["html"]
+    outputs["safety_visualizer_json"] = safety_outputs.get("json")
+    return outputs

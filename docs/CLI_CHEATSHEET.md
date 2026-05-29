@@ -13,6 +13,14 @@ iints doctor --full --suggest
 iints guide
 ```
 
+After the SDK is installed, future updates are shorter:
+
+```bash
+iints update
+iints update --source github --yes   # newest GitHub version
+iints update --dry-run               # show the exact pip command first
+```
+
 If you are installing from the latest GitHub source instead of PyPI:
 
 ```bash
@@ -61,6 +69,19 @@ iints run \
   --duration 1440 \
   --time-step 5 \
   --output-dir results/one_day
+```
+
+Every normal run now writes reviewer-facing quality artifacts:
+
+```text
+results/one_day/
+  results.csv
+  report.pdf
+  run_manifest.json
+  realism_report.json
+  realism_dashboard.html
+  safety_visualizer.html
+  safety_visualizer.json
 ```
 
 Preflight before long runs:
@@ -115,8 +136,18 @@ Generate an AGP-style glucose report:
 iints report \
   --results-csv results/live_demo/results/01_normal_run/results.csv \
   --style agp \
+  --png \
   --subject-name "live demo normal run" \
   --bundle-dir results/live_demo/agp_report
+```
+
+Inspect one run's safety supervisor behavior:
+
+```bash
+iints safety-visualize \
+  --results-csv results/live_demo/results/01_normal_run/results.csv \
+  --output-html results/live_demo/safety_visualizer.html \
+  --output-json results/live_demo/safety_visualizer.json
 ```
 
 ## Real Data And Datasets
@@ -290,7 +321,7 @@ iints sources
 If a command exists in the docs but not on your machine, update the SDK:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge] @ git+https://github.com/python35/IINTS-SDK.git"
+iints update --source github --yes
 hash -r
 iints --help
 ```

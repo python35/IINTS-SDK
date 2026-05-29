@@ -13,6 +13,8 @@ IINTS-AF is a research and education SDK for insulin-algorithm simulation, gluco
 | Choose the right workflow | [Choose Your Path](USER_GUIDE_MAP.md) | `iints guide` |
 | Look up practical commands | [Command Cheatsheet](CLI_CHEATSHEET.md) | `iints --help` |
 | Prepare a live demonstration | [Booth Demo & Presentation](BOOTH_DEMO.md) | `iints demo` |
+| Keep the install current | [Updating The SDK](UPDATING.md) | `iints update` |
+| Explain the safety boundary | [Project Boundaries](PROJECT_BOUNDARIES.md) | `iints safety-visualize` |
 | Understand sources and assumptions | [Complete Source Library](SOURCE_LIBRARY.md) | `iints sources` |
 | Work with hardware | [Hardware Hub](HARDWARE.md) | `iints edge doctor` |
 
@@ -43,6 +45,7 @@ python -m pip install -U pip
 python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge]"
 
 iints doctor --smoke-run
+iints update --dry-run
 iints demo --audience jury --output-dir results/live_demo
 ```
 

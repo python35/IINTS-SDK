@@ -73,11 +73,13 @@ For non-technical readers, start with:
 
 **Output / Artifacts**
 - `run_metadata.json`, `run_manifest.json`, `validation_report.json`, and report outputs from run bundles.
+- `realism_report.json`, `realism_dashboard.html`, `safety_visualizer.html`, and `safety_visualizer.json` from run bundles.
 
 ### Research Checklist (Recommended)
 - Use a fixed `seed` for every run (or record the auto‑seed in `run_metadata.json`).
 - Archive `config.json`, `run_metadata.json`, `run_manifest.json`, and `results.csv` together.
 - Keep `report.pdf` + `audit/` for reviewability.
+- Open `realism_dashboard.html` and `safety_visualizer.html` when explaining whether a run looked physiologically plausible and how the safety layer behaved.
 - Cite datasets using `iints data cite <dataset_id>`.
 - Export literature sources using `iints sources --output-json results/source_manifest.json`.
 - Use `iints study-ready` when you want a ready-to-review bundle in one command.
@@ -122,6 +124,7 @@ iints data info <dataset_id>
 iints data research-plan --output-dir data_packs/research_dataset_plan
 iints data fetch <dataset_id> --output-dir data_packs/<dataset_id>
 iints data realism-check data/my_trace.csv --reference free_living_t1d --output-html results/realism_dashboard.html
+iints safety-visualize --results-csv results/one_day/results.csv --output-html results/one_day/safety_visualizer.html
 ```
 
 Recommended starting points:

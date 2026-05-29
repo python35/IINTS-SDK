@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.5.8"
+    __version__ = "1.5.9"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
@@ -232,6 +232,25 @@ def generate_agp_report(
         summary_json_path=summary_json_path,
     )
 
+def generate_agp_assets(
+    simulation_results: 'pd.DataFrame',
+    output_dir: Optional[str] = None,
+    subject_name: str = "Research simulation",
+    summary_json_path: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Export AGP-style PNG assets and summary JSON from dense CGM/simulation data.
+    """
+    if output_dir is None:
+        return None
+    generator = ClinicalReportGenerator()
+    return generator.export_agp_assets(
+        simulation_results,
+        output_dir,
+        subject_name=subject_name,
+        summary_json_path=summary_json_path,
+    )
+
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`
 __all__ = [
     # API
@@ -309,6 +328,7 @@ __all__ = [
     "generate_quickstart_report",
     "generate_demo_report",
     "generate_agp_report",
+    "generate_agp_assets",
     "generate_results_poster",
     # High-level API
     "run_simulation",

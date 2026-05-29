@@ -6,7 +6,34 @@ If you are not sure which folder you should be in, read [Installation And Paths]
 
 This page assumes the full workstation install. If you are updating a Raspberry Pi or UNO Q runtime, substitute `iints-sdk-python35[edge,mdmp]` instead.
 
-## The safest upgrade path
+## Fast path: `iints update`
+
+If IINTS is already installed in the environment you are using, run:
+
+```bash
+source .venv/bin/activate
+iints update
+hash -r
+iints --version
+```
+
+For the newest GitHub version before a PyPI release:
+
+```bash
+iints update --source github --yes
+hash -r
+iints --version
+```
+
+Use a dry run when you want to see exactly what will happen:
+
+```bash
+iints update --dry-run
+```
+
+The updater uses the same Python executable that launched `iints`, so it updates the virtual environment you are currently inside.
+
+## Manual upgrade path
 
 Always upgrade inside the virtual environment you actually use for IINTS:
 
@@ -28,7 +55,7 @@ iints --help
 If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.8"
+python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.9"
 ```
 
 ## If you installed from source
