@@ -107,6 +107,43 @@ def test_demo_defaults_to_live_presentation(monkeypatch, tmp_path) -> None:
     assert called["prepare_ai"] is False
     assert called["full_code"] is False
     assert called["stage_mode"] is True
+    assert called["story_mode"] == "sdk"
+
+
+def test_demo_doctor_shortcut_dispatches_to_clinical_story(monkeypatch, tmp_path) -> None:
+    called: dict[str, object] = {}
+
+    def _fake_demo_live(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.demo_live", _fake_demo_live)
+
+    output_dir = tmp_path / "doctor_demo"
+    result = runner.invoke(app, ["demo", "doctor", "--output-dir", str(output_dir), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert called["output_dir"] == output_dir
+    assert called["run_demo"] is False
+    assert called["audience"] == "clinical"
+    assert called["story_mode"] == "doctor"
+
+
+def test_demo_eucys_shortcut_dispatches_to_jury_story(monkeypatch, tmp_path) -> None:
+    called: dict[str, object] = {}
+
+    def _fake_demo_live(**kwargs):
+        called.update(kwargs)
+
+    monkeypatch.setattr("iints.cli.cli.demo_live", _fake_demo_live)
+
+    output_dir = tmp_path / "eucys_demo"
+    result = runner.invoke(app, ["demo", "eucys", "--output-dir", str(output_dir), "--dry-run"])
+
+    assert result.exit_code == 0
+    assert called["output_dir"] == output_dir
+    assert called["run_demo"] is False
+    assert called["audience"] == "jury"
+    assert called["story_mode"] == "eucys"
 
 
 def test_guide_dispatches_to_demo(monkeypatch) -> None:

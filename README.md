@@ -50,13 +50,13 @@ Full documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/II
 
 ## Live Demo
 
-For a Zoom call, jury walkthrough, or sponsor demo where you want to show both the code and the generated outputs in one terminal flow:
+For a Zoom call, jury walkthrough, or sponsor demo where you want the story first and code as proof:
 
 ```bash
-iints demo-live --output-dir results/live_demo
+iints demo eucys --output-dir results/live_demo
 ```
 
-That exports the showable demo script, prints the key SDK calls, runs the demo, and lists the poster plus proof artifacts to open next.
+Use `iints demo doctor` for clinical feedback conversations and `iints demo booth` for public digital-patient demos.
 
 ---
 

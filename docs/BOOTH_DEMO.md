@@ -127,7 +127,19 @@ For a Zoom call or jury meeting, the easiest all-in-one command is:
 iints demo --output-dir results/live_demo --audience jury
 ```
 
-That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, prints the important code lines, runs the exported demo script in clean stage mode, saves noisy execution details to `DEMO_RUN_LOG.txt`, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+That now starts with an audience-aware opening explanation, writes `PRESENTER_GUIDE.md`, `DEMO_STORY.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, runs the exported demo script in clean stage mode, saves noisy execution details to `DEMO_RUN_LOG.txt`, and ends with a terminal table of the poster, talk track, summary JSON, and scenario folders.
+
+For live conversations, use the story shortcut that matches the room:
+
+```bash
+iints demo doctor --output-dir results/demo_doctor
+iints demo eucys --output-dir results/demo_eucys
+iints demo booth --output-dir results/demo_booth
+```
+
+- `doctor` opens as a clinical safety discussion: virtual patient, risk context, supervisor decision, and questions for medical feedback.
+- `eucys` opens as one controlled experiment: research question, hypothesis, normal run, stress run, risk run, and evidence.
+- `booth` opens as a public digital-patient story: scenario change, algorithm suggestion, safety check, and visual proof.
 
 It also builds a public research evidence folder by default:
 
@@ -148,6 +160,7 @@ If you need raw subprocess output while debugging, add `--technical`.
 
 Use the generated files like this:
 
+- `DEMO_STORY.md` - the audience-first explanation, including the first 30 seconds, core sentence, safety boundary, and proof order.
 - `DEMO_CUE_CARD.md` - one-page script for a Zoom call or booth explanation.
 - `DEMO_ARTIFACTS.md` - exact files to open and what each artifact proves.
 - `RUN_LIVE_DEMO.sh` - rerun the exported demo without remembering arguments.
@@ -162,12 +175,15 @@ The presenter guide also points you to two ready-made physiology handouts:
 Use the audience mode that matches the room:
 
 ```bash
+iints demo doctor --output-dir results/live_demo_clinical
+iints demo eucys --output-dir results/live_demo_jury
+iints demo booth --output-dir results/live_demo_booth
 iints demo --output-dir results/live_demo_clinical --audience clinical
 iints demo --output-dir results/live_demo_engineering --audience engineering
 iints demo --output-dir results/live_demo_jury --audience jury
 ```
 
-The clinical mode emphasizes pre-clinical safety framing, the engineering mode emphasizes reproducibility and artifacts, and the jury mode keeps the story short and visual.
+The story shortcuts decide what you say first. The audience option still tunes wording inside the guide. For example, `iints demo doctor` keeps code and folders as proof artifacts instead of the opening screen.
 
 `iints demo-live` remains available as an explicit alias, but for live calls and
 booth work the intended command is simply `iints demo`.

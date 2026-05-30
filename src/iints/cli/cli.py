@@ -3540,6 +3540,15 @@ iints data certify contracts/clinical_mdmp_contract.yaml data/demo/diabetes_cgm.
 
 @app.command(name="demo")
 def demo(
+    demo_kind: Annotated[
+        Optional[str],
+        typer.Argument(
+            help=(
+                "Optional story preset: doctor, eucys, booth, live, quick, or full. "
+                "Example: `iints demo eucys`."
+            )
+        ),
+    ] = None,
     output_dir: Annotated[Path, typer.Option(help="Directory where demo outputs should be written")] = Path("results/demo"),
     mode: Annotated[str, typer.Option("--mode", help="Demo mode: live, quick, or full")] = "live",
     quick_mode: Annotated[bool, typer.Option("--quick", help="Shortcut for --mode quick")] = False,
@@ -3588,6 +3597,9 @@ def demo(
 
     Examples:
       iints demo
+      iints demo doctor
+      iints demo eucys
+      iints demo booth
       iints demo --audience clinical
       iints demo --simulation-only --quick
       iints demo --simulation-only --full
@@ -3599,10 +3611,44 @@ def demo(
         raise typer.Exit(code=1)
 
     normalized_mode = mode.strip().lower()
+    story_mode = "sdk"
     if quick_mode:
         normalized_mode = "quick"
     if full_mode:
         normalized_mode = "full"
+    if demo_kind:
+        kind = demo_kind.strip().lower().replace("_", "-")
+        story_aliases = {
+            "clinical": "doctor",
+            "clinician": "doctor",
+            "clinicians": "doctor",
+            "doctor": "doctor",
+            "doctors": "doctor",
+            "eucys": "eucys",
+            "jury": "eucys",
+            "competition": "eucys",
+            "booth": "booth",
+            "expo": "booth",
+            "public": "booth",
+        }
+        mode_aliases = {"live", "quick", "full"}
+        if kind in story_aliases:
+            story_mode = story_aliases[kind]
+            normalized_mode = "live"
+            if story_mode == "doctor":
+                audience = "clinical"
+            elif story_mode == "booth":
+                audience = "mixed"
+            else:
+                audience = "jury"
+        elif kind in mode_aliases:
+            normalized_mode = kind
+        else:
+            console.print(
+                "[bold red]Unknown demo preset.[/bold red] "
+                "Use doctor, eucys, booth, live, quick, or full."
+            )
+            raise typer.Exit(code=1)
     if not presentation_mode and normalized_mode == "live":
         normalized_mode = "quick"
     if normalized_mode not in {"live", "quick", "full"}:
@@ -3619,6 +3665,7 @@ def demo(
             audience=audience,
             stage_mode=stage_mode,
             build_evidence=build_evidence,
+            story_mode=story_mode,
         )
         return
 
@@ -5857,6 +5904,15 @@ def _live_demo_run_command(script_path: Path, results_dir: Path, prepare_ai: boo
     )
 
 
+def _demo_user_command(story_mode: str, output_dir: Path) -> str:
+    normalized = _normalize_demo_story_mode(story_mode)
+    command: List[object] = ["iints", "demo"]
+    if normalized in {"doctor", "eucys", "booth"}:
+        command.append(normalized)
+    command.extend(["--output-dir", output_dir])
+    return _shell_join(command)
+
+
 _DEMO_AUDIENCE_PROFILES: Dict[str, Dict[str, Any]] = {
     "mixed": {
         "label": "mixed audience",
@@ -5913,6 +5969,171 @@ _DEMO_AUDIENCE_PROFILES: Dict[str, Dict[str, Any]] = {
 }
 
 
+_DEMO_STORY_PROFILES: Dict[str, Dict[str, Any]] = {
+    "sdk": {
+        "label": "SDK proof flow",
+        "title": "IINTS Live Demo",
+        "opening": (
+            "This demo shows that one inspected script can create reproducible simulations, reports, "
+            "safety artifacts, and a visual summary."
+        ),
+        "purpose": "Prove that the SDK workflow is inspectable and repeatable.",
+        "core_sentence": (
+            "The demo is not just a graph: it is a reproducible bundle containing data, safety decisions, "
+            "audit artifacts, a report, and a visual summary."
+        ),
+        "first_30_seconds": (
+            "I run one inspected SDK workflow and it creates a visual result plus the raw evidence behind it."
+        ),
+        "flow": [
+            "Show the small code preview.",
+            "Run the exact exported demo script.",
+            "Open the poster first.",
+            "Use the artifact map if someone asks for proof.",
+        ],
+        "proof_order": [
+            "Poster",
+            "Scenario folder",
+            "results.csv",
+            "report.pdf",
+            "run_manifest.json",
+            "evidence_bundle",
+        ],
+        "closing": "The SDK turns an algorithm run into evidence someone else can inspect.",
+    },
+    "doctor": {
+        "label": "doctor discussion",
+        "title": "Clinical Safety Discussion Demo",
+        "opening": (
+            "This is not a treatment tool. It is a simulated diabetes scenario for discussing where an "
+            "insulin algorithm should be cautious."
+        ),
+        "purpose": "Invite medical feedback about scenario realism, risk states, and safety boundaries.",
+        "core_sentence": (
+            "IINTS makes unsafe or doubtful diabetes-algorithm decisions visible in simulation, so they "
+            "can be discussed before any real patient is involved."
+        ),
+        "clinical_question": (
+            "When a simulated patient appears high, what context should make an insulin algorithm slow down, "
+            "ask for review, or block extra insulin?"
+        ),
+        "first_30_seconds": (
+            "This is a virtual patient, not a real patient. I show a normal day, then a harder meal scenario, "
+            "then a risky situation where the safety supervisor should make the algorithm cautious."
+        ),
+        "flow": [
+            "Start with the virtual patient boundary: simulated, educational, not clinical advice.",
+            "Show the normal day as the baseline.",
+            "Show meal stress: glucose rises and the controller responds.",
+            "Show the risky case: glucose may be high, but context makes extra insulin questionable.",
+            "Show the supervisor decision and ask which medical context is still missing.",
+        ],
+        "proof_order": [
+            "Clinical discussion guide",
+            "Poster",
+            "Safety visualizer",
+            "AGP/report",
+            "Scenario folder only if technical proof is requested",
+        ],
+        "questions": [
+            "Which situations should a safety simulator always include: exercise, active insulin, illness, sleep, sensor error, or missed carbs?",
+            "Is the supervisor explanation medically readable enough?",
+            "What scenario would make this useful for teaching or clinical discussion?",
+        ],
+        "closing": (
+            "The goal is not to replace clinicians; the goal is to make algorithm behavior visible enough "
+            "for clinicians to challenge it."
+        ),
+    },
+    "eucys": {
+        "label": "EUCYS experiment",
+        "title": "IINTS EUCYS Safety Simulation Experiment",
+        "opening": (
+            "This demo is one controlled experiment: can an open-source simulation environment make risky "
+            "diabetes-algorithm behavior visible before clinical use?"
+        ),
+        "purpose": "Present IINTS as a research method, not just software.",
+        "research_question": (
+            "Can an open-source simulation environment help expose risky insulin-algorithm decisions "
+            "before they are tested near real patients?"
+        ),
+        "hypothesis": (
+            "An algorithm that only reacts to glucose can make unsafe suggestions in edge cases, while a "
+            "safety supervisor can flag or block some of those decisions."
+        ),
+        "core_sentence": (
+            "The SDK creates normal, stressful, and risky virtual-patient runs, then turns the result into "
+            "evidence a jury can inspect."
+        ),
+        "first_30_seconds": (
+            "My experiment compares three simulated diabetes situations: a normal day, a stress test, and a "
+            "risk scenario. The question is whether the SDK can make unsafe algorithm behavior visible."
+        ),
+        "experiment_design": [
+            "Normal day: baseline behavior.",
+            "Stress test: meals or changing physiology make control harder.",
+            "Risk scenario: an unsafe or doubtful action is flagged by the safety supervisor.",
+        ],
+        "flow": [
+            "Run 1: normal day baseline.",
+            "Run 2: meal or physiology stress test.",
+            "Run 3: supervisor override or risky-action scenario.",
+            "Show one poster with the three results.",
+            "Open the safety evidence only after the visual story is clear.",
+        ],
+        "proof_order": [
+            "Poster",
+            "EUCYS experiment script",
+            "Safety visualizer",
+            "Evidence bundle",
+            "Scenario manifests",
+        ],
+        "closing": (
+            "The project contribution is a transparent pre-clinical research workflow: simulate, stress, "
+            "protect, and document."
+        ),
+    },
+    "booth": {
+        "label": "booth digital patient",
+        "title": "IINTS Digital Patient Booth Demo",
+        "opening": (
+            "This is a digital patient: a safe simulated person we can stress with meals, exercise, sensor "
+            "error, or risky algorithm suggestions."
+        ),
+        "purpose": "Give visitors a fast visual explanation of virtual-patient testing.",
+        "core_sentence": (
+            "IINTS lets people see the difference between an algorithm suggestion and a safety-checked "
+            "decision."
+        ),
+        "first_30_seconds": (
+            "This screen is a digital patient. I can add a meal, exercise, sensor error, or night-hypo risk, "
+            "and the SDK shows what the algorithm suggests and whether the safety layer allows it."
+        ),
+        "visitor_explanation": (
+            "For a non-technical visitor: green means the virtual patient is in range, yellow/red means risk, "
+            "and the important part is whether the safety supervisor agrees with the algorithm."
+        ),
+        "flow": [
+            "Show the current glucose and trend.",
+            "Add a scenario: meal, exercise, sensor error, or night hypo risk.",
+            "Point out what the algorithm wants to do.",
+            "Point out whether the safety supervisor allows, flags, or blocks it.",
+            "Close with the generated poster and evidence folder.",
+        ],
+        "proof_order": [
+            "Fullscreen poster or dashboard",
+            "Cue card",
+            "Safety visualizer",
+            "Evidence bundle",
+        ],
+        "closing": (
+            "For a booth visitor, the important idea is simple: the AI is not blindly trusted; it is tested "
+            "inside a safe virtual patient first."
+        ),
+    },
+}
+
+
 def _demo_audience_profile(audience: str) -> Dict[str, Any]:
     normalized = audience.strip().lower().replace("_", "-")
     aliases = {
@@ -5931,20 +6152,71 @@ def _demo_audience_profile(audience: str) -> Dict[str, Any]:
     return _DEMO_AUDIENCE_PROFILES[normalized]
 
 
+def _demo_story_profile(story_mode: str) -> Dict[str, Any]:
+    normalized = story_mode.strip().lower().replace("_", "-")
+    aliases = {
+        "clinical": "doctor",
+        "clinician": "doctor",
+        "doctors": "doctor",
+        "jury": "eucys",
+        "expo": "booth",
+        "public": "booth",
+        "live": "sdk",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized not in _DEMO_STORY_PROFILES:
+        supported = ", ".join(sorted(_DEMO_STORY_PROFILES))
+        raise typer.BadParameter(f"Unknown demo story '{story_mode}'. Choose one of: {supported}.")
+    return _DEMO_STORY_PROFILES[normalized]
+
+
+def _normalize_demo_story_mode(story_mode: str) -> str:
+    normalized = story_mode.strip().lower().replace("_", "-")
+    aliases = {
+        "clinical": "doctor",
+        "clinician": "doctor",
+        "doctors": "doctor",
+        "jury": "eucys",
+        "expo": "booth",
+        "public": "booth",
+        "live": "sdk",
+    }
+    normalized = aliases.get(normalized, normalized)
+    if normalized not in _DEMO_STORY_PROFILES:
+        supported = ", ".join(sorted(_DEMO_STORY_PROFILES))
+        raise typer.BadParameter(f"Unknown demo story '{story_mode}'. Choose one of: {supported}.")
+    return normalized
+
+
 def _demo_presenter_guide_markdown(
     *,
     audience: str,
+    story_mode: str,
     script_path: Path,
     results_dir: Path,
     summary: Optional[Dict[str, Any]] = None,
 ) -> str:
     profile = _demo_audience_profile(audience)
+    story = _demo_story_profile(story_mode)
     lines = [
         "# IINTS-AF Presenter Guide",
         "",
         f"Audience mode: **{profile['label']}**",
+        f"Story mode: **{story['label']}**",
         "",
-        "## 1. Opening",
+        f"## Demo Title: {story['title']}",
+        "",
+        story["opening"],
+        "",
+        "## Core sentence",
+        "",
+        story["core_sentence"],
+        "",
+        "## First 30 Seconds",
+        "",
+        story["first_30_seconds"],
+        "",
+        "## 1. Opening For This Audience",
         "",
         profile["opening"],
         "",
@@ -5952,10 +6224,35 @@ def _demo_presenter_guide_markdown(
         "",
     ]
     lines.extend(f"- {item}" for item in profile["why_it_matters"])
+    if "research_question" in story:
+        lines.extend(
+            [
+                "",
+                "## 3. Research Question",
+                "",
+                story["research_question"],
+                "",
+                "## 4. Hypothesis",
+                "",
+                story["hypothesis"],
+            ]
+        )
+        next_section = 5
+    else:
+        next_section = 3
     lines.extend(
         [
             "",
-            "## 3. What to say before the live run",
+            f"## {next_section}. Story Flow",
+            "",
+        ]
+    )
+    lines.extend(f"{index}. {item}" for index, item in enumerate(story["flow"], start=1))
+    next_section += 1
+    lines.extend(
+        [
+            "",
+            f"## {next_section}. What to say before the live run",
             "",
             "In the next few minutes I will show three things:",
             "",
@@ -5963,9 +6260,9 @@ def _demo_presenter_guide_markdown(
             "2. a harder meal-and-exercise stress run",
             "3. a deliberately unsafe request that gets blocked by the safety supervisor",
             "",
-            "I will first show the small piece of code that defines the pipeline, then run it once, then open the generated poster and artifacts.",
+            "I will keep the first screen audience-safe: scenario, result, and safety meaning first; code and folders only if they help answer a question.",
             "",
-            "## 4. Code to point at",
+            f"## {next_section + 1}. Technical Proof To Point At",
             "",
             f"- Showable script: `{script_path}`",
             "- `run_full(...)` creates reproducible run bundles.",
@@ -5974,31 +6271,47 @@ def _demo_presenter_guide_markdown(
             "- If physiology comes up, open `research/eucys_pack/pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf`.",
             "- If you need a fast handout, open `research/eucys_pack/pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf`.",
             "",
-            "## 5. Live sequence",
+            f"## {next_section + 2}. Open Artifacts In This Order",
+            "",
+        ]
+    )
+    lines.extend(f"{index}. {item}" for index, item in enumerate(story["proof_order"], start=1))
+    lines.extend(
+        [
+            "",
+            f"## {next_section + 3}. Live Sequence",
             "",
             "1. Read the opening line above.",
-            "2. Show the exported code preview.",
-            "3. Run `iints demo`.",
+            "2. Show the story panel first.",
+            "3. Run the prepared command.",
             "4. Open the poster first.",
             "5. If someone asks for proof, open one scenario folder and show `results.csv`, the report, and the manifest.",
             "6. If someone asks for the public evidence pack, open `evidence_bundle/README.md` and `MODEL_CARD.md`.",
             "",
-            "## 6. How to explain the three panels",
+            f"## {next_section + 4}. How to explain the three panels",
             "",
             "- **Normal Run** = the control case.",
             "- **Meal Stress Test** = the same controller under harder physiology.",
             "- **Supervisor Override** = a bad request is blocked, logged, and made explainable.",
             "",
-            "## 7. Closing",
+            f"## {next_section + 5}. Closing",
+            "",
+            story["closing"],
             "",
             profile["closing"],
             "",
+            "Safety boundary: IINTS is a research and educational SDK, not treatment advice.",
+            "",
         ]
     )
+    if "questions" in story:
+        lines.extend(["## Questions To Ask The Doctor", ""])
+        lines.extend(f"- {item}" for item in story["questions"])
+        lines.append("")
     if summary is not None:
         lines.extend(
             [
-                "## 8. Results generated in this run",
+                "## Results generated in this run",
                 "",
                 f"- Poster: `{summary.get('poster_png', results_dir / 'booth_demo_poster.png')}`",
                 f"- Summary JSON: `{results_dir / 'demo_summary.json'}`",
@@ -6019,13 +6332,16 @@ def _demo_presenter_guide_markdown(
 def _demo_cue_card_markdown(
     *,
     audience: str,
+    story_mode: str,
     script_path: Path,
     results_dir: Path,
     prepare_ai: bool,
     summary: Optional[Dict[str, Any]] = None,
 ) -> str:
     profile = _demo_audience_profile(audience)
+    story = _demo_story_profile(story_mode)
     run_command = _live_demo_run_command(script_path, results_dir, prepare_ai)
+    presenter_command = _demo_user_command(story_mode, results_dir.parent)
     poster_path = summary.get("poster_png") if summary else results_dir / "booth_demo_poster.png"
     supervisor_dir = None
     if summary:
@@ -6039,26 +6355,33 @@ def _demo_cue_card_markdown(
         "",
         "## Opening line",
         "",
-        profile["opening"],
+        story["opening"],
+        "",
+        "## Core sentence",
+        "",
+        story["core_sentence"],
         "",
         "## 60-second flow",
         "",
         "1. **Say the purpose:** pre-clinical research, not treatment advice.",
-        f"2. **Show code:** `{script_path}`",
-        "3. **Point at:** `run_full(...)`, `generate_results_poster(...)`, and optional `prepare_ai_ready_artifacts(...)`.",
+        f"2. **Frame the audience:** {profile['label']}.",
+        "3. **Show the scenario story first:** normal day, stress case, risky case.",
         "4. **Run command:**",
         "",
         "```bash",
-        run_command,
+        presenter_command,
         "```",
         "",
         f"5. **Open poster first:** `{poster_path}`",
         "6. **Explain panels:** normal day, harder physiology, supervisor override.",
-        "7. **If asked for proof:** open `evidence_bundle/README.md`, then one scenario folder with `results.csv`, report PDF, and `run_manifest.json`.",
+        f"7. **If asked for proof:** show `{script_path}` and then open `evidence_bundle/README.md`.",
         "",
-        "## The sentence that makes the demo clear",
+        "## Open in this order",
         "",
-        "The demo is not just a graph: it is a reproducible bundle containing data, safety decisions, audit artifacts, a report, and a visual summary.",
+    ]
+    lines.extend(f"{index}. {item}" for index, item in enumerate(story["proof_order"], start=1))
+    lines.extend(
+        [
         "",
         "## If something fails live",
         "",
@@ -6070,7 +6393,16 @@ def _demo_cue_card_markdown(
         "",
         "IINTS is a research and educational SDK. It is not a certified medical device and is not for treatment decisions.",
         "",
-    ]
+        "## Generated script command",
+        "",
+        "Use this only if you want to rerun the exported script directly:",
+        "",
+        "```bash",
+        run_command,
+        "```",
+        "",
+        ]
+    )
     if supervisor_dir:
         lines.extend(
             [
@@ -6090,18 +6422,27 @@ def _demo_cue_card_markdown(
 def _demo_artifact_map_markdown(
     *,
     audience: str,
+    story_mode: str,
     script_path: Path,
     results_dir: Path,
     prepare_ai: bool,
     summary: Optional[Dict[str, Any]] = None,
 ) -> str:
     profile = _demo_audience_profile(audience)
+    story = _demo_story_profile(story_mode)
     run_command = _live_demo_run_command(script_path, results_dir, prepare_ai)
     poster_path = summary.get("poster_png") if summary else results_dir / "booth_demo_poster.png"
     lines = [
         "# IINTS Live Demo Artifact Map",
         "",
         f"Audience mode: **{profile['label']}**",
+        f"Story mode: **{story['label']}**",
+        "",
+        f"Primary purpose: {story['purpose']}",
+        "",
+        "Core sentence:",
+        "",
+        story["core_sentence"],
         "",
         "## Run command",
         "",
@@ -6112,11 +6453,12 @@ def _demo_artifact_map_markdown(
         "## Open in this order",
         "",
         f"1. Poster: `{poster_path}`",
-        f"2. Presenter guide: `{results_dir.parent / 'PRESENTER_GUIDE.md'}`",
-        f"3. Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
-        f"4. Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
-        f"5. Evidence bundle: `{results_dir.parent / 'evidence_bundle'}`",
-        f"6. Summary JSON: `{results_dir / 'demo_summary.json'}`",
+        f"2. Story guide: `{results_dir.parent / 'DEMO_STORY.md'}`",
+        f"3. Presenter guide: `{results_dir.parent / 'PRESENTER_GUIDE.md'}`",
+        f"4. Jury talk track: `{results_dir / 'JURY_TALK_TRACK.md'}`",
+        f"5. Live demo notes: `{results_dir / 'BEURS_LIVE_DEMO_SCRIPT.txt'}`",
+        f"6. Evidence bundle: `{results_dir.parent / 'evidence_bundle'}`",
+        f"7. Summary JSON: `{results_dir / 'demo_summary.json'}`",
         "",
         "## What each artifact proves",
         "",
@@ -6155,10 +6497,118 @@ def _demo_artifact_map_markdown(
     return "\n".join(str(line) for line in lines)
 
 
+def _demo_specific_story_filename(story_mode: str) -> Optional[str]:
+    normalized = _normalize_demo_story_mode(story_mode)
+    names = {
+        "doctor": "DOCTOR_DISCUSSION_GUIDE.md",
+        "eucys": "EUCYS_EXPERIMENT_SCRIPT.md",
+        "booth": "BOOTH_DIGITAL_PATIENT_SCRIPT.md",
+    }
+    return names.get(normalized)
+
+
+def _demo_story_markdown(
+    *,
+    audience: str,
+    story_mode: str,
+    script_path: Path,
+    results_dir: Path,
+    prepare_ai: bool,
+    summary: Optional[Dict[str, Any]] = None,
+) -> str:
+    profile = _demo_audience_profile(audience)
+    story = _demo_story_profile(story_mode)
+    run_command = _live_demo_run_command(script_path, results_dir, prepare_ai)
+    presenter_command = _demo_user_command(story_mode, results_dir.parent)
+    poster_path = summary.get("poster_png") if summary else results_dir / "booth_demo_poster.png"
+    lines = [
+        f"# {story['title']}",
+        "",
+        f"Audience: **{profile['label']}**",
+        f"Purpose: {story['purpose']}",
+        "",
+        "## One-Sentence Explanation",
+        "",
+        story["core_sentence"],
+        "",
+        "## First 30 Seconds",
+        "",
+        story["first_30_seconds"],
+        "",
+    ]
+    if "clinical_question" in story:
+        lines.extend(["## Clinical Question", "", story["clinical_question"], ""])
+    if "research_question" in story:
+        lines.extend(
+            [
+                "## Research Question",
+                "",
+                story["research_question"],
+                "",
+                "## Hypothesis",
+                "",
+                story["hypothesis"],
+                "",
+            ]
+        )
+    if "experiment_design" in story:
+        lines.extend(["## Experiment Design", ""])
+        lines.extend(f"- {item}" for item in story["experiment_design"])
+        lines.append("")
+    if "visitor_explanation" in story:
+        lines.extend(["## What Visitors See", "", story["visitor_explanation"], ""])
+    lines.extend(["## What To Show", ""])
+    lines.extend(f"{index}. {item}" for index, item in enumerate(story["flow"], start=1))
+    lines.extend(
+        [
+            "",
+            "## Recommended Live Command",
+            "",
+            "```bash",
+            presenter_command,
+            "```",
+            "",
+            "## First Artifact To Open",
+            "",
+            f"`{poster_path}`",
+            "",
+            "## Proof Layer",
+            "",
+        ]
+    )
+    lines.extend(f"{index}. {item}" for index, item in enumerate(story["proof_order"], start=1))
+    if "questions" in story:
+        lines.extend(["", "## Questions To Ask", ""])
+        lines.extend(f"- {item}" for item in story["questions"])
+    lines.extend(
+        [
+            "",
+            "## Safety Boundary",
+            "",
+            "IINTS is a research and educational SDK. It is not a certified medical device, not an insulin-delivery product, and not for diagnosis or treatment decisions.",
+            "",
+            "## Closing Line",
+            "",
+            story["closing"],
+            "",
+            "## Generated Script Command",
+            "",
+            "Use this only if you want to rerun the exported script directly:",
+            "",
+            "```bash",
+            run_command,
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(str(line) for line in lines)
+
+
 def _write_demo_support_files(
     *,
     output_dir: Path,
     audience: str,
+    story_mode: str,
     script_path: Path,
     results_dir: Path,
     prepare_ai: bool,
@@ -6167,11 +6617,13 @@ def _write_demo_support_files(
     output_dir.mkdir(parents=True, exist_ok=True)
     cue_card_path = output_dir / "DEMO_CUE_CARD.md"
     artifact_map_path = output_dir / "DEMO_ARTIFACTS.md"
+    story_path = output_dir / "DEMO_STORY.md"
     run_script_path = output_dir / "RUN_LIVE_DEMO.sh"
 
     cue_card_path.write_text(
         _demo_cue_card_markdown(
             audience=audience,
+            story_mode=story_mode,
             script_path=script_path,
             results_dir=results_dir,
             prepare_ai=prepare_ai,
@@ -6182,6 +6634,7 @@ def _write_demo_support_files(
     artifact_map_path.write_text(
         _demo_artifact_map_markdown(
             audience=audience,
+            story_mode=story_mode,
             script_path=script_path,
             results_dir=results_dir,
             prepare_ai=prepare_ai,
@@ -6189,6 +6642,20 @@ def _write_demo_support_files(
         ),
         encoding="utf-8",
     )
+    story_text = _demo_story_markdown(
+        audience=audience,
+        story_mode=story_mode,
+        script_path=script_path,
+        results_dir=results_dir,
+        prepare_ai=prepare_ai,
+        summary=summary,
+    )
+    story_path.write_text(story_text, encoding="utf-8")
+    specific_story_path: Optional[Path] = None
+    specific_filename = _demo_specific_story_filename(story_mode)
+    if specific_filename is not None:
+        specific_story_path = output_dir / specific_filename
+        specific_story_path.write_text(story_text, encoding="utf-8")
     run_script_path.write_text(
         "\n".join(
             [
@@ -6213,7 +6680,9 @@ def _write_demo_support_files(
     return {
         "cue_card": cue_card_path,
         "artifact_map": artifact_map_path,
+        "story": story_path,
         "run_script": run_script_path,
+        **({"specific_story": specific_story_path} if specific_story_path is not None else {}),
     }
 
 
@@ -6221,6 +6690,7 @@ def _write_demo_presenter_guide(
     *,
     output_dir: Path,
     audience: str,
+    story_mode: str,
     script_path: Path,
     results_dir: Path,
     summary: Optional[Dict[str, Any]] = None,
@@ -6229,6 +6699,7 @@ def _write_demo_presenter_guide(
     guide_path.write_text(
         _demo_presenter_guide_markdown(
             audience=audience,
+            story_mode=story_mode,
             script_path=script_path,
             results_dir=results_dir,
             summary=summary,
@@ -6238,9 +6709,10 @@ def _write_demo_presenter_guide(
     return guide_path
 
 
-def _print_demo_opening(console: Console, *, audience: str, guide_path: Path) -> None:
+def _print_demo_opening(console: Console, *, audience: str, story_mode: str, guide_path: Path) -> None:
     profile = _demo_audience_profile(audience)
-    lines = [profile["opening"], "", "Why this matters:"]
+    story = _demo_story_profile(story_mode)
+    lines = [story["opening"], "", "Core idea:", story["core_sentence"], "", "Why this matters:"]
     lines.extend(f"- {item}" for item in profile["why_it_matters"])
     lines.extend(
         [
@@ -6252,7 +6724,7 @@ def _print_demo_opening(console: Console, *, audience: str, guide_path: Path) ->
     console.print(
         Panel(
             "\n".join(lines),
-            title=f"0. What To Say First ({profile['label']})",
+            title=f"0. What To Say First - {story['title']} ({profile['label']})",
             border_style="green",
         )
     )
@@ -6262,6 +6734,7 @@ def _print_demo_stage_preflight(
     console: Console,
     *,
     audience: str,
+    story_mode: str,
     root_dir: Path,
     script_path: Path,
     results_dir: Path,
@@ -6269,17 +6742,19 @@ def _print_demo_stage_preflight(
     prepare_ai: bool,
 ) -> None:
     profile = _demo_audience_profile(audience)
+    story = _demo_story_profile(story_mode)
     console.print(
         Panel(
             "\n".join(
                 [
-                    "This is the audience-facing path: one command, one story, one evidence bundle.",
+                    story["purpose"],
+                    "The first screen should be the story and safety meaning, not file paths.",
                     "The noisy technical log is kept out of the live terminal unless something fails.",
                     "",
-                    "Flow: purpose -> inspectable code -> live run -> poster + proof artifacts.",
+                    "Flow: problem -> virtual patient -> normal run -> stress run -> safety override -> evidence.",
                 ]
             ),
-            title=f"IINTS Live Demo ({profile['label']})",
+            title=f"{story['title']} ({profile['label']})",
             border_style="cyan",
         )
     )
@@ -6289,6 +6764,7 @@ def _print_demo_stage_preflight(
     table.add_column("Status")
     table.add_row("Output folder", str(root_dir))
     table.add_row("Showable code", str(script_path))
+    table.add_row("Story guide", str(support_files["story"]))
     table.add_row("Cue card", str(support_files["cue_card"]))
     table.add_row("Artifact map", str(support_files["artifact_map"]))
     table.add_row("Live results", str(results_dir))
@@ -6366,9 +6842,22 @@ def demo_live(
         bool,
         typer.Option("--evidence/--no-evidence", help="Build a public research evidence bundle after the live run."),
     ] = True,
+    story_mode: Annotated[
+        str,
+        typer.Option(
+            "--story",
+            help="Demo story layer: sdk, doctor, eucys, or booth. Positional shortcuts also work via `iints demo doctor`.",
+        ),
+    ] = "sdk",
 ) -> None:
     """Export, show, run, and summarize one stage-friendly live demo flow."""
     console = Console()
+    try:
+        story_mode = _normalize_demo_story_mode(story_mode)
+        _demo_story_profile(story_mode)
+    except typer.BadParameter as exc:
+        console.print(f"[bold red]{exc}[/bold red]")
+        raise typer.Exit(code=1)
     root_dir = output_dir.expanduser().resolve()
     code_dir = root_dir / "showable_code"
     results_dir = root_dir / "results"
@@ -6393,12 +6882,14 @@ def demo_live(
     presenter_guide = _write_demo_presenter_guide(
         output_dir=root_dir,
         audience=audience,
+        story_mode=story_mode,
         script_path=script_path,
         results_dir=results_dir,
     )
     support_files = _write_demo_support_files(
         output_dir=root_dir,
         audience=audience,
+        story_mode=story_mode,
         script_path=script_path,
         results_dir=results_dir,
         prepare_ai=prepare_ai,
@@ -6408,6 +6899,7 @@ def demo_live(
         _print_demo_stage_preflight(
             console,
             audience=audience,
+            story_mode=story_mode,
             root_dir=root_dir,
             script_path=script_path,
             results_dir=results_dir,
@@ -6430,12 +6922,32 @@ def demo_live(
                 border_style="cyan",
             )
         )
-    _print_demo_opening(console, audience=audience, guide_path=presenter_guide)
-    console.print(
-        "[bold]1. Code to explain on the call[/bold]\n"
-        "The full script is exported above; this is the shortest useful slice to talk through first."
-    )
-    console.print(Syntax(code_to_show, "python", line_numbers=False, word_wrap=True))
+    _print_demo_opening(console, audience=audience, story_mode=story_mode, guide_path=presenter_guide)
+    if story_mode == "sdk" or not stage_mode:
+        console.print(
+            "[bold]1. Code to explain on the call[/bold]\n"
+            "The full script is exported above; this is the shortest useful slice to talk through first."
+        )
+        console.print(Syntax(code_to_show, "python", line_numbers=False, word_wrap=True))
+    else:
+        story = _demo_story_profile(story_mode)
+        console.print(
+            Panel(
+                "\n".join(
+                    [
+                        "Do not start by explaining folders or Python calls.",
+                        "Start with the virtual patient and the clinical/research question.",
+                        "",
+                        "Story flow:",
+                        *[f"{index}. {item}" for index, item in enumerate(story["flow"], start=1)],
+                        "",
+                        f"Technical proof is ready if asked: {script_path}",
+                    ]
+                ),
+                title="1. Story First",
+                border_style="blue",
+            )
+        )
 
     if not run_demo:
         console.print(
@@ -6452,9 +6964,14 @@ def demo_live(
     command.append("--prepare-ai" if prepare_ai else "--skip-ai")
 
     if stage_mode:
+        live_run_text = (
+            "Now I run the prepared demo pipeline. The terminal stays clean; the full technical log is saved for review."
+            if story_mode != "sdk"
+            else "Now I run the exact script we just inspected. The terminal stays clean; the full technical log is saved for review."
+        )
         console.print(
             Panel(
-                "Now I run the exact script we just inspected. The terminal stays clean; the full technical log is saved for review.",
+                live_run_text,
                 title="2. Live Run",
                 border_style="green",
             )
@@ -6501,6 +7018,7 @@ def demo_live(
     presenter_guide = _write_demo_presenter_guide(
         output_dir=root_dir,
         audience=audience,
+        story_mode=story_mode,
         script_path=script_path,
         results_dir=results_dir,
         summary=summary,
@@ -6508,6 +7026,7 @@ def demo_live(
     support_files = _write_demo_support_files(
         output_dir=root_dir,
         audience=audience,
+        story_mode=story_mode,
         script_path=script_path,
         results_dir=results_dir,
         prepare_ai=prepare_ai,
@@ -6530,6 +7049,9 @@ def demo_live(
         except Exception as exc:
             table.add_row("evidence_bundle_warning", f"Could not build evidence bundle: {exc}")
     table.add_row("presenter_guide", str(presenter_guide))
+    table.add_row("story_guide", str(support_files["story"]))
+    if "specific_story" in support_files:
+        table.add_row("audience_story_guide", str(support_files["specific_story"]))
     table.add_row("cue_card", str(support_files["cue_card"]))
     table.add_row("artifact_map", str(support_files["artifact_map"]))
     table.add_row("run_script", str(support_files["run_script"]))
@@ -6541,10 +7063,24 @@ def demo_live(
         _print_evidence_artifacts(console, evidence_payload)
     if run_log_path is not None:
         console.print(f"[green]Run log saved:[/green] {run_log_path}")
-    console.print(
-        "[green]Suggested call flow:[/green] show the preview, explain `run_full(...)`, open the poster, "
-        "then open one scenario folder if someone asks for proof."
-    )
+    if story_mode == "doctor":
+        suggested_flow = (
+            "open the doctor discussion guide, show the poster, explain the safety override in plain language, "
+            "then ask which clinical scenarios are missing."
+        )
+    elif story_mode == "eucys":
+        suggested_flow = (
+            "state the research question, open the poster, explain normal -> stress -> risk, then show the evidence bundle."
+        )
+    elif story_mode == "booth":
+        suggested_flow = (
+            "open the poster or dashboard fullscreen, narrate the digital patient, then use the cue card for short visitor questions."
+        )
+    else:
+        suggested_flow = (
+            "show the preview, explain `run_full(...)`, open the poster, then open one scenario folder if someone asks for proof."
+        )
+    console.print(f"[green]Suggested call flow:[/green] {suggested_flow}")
 
 
 @app.command()

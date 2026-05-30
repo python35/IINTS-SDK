@@ -25,6 +25,7 @@ def test_cli_demo_live_can_prepare_code_without_running(tmp_path: Path) -> None:
     assert (tmp_path / "PRESENTER_GUIDE.md").is_file()
     assert (tmp_path / "DEMO_CUE_CARD.md").is_file()
     assert (tmp_path / "DEMO_ARTIFACTS.md").is_file()
+    assert (tmp_path / "DEMO_STORY.md").is_file()
     assert (tmp_path / "RUN_LIVE_DEMO.sh").is_file()
     assert "Cue card" in result.stdout
 
@@ -42,6 +43,53 @@ def test_cli_demo_live_supports_clinical_presenter_mode(tmp_path: Path) -> None:
     assert "not treatment advice" in guide
     assert "EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf" in guide
     assert "EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf" in guide
+
+
+def test_cli_demo_live_doctor_story_starts_with_clinical_discussion(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["demo-live", "--output-dir", str(tmp_path), "--no-run", "--story", "doctor"],
+    )
+
+    assert result.exit_code == 0
+    assert "Clinical Safety Discussion Demo" in result.stdout
+    assert "Story First" in result.stdout
+    assert "Code to explain on the call" not in result.stdout
+    story = (tmp_path / "DEMO_STORY.md").read_text(encoding="utf-8")
+    doctor_guide = (tmp_path / "DOCTOR_DISCUSSION_GUIDE.md").read_text(encoding="utf-8")
+    assert "unsafe or doubtful diabetes-algorithm decisions visible" in story
+    assert "Clinical Question" in story
+    assert "iints demo doctor" in story
+    assert "Questions To Ask" in doctor_guide
+
+
+def test_cli_demo_live_eucys_story_exports_experiment_script(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["demo-live", "--output-dir", str(tmp_path), "--no-run", "--story", "eucys"],
+    )
+
+    assert result.exit_code == 0
+    assert "IINTS EUCYS Safety Simulation Experiment" in result.stdout
+    experiment = (tmp_path / "EUCYS_EXPERIMENT_SCRIPT.md").read_text(encoding="utf-8")
+    assert "Research Question" in experiment
+    assert "Hypothesis" in experiment
+    assert "Experiment Design" in experiment
+    assert "iints demo eucys" in experiment
+
+
+def test_cli_demo_live_booth_story_is_public_facing(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["demo-live", "--output-dir", str(tmp_path), "--no-run", "--story", "booth"],
+    )
+
+    assert result.exit_code == 0
+    assert "IINTS Digital Patient Booth Demo" in result.stdout
+    booth_script = (tmp_path / "BOOTH_DIGITAL_PATIENT_SCRIPT.md").read_text(encoding="utf-8")
+    assert "First 30 Seconds" in booth_script
+    assert "What Visitors See" in booth_script
+    assert "iints demo booth" in booth_script
 
 
 def test_cli_demo_live_runs_exported_script_and_summarizes_outputs(monkeypatch, tmp_path: Path) -> None:

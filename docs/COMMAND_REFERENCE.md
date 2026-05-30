@@ -47,6 +47,9 @@ Common forms:
 
 ```bash
 iints demo
+iints demo doctor
+iints demo eucys
+iints demo booth
 iints demo --audience jury --output-dir results/live_demo
 iints demo --audience clinical
 iints demo --dry-run          # rehearsal/preflight only, not the live call
@@ -56,10 +59,16 @@ iints demo --simulation-only --quick
 iints demo --simulation-only --full
 ```
 
+Story presets:
+
+- `iints demo doctor` starts with a clinical safety discussion: virtual patient, normal day, meal stress, risky context, and supervisor decision.
+- `iints demo eucys` frames the run as one experiment with a research question, hypothesis, three runs, and evidence bundle.
+- `iints demo booth` frames the run as a public digital-patient story: scenario changes, algorithm suggestion, safety check, and visual proof.
+
 ### `iints demo-live`
 Explicit alias for the same live presentation engine used by `iints demo`.
 
-It exports showable Python code, prints an audience-aware opening talk track, shows the key SDK calls in the terminal, runs the live demo, writes `PRESENTER_GUIDE.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, then lists the poster plus proof artifacts to open next.
+It exports showable Python code, prints an audience-aware opening talk track, runs the live demo, writes `PRESENTER_GUIDE.md`, `DEMO_STORY.md`, `DEMO_CUE_CARD.md`, `DEMO_ARTIFACTS.md`, and `RUN_LIVE_DEMO.sh`, then lists the poster plus proof artifacts to open next. Non-SDK story modes keep code as the proof layer instead of the first thing shown.
 
 Common forms:
 
@@ -70,6 +79,9 @@ iints demo-live --no-run
 iints demo-live --prepare-ai
 iints demo-live --audience clinical
 iints demo-live --audience engineering
+iints demo-live --story doctor
+iints demo-live --story eucys
+iints demo-live --story booth
 ```
 
 ### `iints quickstart`

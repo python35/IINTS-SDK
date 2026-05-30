@@ -36,16 +36,22 @@ iints demo
 Best live forms:
 
 ```bash
+iints demo doctor --output-dir results/demo_doctor
+iints demo eucys --output-dir results/demo_eucys
+iints demo booth --output-dir results/demo_booth
 iints demo --audience jury --output-dir results/live_demo
 iints demo --audience clinical --output-dir results/live_demo
 iints demo --dry-run --output-dir results/live_demo_rehearsal
 ```
+
+Use `doctor` for clinical feedback, `eucys` for the science-fair experiment story, and `booth` for public digital-patient explanation.
 
 Expected outputs:
 
 ```text
 results/live_demo/
   PRESENTER_GUIDE.md
+  DEMO_STORY.md
   DEMO_CUE_CARD.md
   DEMO_ARTIFACTS.md
   booth_demo_poster.png
