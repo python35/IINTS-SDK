@@ -209,6 +209,12 @@ iints data eu-ai-pact-review \
 
 ## Local AI Research
 
+Inspect local model choices and Mistral Serverless migration targets:
+
+```bash
+iints ai models
+```
+
 Blend prepared predictor datasets:
 
 ```bash

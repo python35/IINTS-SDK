@@ -95,6 +95,16 @@ def test_assistant_local_mode_fails_if_model_is_missing(monkeypatch: pytest.Monk
         )
 
 
+def test_assistant_api_mode_reports_current_mistral_replacement() -> None:
+    with pytest.raises(RuntimeError, match="mistral-small-latest"):
+        IINTSAssistant(
+            "cert.json",
+            guard=_FakeGuard(),  # type: ignore[arg-type]
+            mode="api",
+            model="devstral-small-latest",
+        )
+
+
 def test_guard_rejects_invalid_certificate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     cert_path = tmp_path / "report.signed.mdmp"
     cert_path.write_text(json.dumps({"signature": "abc"}), encoding="utf-8")

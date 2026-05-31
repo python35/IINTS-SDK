@@ -24,7 +24,7 @@ IINTS-AF is a research and education SDK for insulin-algorithm simulation, gluco
 | --- | --- | --- |
 | Simulation | Runs virtual-patient scenarios with algorithms, safety supervision, and reproducible outputs | [Getting Started](GETTING_STARTED.md), [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
 | Data quality | Imports CGM/pump data, checks realism, and creates MDMP-style certification artifacts | [MDMP Quickstart](MDMP_QUICKSTART.md), [Real-Data Realism Gate](REAL_DATA_REALISM.md) |
-| Research datasets | Tracks public and request-gated diabetes datasets for local AI research | [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md), [Local AI Research](LOCAL_AI_RESEARCH.md) |
+| Research AI | Tracks local AI setup, Mistral model migration, and public/request-gated diabetes datasets for research | [AI Assistant](AI_ASSISTANT.md), [Mistral Model Migration](MISTRAL_MODEL_MIGRATION.md), [Local AI Research](LOCAL_AI_RESEARCH.md) |
 | Reports | Generates run reports, evidence bundles, posters, and AGP-style research glucose summaries | [Research Evidence Bundle](EVIDENCE_BUNDLE.md), [Command Reference](COMMAND_REFERENCE.md) |
 | Edge hardware | Supports Raspberry Pi, Jetson endurance runs, and bench-only Pico/UNO workflows | [Hardware Hub](HARDWARE.md), [Jetson Endurance Mode](JETSON_ENDURANCE.md), [Raspberry Pi Pico Pump Lab](PICO_PUMP_LAB.md) |
 | Development | Documents architecture, API symbols, contribution checks, and release maintenance | [Developer Portal](DEVELOPER_PORTAL.md), [API Reference](API_REFERENCE.md), [Maintainer Guide](MAINTAINER_GUIDE.md) |

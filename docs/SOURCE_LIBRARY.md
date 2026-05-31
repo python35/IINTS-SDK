@@ -75,6 +75,9 @@ These references are used in narrative docs, setup guides, local-AI explanation,
 | `mistral_2025_ministral_3_3b` | Mistral AI model docs | [Ministral 3 3B](https://docs.mistral.ai/models/ministral-3-3b-25-12) | Small local model guidance |
 | `mistral_2025_ministral_3_8b` | Mistral AI model docs | [Ministral 3 8B](https://docs.mistral.ai/models/ministral-3-8b-25-12) | Mid-size local model guidance |
 | `mistral_2025_ministral_3_14b` | Mistral AI model docs | [Ministral 3 14B](https://docs.mistral.ai/models/ministral-3-14b-25-12) | Larger local model guidance |
+| `mistral_2026_adjustable_reasoning` | Mistral AI documentation | [Adjustable reasoning](https://docs.mistral.ai/capabilities/reasoning/adjustable) | Serverless replacement settings and `reasoning_effort` |
+| `mistral_2026_small_4` | Mistral AI model docs | [Mistral Small 4](https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03) | Cloud small-model migration target |
+| `mistral_2026_medium_35` | Mistral AI model docs | [Mistral Medium 3.5](https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04) | Cloud strong-model migration target |
 
 ### Device Emulation And Pump-Context Sources
 

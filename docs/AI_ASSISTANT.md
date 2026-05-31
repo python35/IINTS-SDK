@@ -53,6 +53,26 @@ Supported convenience aliases include:
 
 If the alias is used, IINTS resolves it to the installed local Ollama tag before generation.
 
+## Mistral Serverless API Migration
+
+The local SDK default is not affected by Mistral Serverless API retirements, because IINTS uses Ollama unless you explicitly build an external cloud workflow. For cloud-side scripts, use the current replacements:
+
+| Old family | New model |
+| --- | --- |
+| Devstral Small / Magistral Small / Mistral Small 3.2 | `mistral-small-latest` with `reasoning_effort="high"` |
+| Devstral Medium / Magistral Medium / Mistral Large 2 / Pixtral Large / Mistral Medium 3.x | `mistral-medium-3-5` with `reasoning_effort="high"` for code or research-review tasks |
+| Mistral OCR 2 | `mistral-ocr-latest` |
+| Mistral Moderation | `mistral-moderation-2603` |
+| Voxtral Mini Transcribe 1.0 | `voxtral-mini-latest` |
+
+Run the built-in migration table:
+
+```bash
+iints ai models
+```
+
+See [Mistral Model Migration](MISTRAL_MODEL_MIGRATION.md) for the full mapping.
+
 ## Fastest Working Setup
 
 Always work from an active virtual environment:

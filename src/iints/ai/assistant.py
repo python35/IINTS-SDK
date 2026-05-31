@@ -82,12 +82,20 @@ class IINTSAssistant:
             ollama_backend.ensure_model_ready()
             return local_backend
         if requested == "api":
-            api_backend: CompletionBackend = MistralAPIBackend()
+            api_backend: CompletionBackend = MistralAPIBackend(model_name=model)
             if api_backend.available():
                 return api_backend
+            api_model = getattr(api_backend, "model_name", "mistral-small-latest")
+            api_reasoning = getattr(api_backend, "reasoning_effort", None)
+            reasoning_hint = (
+                f" with reasoning_effort='{api_reasoning}'"
+                if isinstance(api_reasoning, str) and api_reasoning.strip()
+                else ""
+            )
             raise RuntimeError(
                 "Cloud API fallback is not enabled in this SDK build yet. "
-                "Use mode='local' with Ollama."
+                "Use mode='local' with Ollama, or configure an external Mistral client with "
+                f"`{api_model}`{reasoning_hint}."
             )
         raise ValueError(f"Unsupported AI mode: {mode}")
 

@@ -197,6 +197,10 @@ def test_ai_models_command_lists_profiles() -> None:
     assert "ministral-3:3b" in result.stdout
     assert "ministral-3:8b" in result.stdout
     assert "ministral-3:14b" in result.stdout
+    assert "Mistral Serverless Migration Guide" in result.stdout
+    assert "mistral-small-latest" in result.stdout
+    assert "mistral-medium-3-5" in result.stdout
+    assert "reasoning_effort=high" in result.stdout
 
 
 def test_ai_prepare_command_reports_generated_artifacts(tmp_path, monkeypatch) -> None:

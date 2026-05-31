@@ -67,6 +67,7 @@ nav:
       - Data Certification Quickstart: MDMP_QUICKSTART.md
       - Data Certification Guide: MDMP_FULL_GUIDE.md
       - AI Assistant: AI_ASSISTANT.md
+      - Mistral Model Migration: MISTRAL_MODEL_MIGRATION.md
       - Booth Demo & Presentation: BOOTH_DEMO.md
   - Hardware:
       - Hardware Hub: HARDWARE.md

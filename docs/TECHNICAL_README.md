@@ -217,6 +217,8 @@ iints ai prepare results/<run_id>
 iints ai report results/<run_id> --output results/<run_id>/ai/ai_report.md
 ```
 
+`iints ai models` also prints the Mistral Serverless migration table for external scripts. Deprecated cloud IDs such as `devstral-small-latest`, `magistral-medium-latest`, and `mistral-large-2411` should move to `mistral-small-latest` or `mistral-medium-3-5` as documented in [Mistral Model Migration](MISTRAL_MODEL_MIGRATION.md).
+
 For imported personal CareLink data:
 
 ```bash
@@ -446,7 +448,7 @@ iints ai report results/simulation_run.json \
 Options:
 - `--mode local` to require the local Ollama backend explicitly.
 - `--model ministral-3:8b` to pin the open local model tag.
-- `iints ai models` to inspect recommended local Mistral-family options for your hardware.
+- `iints ai models` to inspect recommended local Mistral-family options plus Serverless API migration targets.
 - `iints ai local-check --model ministral-3:8b` to verify that Ollama is reachable, the local Ministral tag is installed, and a tiny real generation succeeds before a real run.
 - `--model ministral` remains supported as a friendly alias.
 - `--timeout-seconds 120` to support slower local hardware such as edge devices.

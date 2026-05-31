@@ -12,7 +12,13 @@ from typing_extensions import Annotated
 
 from .assistant import AIResponse, IINTSAssistant
 from .backends import DEFAULT_MINISTRAL_MODEL, OllamaBackend
-from .model_catalog import list_local_mistral_models
+from .model_catalog import (
+    DEFAULT_MISTRAL_API_MODEL,
+    DEFAULT_MISTRAL_API_REASONING_EFFORT,
+    STRONG_MISTRAL_API_MODEL,
+    list_local_mistral_models,
+    list_mistral_api_migrations,
+)
 from .prepare import prepare_ai_ready_artifacts
 
 
@@ -183,9 +189,30 @@ def models() -> None:
         )
 
     console.print(table)
+    migration_table = Table(title="Mistral Serverless Migration Guide")
+    migration_table.add_column("Deprecated", style="yellow", overflow="fold")
+    migration_table.add_column("Replacement", style="cyan", no_wrap=True)
+    migration_table.add_column("Reasoning")
+    migration_table.add_column("Retires")
+    migration_table.add_column("Use Case", overflow="fold")
+    for migration_profile in list_mistral_api_migrations():
+        reasoning = migration_profile.reasoning_effort or "n/a"
+        migration_table.add_row(
+            ", ".join(migration_profile.deprecated_models),
+            migration_profile.replacement_model,
+            reasoning,
+            migration_profile.retirement_date,
+            migration_profile.use_case,
+        )
+    console.print(migration_table)
     console.print(
         "[dim]Tip:[/dim] start with "
         f"`{DEFAULT_MINISTRAL_MODEL}` unless you know your hardware can comfortably run a larger local model."
+    )
+    console.print(
+        "[dim]Serverless:[/dim] use "
+        f"`{DEFAULT_MISTRAL_API_MODEL}` with `reasoning_effort={DEFAULT_MISTRAL_API_REASONING_EFFORT}` "
+        f"for small reasoning/code tasks, or `{STRONG_MISTRAL_API_MODEL}` for stronger review."
     )
 
 

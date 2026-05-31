@@ -303,7 +303,7 @@ Documented modules: **178**
 
 - Source: `src/iints/ai/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `AIResponse, IINTSAssistant, DEFAULT_MINISTRAL_MODEL, DEFAULT_OLLAMA_HOST, OllamaBackend, GuardResult, MDMPGuard, LocalMistralModelProfile, list_local_mistral_models, prepare_ai_ready_artifacts`
+- Explicit exports: `AIResponse, IINTSAssistant, DEFAULT_MINISTRAL_MODEL, DEFAULT_OLLAMA_HOST, OllamaBackend, GuardResult, MDMPGuard, DEFAULT_MISTRAL_API_MODEL, DEFAULT_MISTRAL_API_REASONING_EFFORT, LocalMistralModelProfile, MistralAPIMigrationProfile, list_local_mistral_models, list_mistral_api_migrations, migrate_mistral_api_model, prepare_ai_ready_artifacts`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -449,14 +449,24 @@ No public classes, functions, or all-caps constants are declared directly in thi
 | Class | Signature | Summary |
 | --- | --- | --- |
 | `LocalMistralModelProfile` | `LocalMistralModelProfile` | No module docstring. |
+| `MistralAPIMigrationProfile` | `MistralAPIMigrationProfile` | No module docstring. |
 
 ### Public Functions
 
 - `list_local_mistral_models() -> list[LocalMistralModelProfile]`
+- `list_mistral_api_migrations() -> list[MistralAPIMigrationProfile]`
+- `migrate_mistral_api_model(model_name: str) -> tuple[str, str | None, bool]`
 
 ### Public Constants
 
+- `DEFAULT_MISTRAL_API_MODEL`
+- `DEFAULT_MISTRAL_API_REASONING_EFFORT`
+- `DEFAULT_MISTRAL_MODERATION_MODEL`
+- `DEFAULT_MISTRAL_OCR_MODEL`
+- `DEFAULT_MISTRAL_TRANSCRIBE_MODEL`
 - `LOCAL_MISTRAL_MODEL_PROFILES`
+- `MISTRAL_API_MIGRATION_PROFILES`
+- `STRONG_MISTRAL_API_MODEL`
 
 ## `iints.ai.prepare`
 

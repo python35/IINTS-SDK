@@ -149,6 +149,18 @@ These are the official references used in the guides for installing Ollama, unde
    Mistral AI Docs. *Ministral 3 14B*.  
    URL: [docs.mistral.ai/models/ministral-3-14b-25-12](https://docs.mistral.ai/models/ministral-3-14b-25-12)
 
+6. `mistral_2026_adjustable_reasoning`  
+   Mistral AI Docs. *Adjustable Reasoning*.  
+   URL: [docs.mistral.ai/studio-api/conversations/reasoning/adjustable](https://docs.mistral.ai/capabilities/reasoning/adjustable)
+
+7. `mistral_2026_small_4`  
+   Mistral AI Docs. *Mistral Small 4*.  
+   URL: [docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03](https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03)
+
+8. `mistral_2026_medium_35`  
+   Mistral AI Docs. *Mistral Medium 3.5*.  
+   URL: [docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04](https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04)
+
 ## Documentation-Only Device Emulation References
 
 These references are used for the best-effort emulator notes and are not claims of exact proprietary algorithm reproduction.
