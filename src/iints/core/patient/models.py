@@ -23,7 +23,8 @@ class CustomPatientModel:
                  dawn_phenomenon_strength: float = 0.0, # mg/dL per hour
                  dawn_start_hour: float = 4.0,
                  dawn_end_hour: float = 8.0,
-                 carb_absorption_duration_minutes: float = 240.0):
+                 carb_absorption_duration_minutes: float = 240.0,
+                 max_glucose_rate_mgdl_per_min: float = 3.0):
         """
         Initializes the patient model with simplified parameters.
 
@@ -52,6 +53,7 @@ class CustomPatientModel:
         self.dawn_start_hour = dawn_start_hour
         self.dawn_end_hour = dawn_end_hour
         self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
+        self.max_glucose_rate_mgdl_per_min = max_glucose_rate_mgdl_per_min
 
 
         self.initial_glucose = initial_glucose
@@ -83,6 +85,18 @@ class CustomPatientModel:
     def _effective_carb_absorption_duration(self) -> float:
         """Return a numerically safe carb absorption window."""
         return max(float(self.carb_absorption_duration_minutes), 1.0)
+
+    def _guard_glucose_transition(self, proposed_glucose: float, time_step: float) -> float:
+        """Prevent impossible synthetic jumps while preserving the trend direction."""
+        if not np.isfinite(proposed_glucose):
+            return float(self.current_glucose)
+        max_rate = float(getattr(self, "max_glucose_rate_mgdl_per_min", 0.0) or 0.0)
+        if max_rate <= 0.0:
+            return float(max(20.0, proposed_glucose))
+        max_delta = max_rate * max(float(time_step), 0.0)
+        requested_delta = float(proposed_glucose) - float(self.current_glucose)
+        bounded_delta = float(np.clip(requested_delta, -max_delta, max_delta))
+        return float(max(20.0, self.current_glucose + bounded_delta))
 
     def reset(self):
         """Resets the patient's state to initial conditions."""
@@ -217,7 +231,8 @@ class CustomPatientModel:
 
         # --- Update glucose ---
         delta_glucose = carb_effect - insulin_effect - exercise_effect + basal_glucose_change + dawn_effect
-        self.current_glucose = max(20, self.current_glucose + delta_glucose) # Prevent glucose from going too low (hypoglycemia)
+        proposed_glucose = self.current_glucose + delta_glucose
+        self.current_glucose = self._guard_glucose_transition(proposed_glucose, time_step)
 
         return self.current_glucose
 
@@ -254,6 +269,7 @@ class CustomPatientModel:
             "isf": self.insulin_sensitivity,
             "icr": self.carb_factor,
             "dia_minutes": self.insulin_action_duration,
+            "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
         }
 
     def get_ratio_state(self) -> Dict[str, float]:

@@ -684,7 +684,8 @@ class Simulator:
             self._current_time = current_time
             if self.enable_profiling:
                 step_start_time = time.perf_counter()
-            patient_carb_intake_this_step = 0.0
+            patient_carb_absorbed_this_step = 0.0
+            patient_carb_event_this_step = 0.0
             algo_carb_intake_this_step = 0.0
             self._input_validator_last_step_fail_soft = False
             mechanistic_glucose_reading = self.patient_model.get_current_glucose()
@@ -708,11 +709,13 @@ class Simulator:
                     logger.info("[%d min] Triggering stress event: %s", current_time, event)
                     if event.event_type == 'meal':
                         events_to_queue_for_patient.append(event)
+                        patient_carb_event_this_step += float(event.value or 0.0)
                         # Algorithm gets carb info based on reported_value if available, otherwise actual value
                         algo_carb_intake_this_step += event.reported_value if event.reported_value is not None else event.value
                     elif event.event_type == 'missed_meal':
-                        # Patient consumes carbs immediately, algorithm not aware
-                        patient_carb_intake_this_step += event.value
+                        # Patient consumes carbs, algorithm not aware.
+                        events_to_queue_for_patient.append(event)
+                        patient_carb_event_this_step += float(event.value or 0.0)
                         algo_carb_intake_this_step = 0.0 # Algorithm gets 0 carbs
                     elif event.event_type == 'sensor_error':
                         glucose_to_algorithm = event.value
@@ -743,20 +746,31 @@ class Simulator:
 
             # Add newly triggered meal events to the meal queue for delayed absorption
             for event in events_to_queue_for_patient:
+                total_carbs = float(event.value or 0.0)
                 self.meal_queue.append({
                     'event': event,
-                    'absorption_start_time': current_time + event.absorption_delay_minutes
+                    'absorption_start_time': current_time + event.absorption_delay_minutes,
+                    'remaining_carbs': total_carbs,
+                    'total_carbs': total_carbs,
                 })
 
             # Process meals from the queue that are now ready for absorption
-            meals_absorbed_this_step = []
+            updated_meal_queue = []
             for meal_entry in self.meal_queue:
                 if current_time >= meal_entry['absorption_start_time']:
-                    patient_carb_intake_this_step += meal_entry['event'].value # Actual carbs for the patient model
-                    meals_absorbed_this_step.append(meal_entry)
-            
-            # Remove absorbed meals from the queue
-            self.meal_queue = [meal_entry for meal_entry in self.meal_queue if meal_entry not in meals_absorbed_this_step]
+                    event = meal_entry['event']
+                    remaining_carbs = float(meal_entry.get('remaining_carbs', event.value or 0.0))
+                    # The patient models already contain the physiological
+                    # digestion curve. The simulator queue models only the
+                    # gastric delay before that curve starts; spreading carbs
+                    # here as well double-damped meals and produced flat,
+                    # late, non-physiological traces.
+                    patient_carb_absorbed_this_step += remaining_carbs
+                    meal_entry['remaining_carbs'] = 0.0
+                if float(meal_entry.get('remaining_carbs', 0.0)) > 1e-6:
+                    updated_meal_queue.append(meal_entry)
+
+            self.meal_queue = updated_meal_queue
 
             # Validate glucose passed to algorithm (could be modified by stress events)
             # This ensures even sensor error stress events are validated
@@ -917,7 +931,9 @@ class Simulator:
                 human_intervention = self.on_step(context) or None
                 if isinstance(human_intervention, dict):
                     if "additional_carbs" in human_intervention:
-                        patient_carb_intake_this_step += float(human_intervention["additional_carbs"])
+                        additional_carbs = float(human_intervention["additional_carbs"])
+                        patient_carb_event_this_step += additional_carbs
+                        patient_carb_absorbed_this_step += additional_carbs
                     if "override_delivered_insulin" in human_intervention:
                         requested_override = float(human_intervention["override_delivered_insulin"])
                         if requested_override < 0.0:
@@ -991,7 +1007,7 @@ class Simulator:
             self.patient_model.update(
                 time_step=self.time_step,
                 delivered_insulin=delivered_insulin,
-                carb_intake=patient_carb_intake_this_step, # Use actual carbs for patient
+                carb_intake=patient_carb_absorbed_this_step,
                 current_time=float(current_time),
             )
 
@@ -1029,7 +1045,8 @@ class Simulator:
                 "bolus_insulin_units": bolus_insulin_reported,
                 "meal_bolus_units": insulin_output.get("meal_bolus", 0.0),
                 "correction_bolus_units": insulin_output.get("correction_bolus", 0.0),
-                "carb_intake_grams": patient_carb_intake_this_step,
+                "carb_intake_grams": patient_carb_event_this_step,
+                "carb_absorbed_grams": patient_carb_absorbed_this_step,
                 "patient_iob_units": self.patient_model.insulin_on_board,
                 "patient_cob_grams": self.patient_model.carbs_on_board,
                 "effective_isf": effective_isf,

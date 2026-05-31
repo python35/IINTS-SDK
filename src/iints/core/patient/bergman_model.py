@@ -80,6 +80,7 @@ class BergmanPatientModel:
         dawn_start_hour: float = 4.0,
         dawn_end_hour: float = 8.0,
         carb_absorption_duration_minutes: float = 240.0,
+        max_glucose_rate_mgdl_per_min: float = 3.0,
         bergman_params: Optional[BergmanParameters] = None,
     ) -> None:
         # Store clinical knobs (for ratio queries and compatibility)
@@ -96,9 +97,14 @@ class BergmanPatientModel:
         self.dawn_start_hour = dawn_start_hour
         self.dawn_end_hour = dawn_end_hour
         self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
+        self.max_glucose_rate_mgdl_per_min = max_glucose_rate_mgdl_per_min
 
         # Bergman ODE parameters
-        self.params = bergman_params if bergman_params else BergmanParameters(Gb=initial_glucose)
+        self.params = bergman_params if bergman_params else BergmanParameters(
+            Gb=initial_glucose,
+            tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
+            k_abs=max(0.015, min(float(glucose_absorption_rate), 0.035)),
+        )
 
         # Exercise book-keeping
         self.is_exercising = False
@@ -125,6 +131,18 @@ class BergmanPatientModel:
         ], dtype=np.float64)
 
         self.reset()
+
+    def _guard_glucose_transition(self, proposed_glucose: float, time_step: float) -> float:
+        """Bound solver output to a plausible research-simulator transition."""
+        if not np.isfinite(proposed_glucose):
+            return float(self.current_glucose)
+        max_rate = float(getattr(self, "max_glucose_rate_mgdl_per_min", 0.0) or 0.0)
+        if max_rate <= 0.0:
+            return float(max(20.0, proposed_glucose))
+        max_delta = max_rate * max(float(time_step), 0.0)
+        requested_delta = float(proposed_glucose) - float(self.current_glucose)
+        bounded_delta = float(np.clip(requested_delta, -max_delta, max_delta))
+        return float(max(20.0, self.current_glucose + bounded_delta))
 
     # ------------------------------------------------------------------
     # Public interface (mirrors CustomPatientModel exactly)
@@ -219,8 +237,7 @@ class BergmanPatientModel:
         )
 
         self._state = sol.y[:, -1].copy()
-        # Floor glucose at 20 mg/dL (physiological minimum)
-        self._state[0] = max(20.0, self._state[0])
+        self._state[0] = self._guard_glucose_transition(float(self._state[0]), time_step)
         # Clamp non-negative for other compartments
         self._state[1] = max(0.0, self._state[1])
         self._state[2] = max(0.0, self._state[2])
@@ -249,6 +266,7 @@ class BergmanPatientModel:
             "remote_insulin_action": float(self._state[1]),
             "stomach_glucose_mg": float(self._state[3]),
             "gut_glucose_mg": float(self._state[4]),
+            "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
         }
 
     def get_ratio_state(self) -> Dict[str, float]:

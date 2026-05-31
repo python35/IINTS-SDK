@@ -84,6 +84,8 @@ class PatientConfigModel(BaseModel):
     dawn_phenomenon_strength: float = Field(default=0.0, ge=0.0, le=50.0)
     dawn_start_hour: float = Field(default=4.0, ge=0.0, le=23.0)
     dawn_end_hour: float = Field(default=8.0, ge=0.0, le=24.0)
+    carb_absorption_duration_minutes: float = Field(default=240.0, ge=30.0, le=480.0)
+    max_glucose_rate_mgdl_per_min: float = Field(default=3.0, ge=0.5, le=5.0)
 
     @model_validator(mode="after")
     def _check_peak_vs_duration(self) -> "PatientConfigModel":

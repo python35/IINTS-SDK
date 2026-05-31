@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import numpy as np
+
 from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.data.realism_validator import validate_realism_dataset
 from iints.highlevel import run_simulation
-from iints.presets import get_preset
+from iints.presets import get_preset, load_presets
 
 
 def test_quickstart_preset_contains_early_meal_excursion() -> None:
@@ -156,3 +158,34 @@ def test_dataset_specific_reference_presets_target_their_own_envelopes(tmp_path)
         report = validate_realism_dataset(standard_df, reference=reference)
 
         assert report.verdict in {"likely_realistic", "needs_review"}
+
+
+def test_all_builtin_presets_avoid_impossible_glucose_transitions(tmp_path) -> None:
+    for preset in load_presets():
+        outputs = run_simulation(
+            algorithm=ClinicalBaselineAlgorithm(),
+            scenario=preset["scenario"],
+            patient_config=preset["patient_config"],
+            duration_minutes=preset["duration_minutes"],
+            time_step=preset["time_step_minutes"],
+            seed=42,
+            output_dir=tmp_path / f"transition_guard_{preset['name']}",
+            compare_baselines=False,
+            export_audit=False,
+            generate_report=False,
+        )
+        results = outputs["results"]
+        glucose = results["glucose_actual_mgdl"].to_numpy(dtype=float)
+        minutes = results["time_minutes"].to_numpy(dtype=float)
+        glucose_delta = np.abs(np.diff(glucose))
+        minute_delta = np.diff(minutes)
+
+        if len(glucose_delta) == 0:
+            continue
+
+        max_rate = float(np.max(glucose_delta / minute_delta))
+        flat_step_ratio = float(np.mean(glucose_delta < 0.05))
+
+        assert max_rate <= 3.05, preset["name"]
+        assert float(np.max(glucose_delta)) <= 18.0, preset["name"]
+        assert flat_step_ratio < 0.70, preset["name"]

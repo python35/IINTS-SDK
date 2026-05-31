@@ -27,6 +27,7 @@ REALISM_VERDICT_ORDER: tuple[RealismVerdict, ...] = (
     "needs_review",
     "likely_realistic",
 )
+MEAL_RESPONSE_MAX_LAG_MINUTES = 300.0
 
 
 @dataclass(frozen=True)
@@ -135,7 +136,7 @@ def _evaluate_meal_responses(
     min_meal_grams: float,
     pre_window_minutes: float = 30.0,
     post_peak_start_minutes: float = 20.0,
-    post_peak_end_minutes: float = 180.0,
+    post_peak_end_minutes: float = MEAL_RESPONSE_MAX_LAG_MINUTES,
     insulin_match_window_before_minutes: float = 45.0,
     insulin_match_window_after_minutes: float = 20.0,
     insulin_event_threshold_units: float = 0.3,
@@ -370,7 +371,7 @@ def _check_meal_response(
 
     rises = np.array([response.rise_mgdl for response in responses], dtype=float)
     lags = np.array([response.peak_lag_minutes for response in responses], dtype=float)
-    responding = (rises >= 15.0) & (lags >= 20.0) & (lags <= 180.0)
+    responding = (rises >= 15.0) & (lags >= 20.0) & (lags <= MEAL_RESPONSE_MAX_LAG_MINUTES)
     response_ratio = float(responding.mean()) if len(responding) else 0.0
     metrics = {
         "assessed_meals": len(responses),
@@ -451,9 +452,15 @@ def _check_causal_alignment(
     carb_insulin_corr = _correlation(carb_values[matched_mask], insulin_values[matched_mask]) if matched_mask.sum() >= 3 else None
 
     for response in responses:
-        response_visible = response.rise_mgdl >= 15.0 and 20.0 <= response.peak_lag_minutes <= 180.0
+        response_visible = (
+            response.rise_mgdl >= 15.0
+            and 20.0 <= response.peak_lag_minutes <= MEAL_RESPONSE_MAX_LAG_MINUTES
+        )
         if response.carbs_grams < 20.0:
-            response_visible = response.rise_mgdl >= 8.0 and 15.0 <= response.peak_lag_minutes <= 180.0
+            response_visible = (
+                response.rise_mgdl >= 8.0
+                and 15.0 <= response.peak_lag_minutes <= MEAL_RESPONSE_MAX_LAG_MINUTES
+            )
         insulin_present = response.matched_insulin_units >= 0.3
         insulin_timing_ok = True
         insulin_ratio_ok = True
@@ -586,7 +593,7 @@ def _meal_response_summary_metrics(
 
     rises = np.array([response.rise_mgdl for response in responses], dtype=float)
     lags = np.array([response.peak_lag_minutes for response in responses], dtype=float)
-    responding = (rises >= 15.0) & (lags >= 20.0) & (lags <= 180.0)
+    responding = (rises >= 15.0) & (lags >= 20.0) & (lags <= MEAL_RESPONSE_MAX_LAG_MINUTES)
     return {
         "meal_response_ratio": _round_or_none(float(responding.mean()), 4),
         "median_peak_lag_minutes": _round_or_none(float(np.median(lags))),

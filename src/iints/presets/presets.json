@@ -14,16 +14,18 @@
         {
           "start_time": 450,
           "event_type": "meal",
-          "value": 48,
+          "value": 60,
           "absorption_delay_minutes": 10,
-          "duration": 50
+          "duration": 50,
+          "reported_value": 48
         },
         {
           "start_time": 735,
           "event_type": "meal",
-          "value": 62,
+          "value": 82,
           "absorption_delay_minutes": 15,
-          "duration": 75
+          "duration": 75,
+          "reported_value": 62
         },
         {
           "start_time": 765,
@@ -34,16 +36,18 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 74,
+          "value": 95,
           "absorption_delay_minutes": 20,
-          "duration": 90
+          "duration": 90,
+          "reported_value": 72
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 18,
+          "value": 20,
           "absorption_delay_minutes": 5,
-          "duration": 25
+          "duration": 25,
+          "reported_value": 18
         }
       ]
     }
@@ -63,16 +67,18 @@
         {
           "start_time": 450,
           "event_type": "meal",
-          "value": 48,
+          "value": 60,
           "absorption_delay_minutes": 10,
-          "duration": 50
+          "duration": 50,
+          "reported_value": 48
         },
         {
           "start_time": 735,
           "event_type": "meal",
-          "value": 62,
+          "value": 82,
           "absorption_delay_minutes": 15,
-          "duration": 75
+          "duration": 75,
+          "reported_value": 62
         },
         {
           "start_time": 765,
@@ -83,16 +89,18 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 74,
+          "value": 95,
           "absorption_delay_minutes": 20,
-          "duration": 90
+          "duration": 90,
+          "reported_value": 72
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 18,
+          "value": 20,
           "absorption_delay_minutes": 5,
-          "duration": 25
+          "duration": 25,
+          "reported_value": 18
         }
       ]
     }
@@ -112,16 +120,18 @@
         {
           "start_time": 450,
           "event_type": "meal",
-          "value": 48,
+          "value": 60,
           "absorption_delay_minutes": 10,
-          "duration": 50
+          "duration": 50,
+          "reported_value": 48
         },
         {
           "start_time": 735,
           "event_type": "meal",
-          "value": 62,
+          "value": 82,
           "absorption_delay_minutes": 15,
-          "duration": 75
+          "duration": 75,
+          "reported_value": 62
         },
         {
           "start_time": 765,
@@ -132,16 +142,18 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 74,
+          "value": 95,
           "absorption_delay_minutes": 20,
-          "duration": 90
+          "duration": 90,
+          "reported_value": 72
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 18,
+          "value": 20,
           "absorption_delay_minutes": 5,
-          "duration": 25
+          "duration": 25,
+          "reported_value": 18
         }
       ]
     }
@@ -161,8 +173,8 @@
         {
           "start_time": 30,
           "event_type": "meal",
-          "value": 36,
-          "reported_value": 34,
+          "value": 60,
+          "reported_value": 35,
           "absorption_delay_minutes": 10,
           "duration": 55
         },
@@ -192,16 +204,16 @@
         {
           "start_time": 480,
           "event_type": "meal",
-          "value": 42.0,
-          "reported_value": 39.9,
+          "value": 60.0,
+          "reported_value": 48.0,
           "absorption_delay_minutes": 15,
           "duration": 40
         },
         {
           "start_time": 720,
           "event_type": "meal",
-          "value": 59.0,
-          "reported_value": 57.8,
+          "value": 82.0,
+          "reported_value": 62.0,
           "absorption_delay_minutes": 10,
           "duration": 50
         },
@@ -214,16 +226,16 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 68.0,
-          "reported_value": 66.6,
+          "value": 95.0,
+          "reported_value": 72.0,
           "absorption_delay_minutes": 10,
           "duration": 60
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 12.0,
-          "reported_value": 12.0,
+          "value": 20.0,
+          "reported_value": 18.0,
           "absorption_delay_minutes": 15,
           "duration": 40
         }
@@ -248,16 +260,16 @@
         {
           "start_time": 480,
           "event_type": "meal",
-          "value": 42.0,
-          "reported_value": 39.9,
+          "value": 60.0,
+          "reported_value": 48.0,
           "absorption_delay_minutes": 15,
           "duration": 40
         },
         {
           "start_time": 720,
           "event_type": "meal",
-          "value": 59.0,
-          "reported_value": 57.8,
+          "value": 82.0,
+          "reported_value": 62.0,
           "absorption_delay_minutes": 10,
           "duration": 50
         },
@@ -270,16 +282,16 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 68.0,
-          "reported_value": 66.6,
+          "value": 95.0,
+          "reported_value": 72.0,
           "absorption_delay_minutes": 10,
           "duration": 60
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 12.0,
-          "reported_value": 12.0,
+          "value": 20.0,
+          "reported_value": 18.0,
           "absorption_delay_minutes": 15,
           "duration": 40
         }
@@ -302,16 +314,18 @@
         {
           "start_time": 450,
           "event_type": "meal",
-          "value": 48,
+          "value": 60,
           "absorption_delay_minutes": 10,
-          "duration": 50
+          "duration": 50,
+          "reported_value": 48
         },
         {
           "start_time": 735,
           "event_type": "meal",
-          "value": 62,
+          "value": 82,
           "absorption_delay_minutes": 15,
-          "duration": 75
+          "duration": 75,
+          "reported_value": 62
         },
         {
           "start_time": 765,
@@ -322,16 +336,18 @@
         {
           "start_time": 1080,
           "event_type": "meal",
-          "value": 74,
+          "value": 95,
           "absorption_delay_minutes": 20,
-          "duration": 90
+          "duration": 90,
+          "reported_value": 72
         },
         {
           "start_time": 1290,
           "event_type": "meal",
-          "value": 18,
+          "value": 20,
           "absorption_delay_minutes": 5,
-          "duration": 25
+          "duration": 25,
+          "reported_value": 18
         }
       ]
     }
