@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **178**
+Documented modules: **179**
 
 ## Package Index
 
@@ -20,7 +20,7 @@ Documented modules: **178**
 | `highlevel` | 1 |
 | `jetson` | 3 |
 | `learning` | 3 |
-| `live_patient` | 11 |
+| `live_patient` | 12 |
 | `mdmp` | 3 |
 | `metrics` | 1 |
 | `population` | 3 |
@@ -193,6 +193,7 @@ Documented modules: **178**
 - [`iints.live_patient.daemon`](#iintslive_patientdaemon)
 - [`iints.live_patient.edge_benchmark`](#iintslive_patientedge_benchmark)
 - [`iints.live_patient.edge_ops`](#iintslive_patientedge_ops)
+- [`iints.live_patient.fpga`](#iintslive_patientfpga)
 - [`iints.live_patient.long_study`](#iintslive_patientlong_study)
 - [`iints.live_patient.medtronic_direct`](#iintslive_patientmedtronic_direct)
 - [`iints.live_patient.pico_pump`](#iintslive_patientpico_pump)
@@ -1366,6 +1367,13 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `edge_bundle(workspace: Annotated[Optional[Path], typer.Option(help='Workspace directory for the persistent digital patient state.')] = None, project_dir: Annotated[Optional[Path], typer.Option(help='Optional edge project directory created by `iints edge setup`.')] = None, workspace_name: Annotated[str, typer.Option(help='Workspace folder inside the edge project.')] = 'patient_runtime', output: Annotated[Path, typer.Option(help='ZIP archive written for workstation-side analysis.')] = Path('results/edge_runtime_bundle.zip'), include_log: Annotated[bool, typer.Option(help='Include the patient log in the archive.')] = True, include_database: Annotated[bool, typer.Option(help='Include the SQLite runtime database in the archive.')] = True) -> None`
 - `edge_update(output_script: Annotated[Path, typer.Option(help='Where to write the edge update shell script.')] = Path('update_edge_runtime.sh'), profile: Annotated[str, typer.Option(help='Install profile to upgrade: edge or full.')] = 'edge', version_pin: Annotated[Optional[str], typer.Option(help='Optional exact SDK version pin, for example 1.5.2.')] = None) -> None`
 - `edge_hardware_bridge(board: Annotated[str, typer.Option(help='Hardware bridge target. Currently supported: uno_q.')] = 'uno_q', output_dir: Annotated[Path, typer.Option(help='Directory where the hardware bridge scaffold should be written.')] = Path('uno_q_bridge')) -> None`
+- `fpga_setup(output_dir: Annotated[Path, typer.Option(help='Directory where the FPGA lab workspace should be written.')] = Path('iints_fpga_lab')) -> None`
+- `fpga_doctor() -> None`
+- `fpga_simulate(events: Annotated[Optional[Path], typer.Option(help='Optional JSON/CSV event file. Defaults to bundled FPGA demo events.')] = None, output_dir: Annotated[Path, typer.Option(help='Output directory for FPGA comparison artifacts.')] = Path('results/fpga_mock_run'), transport: Annotated[str, typer.Option(help='FPGA transport: mock or serial.')] = 'mock', port: Annotated[Optional[str], typer.Option(help='Serial port when --transport serial is used.')] = None, baudrate: Annotated[int, typer.Option(help='Serial baudrate for FPGA JSON-lines transport.')] = FPGA_DEFAULT_BAUDRATE, timeout_seconds: Annotated[float, typer.Option(help='Serial timeout per event in seconds.')] = 1.5) -> None`
+- `fpga_run(events: Annotated[Optional[Path], typer.Option(help='Optional JSON/CSV event file. Defaults to bundled FPGA demo events.')] = None, output_dir: Annotated[Path, typer.Option(help='Output directory for FPGA comparison artifacts.')] = Path('results/fpga_run'), transport: Annotated[str, typer.Option(help='FPGA transport: mock or serial.')] = 'mock', port: Annotated[Optional[str], typer.Option(help='Serial port when --transport serial is used.')] = None, baudrate: Annotated[int, typer.Option(help='Serial baudrate for FPGA JSON-lines transport.')] = FPGA_DEFAULT_BAUDRATE, timeout_seconds: Annotated[float, typer.Option(help='Serial timeout per event in seconds.')] = 1.5) -> None`
+- `fpga_compare(run_dir: Annotated[Path, typer.Option(help='FPGA run directory containing fpga_comparison.json.')]) -> None`
+- `fpga_report(run_dir: Annotated[Path, typer.Option(help='FPGA run directory containing fpga_report.md.')]) -> None`
+- `fpga_demo(output_dir: Annotated[Path, typer.Option(help='Output directory for the complete FPGA demo bundle.')] = Path('results/fpga_demo')) -> None`
 - `edge_pump_init(output_dir: Annotated[Path, typer.Option(help='Directory where the Pico pump lab workspace should be written.')] = Path('iints_pico_pump_lab'), algorithm: Annotated[Optional[Path], typer.Option(help='Optional existing SDK algorithm to copy into the lab workspace.')] = None) -> None`
 - `edge_pump_firmware(output_dir: Annotated[Path, typer.Option(help='Directory where locked Pico bench firmware should be written.')] = Path('pico_pump_firmware')) -> None`
 - `edge_pump_package(algorithm: Annotated[Path, typer.Option(help='SDK algorithm Python file to package for bench-only Pico testing.')], output_dir: Annotated[Path, typer.Option(help='Output bundle directory.')] = Path('pico_pump_bundle'), safety_contract: Annotated[Optional[Path], typer.Option(help='Optional zero-delivery safety contract JSON.')] = None, label: Annotated[str, typer.Option(help='Human-readable bundle label written into the manifest.')] = 'pico_pump_bench') -> None`
@@ -2817,6 +2825,50 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `deploy_edge_project(*, host: str, user_name: str | None = None, ssh_port: int = 22, remote_dir: str = '~/iints_pi_demo', local_output_dir: str | Path = 'iints_pi_demo', board: str = 'raspberry_pi', workspace_name: str = 'patient_runtime', scenario_profile: str = 'expo_hot_start', patient_config: str = 'default_patient', patient_model_type: str = 'auto', mode: str = 'demo-time', speed: float = 60.0, api_host: str = '127.0.0.1', api_port: int = 8765, seed: int | None = None, service_name: str = 'iints-digital-patient', include_uno_bridge: bool = False, uno_bridge_port: str | None = None, uno_bridge_baudrate: int = UNO_Q_BRIDGE_BAUDRATE, uno_bridge_service_name: str = 'iints-uno-q-bridge', install_autostart: bool = True, start_runtime: bool = True, enable_connect_linger: bool = True, flash_uno_bridge: bool = False, uno_fqbn: str | None = None, arduino_cli: str = 'arduino-cli', dry_run: bool = False, ssh_timeout_seconds: float = 300.0, ssh_retries: int = 1, progress_callback: Callable[[str], None] | None = None) -> dict[str, Any]`
 - `build_edge_offline_bundle(output_path: str | Path, *, board: str = 'raspberry_pi', workspace_name: str = 'patient_runtime', scenario_profile: str = 'expo_hot_start', patient_config: str = 'default_patient', patient_model_type: str = 'auto', mode: str = 'demo-time', speed: float = 60.0, api_host: str = '127.0.0.1', api_port: int = 8765, seed: int | None = None, service_name: str = 'iints-digital-patient', user_name: str | None = None, include_uno_bridge: bool = False, progress_callback: Callable[[str], None] | None = None) -> dict[str, str]`
 - `run_remote_edge_command(*, host: str, user_name: str | None = None, ssh_port: int = 22, remote_dir: str = '~/iints_pi_demo', action: str = 'status', scenario_profile: str | None = None, seed: int | None = None, timeout_seconds: float = 60.0, retries: int = 0) -> dict[str, str]`
+
+## `iints.live_patient.fpga`
+
+- Source: `src/iints/live_patient/fpga.py`
+- Summary: FPGA safety-core workflow helpers for bench-only hardware research.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `FPGARunSummary` | `FPGARunSummary` | Paths and pass/fail metadata from one FPGA safety-core comparison run. |
+| `MockFPGATransport` | `MockFPGATransport` | Reference transport that behaves like an FPGA safety core without hardware. |
+| `SerialFPGATransport` | `SerialFPGATransport` | JSON-lines serial transport for a future FPGA board or MCU bridge. |
+
+#### `FPGARunSummary` methods
+
+- `to_dict(self) -> dict[str, Any]`
+
+#### `MockFPGATransport` methods
+
+- `evaluate(self, event: dict[str, Any]) -> tuple[dict[str, Any], float]`
+
+#### `SerialFPGATransport` methods
+
+- `evaluate(self, event: dict[str, Any]) -> tuple[dict[str, Any], float]`
+
+### Public Functions
+
+- `normalize_fpga_event(event: dict[str, Any]) -> dict[str, Any]`
+- `evaluate_fpga_safety_reference(event: dict[str, Any]) -> dict[str, Any]`
+- `load_fpga_events(path: str | Path | None = None) -> list[dict[str, Any]]`
+- `write_fpga_report(path: Path, *, comparison: dict[str, Any], rows: list[dict[str, Any]]) -> None`
+- `run_fpga_safety_simulation(*, output_dir: str | Path, events_path: str | Path | None = None, transport: str = 'mock', port: str | None = None, baudrate: int = FPGA_DEFAULT_BAUDRATE, timeout_seconds: float = 1.5, scenario_name: str | None = None) -> FPGARunSummary`
+- `create_fpga_lab(output_dir: str | Path) -> dict[str, str]`
+- `fpga_environment_report() -> dict[str, Any]`
+
+### Public Constants
+
+- `DEFAULT_FPGA_EVENTS`
+- `DEFAULT_FPGA_SAFETY_CONTRACT`
+- `FPGA_CONFIRMATION`
+- `FPGA_DEFAULT_BAUDRATE`
+- `FPGA_NIGHT_HYPO_RISK_EVENTS`
+- `FPGA_READY_BANNER`
 
 ## `iints.live_patient.long_study`
 

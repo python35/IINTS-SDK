@@ -8,6 +8,7 @@ Use this page when you already know the SDK workflow and need to decide where it
 | --- | --- | --- |
 | a stable live digital-patient demo | Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
 | visible hardware feedback with a small bridge layer | Arduino UNO Q | [Arduino UNO Q Setup](ARDUINO_UNO_Q.md) |
+| deterministic hardware-logic verification | FPGA board or mock FPGA flow | [FPGA Mode](FPGA_MODE.md) |
 | accelerated stress testing or real-duration wall-clock studies | NVIDIA Jetson | [Jetson Endurance Mode](JETSON_ENDURANCE.md) |
 
 ## Fastest Safe Start
@@ -22,6 +23,14 @@ Arduino UNO Q:
 
 ```bash
 iints edge quickstart --board uno_q
+```
+
+FPGA safety-core lab:
+
+```bash
+iints fpga doctor
+iints fpga setup --output-dir iints_fpga_lab
+iints fpga demo --output-dir results/fpga_demo
 ```
 
 Jetson:
@@ -66,10 +75,21 @@ Jetson Endurance Mode
   -> status / monitor / export
 ```
 
+### FPGA Mode
+
+```text
+FPGA Mode
+  -> setup lab scaffold
+  -> run mock safety-core comparison
+  -> later connect serial FPGA bridge
+  -> compare hardware output against SDK reference
+```
+
 ## Read Next
 
 - [Edge Hardware Matrix](EDGE_HARDWARE.md)
 - [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
 - [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
+- [FPGA Mode](FPGA_MODE.md)
 - [Jetson Endurance Mode](JETSON_ENDURANCE.md)
 - [Remote Deploy & Pi Connect](EDGE_REMOTE_DEPLOY.md)

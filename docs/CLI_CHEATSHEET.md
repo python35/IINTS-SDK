@@ -319,6 +319,46 @@ iints pump upload \
   --i-understand-bench-only
 ```
 
+## FPGA Safety-Core Workflow
+
+Check and create the bench-only FPGA lab:
+
+```bash
+iints fpga doctor
+iints fpga setup --output-dir iints_fpga_lab
+```
+
+Run the deterministic mock FPGA comparison:
+
+```bash
+iints fpga simulate \
+  --events iints_fpga_lab/scenarios/night_hypo_risk.json \
+  --output-dir results/fpga_mock_run
+```
+
+Review the outputs:
+
+```bash
+iints fpga compare --run-dir results/fpga_mock_run
+iints fpga report --run-dir results/fpga_mock_run
+```
+
+Make a complete demo bundle:
+
+```bash
+iints fpga demo --output-dir results/fpga_demo
+```
+
+Open these after the demo:
+
+```text
+results/fpga_demo/events.csv
+results/fpga_demo/results.json
+results/fpga_demo/manifest.json
+results/fpga_demo/report.md
+results/fpga_demo/lab/FPGA_STORY.md
+```
+
 ## Troubleshooting
 
 ```bash

@@ -161,6 +161,13 @@ from iints.live_patient.pico_pump import (
     run_pico_pump_serial_self_test,
     upload_pico_pump_bundle,
 )
+from iints.live_patient.fpga import (
+    FPGA_DEFAULT_BAUDRATE,
+    FPGARunSummary,
+    create_fpga_lab,
+    fpga_environment_report,
+    run_fpga_safety_simulation,
+)
 from iints.live_patient.medtronic_direct import (
     DIRECT_PUMP_READ_ONLY_CONFIRMATION,
     DirectPumpConfig,
@@ -270,6 +277,7 @@ patientmodel_app = typer.Typer(help="Patient model registry and extension discov
 edge_app = typer.Typer(help="Single-board computer and edge deployment tools.")
 edge_pump_app = typer.Typer(help="Bench-only Raspberry Pi Pico pump research workflow.")
 pump_app = typer.Typer(help="Top-level bench-only Pico pump workflow: compile, bench-test, upload.")
+fpga_app = typer.Typer(help="FPGA safety-core and hardware-logic research workflow.")
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 jetson_app = typer.Typer(help="NVIDIA Jetson headless research tooling.")
 jetson_endurance_app = typer.Typer(help="Headless long-running adversarial endurance tests.")
@@ -288,6 +296,7 @@ app.add_typer(patientmodel_app, name="patientmodel")
 app.add_typer(edge_app, name="edge")
 edge_app.add_typer(edge_pump_app, name="pump")
 app.add_typer(pump_app, name="pump")
+app.add_typer(fpga_app, name="fpga")
 app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 app.add_typer(jetson_app, name="jetson")
@@ -1122,6 +1131,7 @@ def doctor(
     command_groups = {
         "edge": edge_app,
         "evidence": evidence_app,
+        "fpga": fpga_app,
         "jetson": jetson_app,
         "pump": pump_app,
         "profiles": profiles_app,
@@ -12060,6 +12070,215 @@ def edge_hardware_bridge(
     table.add_row("readme", outputs["readme"])
     table.add_row("protocol", outputs["protocol"])
     console.print(table)
+
+
+def _print_fpga_run_summary(console: Console, summary: FPGARunSummary) -> None:
+    table = Table(title="IINTS FPGA Mode Run")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path / Value", overflow="fold")
+    table.add_row("transport", str(summary.transport))
+    table.add_row("mismatch_count", str(summary.mismatch_count))
+    table.add_row("max_latency_ms", f"{summary.max_latency_ms:.3f}")
+    table.add_row("results_csv", str(summary.results_csv))
+    table.add_row("comparison_json", str(summary.comparison_json))
+    table.add_row("report_md", str(summary.report_md))
+    table.add_row("manifest_json", str(summary.manifest_json))
+    console.print(table)
+    console.print(
+        "[yellow]Scope:[/yellow] FPGA mode is education/simulation/pre-clinical research only; "
+        "not a medical device and not for treatment decisions."
+    )
+
+
+@fpga_app.command(name="setup")
+def fpga_setup(
+    output_dir: Annotated[Path, typer.Option(help="Directory where the FPGA lab workspace should be written.")] = Path("iints_fpga_lab"),
+) -> None:
+    """Create an FPGA safety-core lab workspace with RTL scaffold and demo events."""
+
+    console = Console()
+    try:
+        outputs = create_fpga_lab(output_dir)
+    except Exception as exc:
+        console.print(f"[bold red]FPGA lab setup failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS FPGA Lab")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key in (
+        "output_dir",
+        "contract",
+        "scenario",
+        "night_hypo_scenario",
+        "rtl",
+        "protocol",
+        "readme",
+        "story",
+        "demo_script",
+    ):
+        table.add_row(key, outputs[key])
+    console.print(table)
+    console.print(
+        "[green]Next:[/green] "
+        "`iints fpga simulate --events scenarios/night_hypo_risk.json --output-dir reports/night_hypo_mock_run`"
+    )
+
+
+@fpga_app.command(name="doctor")
+def fpga_doctor() -> None:
+    """Check FPGA-mode readiness without requiring physical hardware."""
+
+    console = Console()
+    report = fpga_environment_report()
+    table = Table(title="IINTS FPGA Doctor")
+    table.add_column("Check", style="cyan")
+    table.add_column("Status")
+    table.add_column("Meaning", overflow="fold")
+    table.add_row("Mock transport", "[green]READY[/green]", "Runs today without hardware.")
+    table.add_row(
+        "Serial transport",
+        "[green]READY[/green]" if report["serial_transport_ready"] else "[yellow]OPTIONAL[/yellow]",
+        "Install/use pyserial only when a real FPGA UART bridge is connected.",
+    )
+    table.add_row("Default baudrate", str(report["default_baudrate"]), "JSON-lines FPGA bridge convention.")
+    table.add_row("Medical-device status", "[green]NOT A MEDICAL DEVICE[/green]", "Research/demo safety core only.")
+    console.print(table)
+
+
+@fpga_app.command(name="simulate")
+def fpga_simulate(
+    events: Annotated[Optional[Path], typer.Option(help="Optional JSON/CSV event file. Defaults to bundled FPGA demo events.")] = None,
+    output_dir: Annotated[Path, typer.Option(help="Output directory for FPGA comparison artifacts.")] = Path("results/fpga_mock_run"),
+    transport: Annotated[str, typer.Option(help="FPGA transport: mock or serial.")] = "mock",
+    port: Annotated[Optional[str], typer.Option(help="Serial port when --transport serial is used.")] = None,
+    baudrate: Annotated[int, typer.Option(help="Serial baudrate for FPGA JSON-lines transport.")] = FPGA_DEFAULT_BAUDRATE,
+    timeout_seconds: Annotated[float, typer.Option(help="Serial timeout per event in seconds.")] = 1.5,
+) -> None:
+    """Run the FPGA safety-core comparison flow."""
+
+    console = Console()
+    try:
+        summary = run_fpga_safety_simulation(
+            output_dir=output_dir,
+            events_path=events,
+            transport=transport,
+            port=port,
+            baudrate=baudrate,
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]FPGA simulation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_fpga_run_summary(console, summary)
+    if summary.mismatch_count:
+        raise typer.Exit(code=1)
+
+
+@fpga_app.command(name="run")
+def fpga_run(
+    events: Annotated[Optional[Path], typer.Option(help="Optional JSON/CSV event file. Defaults to bundled FPGA demo events.")] = None,
+    output_dir: Annotated[Path, typer.Option(help="Output directory for FPGA comparison artifacts.")] = Path("results/fpga_run"),
+    transport: Annotated[str, typer.Option(help="FPGA transport: mock or serial.")] = "mock",
+    port: Annotated[Optional[str], typer.Option(help="Serial port when --transport serial is used.")] = None,
+    baudrate: Annotated[int, typer.Option(help="Serial baudrate for FPGA JSON-lines transport.")] = FPGA_DEFAULT_BAUDRATE,
+    timeout_seconds: Annotated[float, typer.Option(help="Serial timeout per event in seconds.")] = 1.5,
+) -> None:
+    """Alias for `iints fpga simulate`."""
+
+    fpga_simulate(
+        events=events,
+        output_dir=output_dir,
+        transport=transport,
+        port=port,
+        baudrate=baudrate,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+@fpga_app.command(name="compare")
+def fpga_compare(
+    run_dir: Annotated[Path, typer.Option(help="FPGA run directory containing fpga_comparison.json.")],
+) -> None:
+    """Read an FPGA run comparison and fail if software/hardware outputs diverged."""
+
+    console = Console()
+    comparison_path = run_dir / "fpga_comparison.json"
+    if not comparison_path.is_file():
+        console.print(f"[bold red]Missing comparison file:[/bold red] {comparison_path}")
+        raise typer.Exit(code=1)
+    payload = json.loads(comparison_path.read_text(encoding="utf-8"))
+    passed = bool(payload.get("passed"))
+    table = Table(title="IINTS FPGA Comparison")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    for key in ("transport", "event_count", "mismatch_count", "max_latency_ms", "passed"):
+        table.add_row(key, str(payload.get(key)))
+    console.print(table)
+    if not passed:
+        raise typer.Exit(code=1)
+
+
+@fpga_app.command(name="report")
+def fpga_report(
+    run_dir: Annotated[Path, typer.Option(help="FPGA run directory containing fpga_report.md.")],
+) -> None:
+    """Print the generated FPGA report path and first-page summary."""
+
+    console = Console()
+    report_path = run_dir / "fpga_report.md"
+    comparison_path = run_dir / "fpga_comparison.json"
+    if not report_path.is_file() or not comparison_path.is_file():
+        console.print(f"[bold red]Missing FPGA report artifacts in:[/bold red] {run_dir}")
+        raise typer.Exit(code=1)
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    f"Report: {report_path}",
+                    f"Transport: {comparison.get('transport')}",
+                    f"Events: {comparison.get('event_count')}",
+                    f"Mismatches: {comparison.get('mismatch_count')}",
+                    "Scope: education/simulation/pre-clinical research only.",
+                ]
+            ),
+            title="IINTS FPGA Report",
+            border_style="cyan",
+        )
+    )
+
+
+@fpga_app.command(name="demo")
+def fpga_demo(
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the complete FPGA demo bundle.")] = Path("results/fpga_demo"),
+) -> None:
+    """Create a lab and run the mock FPGA safety-core demo."""
+
+    console = Console()
+    try:
+        lab_outputs = create_fpga_lab(output_dir / "lab")
+        summary = run_fpga_safety_simulation(
+            output_dir=output_dir,
+            events_path=Path(lab_outputs["night_hypo_scenario"]),
+            transport="mock",
+            scenario_name="night_hypo_risk",
+        )
+    except Exception as exc:
+        console.print(f"[bold red]FPGA demo failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS FPGA Demo")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    table.add_row("lab", lab_outputs["output_dir"])
+    table.add_row("story", lab_outputs["story"])
+    table.add_row("rtl", lab_outputs["rtl"])
+    table.add_row("report", str(summary.report_md))
+    table.add_row("friendly_report", str(summary.output_dir / "report.md"))
+    table.add_row("results_json", str(summary.output_dir / "results.json"))
+    table.add_row("comparison", str(summary.comparison_json))
+    console.print(table)
+    console.print("[green]Demo complete:[/green] software reference and mock FPGA safety core matched.")
 
 
 @edge_pump_app.command(name="init")

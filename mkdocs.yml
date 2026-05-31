@@ -74,6 +74,7 @@ nav:
       - Edge Hardware Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
       - Raspberry Pi Pico Pump Lab: PICO_PUMP_LAB.md
+      - FPGA Mode: FPGA_MODE.md
       - Medtronic CareLink Live Bridge: MEDTRONIC_CARELINK_LIVE_BRIDGE.md
       - Medtronic Direct Pump Transport: MEDTRONIC_DIRECT_PUMP_TRANSPORT.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md

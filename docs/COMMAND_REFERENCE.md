@@ -424,6 +424,54 @@ iints pump bench-test \
 ### `iints pump upload`
 Copy the locked bundle to a writable Pico/CircuitPython-style drive after explicit bench-only confirmation.
 
+## FPGA Safety-Core Commands
+
+### `iints fpga doctor`
+Check whether FPGA mode can run locally. Mock transport works without hardware; serial transport is optional and requires `pyserial`.
+
+### `iints fpga setup`
+Create a bench-only FPGA lab workspace:
+
+```bash
+iints fpga setup --output-dir iints_fpga_lab
+```
+
+The workspace includes a safety contract, demo events, a golden `night_hypo_risk` scenario, JSON-lines protocol description, Verilog scaffold, `FPGA_STORY.md`, and a mock-demo shell script.
+
+### `iints fpga simulate`
+Run a software-reference versus FPGA-style safety-core comparison:
+
+```bash
+iints fpga simulate \
+  --events iints_fpga_lab/scenarios/night_hypo_risk.json \
+  --output-dir results/fpga_mock_run
+```
+
+Use `--transport serial --port /dev/ttyUSB0` when a real FPGA bridge is available.
+
+### `iints fpga compare`
+Read `fpga_comparison.json` and fail if hardware-style output diverged from the SDK reference:
+
+```bash
+iints fpga compare --run-dir results/fpga_mock_run
+```
+
+### `iints fpga report`
+Print the report location and summary:
+
+```bash
+iints fpga report --run-dir results/fpga_mock_run
+```
+
+### `iints fpga demo`
+Create the lab scaffold and run a mock FPGA safety-core demo in one command:
+
+```bash
+iints fpga demo --output-dir results/fpga_demo
+```
+
+The demo bundle includes reviewer-friendly top-level files: `events.csv`, `results.json`, `manifest.json`, and `report.md`.
+
 ## Maker Faire Commands
 
 ### `iints makerfaire up`
