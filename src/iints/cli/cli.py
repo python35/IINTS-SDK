@@ -10960,6 +10960,190 @@ def edge_quickstart(
         )
 
 
+@edge_app.command(name="install")
+def edge_install(
+    board: Annotated[str, typer.Option(help="Edge board target: raspberry_pi or uno_q.")] = "raspberry_pi",
+    output_dir: Annotated[Optional[Path], typer.Option(help="Project directory to create. Defaults to iints_pi_demo or iints_uno_q_demo.")] = None,
+    scenario_profile: Annotated[str, typer.Option(help="Initial live scenario profile.")] = "expo_hot_start",
+    patient_config: Annotated[str, typer.Option(help="Patient configuration name or YAML path.")] = "default_patient",
+    patient_model: Annotated[str, typer.Option("--patient-model", help="Patient model type.")] = "auto",
+    mode: Annotated[str, typer.Option(help="Clock mode for the generated edge project.")] = "demo-time",
+    speed: Annotated[str, typer.Option(help="Acceleration factor for demo-time mode. Accepts 60 or 60x.")] = "60x",
+    api_host: Annotated[str, typer.Option(help="Dashboard host to bake into the generated runtime config.")] = "127.0.0.1",
+    api_port: Annotated[int, typer.Option(help="Dashboard port to bake into the generated runtime config.")] = 8765,
+    seed: Annotated[Optional[int], typer.Option(help="Optional deterministic seed override.")] = None,
+    install_python_extras: Annotated[
+        bool,
+        typer.Option(
+            "--install-python-extras/--no-install-python-extras",
+            help="Install or upgrade the SDK edge extras in the current Python environment.",
+        ),
+    ] = True,
+    package_spec: Annotated[str, typer.Option(help="Package spec used when installing edge extras.")] = "iints-sdk-python35[edge,mdmp]",
+    start: Annotated[bool, typer.Option("--start/--no-start", help="Start the Linux-side digital patient after setup.")] = True,
+    reset: Annotated[bool, typer.Option(help="Reset runtime state when starting.")] = True,
+    foreground: Annotated[bool, typer.Option(help="Run the patient runtime in the foreground instead of spawning the daemon.")] = False,
+    bridge_port: Annotated[str, typer.Option(help="UNO Q serial port. Use auto if exactly one board is connected.")] = "auto",
+    flash: Annotated[bool, typer.Option(help="Flash the generated UNO Q bridge sketch with Arduino CLI.")] = False,
+    fqbn: Annotated[Optional[str], typer.Option(help="Arduino CLI FQBN used when --flash is set.")] = None,
+    arduino_cli: Annotated[str, typer.Option(help="Arduino CLI executable name or path.")] = "arduino-cli",
+    test_bridge: Annotated[bool, typer.Option(help="Run one UNO Q bridge test after setup/flash.")] = False,
+    dry_run: Annotated[bool, typer.Option(help="Write the project scaffold but skip pip install, start, flash, and bridge test.")] = False,
+    max_steps: Annotated[Optional[int], typer.Option("--max-steps", hidden=True)] = None,
+) -> None:
+    """One-command Raspberry Pi / UNO Q setup after installing the SDK."""
+    console = Console()
+    normalized_board = board.strip().lower()
+    if normalized_board not in {"raspberry_pi", "uno_q"}:
+        console.print("[bold red]Unsupported board. Use `raspberry_pi` or `uno_q`.[/bold red]")
+        raise typer.Exit(code=1)
+
+    root = output_dir or Path("iints_uno_q_demo" if normalized_board == "uno_q" else "iints_pi_demo")
+    actions: list[dict[str, str]] = []
+
+    def record(action: str, status: str, detail: str = "") -> None:
+        actions.append({"action": action, "status": status, "detail": detail})
+
+    if install_python_extras:
+        if dry_run:
+            record("python_extras", "planned", package_spec)
+        else:
+            try:
+                subprocess.run([sys.executable, "-m", "pip", "install", "-U", "pip"], check=True)
+                subprocess.run([sys.executable, "-m", "pip", "install", "-U", package_spec], check=True)
+            except subprocess.CalledProcessError as exc:
+                console.print(f"[bold red]Python edge dependency install failed:[/bold red] {exc}")
+                raise typer.Exit(code=1)
+            record("python_extras", "installed", package_spec)
+    else:
+        record("python_extras", "skipped", "User passed --no-install-python-extras.")
+
+    outputs = export_edge_setup(
+        root,
+        board=normalized_board,
+        scenario_profile=scenario_profile,
+        patient_config=patient_config,
+        patient_model_type=patient_model,
+        mode=mode,
+        speed=_parse_edge_speed(speed),
+        api_host=api_host,
+        api_port=api_port,
+        seed=seed,
+        include_uno_bridge=normalized_board == "uno_q",
+    )
+    record("project_scaffold", "ready", outputs["root"])
+
+    cfg = _load_edge_project_config(Path(outputs["root"]))
+    if start:
+        if dry_run:
+            record("linux_runtime", "planned", f"http://{cfg.api_host}:{cfg.api_port}/kiosk")
+        else:
+            patient_cli_module.start(
+                algo=Path(cfg.algo_path),
+                patient_config=cfg.patient_config,
+                patient_model=cfg.patient_model_type,
+                scenario_profile=cfg.scenario_profile,
+                workspace=Path(cfg.workspace),
+                mode=cfg.mode,
+                speed=f"{cfg.speed:g}x",
+                api_host=cfg.api_host,
+                api_port=cfg.api_port,
+                seed=cfg.seed,
+                foreground=foreground,
+                max_steps=max_steps,
+                reset=reset,
+            )
+            record("linux_runtime", "started", f"http://{cfg.api_host}:{cfg.api_port}/kiosk")
+    else:
+        record("linux_runtime", "skipped", "User passed --no-start.")
+
+    flash_result: dict[str, Any] | None = None
+    bridge_test_result = "skipped"
+    if normalized_board == "uno_q":
+        sketch_dir = Path(outputs["root"]) / "uno_q_bridge"
+        if flash:
+            if not fqbn:
+                console.print("[bold red]UNO Q flashing needs --fqbn.[/bold red]")
+                console.print("Example: iints edge install --board uno_q --flash --fqbn <arduino-cli-fqbn> --bridge-port auto")
+                raise typer.Exit(code=1)
+            if dry_run:
+                record("uno_q_firmware", "planned", f"{sketch_dir} -> {bridge_port} ({fqbn})")
+            else:
+                try:
+                    flash_result = flash_uno_q_bridge(
+                        sketch_dir,
+                        port=bridge_port,
+                        fqbn=fqbn,
+                        arduino_cli=arduino_cli,
+                    )
+                except Exception as exc:
+                    console.print(f"[bold red]UNO Q bridge flash failed:[/bold red] {exc}")
+                    raise typer.Exit(code=1)
+                record("uno_q_firmware", "flashed", f"{flash_result['port']} ({flash_result['fqbn']})")
+        else:
+            record("uno_q_firmware", "ready_to_flash", str(sketch_dir / "iints_supervisor_bridge.ino"))
+
+        if test_bridge:
+            if dry_run:
+                record("uno_q_bridge_test", "planned", bridge_port)
+                bridge_test_result = "planned"
+            else:
+                try:
+                    run_uno_q_bridge_test(bridge_port)
+                except Exception as exc:
+                    console.print(f"[bold red]UNO Q bridge test failed:[/bold red] {exc}")
+                    raise typer.Exit(code=1)
+                record("uno_q_bridge_test", "passed", bridge_port)
+                bridge_test_result = "passed"
+        elif not dry_run:
+            record("uno_q_bridge_test", "skipped", "Pass --test-bridge after flashing/connecting the board.")
+
+    summary = {
+        "board": normalized_board,
+        "project_dir": outputs["root"],
+        "package_spec": package_spec,
+        "dry_run": dry_run,
+        "kiosk_url": f"http://{cfg.api_host}:{cfg.api_port}/kiosk",
+        "dashboard_url": f"http://{cfg.api_host}:{cfg.api_port}/dashboard",
+        "actions": actions,
+        "artifacts": outputs,
+        "uno_q_flash": flash_result,
+        "uno_q_bridge_test": bridge_test_result,
+    }
+    summary_path = Path(outputs["root"]) / "EDGE_INSTALL_SUMMARY.json"
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+
+    table = Table(title="IINTS Edge One-Command Install")
+    table.add_column("Action", style="cyan")
+    table.add_column("Status")
+    table.add_column("Detail", overflow="fold")
+    for action in actions:
+        table.add_row(action["action"], action["status"], action["detail"])
+    console.print(table)
+
+    next_lines = [
+        f"Project: {outputs['root']}",
+        f"Kiosk: http://{cfg.api_host}:{cfg.api_port}/kiosk",
+        f"Summary: {summary_path}",
+    ]
+    if normalized_board == "uno_q":
+        next_lines.extend(
+            [
+                f"Bridge sketch: {Path(outputs['root']) / 'uno_q_bridge' / 'iints_supervisor_bridge.ino'}",
+                f"Bridge test: ./test_uno_q_bridge.sh {bridge_port}",
+                f"Live bridge: ./run_uno_q_bridge.sh {bridge_port}",
+            ]
+        )
+    else:
+        next_lines.extend(
+            [
+                "Restart later: ./start_edge_easy.sh",
+                "Open kiosk later: iints edge kiosk --project-dir .",
+            ]
+        )
+    console.print(Panel("\n".join(next_lines), title="Ready", border_style="green"))
+
+
 @edge_app.command(name="deploy")
 def edge_deploy(
     host: Annotated[str, typer.Option(help="Remote Raspberry Pi hostname or IP address.")],
@@ -11502,21 +11686,20 @@ def edge_doctor(
             )
         )
 
-    suggested_dir = f"./iints_{normalized_board}_demo"
+    suggested_dir = "./iints_uno_q_demo" if normalized_board == "uno_q" else "./iints_pi_demo"
     next_steps = [
-        f"1. Create the project: iints edge setup --board {normalized_board} --output-dir {suggested_dir}",
-        f"2. Start the runtime: iints edge up --project-dir {suggested_dir}",
-        f"3. Check that it is alive: iints edge status --project-dir {suggested_dir}",
+        f"1. Create the project with one command: iints edge install --board {normalized_board} --output-dir {suggested_dir}",
+        f"2. Check that it is alive: iints edge status --project-dir {suggested_dir}",
     ]
     if normalized_board == "uno_q":
         next_steps.extend(
             [
-                "4. Test the serial bridge: iints edge bridge-test --port /dev/ttyACM0",
-                "5. Forward live states to the board: iints edge bridge-run --project-dir ./iints_uno_q_demo --port /dev/ttyACM0",
+                "3. Full CLI flash path: iints edge install --board uno_q --flash --fqbn <your-board-fqbn> --bridge-port /dev/ttyACM0",
+                "4. Forward live states to the board: iints edge bridge-run --project-dir ./iints_uno_q_demo --port /dev/ttyACM0",
             ]
         )
     else:
-        next_steps.append(f"4. Open the kiosk view: iints edge kiosk --project-dir {suggested_dir}")
+        next_steps.append(f"3. Open the kiosk view: iints edge kiosk --project-dir {suggested_dir}")
     console.print(Panel("\n".join(next_steps), title="Next Commands", border_style="cyan"))
 
     if failures:

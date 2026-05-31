@@ -80,6 +80,93 @@ def test_edge_quickstart_starts_uno_q_easy_path(monkeypatch, tmp_path) -> None:
     assert "uno_q_bridge/iints_supervisor_bridge.ino" in result.stdout
 
 
+def test_edge_install_creates_pi_project_without_extra_fiddling(tmp_path) -> None:
+    setup_dir = tmp_path / "pi_install"
+    result = runner.invoke(
+        app,
+        [
+            "edge",
+            "install",
+            "--board",
+            "raspberry_pi",
+            "--output-dir",
+            str(setup_dir),
+            "--no-install-python-extras",
+            "--no-start",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (setup_dir / "EDGE_INSTALL_SUMMARY.json").is_file()
+    assert (setup_dir / "start_edge_easy.sh").is_file()
+    assert (setup_dir / "patient_runtime" / "iints-digital-patient.service").is_file()
+    summary = json.loads((setup_dir / "EDGE_INSTALL_SUMMARY.json").read_text(encoding="utf-8"))
+    assert summary["board"] == "raspberry_pi"
+    assert summary["kiosk_url"].endswith("/kiosk")
+    assert any(action["action"] == "project_scaffold" and action["status"] == "ready" for action in summary["actions"])
+    assert "IINTS Edge One-Command Install" in result.stdout
+
+
+def test_edge_install_can_flash_and_test_uno_q(monkeypatch, tmp_path) -> None:
+    flash_calls: list[dict[str, object]] = []
+    test_calls: list[str] = []
+
+    def _fake_flash(sketch_dir, *, port, fqbn, arduino_cli):
+        flash_calls.append(
+            {
+                "sketch_dir": str(sketch_dir),
+                "port": port,
+                "fqbn": fqbn,
+                "arduino_cli": arduino_cli,
+            }
+        )
+        return {
+            "sketch_dir": str(sketch_dir),
+            "port": port,
+            "fqbn": fqbn,
+            "arduino_cli": arduino_cli,
+        }
+
+    def _fake_test(port):
+        test_calls.append(port)
+        return [{"state": "OK", "port": port, "response": "STATE=OK"}]
+
+    monkeypatch.setattr("iints.cli.cli.flash_uno_q_bridge", _fake_flash)
+    monkeypatch.setattr("iints.cli.cli.run_uno_q_bridge_test", _fake_test)
+
+    setup_dir = tmp_path / "uno_install"
+    result = runner.invoke(
+        app,
+        [
+            "edge",
+            "install",
+            "--board",
+            "uno_q",
+            "--output-dir",
+            str(setup_dir),
+            "--no-install-python-extras",
+            "--no-start",
+            "--flash",
+            "--fqbn",
+            "vendor:arch:board",
+            "--bridge-port",
+            "/dev/ttyACM0",
+            "--test-bridge",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert len(flash_calls) == 1
+    assert flash_calls[0]["fqbn"] == "vendor:arch:board"
+    assert test_calls == ["/dev/ttyACM0"]
+    assert (setup_dir / "uno_q_bridge" / "iints_supervisor_bridge.ino").is_file()
+    summary = json.loads((setup_dir / "EDGE_INSTALL_SUMMARY.json").read_text(encoding="utf-8"))
+    assert summary["board"] == "uno_q"
+    assert summary["uno_q_bridge_test"] == "passed"
+    assert any(action["action"] == "uno_q_firmware" and action["status"] == "flashed" for action in summary["actions"])
+    assert "Live bridge" in result.stdout
+
+
 def test_edge_deploy_invokes_remote_deployer(monkeypatch, tmp_path) -> None:
     captured: dict[str, object] = {}
 
