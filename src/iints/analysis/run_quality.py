@@ -46,6 +46,66 @@ def _auto_realism_reference(realism_frame: pd.DataFrame, requested: str | None) 
     return None
 
 
+def _write_run_quality_markdown(
+    output_path: Path,
+    *,
+    run_label: str,
+    realism_report: Any,
+    selected_reference: str | None,
+    reference_selection: str | None,
+) -> Path:
+    failed = [check for check in realism_report.checks if check.status == "failed"]
+    warnings = [check for check in realism_report.checks if check.status == "warning"]
+    lines = [
+        f"# IINTS Run Quality Review - {run_label}",
+        "",
+        "This review is generated automatically to catch physiologically implausible simulation artifacts before a run is used for demos, reports, or AI research.",
+        "",
+        "## Summary",
+        "",
+        f"- Verdict: `{realism_report.verdict}`",
+        f"- Realism score: `{realism_report.realism_score:.2f}`",
+        f"- Reference selection: `{reference_selection}`",
+        f"- Applied reference: `{selected_reference or 'none'}`",
+        f"- Mean glucose: `{realism_report.metrics.get('mean_glucose_mgdl')} mg/dL`",
+        f"- CV: `{realism_report.metrics.get('cv_pct')}%`",
+        f"- Max glucose rate: `{realism_report.metrics.get('max_abs_rate_mgdl_per_min')} mg/dL/min`",
+        f"- Longest near-flat stretch: `{realism_report.metrics.get('longest_low_motion_minutes')} min`",
+        "",
+        "## Interpretation",
+        "",
+        realism_report.summary,
+        "",
+    ]
+    if failed or warnings:
+        lines.extend(["## Review Items", ""])
+        for check in failed + warnings:
+            lines.append(f"- `{check.status}` - {check.title}: {check.detail}")
+        lines.append("")
+    else:
+        lines.extend(["## Review Items", "", "- No failed or warning realism checks were detected.", ""])
+
+    lines.extend([
+        "## Check Breakdown",
+        "",
+        "| Check | Status | Detail |",
+        "| --- | --- | --- |",
+    ])
+    for check in realism_report.checks:
+        detail = str(check.detail).replace("|", "\\|")
+        lines.append(f"| {check.title} | `{check.status}` | {detail} |")
+
+    lines.extend([
+        "",
+        "## Research Use Note",
+        "",
+        "A `likely_realistic` verdict means the trace passes the SDK's plausibility checks. It does not make the SDK a medical device and does not prove clinical validity. For local-AI training or public claims, use external reference profiles and the strict real-data gate.",
+        "",
+    ])
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    return output_path
+
+
 def write_run_quality_artifacts(
     results_df: pd.DataFrame,
     output_dir: str | Path,
@@ -71,6 +131,7 @@ def write_run_quality_artifacts(
         realism_report = validate_realism_dataset(realism_frame, reference=selected_reference)
         realism_json = output_path / "realism_report.json"
         realism_html = output_path / "realism_dashboard.html"
+        realism_markdown = output_path / "run_quality_review.md"
         write_realism_report(realism_report, realism_json)
         write_realism_dashboard(
             realism_report,
@@ -78,6 +139,13 @@ def write_run_quality_artifacts(
             realism_html,
             title="IINTS Run Realism Review",
             source_label=label,
+        )
+        _write_run_quality_markdown(
+            realism_markdown,
+            run_label=label,
+            realism_report=realism_report,
+            selected_reference=selected_reference,
+            reference_selection=realism_reference,
         )
         realism_summary = {
             "verdict": realism_report.verdict,
@@ -92,6 +160,7 @@ def write_run_quality_artifacts(
             {
                 "realism_report_json": str(realism_json),
                 "realism_dashboard_html": str(realism_html),
+                "run_quality_review_md": str(realism_markdown),
                 "realism_review": realism_summary,
             }
         )

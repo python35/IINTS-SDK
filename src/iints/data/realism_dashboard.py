@@ -175,6 +175,8 @@ def build_realism_dashboard_html(
         ("Mean glucose", _format_metric(report.metrics.get("mean_glucose_mgdl"), " mg/dL")),
         ("CV", _format_metric(report.metrics.get("cv_pct"), "%")),
         ("TIR 70-180", _format_metric(report.metrics.get("tir_70_180_pct"), "%")),
+        ("Max rate", _format_metric(report.metrics.get("max_abs_rate_mgdl_per_min"), " mg/dL/min")),
+        ("Flat stretch", _format_metric(report.metrics.get("longest_low_motion_minutes"), " min")),
         ("Meals", _format_metric(report.metrics.get("meal_count"))),
     ]
     card_html = "".join(

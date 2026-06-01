@@ -207,6 +207,163 @@ def _correlation(values_a: np.ndarray, values_b: np.ndarray) -> float | None:
     return corr
 
 
+
+
+def _glucose_dynamics_metrics(df: pd.DataFrame) -> Dict[str, Any]:
+    """Summarize trace dynamics that catch jumpy or rectangular simulations."""
+    trace = df[["timestamp", "glucose"]].dropna().sort_values("timestamp")
+    if len(trace) < 3:
+        return {
+            "max_abs_rate_mgdl_per_min": None,
+            "p95_abs_rate_mgdl_per_min": None,
+            "high_rate_transition_count": 0,
+            "very_high_rate_transition_count": 0,
+            "right_angle_transition_count": 0,
+            "flat_step_ratio": None,
+            "longest_low_motion_minutes": 0.0,
+        }
+
+    timestamps = trace["timestamp"].to_numpy(dtype=float)
+    glucose = trace["glucose"].to_numpy(dtype=float)
+    minute_delta = np.diff(timestamps)
+    glucose_delta = np.diff(glucose)
+    valid = minute_delta > 0.0
+    if not np.any(valid):
+        return {
+            "max_abs_rate_mgdl_per_min": None,
+            "p95_abs_rate_mgdl_per_min": None,
+            "high_rate_transition_count": 0,
+            "very_high_rate_transition_count": 0,
+            "right_angle_transition_count": 0,
+            "flat_step_ratio": None,
+            "longest_low_motion_minutes": 0.0,
+        }
+
+    valid_minutes = minute_delta[valid]
+    valid_delta = glucose_delta[valid]
+    abs_rates = np.abs(valid_delta / valid_minutes)
+    abs_steps = np.abs(valid_delta)
+    rates = valid_delta / valid_minutes
+    high_rate_count = int(np.sum(abs_rates > 2.2))
+    very_high_rate_count = int(np.sum(abs_rates > 3.05))
+
+    right_angle_count = 0
+    for left_rate, right_rate, left_step, right_step in zip(rates[:-1], rates[1:], abs_steps[:-1], abs_steps[1:]):
+        if left_rate == 0.0 or right_rate == 0.0:
+            continue
+        if np.sign(left_rate) != np.sign(right_rate) and left_step >= 10.0 and right_step >= 10.0:
+            right_angle_count += 1
+
+    low_motion_mask = abs_steps < 0.1
+    longest_low_motion = 0.0
+    current_low_motion = 0.0
+    for is_low_motion, minutes in zip(low_motion_mask, valid_minutes):
+        if is_low_motion:
+            current_low_motion += float(minutes)
+            longest_low_motion = max(longest_low_motion, current_low_motion)
+        else:
+            current_low_motion = 0.0
+
+    return {
+        "max_abs_rate_mgdl_per_min": _round_or_none(float(np.max(abs_rates))),
+        "p95_abs_rate_mgdl_per_min": _round_or_none(float(np.percentile(abs_rates, 95))),
+        "high_rate_transition_count": high_rate_count,
+        "very_high_rate_transition_count": very_high_rate_count,
+        "right_angle_transition_count": right_angle_count,
+        "flat_step_ratio": _round_or_none(float(np.mean(low_motion_mask)), 4),
+        "longest_low_motion_minutes": _round_or_none(longest_low_motion),
+    }
+
+
+def _check_dynamics_smoothness(metrics: Dict[str, Any]) -> RealismCheck:
+    max_rate = float(metrics.get("max_abs_rate_mgdl_per_min") or 0.0)
+    p95_rate = float(metrics.get("p95_abs_rate_mgdl_per_min") or 0.0)
+    high_rate_count = int(metrics.get("high_rate_transition_count") or 0)
+    very_high_rate_count = int(metrics.get("very_high_rate_transition_count") or 0)
+    right_angle_count = int(metrics.get("right_angle_transition_count") or 0)
+    detail = (
+        f"Max rate {max_rate:.2f} mg/dL/min, p95 rate {p95_rate:.2f}, "
+        f"{high_rate_count} high-rate transition(s), {right_angle_count} sharp reversal(s)."
+    )
+    check_metrics = {
+        "max_abs_rate_mgdl_per_min": metrics.get("max_abs_rate_mgdl_per_min"),
+        "p95_abs_rate_mgdl_per_min": metrics.get("p95_abs_rate_mgdl_per_min"),
+        "high_rate_transition_count": high_rate_count,
+        "very_high_rate_transition_count": very_high_rate_count,
+        "right_angle_transition_count": right_angle_count,
+    }
+    if right_angle_count > 0 or very_high_rate_count >= 6:
+        return RealismCheck(
+            code="dynamics_smoothness",
+            title="Glucose dynamics smoothness",
+            status="failed",
+            severity="critical",
+            detail=f"Trace contains abrupt dynamics that look more like artifacts than physiology. {detail}",
+            score_impact=0.24,
+            metrics=check_metrics,
+        )
+    if p95_rate > 3.0 or high_rate_count >= 12:
+        return RealismCheck(
+            code="dynamics_smoothness",
+            title="Glucose dynamics smoothness",
+            status="warning",
+            severity="warning",
+            detail=f"Trace has aggressive but not impossible dynamics; review before using as research evidence. {detail}",
+            score_impact=0.08,
+            metrics=check_metrics,
+        )
+    return RealismCheck(
+        code="dynamics_smoothness",
+        title="Glucose dynamics smoothness",
+        status="passed",
+        severity="info",
+        detail=f"Glucose changes are smooth enough for plausible CGM-scale physiology. {detail}",
+        metrics=check_metrics,
+    )
+
+
+def _check_flatline_artifacts(metrics: Dict[str, Any]) -> RealismCheck:
+    duration_hours = float(metrics.get("duration_hours") or 0.0)
+    flat_step_ratio = float(metrics.get("flat_step_ratio") or 0.0)
+    longest_low_motion = float(metrics.get("longest_low_motion_minutes") or 0.0)
+    detail = f"Flat-step ratio {flat_step_ratio:.2f}; longest near-flat stretch {longest_low_motion:.0f} min."
+    check_metrics = {
+        "flat_step_ratio": metrics.get("flat_step_ratio"),
+        "longest_low_motion_minutes": metrics.get("longest_low_motion_minutes"),
+        "duration_hours": metrics.get("duration_hours"),
+    }
+    fail_flat_minutes = 360.0 if duration_hours >= 18.0 else 240.0
+    warn_flat_minutes = 240.0
+    if flat_step_ratio >= 0.70 or longest_low_motion >= fail_flat_minutes:
+        return RealismCheck(
+            code="flatline_artifacts",
+            title="Flatline and stair-step artifacts",
+            status="failed",
+            severity="critical",
+            detail=f"Trace has long nearly unchanged sections that can indicate synthetic plateaus or broken dynamics. {detail}",
+            score_impact=0.22,
+            metrics=check_metrics,
+        )
+    if flat_step_ratio >= 0.50 or longest_low_motion >= warn_flat_minutes:
+        return RealismCheck(
+            code="flatline_artifacts",
+            title="Flatline and stair-step artifacts",
+            status="warning",
+            severity="warning",
+            detail=f"Trace contains unusually still sections; verify this is intentional physiology, not a stuck simulator. {detail}",
+            score_impact=0.08,
+            metrics=check_metrics,
+        )
+    return RealismCheck(
+        code="flatline_artifacts",
+        title="Flatline and stair-step artifacts",
+        status="passed",
+        severity="info",
+        detail=f"No suspicious flatline or rectangular-step pattern was detected. {detail}",
+        metrics=check_metrics,
+    )
+
+
 def _check_quality_basics(df: pd.DataFrame, *, expected_interval_minutes: int) -> tuple[RealismCheck, Dict[str, Any]]:
     report = DataQualityChecker(expected_interval=expected_interval_minutes).check(df[["timestamp", "glucose"]].copy())
     critical_anomalies = [anomaly for anomaly in report.anomalies if anomaly.severity == "high"]
@@ -724,6 +881,7 @@ def validate_realism_dataset(
     insulin_events = _insulin_event_count(df)
     median_interval = _median_interval_minutes(df["timestamp"])
     responses = _evaluate_meal_responses(df, min_meal_grams=min_meal_grams)
+    dynamics_metrics = _glucose_dynamics_metrics(df)
     summary_metrics = _meal_response_summary_metrics(responses)
 
     summary_metrics.update({
@@ -745,10 +903,13 @@ def validate_realism_dataset(
         "assessed_meal_responses": len(responses),
     })
 
+    summary_metrics.update(dynamics_metrics)
     quality_check, quality_metrics = _check_quality_basics(df, expected_interval_minutes=expected_interval_minutes)
     summary_metrics.update(quality_metrics)
     checks = [
         quality_check,
+        _check_dynamics_smoothness(summary_metrics),
+        _check_flatline_artifacts(summary_metrics),
         _check_variability(summary_metrics, meal_count=meal_count),
         _check_event_balance(meal_count=meal_count, insulin_event_count=insulin_events),
         _check_meal_response(responses, meal_count=meal_count),

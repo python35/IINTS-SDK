@@ -50,6 +50,32 @@ def _late_insulin_trace() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _rectangular_jump_trace() -> pd.DataFrame:
+    glucose = [110.0] * 12 + [178.0, 110.0] + [112.0 + idx * 0.2 for idx in range(46)]
+    return pd.DataFrame(
+        {
+            "timestamp": list(range(0, len(glucose) * 5, 5)),
+            "glucose": glucose,
+            "carbs": [0.0 for _ in glucose],
+            "insulin": [0.0 for _ in glucose],
+        }
+    )
+
+
+def _long_flatline_trace() -> pd.DataFrame:
+    rows = []
+    for timestamp in range(0, 360, 5):
+        rows.append(
+            {
+                "timestamp": timestamp,
+                "glucose": 118.0,
+                "carbs": 0.0,
+                "insulin": 0.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def test_realism_validator_accepts_bundled_demo_trace() -> None:
     demo_df = load_demo_dataframe()
     standard_df = import_cgm_dataframe(demo_df, data_format="generic", source="demo")
@@ -162,3 +188,22 @@ def test_data_realism_check_cli_can_write_strict_gate_payload(tmp_path) -> None:
     payload = json.loads(output_json.read_text())
     assert payload["strict_real_data_gate"]["status"] == "blocked"
     assert any("No empirical reference profile" in item for item in payload["strict_real_data_gate"]["critical_failures"])
+
+
+
+def test_realism_validator_flags_rectangular_jump_artifacts() -> None:
+    report = validate_realism_dataset(_rectangular_jump_trace())
+
+    statuses = {check.code: check.status for check in report.checks}
+    assert statuses["dynamics_smoothness"] == "failed"
+    assert report.metrics["very_high_rate_transition_count"] >= 1
+    assert report.verdict != "likely_realistic"
+
+
+def test_realism_validator_flags_long_flatline_artifacts() -> None:
+    report = validate_realism_dataset(_long_flatline_trace())
+
+    statuses = {check.code: check.status for check in report.checks}
+    assert statuses["flatline_artifacts"] == "failed"
+    assert report.metrics["longest_low_motion_minutes"] >= 120.0
+    assert report.verdict == "likely_unrealistic"

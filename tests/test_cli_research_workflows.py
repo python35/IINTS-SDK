@@ -170,9 +170,13 @@ def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> Non
 
     assert Path(outputs["realism_report_json"]).is_file()
     assert Path(outputs["realism_dashboard_html"]).is_file()
+    assert Path(outputs["run_quality_review_md"]).is_file()
     assert Path(outputs["safety_visualizer_html"]).is_file()
     assert Path(outputs["safety_visualizer_json"]).is_file()
     assert "verdict" in outputs["realism_review"]
+    review_text = Path(outputs["run_quality_review_md"]).read_text()
+    assert "IINTS Run Quality Review" in review_text
+    assert "Max glucose rate" in review_text
 
 
 def test_run_quality_artifacts_do_not_force_daily_reference_on_short_demos(tmp_path) -> None:
