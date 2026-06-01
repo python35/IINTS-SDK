@@ -166,7 +166,9 @@ from iints.live_patient.fpga import (
     FPGARunSummary,
     create_fpga_lab,
     fpga_environment_report,
+    run_fpga_replay_from_results,
     run_fpga_safety_simulation,
+    write_fpga_events_from_results_csv,
 )
 from iints.live_patient.medtronic_direct import (
     DIRECT_PUMP_READ_ONLY_CONFIRMATION,
@@ -12296,6 +12298,9 @@ def fpga_setup(
         "night_hypo_scenario",
         "rtl",
         "protocol",
+        "bridge_script",
+        "testbench",
+        "verilog_smoke_script",
         "readme",
         "story",
         "demo_script",
@@ -12304,7 +12309,8 @@ def fpga_setup(
     console.print(table)
     console.print(
         "[green]Next:[/green] "
-        "`iints fpga simulate --events scenarios/night_hypo_risk.json --output-dir reports/night_hypo_mock_run`"
+        "`iints fpga start` for the easiest demo, or "
+        "`iints fpga simulate --events scenarios/night_hypo_risk.json --output-dir reports/night_hypo_mock_run` inside the lab."
     )
 
 
@@ -12354,6 +12360,66 @@ def fpga_simulate(
         console.print(f"[bold red]FPGA simulation failed:[/bold red] {exc}")
         raise typer.Exit(code=1)
     _print_fpga_run_summary(console, summary)
+    if summary.mismatch_count:
+        raise typer.Exit(code=1)
+
+
+@fpga_app.command(name="export-events")
+def fpga_export_events(
+    results_csv: Annotated[Path, typer.Option(help="Existing IINTS results CSV to convert into FPGA event JSON.")],
+    output_events: Annotated[Path, typer.Option(help="Output FPGA events JSON path.")] = Path("results/fpga_events_from_results.json"),
+    stride: Annotated[int, typer.Option(help="Use every Nth results row when exporting events.")] = 1,
+    max_events: Annotated[Optional[int], typer.Option(help="Maximum exported events. Use 0 for no limit.")] = 288,
+) -> None:
+    """Convert a normal SDK results CSV into FPGA safety-core input events."""
+
+    console = Console()
+    try:
+        limit = None if max_events == 0 else max_events
+        path = write_fpga_events_from_results_csv(
+            results_csv,
+            output_events,
+            stride=stride,
+            max_events=limit,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]FPGA event export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print(f"[green]FPGA events written:[/green] {path}")
+    console.print("[dim]Next: iints fpga simulate --events <that-json> --output-dir results/fpga_replay[/dim]")
+
+
+@fpga_app.command(name="replay")
+def fpga_replay(
+    results_csv: Annotated[Path, typer.Option(help="Existing IINTS results CSV to replay through FPGA mode.")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for replay artifacts.")] = Path("results/fpga_replay"),
+    transport: Annotated[str, typer.Option(help="FPGA transport: mock or serial.")] = "mock",
+    port: Annotated[Optional[str], typer.Option(help="Serial port when --transport serial is used.")] = None,
+    baudrate: Annotated[int, typer.Option(help="Serial baudrate for FPGA JSON-lines transport.")] = FPGA_DEFAULT_BAUDRATE,
+    timeout_seconds: Annotated[float, typer.Option(help="Serial timeout per event in seconds.")] = 1.5,
+    stride: Annotated[int, typer.Option(help="Use every Nth results row when generating events.")] = 1,
+    max_events: Annotated[Optional[int], typer.Option(help="Maximum replayed events. Use 0 for no limit.")] = 288,
+) -> None:
+    """Replay an existing SDK simulation run through the FPGA comparison pipeline."""
+
+    console = Console()
+    try:
+        limit = None if max_events == 0 else max_events
+        summary = run_fpga_replay_from_results(
+            results_csv=results_csv,
+            output_dir=output_dir,
+            transport=transport,
+            port=port,
+            baudrate=baudrate,
+            timeout_seconds=timeout_seconds,
+            stride=stride,
+            max_events=limit,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]FPGA replay failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_fpga_run_summary(console, summary)
+    console.print(f"[green]Replay events:[/green] {summary.output_dir / 'fpga_events_from_results.json'}")
     if summary.mismatch_count:
         raise typer.Exit(code=1)
 
@@ -12462,6 +12528,33 @@ def fpga_demo(
     table.add_row("comparison", str(summary.comparison_json))
     console.print(table)
     console.print("[green]Demo complete:[/green] software reference and mock FPGA safety core matched.")
+
+
+@fpga_app.command(name="start")
+def fpga_start(
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the guided FPGA quickstart bundle.")] = Path("results/fpga_start"),
+) -> None:
+    """One-command guided FPGA quickstart: lab scaffold + golden mock run."""
+
+    console = Console()
+    fpga_demo(output_dir=output_dir)
+    console.print(
+        Panel(
+            "\n".join(
+                [
+                    "You now have a complete bench-only FPGA bundle.",
+                    f"Open/read: {output_dir / 'report.md'}",
+                    f"Lab story: {output_dir / 'lab' / 'FPGA_STORY.md'}",
+                    f"RTL scaffold: {output_dir / 'lab' / 'rtl' / 'iints_fpga_safety_core.v'}",
+                    "",
+                    "Next useful step:",
+                    "iints fpga replay --results-csv <normal-iints-results.csv> --output-dir results/fpga_replay",
+                ]
+            ),
+            title="IINTS FPGA Start",
+            border_style="green",
+        )
+    )
 
 
 @edge_pump_app.command(name="init")

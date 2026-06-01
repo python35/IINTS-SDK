@@ -3,10 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from iints.live_patient.fpga import (
     create_fpga_lab,
     evaluate_fpga_safety_reference,
+    fpga_events_from_results_dataframe,
     normalize_fpga_event,
+    run_fpga_replay_from_results,
     run_fpga_safety_simulation,
 )
 
@@ -86,3 +90,39 @@ def test_run_fpga_mock_simulation_writes_comparison_artifacts(tmp_path: Path) ->
     assert comparison["passed"] is True
     assert comparison["event_count"] > 0
     assert "Software Reference Logic" in summary.report_md.read_text(encoding="utf-8")
+
+
+def test_fpga_events_can_be_exported_from_results_dataframe() -> None:
+    frame = pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10],
+            "glucose_actual_mgdl": [120.0, 115.0, 106.0],
+            "carb_intake_grams": [0.0, 12.0, 0.0],
+            "delivered_insulin_units": [0.0, 0.0, 0.5],
+        }
+    )
+
+    events = fpga_events_from_results_dataframe(frame)
+
+    assert len(events) == 3
+    assert events[1]["meal_event"] is True
+    assert events[2]["insulin_event"] is True
+    assert events[2]["trend_mgdl_per_min"] == -1.8
+
+
+def test_run_fpga_replay_from_results_csv(tmp_path: Path) -> None:
+    results_csv = tmp_path / "results.csv"
+    pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10, 15],
+            "glucose_actual_mgdl": [118.0, 108.0, 92.0, 68.0],
+            "carb_intake_grams": [0.0, 0.0, 0.0, 0.0],
+            "delivered_insulin_units": [0.0, 0.4, 0.0, 0.0],
+        }
+    ).to_csv(results_csv, index=False)
+
+    summary = run_fpga_replay_from_results(results_csv=results_csv, output_dir=tmp_path / "replay")
+
+    assert summary.mismatch_count == 0
+    assert (summary.output_dir / "fpga_events_from_results.json").is_file()
+    assert summary.comparison_json.is_file()

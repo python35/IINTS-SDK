@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+import pandas as pd
+
 
 FPGA_CONFIRMATION = "I understand this is bench-only FPGA research and not for treatment"
 FPGA_DEFAULT_BAUDRATE = 115200
@@ -364,6 +366,121 @@ def _write_results_csv(path: Path, rows: list[dict[str, Any]]) -> None:
             writer.writerow({key: row.get(key, "") for key in fieldnames})
 
 
+def _first_existing_column(frame: pd.DataFrame, candidates: Iterable[str]) -> str | None:
+    for candidate in candidates:
+        if candidate in frame.columns:
+            return candidate
+    return None
+
+
+def fpga_events_from_results_dataframe(
+    dataframe: pd.DataFrame,
+    *,
+    stride: int = 1,
+    max_events: int | None = 288,
+) -> list[dict[str, Any]]:
+    """Convert an IINTS simulation/results dataframe into FPGA safety-core events."""
+    if stride < 1:
+        raise ValueError("FPGA event export stride must be at least 1.")
+    time_column = _first_existing_column(dataframe, ("time_minutes", "timestamp", "minute"))
+    glucose_column = _first_existing_column(dataframe, ("glucose_actual_mgdl", "glucose_mgdl", "glucose"))
+    if time_column is None or glucose_column is None:
+        raise ValueError("FPGA replay needs time_minutes/timestamp and glucose_actual_mgdl/glucose columns.")
+
+    carbs_column = _first_existing_column(dataframe, ("carb_intake_grams", "carbs", "carbohydrates_grams"))
+    insulin_column = _first_existing_column(dataframe, ("delivered_insulin_units", "insulin", "bolus_units"))
+    sensor_column = _first_existing_column(dataframe, ("sensor_status", "cgm_status"))
+
+    selected = dataframe.iloc[::stride].copy()
+    events: list[dict[str, Any]] = []
+    previous_minute: float | None = None
+    previous_glucose: float | None = None
+    for _, row in selected.iterrows():
+        minute = float(row[time_column])
+        glucose = float(row[glucose_column])
+        if previous_minute is None or previous_glucose is None or minute <= previous_minute:
+            trend = 0.0
+        else:
+            trend = (glucose - previous_glucose) / (minute - previous_minute)
+        carbs = float(row[carbs_column]) if carbs_column is not None else 0.0
+        insulin = float(row[insulin_column]) if insulin_column is not None else 0.0
+        sensor_status = str(row[sensor_column]).upper() if sensor_column is not None else "OK"
+        events.append(
+            normalize_fpga_event(
+                {
+                    "minute": minute,
+                    "glucose_mgdl": glucose,
+                    "trend_mgdl_per_min": round(trend, 4),
+                    "sensor_status": sensor_status,
+                    "meal_event": carbs >= 10.0,
+                    "insulin_event": insulin >= 0.3,
+                }
+            )
+        )
+        previous_minute = minute
+        previous_glucose = glucose
+        if max_events is not None and len(events) >= max_events:
+            break
+    return events
+
+
+def write_fpga_events_from_results_csv(
+    results_csv: str | Path,
+    output_path: str | Path,
+    *,
+    stride: int = 1,
+    max_events: int | None = 288,
+) -> Path:
+    """Write a JSON event stream derived from an existing IINTS results CSV."""
+    source = Path(results_csv).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"IINTS results CSV not found: {source}")
+    dataframe = pd.read_csv(source)
+    events = fpga_events_from_results_dataframe(dataframe, stride=stride, max_events=max_events)
+    output = Path(output_path).expanduser().resolve()
+    _write_json(
+        output,
+        {
+            "source": str(source),
+            "stride": stride,
+            "max_events": max_events,
+            "events": events,
+        },
+    )
+    return output
+
+
+def run_fpga_replay_from_results(
+    *,
+    results_csv: str | Path,
+    output_dir: str | Path,
+    transport: str = "mock",
+    port: str | None = None,
+    baudrate: int = FPGA_DEFAULT_BAUDRATE,
+    timeout_seconds: float = 1.5,
+    stride: int = 1,
+    max_events: int | None = 288,
+) -> FPGARunSummary:
+    """Replay an existing SDK results CSV through the FPGA comparison pipeline."""
+    root = Path(output_dir).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    events_path = write_fpga_events_from_results_csv(
+        results_csv,
+        root / "fpga_events_from_results.json",
+        stride=stride,
+        max_events=max_events,
+    )
+    return run_fpga_safety_simulation(
+        output_dir=root,
+        events_path=events_path,
+        transport=transport,
+        port=port,
+        baudrate=baudrate,
+        timeout_seconds=timeout_seconds,
+        scenario_name=f"replay_{Path(results_csv).stem}",
+    )
+
+
 def write_fpga_report(path: Path, *, comparison: dict[str, Any], rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -550,7 +667,9 @@ def create_fpga_lab(output_dir: str | Path) -> dict[str, str]:
     scenarios_dir = root / "scenarios"
     reports_dir = root / "reports"
     scripts_dir = root / "scripts"
-    for directory in (rtl_dir, scenarios_dir, reports_dir, scripts_dir):
+    testbench_dir = root / "testbench"
+    bridge_dir = root / "bridge"
+    for directory in (rtl_dir, scenarios_dir, reports_dir, scripts_dir, testbench_dir, bridge_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
     contract_path = root / "fpga_safety_contract.json"
@@ -619,6 +738,117 @@ endmodule
         },
     )
 
+    bridge_script_path = bridge_dir / "fpga_jsonline_bridge.py"
+    bridge_script_path.write_text(
+        '''#!/usr/bin/env python3
+"""Tiny stdin/stdout JSON-lines bridge for IINTS FPGA protocol experiments.
+
+This script mirrors the first deterministic safety core so you can test the
+packet shape before replacing it with a real FPGA UART bridge.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+
+
+def classify(event):
+    glucose = float(event.get("glucose_mgdl", 120.0))
+    trend = float(event.get("trend_mgdl_per_min", 0.0))
+    sensor_ok = str(event.get("sensor_status", "OK")).upper() in {"OK", "VALID"}
+    insulin_event = bool(event.get("insulin_event", False))
+    if not sensor_ok:
+        return {"risk_label": "SENSOR_ERROR", "risk_score": 3, "check_required": True}
+    if glucose < 70:
+        return {"risk_label": "CRITICAL", "risk_score": 3, "check_required": True}
+    if glucose < 90 or glucose > 250:
+        return {"risk_label": "WARNING", "risk_score": 2, "check_required": True}
+    if trend <= -1.0 and glucose < 110:
+        return {"risk_label": "WARNING", "risk_score": 2, "check_required": True}
+    if insulin_event and glucose < 110:
+        return {"risk_label": "WARNING", "risk_score": 2, "check_required": True}
+    return {"risk_label": "NORMAL", "risk_score": 0, "check_required": False}
+
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    event = json.loads(line)
+    response = classify(event)
+    print(json.dumps(response, sort_keys=True), flush=True)
+''',
+        encoding="utf-8",
+    )
+    bridge_script_path.chmod(0o755)
+
+    testbench_path = testbench_dir / "iints_fpga_safety_core_tb.v"
+    testbench_path.write_text(
+        """// Minimal smoke test for the IINTS educational FPGA safety core.
+// Run with: iverilog -o build/iints_fpga_tb rtl/iints_fpga_safety_core.v testbench/iints_fpga_safety_core_tb.v && vvp build/iints_fpga_tb
+module iints_fpga_safety_core_tb;
+    reg [15:0] glucose_mgdl;
+    reg signed [15:0] trend_mgdl_per_min_x100;
+    reg sensor_ok;
+    reg meal_event;
+    reg insulin_event;
+    wire [1:0] risk_score;
+    wire check_required;
+
+    iints_fpga_safety_core dut(
+        .glucose_mgdl(glucose_mgdl),
+        .trend_mgdl_per_min_x100(trend_mgdl_per_min_x100),
+        .sensor_ok(sensor_ok),
+        .meal_event(meal_event),
+        .insulin_event(insulin_event),
+        .risk_score(risk_score),
+        .check_required(check_required)
+    );
+
+    initial begin
+        sensor_ok = 1'b1; meal_event = 1'b0; insulin_event = 1'b0; trend_mgdl_per_min_x100 = 0;
+        glucose_mgdl = 16'd120; #1;
+        if (risk_score !== 2'd0 || check_required !== 1'b0) $fatal(1, "normal case failed");
+
+        glucose_mgdl = 16'd65; #1;
+        if (risk_score !== 2'd3 || check_required !== 1'b1) $fatal(1, "hypo case failed");
+
+        glucose_mgdl = 16'd100; trend_mgdl_per_min_x100 = -16'sd150; #1;
+        if (risk_score !== 2'd2 || check_required !== 1'b1) $fatal(1, "falling-trend case failed");
+
+        sensor_ok = 1'b0; glucose_mgdl = 16'd140; trend_mgdl_per_min_x100 = 0; #1;
+        if (risk_score !== 2'd3 || check_required !== 1'b1) $fatal(1, "sensor-error case failed");
+
+        $display("IINTS FPGA safety-core smoke test passed");
+        $finish;
+    end
+endmodule
+""",
+        encoding="utf-8",
+    )
+
+    verilog_smoke_script = scripts_dir / "run_verilog_smoke.sh"
+    verilog_smoke_script.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env bash",
+                "set -euo pipefail",
+                "cd \"$(dirname \"$0\")/..\"",
+                "if ! command -v iverilog >/dev/null 2>&1; then",
+                "  echo 'iverilog not found; install Icarus Verilog to run the RTL smoke test.'",
+                "  exit 0",
+                "fi",
+                "mkdir -p build",
+                "iverilog -o build/iints_fpga_tb rtl/iints_fpga_safety_core.v testbench/iints_fpga_safety_core_tb.v",
+                "vvp build/iints_fpga_tb",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    verilog_smoke_script.chmod(0o755)
+
     readme_path = root / "README.md"
     readme_path.write_text(
         "\n".join(
@@ -639,6 +869,18 @@ endmodule
                 "",
                 "```bash",
                 "iints fpga simulate --events scenarios/night_hypo_risk.json --output-dir reports/night_hypo_mock_run",
+                "```",
+                "",
+                "## Replay An SDK Run",
+                "",
+                "```bash",
+                "iints fpga replay --results-csv ../results/my_run/results.csv --output-dir reports/fpga_replay",
+                "```",
+                "",
+                "## Optional RTL Smoke Test",
+                "",
+                "```bash",
+                "scripts/run_verilog_smoke.sh",
                 "```",
             ]
         )
@@ -662,6 +904,7 @@ endmodule
                 "- how glucose/events from a simulator can be sent to a hardware-style safety core",
                 "- how a software reference and FPGA-style output can be compared event by event",
                 "- how mismatch counts, latency, and manifests can become research evidence",
+                "- how an ordinary IINTS `results.csv` can be replayed through hardware-style verification",
                 "- how medical-device logic can be discussed transparently before any clinical or actuator use",
                 "",
                 "## What It Does Not Do",
@@ -704,6 +947,9 @@ endmodule
         "night_hypo_scenario": str(night_hypo_path),
         "rtl": str(rtl_path),
         "protocol": str(protocol_path),
+        "bridge_script": str(bridge_script_path),
+        "testbench": str(testbench_path),
+        "verilog_smoke_script": str(verilog_smoke_script),
         "readme": str(readme_path),
         "story": str(story_path),
         "demo_script": str(demo_script),

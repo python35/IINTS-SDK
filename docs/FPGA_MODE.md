@@ -44,6 +44,14 @@ The first implementation is a bench-only safety-core workflow:
 
 ## Quick Start
 
+The easiest path is:
+
+```bash
+iints fpga start
+```
+
+That creates a full demo bundle with a lab scaffold, RTL safety core, protocol files, a golden scenario, a mock run, and a reviewer-facing report.
+
 Check the mode:
 
 ```bash
@@ -78,6 +86,16 @@ Or generate the complete demo bundle in one command:
 iints fpga demo --output-dir results/fpga_demo
 ```
 
+Replay an existing SDK simulation through FPGA mode:
+
+```bash
+iints fpga replay \
+  --results-csv results/my_run/results.csv \
+  --output-dir results/fpga_replay
+```
+
+This converts the normal IINTS results CSV into FPGA events, runs the software-vs-FPGA comparison, and writes the same evidence bundle.
+
 ## Generated Lab
 
 `iints fpga setup` writes:
@@ -88,9 +106,12 @@ iints fpga demo --output-dir results/fpga_demo
 | `scenarios/fpga_demo_events.json` | Small deterministic event set for first testing |
 | `scenarios/night_hypo_risk.json` | Golden demo scenario with a falling overnight glucose trend |
 | `rtl/iints_fpga_safety_core.v` | Minimal Verilog risk-classifier scaffold |
+| `testbench/iints_fpga_safety_core_tb.v` | Minimal Verilog smoke test for the safety core |
 | `fpga_protocol.json` | JSON-lines transport convention |
+| `bridge/fpga_jsonline_bridge.py` | Tiny stdin/stdout JSON-lines bridge for protocol experiments |
 | `FPGA_STORY.md` | Short explanation for demos, jury questions, and future silicon/AI roadmap |
 | `scripts/run_mock_fpga_demo.sh` | One-command local mock run |
+| `scripts/run_verilog_smoke.sh` | Optional Icarus Verilog smoke-test runner |
 | `README.md` | Human-readable lab instructions |
 
 ## Generated Run Artifacts
@@ -150,6 +171,41 @@ iints fpga simulate \
 ```
 
 The serial device receives one normalized JSON event per line and should return one JSON object per line with `risk_label`, `risk_score`, and `check_required`.
+
+## From SDK Run To FPGA Events
+
+FPGA mode can now use an existing SDK run as its input. This is the important research workflow:
+
+```mermaid
+flowchart LR
+    RUN["IINTS simulation results.csv"]
+    EXPORT["fpga export-events"]
+    EVENTS["FPGA event JSON"]
+    REPLAY["fpga replay"]
+    COMPARE["software vs FPGA comparison"]
+    REPORT["report.md / manifest.json"]
+    RUN --> EXPORT --> EVENTS --> REPLAY --> COMPARE --> REPORT
+```
+
+Use only the event export step when you want to inspect or edit the event stream:
+
+```bash
+iints fpga export-events \
+  --results-csv results/my_run/results.csv \
+  --output-events results/fpga_events.json
+```
+
+Then run it:
+
+```bash
+iints fpga simulate --events results/fpga_events.json --output-dir results/fpga_from_run
+```
+
+Or do both at once:
+
+```bash
+iints fpga replay --results-csv results/my_run/results.csv --output-dir results/fpga_replay
+```
 
 ## Why This Matters
 

@@ -426,6 +426,13 @@ Copy the locked bundle to a writable Pico/CircuitPython-style drive after explic
 
 ## FPGA Safety-Core Commands
 
+### `iints fpga start`
+Run the easiest FPGA quickstart: create a lab scaffold and run the golden mock safety-core demo.
+
+```bash
+iints fpga start --output-dir results/fpga_start
+```
+
 ### `iints fpga doctor`
 Check whether FPGA mode can run locally. Mock transport works without hardware; serial transport is optional and requires `pyserial`.
 
@@ -436,7 +443,7 @@ Create a bench-only FPGA lab workspace:
 iints fpga setup --output-dir iints_fpga_lab
 ```
 
-The workspace includes a safety contract, demo events, a golden `night_hypo_risk` scenario, JSON-lines protocol description, Verilog scaffold, `FPGA_STORY.md`, and a mock-demo shell script.
+The workspace includes a safety contract, demo events, a golden `night_hypo_risk` scenario, JSON-lines protocol description, Verilog scaffold, Verilog smoke test, JSON-lines bridge stub, `FPGA_STORY.md`, and a mock-demo shell script.
 
 ### `iints fpga simulate`
 Run a software-reference versus FPGA-style safety-core comparison:
@@ -448,6 +455,24 @@ iints fpga simulate \
 ```
 
 Use `--transport serial --port /dev/ttyUSB0` when a real FPGA bridge is available.
+
+### `iints fpga export-events`
+Convert an existing IINTS results CSV into FPGA event JSON:
+
+```bash
+iints fpga export-events \
+  --results-csv results/my_run/results.csv \
+  --output-events results/fpga_events.json
+```
+
+### `iints fpga replay`
+Convert an existing IINTS results CSV and immediately run the FPGA comparison:
+
+```bash
+iints fpga replay \
+  --results-csv results/my_run/results.csv \
+  --output-dir results/fpga_replay
+```
 
 ### `iints fpga compare`
 Read `fpga_comparison.json` and fail if hardware-style output diverged from the SDK reference:
