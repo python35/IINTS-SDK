@@ -29,13 +29,30 @@ def standardize_simulation_for_realism(results_df: pd.DataFrame) -> pd.DataFrame
     return frame
 
 
+def _auto_realism_reference(realism_frame: pd.DataFrame, requested: str | None) -> str | None:
+    """Use empirical daily references only when the run is actually day-scale."""
+    if requested != "auto":
+        return requested
+
+    timestamps = pd.to_numeric(realism_frame.get("timestamp", pd.Series(dtype=float)), errors="coerce").dropna()
+    if len(timestamps) < 2:
+        return None
+
+    duration_hours = float((timestamps.max() - timestamps.min()) / 60.0)
+    carbs = pd.to_numeric(realism_frame.get("carbs", pd.Series(dtype=float)), errors="coerce").fillna(0.0)
+    meal_count = int((carbs >= 10.0).sum())
+    if duration_hours >= 18.0 and meal_count >= 3:
+        return "free_living_t1d"
+    return None
+
+
 def write_run_quality_artifacts(
     results_df: pd.DataFrame,
     output_dir: str | Path,
     *,
     run_label: Optional[str] = None,
     safety_report: Optional[Dict[str, Any]] = None,
-    realism_reference: str = "free_living_t1d",
+    realism_reference: Optional[str] = "auto",
 ) -> Dict[str, Any]:
     """Write reviewer-facing quality artifacts for one run.
 
@@ -50,7 +67,8 @@ def write_run_quality_artifacts(
 
     try:
         realism_frame = standardize_simulation_for_realism(results_df)
-        realism_report = validate_realism_dataset(realism_frame, reference=realism_reference)
+        selected_reference = _auto_realism_reference(realism_frame, realism_reference)
+        realism_report = validate_realism_dataset(realism_frame, reference=selected_reference)
         realism_json = output_path / "realism_report.json"
         realism_html = output_path / "realism_dashboard.html"
         write_realism_report(realism_report, realism_json)
@@ -65,7 +83,8 @@ def write_run_quality_artifacts(
             "verdict": realism_report.verdict,
             "realism_score": realism_report.realism_score,
             "summary": realism_report.summary,
-            "reference": realism_reference,
+            "reference": selected_reference,
+            "reference_selection": realism_reference,
         }
         if safety_report is not None:
             safety_report["realism_review"] = realism_summary

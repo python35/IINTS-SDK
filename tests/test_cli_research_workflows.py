@@ -175,6 +175,25 @@ def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> Non
     assert "verdict" in outputs["realism_review"]
 
 
+def test_run_quality_artifacts_do_not_force_daily_reference_on_short_demos(tmp_path) -> None:
+    df = pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 180, 5)),
+            "glucose_actual_mgdl": [125.0 + min(idx, 16) * 2.6 - max(idx - 18, 0) * 1.2 for idx in range(36)],
+            "carb_intake_grams": [45.0 if idx == 6 else 0.0 for idx in range(36)],
+            "delivered_insulin_units": [2.0 if idx == 6 else 0.0 for idx in range(36)],
+            "safety_triggered": [False for _ in range(36)],
+            "safety_reason": ["" for _ in range(36)],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(df, tmp_path, run_label="short-demo", safety_report={})
+
+    assert outputs["realism_review"]["reference_selection"] == "auto"
+    assert outputs["realism_review"]["reference"] is None
+    assert outputs["realism_review"]["verdict"] == "likely_realistic"
+
+
 def test_top_level_pump_compile_and_bench_test(tmp_path) -> None:
     algo = tmp_path / "algorithm.py"
     bundle = tmp_path / "bundle"

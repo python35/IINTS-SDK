@@ -185,7 +185,17 @@ def test_all_builtin_presets_avoid_impossible_glucose_transitions(tmp_path) -> N
 
         max_rate = float(np.max(glucose_delta / minute_delta))
         flat_step_ratio = float(np.mean(glucose_delta < 0.05))
+        standard_df = results.rename(
+            columns={
+                "time_minutes": "timestamp",
+                "glucose_actual_mgdl": "glucose",
+                "carb_intake_grams": "carbs",
+                "delivered_insulin_units": "insulin",
+            }
+        )[["timestamp", "glucose", "carbs", "insulin"]]
+        realism_report = validate_realism_dataset(standard_df)
 
         assert max_rate <= 3.05, preset["name"]
         assert float(np.max(glucose_delta)) <= 18.0, preset["name"]
         assert flat_step_ratio < 0.70, preset["name"]
+        assert realism_report.verdict == "likely_realistic", preset["name"]

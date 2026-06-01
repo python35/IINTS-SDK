@@ -146,13 +146,23 @@ def _evaluate_meal_responses(
     if meals.empty:
         return responses
 
-    for row in meals.itertuples(index=False):
+    meal_times = [float(value) for value in pd.to_numeric(meals["timestamp"], errors="coerce").dropna().tolist()]
+    sample_interval = max(_median_interval_minutes(df["timestamp"]), 1.0)
+
+    for index, row in enumerate(meals.itertuples(index=False)):
         meal_time = float(getattr(row, "timestamp"))
         carbs = float(getattr(row, "carbs"))
         pre = df[(df["timestamp"] < meal_time) & (df["timestamp"] >= meal_time - pre_window_minutes)]
+        post_window_end = meal_time + post_peak_end_minutes
+        if index + 1 < len(meal_times):
+            # Do not let the next meal's peak get attributed to this meal.
+            # Overlapping windows created false "huge late rise" artifacts in
+            # stress-test presets and made causal checks look worse than the
+            # underlying trace.
+            post_window_end = min(post_window_end, meal_times[index + 1] - sample_interval)
         post = df[
             (df["timestamp"] >= meal_time + post_peak_start_minutes)
-            & (df["timestamp"] <= meal_time + post_peak_end_minutes)
+            & (df["timestamp"] <= post_window_end)
         ]
         if len(pre) < 2 or post.empty:
             continue

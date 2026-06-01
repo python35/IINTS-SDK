@@ -181,8 +181,8 @@
         {
           "start_time": 150,
           "event_type": "meal",
-          "value": 12,
-          "reported_value": 12,
+          "value": 8,
+          "reported_value": 8,
           "absorption_delay_minutes": 5,
           "duration": 20
         }
