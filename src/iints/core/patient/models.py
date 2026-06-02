@@ -64,10 +64,14 @@ class CustomPatientModel:
 
         # Exercise state
         self.is_exercising = False
-        self.exercise_intensity = 0.0 # 0.0 to 1.0
-        self.exercise_glucose_consumption_rate = 1.5 # mg/dL per minute at max intensity
+        self.exercise_intensity = 0.0  # 0.0 to 1.0
+        self.exercise_glucose_consumption_rate = 1.5  # mg/dL per minute at max intensity
 
-        self.reset() # Call reset to ensure initial state consistency
+        # Stress state
+        self.is_stressed = False
+        self.stress_intensity = 0.0  # 0.0 to 1.0
+
+        self.reset()  # Call reset to ensure initial state consistency
 
     def _effective_insulin_curve(self) -> tuple[float, float]:
         """
@@ -107,6 +111,8 @@ class CustomPatientModel:
         self.active_carb_intakes = [] # (carb_amount, time_since_intake)
         self.is_exercising = False
         self.exercise_intensity = 0.0
+        self.is_stressed = False
+        self.stress_intensity = 0.0
 
     def start_exercise(self, intensity: float):
         """Starts an exercise session."""
@@ -121,6 +127,20 @@ class CustomPatientModel:
         self.is_exercising = False
         self.exercise_intensity = 0.0
         print("INFO: Patient stopped exercise.")
+
+    def start_stress(self, intensity: float):
+        """Starts a physiological stress/illness session."""
+        if not (0.0 <= intensity <= 1.0):
+            raise ValueError("Stress intensity must be between 0.0 and 1.0")
+        self.is_stressed = True
+        self.stress_intensity = intensity
+        print(f"INFO: Patient started stress with intensity {intensity:.2f}")
+
+    def stop_stress(self):
+        """Stops a physiological stress/illness session."""
+        self.is_stressed = False
+        self.stress_intensity = 0.0
+        print("INFO: Patient stopped stress.")
 
     def update(self, time_step: float, delivered_insulin: float, carb_intake: float = 0.0, current_time: Optional[float] = None, **kwargs) -> float:
         """
@@ -174,7 +194,10 @@ class CustomPatientModel:
             dose_action_this_step = dose['amount'] * action_factor * (time_step / (0.5 * insulin_action_duration))
             total_insulin_action += dose_action_this_step
 
-        insulin_effect = total_insulin_action * self.insulin_sensitivity
+        # Stress decreases insulin sensitivity up to 70%
+        stress_isf_multiplier = 1.0 - 0.7 * self.stress_intensity if self.is_stressed else 1.0
+        effective_isf = self.insulin_sensitivity * stress_isf_multiplier
+        insulin_effect = total_insulin_action * effective_isf
 
         # --- Carb effect ---
         # The 'carb_intake' parameter represents the "announced carbs" by the AI.
@@ -218,7 +241,10 @@ class CustomPatientModel:
 
         # --- Basal metabolic glucose production/consumption (simplified) ---
         # Homeostatic drift toward a basal target (prevents runaway decline)
-        basal_glucose_change = -self.glucose_decay_rate * (self.current_glucose - self.basal_glucose_target) * time_step
+        # Stress increases endogenous glucose production, shifting the basal target up
+        stress_bg_increase = 50.0 * self.stress_intensity if self.is_stressed else 0.0
+        effective_basal_target = self.basal_glucose_target + stress_bg_increase
+        basal_glucose_change = -self.glucose_decay_rate * (self.current_glucose - effective_basal_target) * time_step
 
         # --- Dawn phenomenon effect ---
         dawn_effect = 0.0
@@ -305,6 +331,8 @@ class CustomPatientModel:
             "active_carb_intakes": self.active_carb_intakes,
             "is_exercising": self.is_exercising,
             "exercise_intensity": self.exercise_intensity,
+            "is_stressed": self.is_stressed,
+            "stress_intensity": self.stress_intensity,
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
@@ -315,6 +343,8 @@ class CustomPatientModel:
         self.active_carb_intakes = state.get("active_carb_intakes", [])
         self.is_exercising = state.get("is_exercising", False)
         self.exercise_intensity = state.get("exercise_intensity", 0.0)
+        self.is_stressed = state.get("is_stressed", False)
+        self.stress_intensity = state.get("stress_intensity", 0.0)
 
 # Alias for easy import
 PatientModel = CustomPatientModel

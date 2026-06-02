@@ -28,16 +28,16 @@ import json
 class CockpitConfig:
     """Configuration for the clinical cockpit"""
     # Layout
-    figure_size: Tuple[int, int] = (20, 12)
-    dpi: int = 150
-    
-    # Colors
-    primary_color: str = '#2196F3'
-    secondary_color: str = '#4CAF50'
-    alert_color: str = '#F44336'
-    warning_color: str = '#FF9800'
-    success_color: str = '#4CAF50'
-    
+    figure_size: Tuple[int, int] = (16, 10)
+    dpi: int = 300  # Publication quality DPI
+
+    # Colors (Colorblind-friendly Palette)
+    primary_color: str = '#0072B2'  # Blue
+    secondary_color: str = '#D55E00'  # Vermillion
+    alert_color: str = '#D55E00'
+    warning_color: str = '#E69F00'  # Orange
+    success_color: str = '#009E73'  # Bluish Green
+
     # Target zones
     target_low: float = 70.0
     target_high: float = 180.0
@@ -129,6 +129,29 @@ class ClinicalCockpit:
         self.state = DashboardState()
         self.history: List[Dict[str, Any]] = []
         
+        # Apply scientific styling
+        try:
+            plt.style.use('seaborn-v0_8-whitegrid')
+        except OSError:
+            pass  # Fallback to default if the style is unavailable.
+
+        plt.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': ['Arial', 'Helvetica', 'DejaVu Sans'],
+            'axes.labelsize': 11,
+            'axes.titlesize': 12,
+            'legend.fontsize': 10,
+            'xtick.labelsize': 10,
+            'ytick.labelsize': 10,
+            'axes.linewidth': 1.0,
+            'grid.alpha': 0.3
+        })
+
+    def _despine(self, ax: plt.Axes) -> None:
+        """Remove top and right spines for a clean academic look."""
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+
     def _create_glucose_panel(self, 
                               gs: GridSpec,
                               simulation_data: pd.DataFrame,
@@ -141,13 +164,13 @@ class ClinicalCockpit:
         timestamps = simulation_data['time_minutes']
         glucose = simulation_data['glucose_actual_mgdl']
         
-        # Target zones
+        # Target zones (Grayscale for academic paper clarity)
         ax.axhspan(self.config.target_low, self.config.target_high,
-                   alpha=0.15, color='green', label='Target (70-180)')
+                   alpha=0.1, color='gray', label='Target (70-180)')
         ax.axhspan(self.config.critical_low, self.config.target_low,
-                   alpha=0.2, color='red', label='Low Zone')
+                   alpha=0.05, color=self.config.warning_color, label='Low Zone')
         ax.axhspan(self.config.target_high, self.config.critical_high,
-                   alpha=0.2, color='orange', label='High Zone')
+                   alpha=0.05, color='gray', label='High Zone')
         
         # Glucose line
         ax.plot(timestamps, glucose, 
@@ -188,8 +211,9 @@ class ClinicalCockpit:
         
         # Reference lines
         ax.axhline(y=120, color='gray', linestyle=':', alpha=0.5)
-        ax.axhline(y=self.config.target_low, color='red', linestyle='--', alpha=0.5)
-        ax.axhline(y=self.config.target_high, color='orange', linestyle='--', alpha=0.5)
+        ax.axhline(y=self.config.critical_low, color=self.config.alert_color, linestyle='--', alpha=0.5)
+        ax.axhline(y=self.config.target_low, color='gray', linestyle='--', alpha=0.5)
+        ax.axhline(y=self.config.target_high, color='gray', linestyle='--', alpha=0.5)
         
         # Formatting
         ax.set_xlim(timestamps.min(), timestamps.max())
@@ -197,8 +221,8 @@ class ClinicalCockpit:
         ax.set_xlabel('Time (minutes)', fontsize=10)
         ax.set_ylabel('Glucose (mg/dL)', fontsize=10)
         ax.set_title('Glucose Monitor', fontsize=12, fontweight='bold')
-        ax.legend(loc='upper right', fontsize=8)
-        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right', fontsize=9, frameon=True, facecolor='white', edgecolor='none')
+        self._despine(ax)
         
         return ax
     
@@ -372,8 +396,8 @@ class ClinicalCockpit:
         ax.set_xlabel('Time (minutes)', fontsize=10)
         ax.set_ylabel('Units', fontsize=10)
         ax.set_title('Insulin Delivery', fontsize=12, fontweight='bold')
-        ax.legend(loc='upper right', fontsize=8)
-        ax.grid(True, alpha=0.3)
+        ax.legend(loc='upper right', fontsize=9, frameon=True, facecolor='white', edgecolor='none')
+        self._despine(ax)
         
         return ax
     

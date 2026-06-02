@@ -49,6 +49,7 @@ class BergmanParameters:
     Vi: float = 0.05        # L/kg   — insulin distribution volume
     gamma: float = 0.0      # (mU/L)/(mg/dL)/min — endogenous secretion gain (0 for T1D default)
     h: float = 80.0         # mg/dL  — secretion glucose threshold
+    k_a: float = 0.018      # 1/min  — subcutaneous insulin absorption rate constant
 
     # --- Gut absorption ---
     tau_meal: float = 40.0  # min    — gastric emptying time constant
@@ -101,7 +102,7 @@ class BergmanPatientModel:
 
         # Bergman ODE parameters
         self.params = bergman_params if bergman_params else BergmanParameters(
-            Gb=initial_glucose,
+            Gb=min(float(initial_glucose), 115.0),
             tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
             k_abs=max(0.015, min(float(glucose_absorption_rate), 0.035)),
         )
@@ -110,6 +111,10 @@ class BergmanPatientModel:
         self.is_exercising = False
         self.exercise_intensity = 0.0
         self.exercise_glucose_consumption_rate = 1.5  # mg/dL per min at max
+
+        # Stress book-keeping
+        self.is_stressed = False
+        self.stress_intensity = 0.0
 
         # Dose/carb trackers for IOB/COB (same format as CustomPatientModel)
         self.active_insulin_doses: List[Dict[str, float]] = []
@@ -121,13 +126,15 @@ class BergmanPatientModel:
         self.carbs_on_board = 0.0
         self.meal_effect_delay = 30  # kept for API compat
 
-        # ODE state vector: [G, X, I, Q_stomach, Q_gut]
+        # ODE state vector: [G, X, I, Q_stomach, Q_gut, S1, S2]
         self._state = np.array([
             initial_glucose,       # G  (mg/dL)
             0.0,                   # X  (1/min)
             self.params.Ib,        # I  (mU/L)
             0.0,                   # Q_stomach (mg)
             0.0,                   # Q_gut (mg)
+            0.0,                   # S1 (mU)
+            0.0,                   # S2 (mU)
         ], dtype=np.float64)
 
         self.reset()
@@ -151,7 +158,7 @@ class BergmanPatientModel:
     def reset(self) -> None:
         """Reset to initial conditions."""
         self._state = np.array([
-            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0,
+            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0,
         ], dtype=np.float64)
         self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
@@ -160,6 +167,8 @@ class BergmanPatientModel:
         self.active_carb_intakes = []
         self.is_exercising = False
         self.exercise_intensity = 0.0
+        self.is_stressed = False
+        self.stress_intensity = 0.0
 
     def start_exercise(self, intensity: float) -> None:
         if not (0.0 <= intensity <= 1.0):
@@ -170,6 +179,16 @@ class BergmanPatientModel:
     def stop_exercise(self) -> None:
         self.is_exercising = False
         self.exercise_intensity = 0.0
+
+    def start_stress(self, intensity: float) -> None:
+        if not (0.0 <= intensity <= 1.0):
+            raise ValueError("Stress intensity must be between 0.0 and 1.0")
+        self.is_stressed = True
+        self.stress_intensity = intensity
+
+    def stop_stress(self) -> None:
+        self.is_stressed = False
+        self.stress_intensity = 0.0
 
     def update(
         self,
@@ -239,10 +258,8 @@ class BergmanPatientModel:
         self._state = sol.y[:, -1].copy()
         self._state[0] = self._guard_glucose_transition(float(self._state[0]), time_step)
         # Clamp non-negative for other compartments
-        self._state[1] = max(0.0, self._state[1])
-        self._state[2] = max(0.0, self._state[2])
-        self._state[3] = max(0.0, self._state[3])
-        self._state[4] = max(0.0, self._state[4])
+        for i in range(1, len(self._state)):
+            self._state[i] = max(0.0, self._state[i])
 
         self.current_glucose = float(self._state[0])
         return self.current_glucose
@@ -266,6 +283,8 @@ class BergmanPatientModel:
             "remote_insulin_action": float(self._state[1]),
             "stomach_glucose_mg": float(self._state[3]),
             "gut_glucose_mg": float(self._state[4]),
+            "subcut_insulin_1_mU": float(self._state[5]),
+            "subcut_insulin_2_mU": float(self._state[6]),
             "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
         }
 
@@ -303,6 +322,8 @@ class BergmanPatientModel:
             "active_carb_intakes": self.active_carb_intakes,
             "is_exercising": self.is_exercising,
             "exercise_intensity": self.exercise_intensity,
+            "is_stressed": self.is_stressed,
+            "stress_intensity": self.stress_intensity,
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
@@ -313,7 +334,12 @@ class BergmanPatientModel:
             # emptied from the stomach.
             if ode_state.size == 4:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], 0.0, ode_state[3]],
+                    [ode_state[0], ode_state[1], ode_state[2], 0.0, ode_state[3], 0.0, 0.0],
+                    dtype=np.float64,
+                )
+            elif ode_state.size == 5:
+                ode_state = np.array(
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], ode_state[4], 0.0, 0.0],
                     dtype=np.float64,
                 )
             self._state = ode_state
@@ -324,6 +350,8 @@ class BergmanPatientModel:
         self.active_carb_intakes = state.get("active_carb_intakes", [])
         self.is_exercising = state.get("is_exercising", False)
         self.exercise_intensity = state.get("exercise_intensity", 0.0)
+        self.is_stressed = state.get("is_stressed", False)
+        self.stress_intensity = state.get("stress_intensity", 0.0)
 
     # ------------------------------------------------------------------
     # ODE right-hand-side
@@ -336,7 +364,7 @@ class BergmanPatientModel:
         u_insulin_mu_per_min: float,
         current_time: float,
     ) -> np.ndarray:
-        G, X, I, Q_stomach, Q_gut = y
+        G, X, I, Q_stomach, Q_gut, S1, S2 = y
         p = self.params
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
@@ -354,26 +382,55 @@ class BergmanPatientModel:
             if ds <= minutes_in_day <= de:
                 dawn = self.dawn_phenomenon_strength / 60.0  # mg/dL/min
 
-        # --- Exercise ---
-        exercise = 0.0
+        # --- Exercise Physiologic Impact ---
+        # Exercise increases both insulin-independent glucose uptake (p1)
+        # and insulin sensitivity (p3).
+        exercise_p1_multiplier = 1.0
+        exercise_p3_multiplier = 1.0
+        exercise_glucose_uptake = 0.0
         if self.is_exercising:
-            exercise = self.exercise_intensity * self.exercise_glucose_consumption_rate
+            # Scale non-insulin glucose uptake and insulin sensitivity up to 3x based on intensity.
+            exercise_p1_multiplier = 1.0 + 2.0 * self.exercise_intensity
+            exercise_p3_multiplier = 1.0 + 2.0 * self.exercise_intensity
+            exercise_glucose_uptake = self.exercise_intensity * self.exercise_glucose_consumption_rate
+
+        # --- Stress Physiologic Impact ---
+        # Stress decreases insulin sensitivity (p3) and non-insulin-dependent uptake (p1),
+        # while increasing Endogenous Glucose Production (Gb).
+        stress_p1_multiplier = 1.0
+        stress_p3_multiplier = 1.0
+        stress_Gb_multiplier = 1.0
+        if self.is_stressed:
+            stress_p1_multiplier = 1.0 - 0.2 * self.stress_intensity
+            stress_p3_multiplier = 1.0 - 0.7 * self.stress_intensity
+            stress_Gb_multiplier = 1.0 + 0.5 * self.stress_intensity
+
+        p1_eff = p.p1 * exercise_p1_multiplier * stress_p1_multiplier
+        p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier
+        Gb_eff = p.Gb * stress_Gb_multiplier
 
         # --- dG/dt ---
-        dGdt = -(p.p1 + X) * G + p.p1 * p.Gb + Ra + dawn - exercise
+        dGdt = -(p1_eff + X) * G + p1_eff * Gb_eff + Ra + dawn - exercise_glucose_uptake
 
         # --- dX/dt ---
-        dXdt = -p.p2 * X + p.p3 * max(I - p.Ib, 0.0)
+        dXdt = -p.p2 * X + p3_eff * max(I - p.Ib, 0.0)
+
+        # --- dS1/dt, dS2/dt (Subcutaneous Insulin Absorption) ---
+        dS1dt = u_insulin_mu_per_min - p.k_a * S1
+        dS2dt = p.k_a * S1 - p.k_a * S2
+
+        # Rate of appearance of insulin into plasma (mU/min)
+        Ra_I = p.k_a * S2
 
         # --- dI/dt ---
         # T1D defaults keep endogenous secretion disabled (gamma=0). Override
         # gamma explicitly if you intentionally want residual beta-cell function.
         secretion = p.gamma * max(G - p.h, 0.0)
-        dIdt = -p.n * (I - p.Ib) + secretion + u_insulin_mu_per_min / Vi_abs
+        dIdt = -p.n * (I - p.Ib) + secretion + Ra_I / Vi_abs
 
         # --- Meal transit compartments ---
         gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
         dQ_stomach_dt = -gastric_emptying_rate * Q_stomach
         dQ_gut_dt = gastric_emptying_rate * Q_stomach - p.k_abs * Q_gut
 
-        return np.array([dGdt, dXdt, dIdt, dQ_stomach_dt, dQ_gut_dt])
+        return np.array([dGdt, dXdt, dIdt, dQ_stomach_dt, dQ_gut_dt, dS1dt, dS2dt])

@@ -187,22 +187,36 @@ class ClinicalReportGenerator:
         p75 = q[0.75].to_numpy(dtype=float)
         p95 = q[0.95].to_numpy(dtype=float)
 
+        import seaborn as sns
+
+        sns.set_style("whitegrid")
+
         plt.figure(figsize=(10, 4.2))
-        plt.fill_between(x, p05, p95, color="#d6deef", label="5-95%", linewidth=0)
-        plt.fill_between(x, p25, p75, color="#8fa8cc", label="25-75%", linewidth=0)
-        plt.plot(x, p50, color="#111111", linewidth=2.0, label="Median")
-        plt.axhspan(target_low, target_high, color="#6fbf73", alpha=0.14)
-        plt.axhline(target_low, color="#6b8e23", linewidth=1)
-        plt.axhline(target_high, color="#6b8e23", linewidth=1)
+        plt.fill_between(x, p05, p95, color="#E0E0E0", label="5-95%", linewidth=0)
+        plt.fill_between(x, p25, p75, color="#A6A6A6", label="25-75%", linewidth=0)
+        plt.plot(x, p50, color="#000000", linewidth=2.5, label="Median")
+        plt.axhspan(target_low, target_high, color="#2E7D32", alpha=0.08)
+        plt.axhline(target_low, color="#424242", linestyle="--", linewidth=1.0)
+        plt.axhline(target_high, color="#424242", linestyle="--", linewidth=1.0)
+
+        ax = plt.gca()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#333333')
+        ax.spines['bottom'].set_color('#333333')
+
         plt.xlim(0, 24)
         ymax = max(350.0, float(np.nanmax(p95)) + 20.0)
         plt.ylim(40, ymax)
         plt.xticks([0, 3, 6, 9, 12, 15, 18, 21, 24], ["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p", "12a"])
-        plt.ylabel("mg/dL")
-        plt.title("Ambulatory Glucose Profile (AGP-style modal day)")
-        plt.grid(True, axis="y", alpha=0.25)
+        plt.ylabel("mg/dL", fontweight="bold")
+        plt.title("Ambulatory Glucose Profile (AGP-style modal day)", fontweight="bold")
+
+        ax.grid(True, axis="y", alpha=0.3, linestyle="-", color="#CCCCCC")
+        ax.grid(False, axis="x")
+
         plt.tight_layout()
-        plt.savefig(output_path, dpi=180)
+        plt.savefig(output_path, dpi=300)
         plt.close()
 
     def _plot_daily_profiles(
@@ -230,23 +244,27 @@ class ClinicalReportGenerator:
             daily = df[df["day_index"] == day_id].copy()
             x = daily["minute_of_day"].to_numpy(dtype=float) / 60.0
             y = daily["glucose_actual_mgdl"].to_numpy(dtype=float)
-            ax.axhspan(target_low, target_high, color="#eeeeee", alpha=1.0)
-            ax.fill_between(x, target_high, y, where=y > target_high, color="#f5d51b", alpha=0.9)
-            ax.fill_between(x, y, target_low, where=y < target_low, color="#b71c1c", alpha=0.9)
-            ax.plot(x, y, color="#333333", linewidth=0.9)
+            ax.axhspan(target_low, target_high, color="#F5F5F5", alpha=1.0)
+            ax.fill_between(x, target_high, y, where=y > target_high, color="#FFB300", alpha=0.7)
+            ax.fill_between(x, y, target_low, where=y < target_low, color="#D32F2F", alpha=0.7)
+            ax.plot(x, y, color="#212121", linewidth=1.2)
             ax.set_xlim(0, 24)
             ax.set_ylim(40, max(260, float(np.nanmax(y)) + 20 if len(y) else 260))
             ax.set_xticks([0, 12, 24])
             ax.set_xticklabels(["12a", "12p", "12a"], fontsize=6)
             ax.set_yticks([])
-            ax.set_title(f"Day {int(day_id) + 1}", fontsize=8)
-            for spine in ax.spines.values():
-                spine.set_color("#555555")
-                spine.set_linewidth(0.5)
+            ax.set_title(f"Day {int(day_id) + 1}", fontsize=8, fontweight="bold")
+
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            ax.spines['left'].set_color("#888888")
+            ax.spines['left'].set_linewidth(0.5)
+            ax.spines['bottom'].set_color("#888888")
+            ax.spines['bottom'].set_linewidth(0.5)
 
         fig.suptitle("Daily Glucose Profiles", fontsize=12, fontweight="bold")
         fig.tight_layout(rect=(0, 0, 1, 0.92))
-        fig.savefig(output_path, dpi=180)
+        fig.savefig(output_path, dpi=300)
         plt.close(fig)
 
     @staticmethod

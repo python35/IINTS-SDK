@@ -1252,6 +1252,13 @@ def update_sdk(
         bool,
         typer.Option("--yes", "-y", help="Run without asking for confirmation."),
     ] = False,
+    verify: Annotated[
+        bool,
+        typer.Option(
+            "--verify/--no-verify",
+            help="Verify the installed package version after the update command completes.",
+        ),
+    ] = True,
 ) -> None:
     """Update the current IINTS SDK environment to the newest release."""
     console = Console()
@@ -1308,7 +1315,35 @@ def update_sdk(
         raise typer.Exit(code=result.returncode)
 
     console.print("[bold green]IINTS update completed.[/bold green]")
+    if verify:
+        verify_cmd = [
+            sys.executable,
+            "-c",
+            (
+                "from importlib import metadata; "
+                "print(metadata.version('iints-sdk-python35'))"
+            ),
+        ]
+        verify_result = subprocess.run(
+            verify_cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if verify_result.returncode == 0:
+            installed_version = verify_result.stdout.strip() or "unknown"
+            console.print(f"Verified installed package version: [cyan]{installed_version}[/cyan]")
+        else:
+            console.print(
+                "[yellow]Update finished, but version verification failed. "
+                "Run `python -m pip show iints-sdk-python35` if you want to inspect it.[/yellow]"
+            )
+
     console.print("Run [cyan]hash -r[/cyan] or restart your terminal, then check [cyan]iints --version[/cyan].")
+    console.print(
+        "If you need the newest GitHub main before PyPI finishes publishing, run "
+        "[cyan]iints update --source github --yes[/cyan]."
+    )
 
 
 @app.command(name="run-doctor")

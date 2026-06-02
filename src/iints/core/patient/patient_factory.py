@@ -10,6 +10,13 @@ except Exception:
     BERGMAN_AVAILABLE = False
 
 try:
+    from .hovorka_model import HovorkaPatientModel
+    HOVORKA_AVAILABLE = True
+except Exception:
+    HovorkaPatientModel = None  # type: ignore[assignment,misc]
+    HOVORKA_AVAILABLE = False
+
+try:
     from simglucose.simulation.env import T1DSimEnv
     from simglucose.patient.t1dpatient import T1DPatient
     from simglucose.sensor.cgm import CGMSensor
@@ -48,6 +55,11 @@ class PatientFactory:
                 print("Warning: Bergman model not available, falling back to custom model")
                 return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
             return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
+        elif patient_type == 'hovorka':
+            if not HOVORKA_AVAILABLE or HovorkaPatientModel is None:
+                print("Warning: Hovorka model not available, falling back to custom model")
+                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+            return HovorkaPatientModel(initial_glucose=initial_glucose, **kwargs)
         elif patient_type == 'simglucose':
             if not SIMGLUCOSE_AVAILABLE:
                 print("Warning: Simglucose not available, falling back to custom model")

@@ -726,6 +726,20 @@ class Simulator:
                         self.add_stress_event(end_event)
                     elif event.event_type == 'exercise_end':
                         self.patient_model.stop_exercise()
+                    elif event.event_type in {'stress', 'illness'}:
+                        start_stress = getattr(self.patient_model, 'start_stress', None)
+                        if callable(start_stress):
+                            start_stress(float(event.value or 0.0))
+                            end_type = f"{event.event_type}_end"
+                            end_event = StressEvent(
+                                start_time=current_time + event.duration,
+                                event_type=end_type,
+                            )
+                            self.add_stress_event(end_event)
+                    elif event.event_type in {'stress_end', 'illness_end'}:
+                        stop_stress = getattr(self.patient_model, 'stop_stress', None)
+                        if callable(stop_stress):
+                            stop_stress()
                     elif event.event_type == 'ratio_change':
                         duration = event.duration if event.duration > 0 else float("inf")
                         self._ratio_overrides.append(

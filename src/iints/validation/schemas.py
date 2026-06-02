@@ -11,7 +11,18 @@ class StressEventModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     start_time: int = Field(ge=0)
-    event_type: Literal["meal", "missed_meal", "sensor_error", "exercise", "exercise_end", "ratio_change"]
+    event_type: Literal[
+        "meal",
+        "missed_meal",
+        "sensor_error",
+        "exercise",
+        "exercise_end",
+        "stress",
+        "stress_end",
+        "illness",
+        "illness_end",
+        "ratio_change",
+    ]
     value: Optional[float] = None
     reported_value: Optional[float] = None
     absorption_delay_minutes: int = Field(default=0, ge=0)
@@ -29,6 +40,9 @@ class StressEventModel(BaseModel):
         if self.event_type == "exercise":
             if self.value is None or not (0.0 <= self.value <= 1.0):
                 raise ValueError("exercise value must be between 0.0 and 1.0")
+        if self.event_type in {"stress", "illness"}:
+            if self.value is None or not (0.0 <= self.value <= 1.0):
+                raise ValueError("stress/illness value must be between 0.0 and 1.0")
         if self.event_type == "sensor_error":
             if self.value is None:
                 raise ValueError("sensor_error requires a value")

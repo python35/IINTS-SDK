@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.9"
+version = "1.5.10"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -24,7 +24,7 @@ classifiers = [
     "Development Status :: 5 - Production/Stable",
 ]
 dependencies = [
-    "fastapi>=0.115.0,<0.136.4",
+    "fastapi>=0.115.0,!=0.136.3,<1.0.0",
     "numpy>=1.24.0,<3.0.0",
     "pandas>=2.0.0,<3.0.0",
     "pydantic>=2.0.0,<3.0.0",
