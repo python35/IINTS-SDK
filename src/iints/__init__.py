@@ -11,7 +11,7 @@ except ImportError:  # pragma: no cover - Python < 3.8 fallback
 try:
     __version__ = version("iints-sdk-python35")
 except PackageNotFoundError:  # pragma: no cover - source tree fallback
-    __version__ = "1.5.10"
+    __version__ = "1.5.11"
 
 # Note to developers: this SDK is currently maintained by a single author.
 # Please report bugs via GitHub issues and feel free to contribute fixes via PRs.
@@ -237,9 +237,10 @@ def generate_agp_assets(
     output_dir: Optional[str] = None,
     subject_name: str = "Research simulation",
     summary_json_path: Optional[str] = None,
+    export_svg: bool = True,
 ) -> Optional[dict]:
     """
-    Export AGP-style PNG assets and summary JSON from dense CGM/simulation data.
+    Export AGP-style PNG/SVG assets and summary JSON from dense CGM/simulation data.
     """
     if output_dir is None:
         return None
@@ -249,6 +250,7 @@ def generate_agp_assets(
         output_dir,
         subject_name=subject_name,
         summary_json_path=summary_json_path,
+        export_svg=export_svg,
     )
 
 # You can also define __all__ to explicitly control what gets imported with `from iints import *`

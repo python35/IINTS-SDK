@@ -51,6 +51,46 @@ iints research prepare-hupa
 iints research prepare-ohio
 ```
 
+If you have the full request-gated OhioT1DM XML release locally, prepare it as
+train/test/all files and keep the raw data outside git:
+
+```bash
+export OHIO_T1DM_ROOT="/path/to/OhioT1DM-volledig"
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits test \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_test_quality_report.json
+```
+
+Recommended leakage-safe Ohio workflow:
+
+```bash
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --config research/configs/predictor_ohio_dual_guard_v2.yaml \
+  --out models/ohio_t1dm_full
+
+PYTHONPATH=src python3 research/evaluate_predictor.py \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --model models/ohio_t1dm_full/predictor.pt \
+  --reference-data data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --subgroup-column subject_id \
+  --subgroup-column dataset_year \
+  --out results/ohio_t1dm_full_eval.json
+```
+
+Use `ohio_train.csv` for fitting, `ohio_test.csv` for held-out evaluation, and
+`ohio_all.csv` only for descriptive cohort summaries or final re-training after
+the benchmark protocol is frozen.
+
 Then blend the real training sources while preserving source-aware subject IDs:
 
 ```bash
@@ -77,7 +117,56 @@ PYTHONPATH=src python3 research/evaluate_predictor.py \
   --out results/predictor_blend_external_eval.json
 ```
 
-## 2. Build Controller Training Data
+## 2. Forecast One Run Before Training A Controller
+
+Glucose prediction now has a dedicated evidence command. Use it on a run folder or CSV before you start making controller claims:
+
+```bash
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --output-dir results/jetson_research_day_forecast
+```
+
+With a trained predictor checkpoint:
+
+```bash
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --predictor models/predictor_blend/predictor.pt \
+  --output-dir results/jetson_research_day_forecast_ai
+```
+
+For hidden-biology stress testing, you can explicitly simulate an insulin-antibody-like delay in the forecast evidence:
+
+```bash
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --hidden-biology insulin-antibody \
+  --output-dir results/jetson_research_day_forecast_antibody
+```
+
+This does **not** diagnose antibody problems and it is not a normal assumption for most people with type 1 diabetes. It is a research-only stress test for the idea that some relevant biological variables are hidden from the algorithm.
+
+This writes:
+
+```text
+results/jetson_research_day_forecast/
+  forecast_predictions.csv
+  forecast_report.json
+  forecast_report.md
+  forecast_manifest.json
+```
+
+The forecast bundle compares:
+
+- a last-value baseline
+- a transparent physiology-aware baseline using glucose trend, IOB, COB, ISF, ICR, activity and stress features
+- the neural predictor when a checkpoint is provided
+- optional hidden-biology feature overrides such as insulin-antibody-like binding/release
+
+The key rule is simple: the AI predictor must beat transparent baselines and must be checked for missed hypoglycemia, uncertainty, calibration and risk-level behavior before it is used in a research controller experiment.
+
+## 3. Build Controller Training Data
 
 The Jetson research runner now writes:
 
@@ -109,7 +198,7 @@ iints research build-control-dataset \
   --manifest data_packs/processed/controller_teacher_manifest.json
 ```
 
-## 3. Train A Local Controller
+## 4. Train A Local Controller
 
 The first controller learner is intentionally simple and auditable:
 
@@ -158,7 +247,7 @@ iints research evaluate-controller \
 
 That report compares the learned controller with `ClinicalBaselineAlgorithm` on unseen presets such as `hypo_prone_night`, `hyper_challenge`, `pizza_paradox`, and `midnight_crash`.
 
-## 4. One-Step Jetson Research Finalization
+## 5. One-Step Jetson Research Finalization
 
 After a completed endurance run you can close the whole post-run loop in one command:
 
@@ -183,7 +272,7 @@ If you want the same work to happen automatically at the end of the endurance co
 
 to `iints jetson endurance start`.
 
-## 5. Multi-Run Local AI Lab
+## 6. Multi-Run Local AI Lab
 
 For actual AI research, one run should not be the whole story. The SDK now has a higher-level lab command that combines multiple completed Jetson or simulator bundles into one training workspace:
 
@@ -242,7 +331,7 @@ The important separation is:
 
 The older command name `iints research local-ai-lab` remains available, but `train-local-ai` is the clearest command for new users.
 
-## 6. Publish The Research Evidence
+## 7. Publish The Research Evidence
 
 After training, attach the run folders and local AI lab to one evidence bundle:
 
@@ -261,7 +350,7 @@ This writes:
 - `evidence_summary.json` for machine-readable review
 - `run_index.csv` for quick comparison tables
 
-## 7. What Good Research Looks Like
+## 8. What Good Research Looks Like
 
 Before making any strong claim, require all of the following:
 

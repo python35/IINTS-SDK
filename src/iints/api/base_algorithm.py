@@ -56,6 +56,7 @@ class AlgorithmMetadata:
 class AlgorithmResult:
     """Result of an insulin prediction with uncertainty"""
     total_insulin_delivered: float
+    total_glucagon_delivered_mg: float = 0.0
     bolus_insulin: float = 0.0
     basal_insulin: float = 0.0
     correction_bolus: float = 0.0
@@ -77,6 +78,7 @@ class AlgorithmResult:
     def to_dict(self) -> Dict:
         return {
             'total_insulin_delivered': self.total_insulin_delivered,
+            'total_glucagon_delivered_mg': self.total_glucagon_delivered_mg,
             'bolus_insulin': self.bolus_insulin,
             'basal_insulin': self.basal_insulin,
             'correction_bolus': self.correction_bolus,

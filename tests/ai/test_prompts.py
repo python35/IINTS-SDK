@@ -24,3 +24,23 @@ def test_review_realism_prompt_requests_structured_feedback_sections() -> None:
     assert "What looks suspicious" in user_prompt
     assert "Priority fixes" in user_prompt
     assert "What to improve next" in user_prompt
+
+
+def test_predict_insulin_prompt_is_research_only_and_cannot_increase_mpc_dose() -> None:
+    _, user_prompt = build_prompt(
+        "predict_insulin",
+        {
+            "current_glucose": 185,
+            "active_insulin": 2.4,
+            "insulin_effect": 0.02,
+            "mpc_recommended_units": 0.45,
+        },
+    )
+
+    lowered = user_prompt.lower()
+    assert "research sandbox" in lowered
+    assert "not controlling a real pump" in lowered
+    assert "never increase insulin above the deterministic mpc dose" in lowered
+    assert "simulator will still apply hard glucagon safety caps" in lowered
+    assert "FINAL_DOSE" in user_prompt
+    assert "FINAL_GLUCAGON_DOSE_MG" in user_prompt

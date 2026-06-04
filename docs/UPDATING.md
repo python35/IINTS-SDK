@@ -17,7 +17,9 @@ hash -r
 iints --version
 ```
 
-For the newest GitHub version before a PyPI release:
+By default `iints update` uses `--source auto`: it tries PyPI first and falls back to GitHub `main` if the release has not propagated yet.
+
+For the newest GitHub version directly:
 
 ```bash
 iints update --source github --yes
@@ -31,7 +33,67 @@ Use a dry run when you want to see exactly what will happen:
 iints update --dry-run
 ```
 
+If your terminal still sees an older command after updating, repair the environment:
+
+```bash
+iints update --repair --force-reinstall --yes
+hash -r
+iints --version
+```
+
+If pip seems to reuse stale wheels/caches:
+
+```bash
+iints update --no-cache-dir --force-reinstall --yes
+```
+
 The updater uses the same Python executable that launched `iints`, so it updates the virtual environment you are currently inside.
+
+## Clean removal: `iints delete`
+
+Use this when you want to remove IINTS from the active Python environment and clean user-level IINTS files. The default command uninstalls the SDK package itself from the Python environment that launched `iints`.
+
+```bash
+iints delete --dry-run
+iints delete --yes
+```
+
+Default behavior:
+
+- uninstalls `iints` and `iints-sdk-python35` from the active Python environment
+- removes user-level IINTS config, plugin, and cache folders such as `~/.iints`
+- refuses dangerous targets such as home, root, or the current working directory
+- does not remove source checkouts, private datasets, or generated `results/` folders by default
+
+To remove **everything IINTS-owned that the command can safely identify**, including generated output folders in the current directory and a detected local `IINTS-SDK` source checkout:
+
+```bash
+iints delete --everything --dry-run
+iints delete --everything --yes
+```
+
+This is the closest command to "remove the whole SDK from this machine." It still does not guess private datasets, external-drive research archives, or unrelated virtual environments.
+
+To also remove generated IINTS output folders in the current project directory:
+
+```bash
+iints delete --local-outputs --yes
+```
+
+To explicitly remove a detected source checkout without using `--everything`:
+
+```bash
+cd /path/to/IINTS-SDK
+iints delete --source-checkout --yes
+```
+
+To remove one extra IINTS-owned folder:
+
+```bash
+iints delete --no-packages --no-user-data --path results/old_iints_run --yes
+```
+
+Always run `--dry-run` first when cleaning research machines or external drives.
 
 ## Manual upgrade path
 
@@ -55,7 +117,7 @@ iints --help
 If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.10"
+python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.11"
 ```
 
 ## If you installed from source

@@ -3,20 +3,30 @@ import tempfile
 import logging
 import json
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "iints-matplotlib"))
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
+from matplotlib.patches import Patch
 
 from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
 from iints.utils.plotting import apply_plot_style
 
 logger = logging.getLogger("iints")
+
+AGP_TIR_STACK = [
+    ("very_low_lt_54", "Very Low", "<54 mg/dL", "#8B0000", "white"),
+    ("low_54_69", "Low", "54-69 mg/dL", "#D32F2F", "white"),
+    ("target_70_180", "Target", "70-180 mg/dL", "#4CAF50", "black"),
+    ("high_181_250", "High", "181-250 mg/dL", "#FFD54F", "black"),
+    ("very_high_gt_250", "Very High", ">250 mg/dL", "#F57C00", "black"),
+]
 
 
 class ClinicalReportGenerator:
@@ -170,6 +180,7 @@ class ClinicalReportGenerator:
         *,
         target_low: float,
         target_high: float,
+        svg_path: Optional[Path] = None,
     ) -> None:
         apply_plot_style()
         step = max(1, int(round(self._infer_step_minutes(df))))
@@ -187,37 +198,78 @@ class ClinicalReportGenerator:
         p75 = q[0.75].to_numpy(dtype=float)
         p95 = q[0.95].to_numpy(dtype=float)
 
-        import seaborn as sns
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4.6), gridspec_kw={"width_ratios": [4.5, 1.4]})
 
-        sns.set_style("whitegrid")
+        # Panel 1: AGP Curve
+        ax1.fill_between(x, p05, p95, color="#D0D0D0", label="5-95%", alpha=0.5, linewidth=0)
+        ax1.fill_between(x, p25, p75, color="#A0A0A0", label="25-75%", alpha=0.8, linewidth=0)
+        ax1.plot(x, p50, color="#103b5c", linewidth=2.5, label="Median")
 
-        plt.figure(figsize=(10, 4.2))
-        plt.fill_between(x, p05, p95, color="#E0E0E0", label="5-95%", linewidth=0)
-        plt.fill_between(x, p25, p75, color="#A6A6A6", label="25-75%", linewidth=0)
-        plt.plot(x, p50, color="#000000", linewidth=2.5, label="Median")
-        plt.axhspan(target_low, target_high, color="#2E7D32", alpha=0.08)
-        plt.axhline(target_low, color="#424242", linestyle="--", linewidth=1.0)
-        plt.axhline(target_high, color="#424242", linestyle="--", linewidth=1.0)
+        ax1.axhspan(target_low, target_high, color="#2ca02c", alpha=0.1)
+        ax1.axhline(target_low, color="#2ca02c", linestyle=":", linewidth=1)
+        ax1.axhline(target_high, color="#2ca02c", linestyle=":", linewidth=1)
 
-        ax = plt.gca()
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_color('#333333')
-        ax.spines['bottom'].set_color('#333333')
-
-        plt.xlim(0, 24)
+        ax1.set_xlim(0, 24)
         ymax = max(350.0, float(np.nanmax(p95)) + 20.0)
-        plt.ylim(40, ymax)
-        plt.xticks([0, 3, 6, 9, 12, 15, 18, 21, 24], ["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p", "12a"])
-        plt.ylabel("mg/dL", fontweight="bold")
-        plt.title("Ambulatory Glucose Profile (AGP-style modal day)", fontweight="bold")
+        ax1.set_ylim(40, ymax)
+        ax1.set_xticks([0, 3, 6, 9, 12, 15, 18, 21, 24])
+        ax1.set_xticklabels(["12a", "3a", "6a", "9a", "12p", "3p", "6p", "9p", "12a"])
+        ax1.set_ylabel("Glucose (mg/dL)", fontweight="bold")
 
-        ax.grid(True, axis="y", alpha=0.3, linestyle="-", color="#CCCCCC")
-        ax.grid(False, axis="x")
+        report_day_count = int(max(1, df["day_index"].nunique()))
+        title = "Single-Day Glucose Profile" if report_day_count < 2 else "Ambulatory Glucose Profile (AGP)"
+        ax1.set_title(title, fontweight="bold")
 
-        plt.tight_layout()
-        plt.savefig(output_path, dpi=300)
-        plt.close()
+        # Panel 2: TIR Bar
+        summary = self._agp_summary(df, target_low=target_low, target_high=target_high)
+        pct_map = summary["time_ranges_pct"]
+        bottom = 0.0
+        legend_handles = []
+        for key, label, range_text, color, text_color in AGP_TIR_STACK:
+            val = float(pct_map.get(key, 0.0))
+            legend_handles.append(
+                Patch(
+                    facecolor=color,
+                    edgecolor="none",
+                    label=f"{label} ({range_text}) {val:.0f}%",
+                )
+            )
+            if val > 0:
+                ax2.bar([0], [val], bottom=[bottom], color=color, width=0.48)
+                if val >= 6:
+                    ax2.text(
+                        0,
+                        bottom + val / 2.0,
+                        f"{val:.0f}%",
+                        ha="center",
+                        va="center",
+                        color=text_color,
+                        fontweight="bold",
+                        fontsize=9,
+                    )
+            bottom += val
+
+        ax2.set_ylim(0, 100)
+        ax2.set_xlim(-0.5, 0.5)
+        ax2.set_xticks([0])
+        ax2.set_xticklabels(["TIR"])
+        ax2.set_yticks([0, 25, 50, 75, 100])
+        ax2.set_ylabel("% Time", fontweight="bold")
+        ax2.set_title("Time in Range", fontweight="bold")
+        ax2.legend(
+            handles=list(reversed(legend_handles)),
+            loc="center left",
+            bbox_to_anchor=(1.02, 0.5),
+            frameon=False,
+            fontsize=7,
+            borderaxespad=0.0,
+        )
+
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=600, bbox_inches="tight")
+        if svg_path is not None:
+            fig.savefig(svg_path, format="svg", bbox_inches="tight")
+        plt.close(fig)
 
     def _plot_daily_profiles(
         self,
@@ -227,14 +279,21 @@ class ClinicalReportGenerator:
         target_low: float,
         target_high: float,
         max_days: int = 14,
+        svg_path: Optional[Path] = None,
     ) -> None:
         apply_plot_style()
         day_ids = sorted(df["day_index"].unique().tolist())[:max_days]
         if not day_ids:
             day_ids = [0]
-        cols = 7
+        # A single-day AGP should not render as one tiny panel in a 7-day grid.
+        # Keep the 7-column layout for longer reports, but let short reports breathe.
+        if len(day_ids) <= 3:
+            cols = len(day_ids)
+        else:
+            cols = 7
         rows = int(np.ceil(len(day_ids) / cols))
-        fig, axes = plt.subplots(rows, cols, figsize=(10, max(1.6, rows * 1.35)), squeeze=False)
+        fig_height = max(1.9, rows * 1.45 if cols >= 7 else 2.35)
+        fig, axes = plt.subplots(rows, cols, figsize=(10, fig_height), squeeze=False)
         for ax in axes.ravel():
             ax.axis("off")
 
@@ -262,44 +321,93 @@ class ClinicalReportGenerator:
             ax.spines['bottom'].set_color("#888888")
             ax.spines['bottom'].set_linewidth(0.5)
 
-        fig.suptitle("Daily Glucose Profiles", fontsize=12, fontweight="bold")
-        fig.tight_layout(rect=(0, 0, 1, 0.92))
-        fig.savefig(output_path, dpi=300)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=600, bbox_inches="tight")
+        if svg_path is not None:
+            fig.savefig(svg_path, format="svg", bbox_inches="tight")
         plt.close(fig)
 
     @staticmethod
-    def _section_header(pdf: FPDF, title: str) -> None:
-        pdf.set_fill_color(0, 0, 0)
+    def _extract_xai_events(df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """Extract explainable-event strings into a structured export list."""
+        if "explainable_events" not in df.columns:
+            return []
+
+        events: List[Dict[str, Any]] = []
+        for row_index, row in df.dropna(subset=["explainable_events"]).iterrows():
+            raw_events = row.get("explainable_events")
+            if isinstance(raw_events, str):
+                parts = [part.strip() for part in raw_events.split(";") if part.strip()]
+            elif isinstance(raw_events, (list, tuple)):
+                parts = [str(part).strip() for part in raw_events if str(part).strip()]
+            else:
+                continue
+
+            time_minutes = row.get("time_minutes")
+            try:
+                normalized_time = None if pd.isna(time_minutes) else float(time_minutes)
+            except (TypeError, ValueError):
+                normalized_time = None
+
+            for event in parts:
+                events.append(
+                    {
+                        "row_index": str(row_index),
+                        "time_minutes": normalized_time,
+                        "event": event,
+                    }
+                )
+        return events
+
+    @staticmethod
+    def _section_header(pdf: FPDF, title: str, width: float = 0) -> None:
+        pdf.set_fill_color(35, 55, 67)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(0, 6, title, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.set_text_color(0, 0, 0)
+        pdf.cell(width, 5.5, title, fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(25, 35, 43)
 
     @staticmethod
     def _range_bar(pdf: FPDF, x: float, y: float, width: float, height: float, summary: Dict[str, Any]) -> None:
         ranges = [
-            ("very_high_gt_250", (245, 176, 0), "Very High >250"),
-            ("high_181_250", (255, 218, 58), "High 181-250"),
-            ("target_70_180", (98, 181, 86), "Target 70-180"),
-            ("low_54_69", (211, 47, 47), "Low 54-69"),
-            ("very_low_lt_54", (124, 20, 20), "Very Low <54"),
+            ("very_high_gt_250", (230, 126, 34), "Very High", ">250 mg/dL"),
+            ("high_181_250", (248, 200, 48), "High", "181-250 mg/dL"),
+            ("target_70_180", (86, 160, 88), "Target Range", "70-180 mg/dL"),
+            ("low_54_69", (204, 57, 57), "Low", "54-69 mg/dL"),
+            ("very_low_lt_54", (126, 29, 33), "Very Low", "<54 mg/dL"),
         ]
-        current_y = y
         total_h = height
         pct_map = summary["time_ranges_pct"]
-        min_visible = 2.0
-        for key, color, label in ranges:
+
+        current_y = y
+        for key, color, _label, _range_text in ranges:
             pct = float(pct_map.get(key, 0.0))
-            part_h = max(min_visible if pct > 0 else 0, total_h * pct / 100.0)
+            part_h = total_h * pct / 100.0
             pdf.set_fill_color(*color)
-            pdf.rect(x, current_y, width, part_h, style="F")
-            pdf.set_xy(x + width + 4, current_y)
-            pdf.set_font("Helvetica", "", 8)
-            minutes = summary["time_ranges_minutes"].get(key, 0.0)
-            pdf.cell(0, 4, f"{label}: {pct:.0f}% ({ClinicalReportGenerator._format_duration(minutes)})")
+            if part_h > 0:
+                pdf.rect(x, current_y, width, part_h, style="F")
             current_y += part_h
-        pdf.set_draw_color(0, 0, 0)
+        pdf.set_draw_color(85, 95, 103)
         pdf.rect(x, y, width, height)
+
+        label_x = x + width + 7
+        row_y = y - 1
+        pdf.set_font("Helvetica", "", 7.3)
+        for idx, (key, color, label, range_text) in enumerate(ranges):
+            pct = float(pct_map.get(key, 0.0))
+            minutes = float(summary["time_ranges_minutes"].get(key, 0.0))
+            line_y = row_y + idx * 10.8
+            pdf.set_fill_color(*color)
+            pdf.rect(label_x, line_y + 1.4, 3.4, 3.4, style="F")
+            pdf.set_xy(label_x + 5, line_y)
+            pdf.set_font("Helvetica", "B", 7.3)
+            pdf.cell(24, 3.6, label)
+            pdf.set_font("Helvetica", "", 7.0)
+            pdf.cell(22, 3.6, range_text)
+            pdf.set_font("Helvetica", "B", 7.3)
+            pdf.cell(12, 3.6, f"{pct:.0f}%", align="R")
+            pdf.set_font("Helvetica", "", 6.8)
+            pdf.cell(0, 3.6, f" ({ClinicalReportGenerator._format_duration(minutes)})")
 
     def generate_agp_pdf(
         self,
@@ -337,19 +445,44 @@ class ClinicalReportGenerator:
             pdf.add_page()
             pdf.set_margins(8, 8, 8)
 
-            pdf.set_font("Helvetica", "B", 18)
-            pdf.cell(88, 8, title)
-            pdf.set_font("Helvetica", "", 9)
-            pdf.cell(0, 4, f"Name: {subject_name}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_x(96)
-            pdf.cell(0, 4, "Report type: research simulation / educational", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.ln(3)
+            header_y = 8
+            title_w = 121
+            meta_x = 134
+            pdf.set_xy(8, header_y)
+            title_size = 15 if len(title) <= 72 else 13
+            pdf.set_text_color(25, 35, 43)
+            pdf.set_font("Helvetica", "B", title_size)
+            pdf.multi_cell(title_w, 6.2, title, align="L")
+            title_bottom = pdf.get_y()
+
+            pdf.set_xy(meta_x, header_y)
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.set_text_color(25, 35, 43)
+            pdf.cell(0, 4, "Name", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_xy(meta_x, header_y + 4.5)
+            pdf.set_font("Helvetica", "", 7.2)
+            pdf.multi_cell(64, 3.5, subject_name)
+            meta_bottom = pdf.get_y()
+            pdf.set_xy(meta_x, max(meta_bottom + 1.5, header_y + 12))
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.cell(0, 4, "Report type", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_xy(meta_x, pdf.get_y())
+            pdf.set_font("Helvetica", "", 7.2)
+            pdf.multi_cell(64, 3.5, "Research simulation / educational")
+            meta_bottom = pdf.get_y()
+
+            header_bottom = max(title_bottom, meta_bottom, header_y + 23)
+            pdf.set_draw_color(170, 181, 188)
+            pdf.line(8, header_bottom + 1.5, 202, header_bottom + 1.5)
+            pdf.set_y(header_bottom + 5)
 
             left_x = 8
             right_x = 112
+            left_w = 98
+            right_w = 90
             top_y = pdf.get_y()
             pdf.set_xy(left_x, top_y)
-            self._section_header(pdf, "GLUCOSE STATISTICS AND TARGETS")
+            self._section_header(pdf, "GLUCOSE STATISTICS AND TARGETS", left_w)
             pdf.set_font("Helvetica", "", 8)
             pdf.cell(0, 5, f"Report period: {summary['report_days']} day(s)", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
             pdf.cell(0, 5, f"Time CGM/simulation active: {summary['data_active_pct']:.1f}%", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -382,22 +515,36 @@ class ClinicalReportGenerator:
                 pdf.cell(0, 5, str(safety_report.get("bolus_interventions_count", 0)), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
             pdf.set_xy(right_x, top_y)
-            self._section_header(pdf, "TIME IN RANGES")
-            self._range_bar(pdf, right_x + 8, top_y + 12, 14, 58, summary)
+            self._section_header(pdf, "TIME IN RANGES", right_w)
+            self._range_bar(pdf, right_x + 3, top_y + 12, 13, 55, summary)
 
-            pdf.set_xy(8, 94)
+            agp_y = max(100, top_y + 74)
+            pdf.set_xy(8, agp_y)
             self._section_header(pdf, "AMBULATORY GLUCOSE PROFILE (AGP-STYLE)")
             pdf.set_font("Helvetica", "", 7)
+            if summary["report_days"] < 2:
+                agp_note = (
+                    "Single-day AGP-style view: percentile bands collapse toward the visible trace. "
+                    "Use multi-day CGM/simulation data for a full AGP percentile profile."
+                )
+            else:
+                agp_note = (
+                    "AGP-style summary of glucose values over the report period, with median (50%) "
+                    "and percentile bands shown as a single modal day."
+                )
             pdf.multi_cell(
                 0,
                 4,
-                "AGP-style summary of glucose values over the report period, with median (50%) and percentile bands shown as a single modal day.",
+                agp_note,
             )
-            pdf.image(str(agp_plot), x=12, y=108, w=186)
+            agp_image_y = pdf.get_y() + 2
+            pdf.image(str(agp_plot), x=12, y=agp_image_y, w=186)
 
-            pdf.set_xy(8, 186)
+            daily_y = agp_image_y + 78
+            pdf.set_xy(8, daily_y)
             self._section_header(pdf, "DAILY GLUCOSE PROFILES")
-            pdf.image(str(daily_plot), x=10, y=199, w=190)
+            daily_image_y = pdf.get_y() + 4
+            pdf.image(str(daily_plot), x=10, y=daily_image_y, w=190)
 
             pdf.set_xy(8, 285)
             pdf.set_font("Helvetica", "I", 7)
@@ -420,8 +567,9 @@ class ClinicalReportGenerator:
         target_low: float = 70.0,
         target_high: float = 180.0,
         summary_json_path: Optional[str] = None,
+        export_svg: bool = True,
     ) -> Dict[str, str]:
-        """Export AGP-style PNGs and summary JSON without creating a PDF."""
+        """Export AGP-style PNG/SVG assets and summary JSON without creating a PDF."""
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         df = self._prepare_agp_frame(simulation_data)
@@ -430,18 +578,51 @@ class ClinicalReportGenerator:
 
         agp_plot = output_path / "agp_profile.png"
         daily_plot = output_path / "daily_profiles.png"
+        agp_svg = output_path / "agp_profile.svg" if export_svg else None
+        daily_svg = output_path / "daily_profiles.svg" if export_svg else None
         summary_file = Path(summary_json_path) if summary_json_path else output_path / "agp_summary.json"
         summary_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self._plot_agp_profile(df, agp_plot, target_low=target_low, target_high=target_high)
-        self._plot_daily_profiles(df, daily_plot, target_low=target_low, target_high=target_high)
+        self._plot_agp_profile(
+            df,
+            agp_plot,
+            target_low=target_low,
+            target_high=target_high,
+            svg_path=agp_svg,
+        )
+        self._plot_daily_profiles(
+            df,
+            daily_plot,
+            target_low=target_low,
+            target_high=target_high,
+            svg_path=daily_svg,
+        )
         summary_file.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-        return {
+        xai_file = output_path / "xai_events.txt"
+        xai_json_file = output_path / "xai_events.json"
+        xai_events = self._extract_xai_events(df)
+
+        with open(xai_file, "w", encoding="utf-8") as f:
+            f.write("=== IINTS Explainable AI (XAI) Events Log ===\n")
+            if xai_events:
+                for entry in xai_events:
+                    f.write(f"- {entry['event']}\n")
+            else:
+                f.write("No significant XAI events detected.\n")
+        xai_json_file.write_text(json.dumps(xai_events, indent=2), encoding="utf-8")
+
+        outputs = {
             "agp_profile_png": str(agp_plot),
             "daily_profiles_png": str(daily_plot),
             "summary_json": str(summary_file),
+            "xai_events_txt": str(xai_file),
+            "xai_events_json": str(xai_json_file),
         }
+        if agp_svg is not None and daily_svg is not None:
+            outputs["agp_profile_svg"] = str(agp_svg)
+            outputs["daily_profiles_svg"] = str(daily_svg)
+        return outputs
 
     def export_plots(self, simulation_data: pd.DataFrame, output_dir: str) -> Dict[str, str]:
         output_path = Path(output_dir)

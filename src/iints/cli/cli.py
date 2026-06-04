@@ -1218,19 +1218,154 @@ def doctor(
         raise typer.Exit(code=1)
 
 
+def _format_bytes(num_bytes: int) -> str:
+    size = float(max(num_bytes, 0))
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024.0:
+            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+        size /= 1024.0
+    return f"{size:.1f} TB"
+
+
+def _path_size_bytes(path: Path) -> int:
+    if not path.exists():
+        return 0
+    if path.is_file() or path.is_symlink():
+        try:
+            return path.stat().st_size
+        except OSError:
+            return 0
+    total = 0
+    for child in path.rglob("*"):
+        try:
+            if child.is_file() or child.is_symlink():
+                total += child.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _dedupe_paths(paths: Sequence[Tuple[str, Path]]) -> List[Tuple[str, Path]]:
+    seen: set[Path] = set()
+    deduped: List[Tuple[str, Path]] = []
+    for label, path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved not in seen:
+            deduped.append((label, resolved))
+            seen.add(resolved)
+    return deduped
+
+
+def _is_dangerous_delete_path(path: Path, *, allow_cwd: bool = False) -> bool:
+    resolved = path.expanduser().resolve()
+    home = Path.home().expanduser().resolve()
+    cwd = Path.cwd().resolve()
+    anchors = {resolved.anchor}
+    blocked = {home, *[Path(anchor).resolve() for anchor in anchors if anchor]}
+    if not allow_cwd:
+        blocked.add(cwd)
+    return resolved in blocked
+
+
+def _default_iints_user_paths() -> List[Tuple[str, Path]]:
+    home = Path.home()
+    paths: List[Tuple[str, Path]] = [
+        ("user config/data", home / ".iints"),
+        ("user cache", home / ".cache" / "iints"),
+        ("user cache", home / ".cache" / "iints-sdk"),
+        ("user data", home / ".local" / "share" / "iints"),
+        ("user config", home / ".config" / "iints"),
+        ("macOS cache", home / "Library" / "Caches" / "iints"),
+        ("macOS app support", home / "Library" / "Application Support" / "IINTS"),
+        ("macOS app support", home / "Library" / "Application Support" / "iints"),
+    ]
+    plugin_home = get_plugin_home()
+    paths.append(("plugin home", plugin_home))
+    return _dedupe_paths(paths)
+
+
+def _default_iints_local_output_paths(base_dir: Path) -> List[Tuple[str, Path]]:
+    names = [
+        "results",
+        "digital_patient_runtime",
+        "patient_runtime",
+        "iints_pi_demo",
+        "iints_uno_q_demo",
+        "iints_demo",
+        "iints_offline",
+        "registry",
+        ".cache_iints",
+        ".cache_eucys",
+    ]
+    return _dedupe_paths([("local generated output", base_dir / name) for name in names])
+
+
+def _looks_like_iints_source_checkout(path: Path) -> bool:
+    pyproject = path / "pyproject.toml"
+    package_dir = path / "src" / "iints"
+    if not pyproject.is_file() or not package_dir.is_dir():
+        return False
+    try:
+        pyproject_text = pyproject.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
+    return "iints-sdk-python35" in pyproject_text or "IINTS-AF" in pyproject_text
+
+
+def _find_iints_source_checkout(start: Path) -> Optional[Path]:
+    current = start.expanduser().resolve()
+    candidates = [current, *current.parents]
+    for candidate in candidates:
+        if _looks_like_iints_source_checkout(candidate):
+            return candidate
+    return None
+
+
+def _build_update_install_command(
+    *,
+    source: str,
+    extras_suffix: str,
+    github_ref: str,
+    pre: bool,
+    user: bool,
+    force_reinstall: bool,
+    no_cache_dir: bool,
+) -> List[str]:
+    normalized_ref = github_ref.strip() or "main"
+    if source == "github":
+        package_spec = (
+            f"iints-sdk-python35{extras_suffix} @ "
+            f"git+https://github.com/python35/IINTS-SDK.git@{normalized_ref}"
+        )
+    else:
+        package_spec = f"iints-sdk-python35{extras_suffix}"
+
+    install_cmd = [sys.executable, "-m", "pip", "install", "-U"]
+    if pre:
+        install_cmd.append("--pre")
+    if user:
+        install_cmd.append("--user")
+    if force_reinstall:
+        install_cmd.append("--force-reinstall")
+    if no_cache_dir:
+        install_cmd.append("--no-cache-dir")
+    install_cmd.append(package_spec)
+    return install_cmd
+
+
 @app.command(name="update")
 def update_sdk(
     source: Annotated[
         str,
-        typer.Option(help="Update source: pypi or github."),
-    ] = "pypi",
+        typer.Option(help="Update source: auto, pypi, or github. Auto tries PyPI first and falls back to GitHub main."),
+    ] = "auto",
     install_extras: Annotated[
         str,
         typer.Option("--extras", help="Comma-separated extras to install, e.g. full,mdmp,research,edge. Use empty string for none."),
     ] = "full,mdmp,research,edge",
     github_ref: Annotated[
         str,
-        typer.Option("--github-ref", help="Git ref used with --source github."),
+        typer.Option("--github-ref", help="Git ref used with --source github or as the auto fallback."),
     ] = "main",
     user: Annotated[
         bool,
@@ -1243,6 +1378,18 @@ def update_sdk(
     upgrade_pip: Annotated[
         bool,
         typer.Option("--upgrade-pip/--no-upgrade-pip", help="Upgrade pip before installing IINTS."),
+    ] = False,
+    repair: Annotated[
+        bool,
+        typer.Option("--repair/--no-repair", help="Uninstall legacy/conflicting IINTS packages before reinstalling."),
+    ] = False,
+    force_reinstall: Annotated[
+        bool,
+        typer.Option("--force-reinstall/--no-force-reinstall", help="Ask pip to reinstall even if the version appears current."),
+    ] = False,
+    no_cache_dir: Annotated[
+        bool,
+        typer.Option("--no-cache-dir/--use-pip-cache", help="Disable pip's wheel/download cache for this update."),
     ] = False,
     dry_run: Annotated[
         bool,
@@ -1263,37 +1410,53 @@ def update_sdk(
     """Update the current IINTS SDK environment to the newest release."""
     console = Console()
     normalized_source = source.strip().lower()
-    if normalized_source not in {"pypi", "github"}:
-        console.print("[bold red]Error: --source must be either 'pypi' or 'github'.[/bold red]")
+    if normalized_source not in {"auto", "pypi", "github"}:
+        console.print("[bold red]Error: --source must be 'auto', 'pypi', or 'github'.[/bold red]")
         raise typer.Exit(code=1)
 
     extra_tokens = [token.strip() for token in install_extras.split(",") if token.strip()]
     extras_suffix = f"[{','.join(extra_tokens)}]" if extra_tokens else ""
-    if normalized_source == "github":
-        package_spec = (
-            f"iints-sdk-python35{extras_suffix} @ "
-            f"git+https://github.com/python35/IINTS-SDK.git@{github_ref.strip() or 'main'}"
+    primary_source = "pypi" if normalized_source == "auto" else normalized_source
+    install_cmd = _build_update_install_command(
+        source=primary_source,
+        extras_suffix=extras_suffix,
+        github_ref=github_ref,
+        pre=pre,
+        user=user,
+        force_reinstall=force_reinstall,
+        no_cache_dir=no_cache_dir,
+    )
+    fallback_cmd: Optional[List[str]] = None
+    if normalized_source == "auto":
+        fallback_cmd = _build_update_install_command(
+            source="github",
+            extras_suffix=extras_suffix,
+            github_ref=github_ref,
+            pre=pre,
+            user=user,
+            force_reinstall=force_reinstall,
+            no_cache_dir=no_cache_dir,
         )
-    else:
-        package_spec = f"iints-sdk-python35{extras_suffix}"
-
-    install_cmd = [sys.executable, "-m", "pip", "install", "-U"]
-    if pre:
-        install_cmd.append("--pre")
-    if user:
-        install_cmd.append("--user")
-    install_cmd.append(package_spec)
 
     pip_cmd = [sys.executable, "-m", "pip", "install", "-U", "pip"]
+    repair_cmd = [sys.executable, "-m", "pip", "uninstall", "-y", "iints", "iints-sdk-python35"]
     console.print("[bold]IINTS SDK updater[/bold]")
     console.print(f"Current SDK version: [cyan]{getattr(iints, '__version__', 'unknown')}[/cyan]")
     console.print(f"Python executable: [cyan]{sys.executable}[/cyan]")
+    console.print(f"CLI path: [cyan]{shutil.which('iints') or 'not found on PATH'}[/cyan]")
+    console.print(f"Update source: [cyan]{normalized_source}[/cyan]")
     console.print(f"Install extras: [cyan]{','.join(extra_tokens) if extra_tokens else 'none'}[/cyan]")
     if upgrade_pip:
         console.print("pip upgrade command:")
         console.print(shlex.join(pip_cmd), markup=False)
+    if repair:
+        console.print("Repair uninstall command:")
+        console.print(shlex.join(repair_cmd), markup=False)
     console.print("SDK update command:")
     console.print(shlex.join(install_cmd), markup=False)
+    if fallback_cmd is not None:
+        console.print("Auto fallback command if PyPI update fails:")
+        console.print(shlex.join(fallback_cmd), markup=False)
 
     if dry_run:
         console.print("[yellow]Dry run only; no packages were changed.[/yellow]")
@@ -1309,7 +1472,16 @@ def update_sdk(
             console.print("[bold red]pip upgrade failed; SDK update was not attempted.[/bold red]")
             raise typer.Exit(code=pip_result.returncode)
 
+    if repair:
+        repair_result = subprocess.run(repair_cmd, check=False)
+        if repair_result.returncode != 0:
+            console.print("[bold red]Repair uninstall failed; SDK update was not attempted.[/bold red]")
+            raise typer.Exit(code=repair_result.returncode)
+
     result = subprocess.run(install_cmd, check=False)
+    if result.returncode != 0 and fallback_cmd is not None:
+        console.print("[yellow]PyPI update failed; trying GitHub fallback.[/yellow]")
+        result = subprocess.run(fallback_cmd, check=False)
     if result.returncode != 0:
         console.print("[bold red]IINTS update failed.[/bold red]")
         raise typer.Exit(code=result.returncode)
@@ -1340,10 +1512,140 @@ def update_sdk(
             )
 
     console.print("Run [cyan]hash -r[/cyan] or restart your terminal, then check [cyan]iints --version[/cyan].")
+    console.print("If commands still look old, run [cyan]iints update --repair --force-reinstall --yes[/cyan].")
+
+
+@app.command(name="delete")
+def delete_sdk(
+    everything: Annotated[
+        bool,
+        typer.Option("--everything/--standard", help="Remove packages, user data, local generated outputs, and a detected IINTS source checkout."),
+    ] = False,
+    packages: Annotated[
+        bool,
+        typer.Option("--packages/--no-packages", help="Uninstall IINTS Python packages from the active Python environment."),
+    ] = True,
+    user_data: Annotated[
+        bool,
+        typer.Option("--user-data/--no-user-data", help="Remove user-level IINTS config, plugin, and cache folders."),
+    ] = True,
+    local_outputs: Annotated[
+        bool,
+        typer.Option("--local-outputs/--no-local-outputs", help="Also remove known generated IINTS output folders in the current directory."),
+    ] = False,
+    source_checkout: Annotated[
+        bool,
+        typer.Option("--source-checkout/--no-source-checkout", help="Also remove the detected local IINTS-SDK source checkout, if running from one."),
+    ] = False,
+    extra_path: Annotated[
+        Optional[List[Path]],
+        typer.Option("--path", help="Extra IINTS-owned path to remove. Refuses home, root, and current working directory."),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Show what would be removed without deleting anything."),
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Delete without asking for confirmation."),
+    ] = False,
+) -> None:
+    """Remove IINTS packages and generated user data from this machine."""
+    console = Console()
+    if everything:
+        packages = True
+        user_data = True
+        local_outputs = True
+        source_checkout = True
+
+    package_names = ["iints", "iints-sdk-python35"] if packages else []
+    candidates: List[Tuple[str, Path]] = []
+    if user_data:
+        candidates.extend(_default_iints_user_paths())
+    if local_outputs:
+        candidates.extend(_default_iints_local_output_paths(Path.cwd()))
+    if source_checkout:
+        checkout = _find_iints_source_checkout(Path.cwd())
+        if checkout is not None:
+            candidates.append(("source checkout", checkout))
+        else:
+            console.print("[yellow]No local IINTS-SDK source checkout was detected from the current directory.[/yellow]")
+    if extra_path:
+        candidates.extend(("extra path", path) for path in extra_path)
+
+    cleanup_paths = []
+    refused_paths = []
+    for label, path in _dedupe_paths(candidates):
+        allow_cwd = label == "source checkout" and _looks_like_iints_source_checkout(path)
+        if _is_dangerous_delete_path(path, allow_cwd=allow_cwd):
+            refused_paths.append((label, path))
+        else:
+            cleanup_paths.append((label, path))
+
+    console.print("[bold red]IINTS delete[/bold red]")
     console.print(
-        "If you need the newest GitHub main before PyPI finishes publishing, run "
-        "[cyan]iints update --source github --yes[/cyan]."
+        "This removes the installed IINTS SDK package plus IINTS-owned cache/config. "
+        "Use --everything to include local outputs and a detected source checkout. "
+        "Private datasets are never guessed automatically."
     )
+    table = Table(title="Delete Plan")
+    table.add_column("Type", style="cyan")
+    table.add_column("Target")
+    table.add_column("Exists")
+    table.add_column("Size", justify="right")
+    for package_name in package_names:
+        table.add_row("package", package_name, "n/a", "n/a")
+    for label, path in cleanup_paths:
+        exists = path.exists()
+        table.add_row(label, str(path), "yes" if exists else "no", _format_bytes(_path_size_bytes(path)) if exists else "0 B")
+    for label, path in refused_paths:
+        table.add_row(f"{label} [red](refused)[/red]", str(path), "yes" if path.exists() else "no", "blocked")
+    console.print(table)
+
+    if refused_paths:
+        console.print("[yellow]Some paths were refused because they point at home, root, or the current working directory.[/yellow]")
+
+    if dry_run:
+        if package_names:
+            uninstall_cmd = [sys.executable, "-m", "pip", "uninstall", "-y", *package_names]
+            console.print("Package uninstall command:")
+            console.print(shlex.join(uninstall_cmd), markup=False)
+        console.print("[yellow]Dry run only; nothing was removed.[/yellow]")
+        return
+
+    if not package_names and not cleanup_paths:
+        console.print("[yellow]Nothing selected for deletion.[/yellow]")
+        return
+
+    if not yes and not typer.confirm("Delete the listed IINTS packages/data now?"):
+        console.print("Delete cancelled.")
+        return
+
+    failures: List[str] = []
+    if package_names:
+        uninstall_cmd = [sys.executable, "-m", "pip", "uninstall", "-y", *package_names]
+        result = subprocess.run(uninstall_cmd, check=False)
+        if result.returncode != 0:
+            failures.append(f"pip uninstall failed with exit code {result.returncode}")
+
+    for _, path in cleanup_paths:
+        if not path.exists():
+            continue
+        try:
+            if path.is_file() or path.is_symlink():
+                path.unlink()
+            else:
+                shutil.rmtree(path)
+        except Exception as exc:
+            failures.append(f"{path}: {exc}")
+
+    if failures:
+        console.print("[bold red]IINTS delete completed with errors:[/bold red]")
+        for failure in failures:
+            console.print(f"- {failure}")
+        raise typer.Exit(code=1)
+
+    console.print("[bold green]IINTS delete completed.[/bold green]")
 
 
 @app.command(name="run-doctor")
@@ -7144,6 +7446,10 @@ def report(
         bool,
         typer.Option("--png/--no-png", help="For AGP reports, export agp_profile.png and daily_profiles.png."),
     ] = False,
+    agp_svg: Annotated[
+        bool,
+        typer.Option("--svg/--no-svg", help="For AGP reports, export vector SVG assets alongside PNG assets."),
+    ] = True,
 ):
     """Generate a research PDF report (standard or AGP-style) from a results CSV."""
     console = Console()
@@ -7196,9 +7502,10 @@ def report(
             str(asset_dir),
             subject_name=subject_name,
             summary_json_path=str(summary_json_path) if summary_json_path else None,
+            export_svg=agp_svg,
         )
         if asset_paths:
-            console.print(f"AGP PNG assets saved to: [link=file://{asset_dir}]{asset_dir}[/link]")
+            console.print(f"AGP assets saved to: [link=file://{asset_dir}]{asset_dir}[/link]")
 
     if audit_output_dir:
         audit_output_dir.mkdir(parents=True, exist_ok=True)
@@ -8893,6 +9200,98 @@ def research_local_ai_lab(
     )
 
 
+def _print_results_index_bundle(bundle: Any, console: Console) -> None:
+    table = Table(title="IINTS Results Manager")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Runs indexed", str(bundle.run_count))
+    table.add_row("Artifacts inventoried", str(bundle.artifact_count))
+    table.add_row("Output directory", str(bundle.output_dir))
+    table.add_row("Run index", str(bundle.run_index_csv))
+    table.add_row("Artifact inventory", str(bundle.artifact_inventory_csv))
+    table.add_row("Markdown report", str(bundle.report_md))
+    table.add_row("Manifest", str(bundle.manifest_json))
+    table.add_row("Workbook", str(bundle.workbook_xlsx) if bundle.workbook_xlsx else "not written")
+    table.add_row("Raw long table", str(bundle.raw_long_csv) if bundle.raw_long_csv else "metadata-only")
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] this indexes local simulation artifacts; "
+        "it is not a medical-device record or treatment log."
+    )
+
+
+@app.command(name="results")
+def manage_results(
+    root: Annotated[
+        Path,
+        typer.Option(
+            "--root",
+            help="Results root to index. Use this when your results folder starts getting too large.",
+        ),
+    ] = Path("results"),
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output-dir",
+            help="Index output directory. Defaults to <root>/_iints_results_index.",
+        ),
+    ] = None,
+    include_raw: Annotated[
+        bool,
+        typer.Option(
+            "--include-raw/--metadata-only",
+            help="Also concatenate every results.csv into all_results_long.csv. This can become large.",
+        ),
+    ] = False,
+) -> None:
+    """Build a searchable catalogue for all local IINTS run results and artifacts."""
+    console = Console()
+    from iints.research.results_manager import index_results
+
+    try:
+        bundle = index_results(root, output_dir, include_raw=include_raw)
+    except Exception as exc:
+        console.print(f"[bold red]Results indexing failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_results_index_bundle(bundle, console)
+
+
+@research_app.command(name="results-index")
+def research_results_index(
+    root: Annotated[
+        Path,
+        typer.Option(
+            "--root",
+            help="Results root to index. Defaults to the normal ./results folder.",
+        ),
+    ] = Path("results"),
+    output_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--output-dir",
+            help="Index output directory. Defaults to <root>/_iints_results_index.",
+        ),
+    ] = None,
+    include_raw: Annotated[
+        bool,
+        typer.Option(
+            "--include-raw/--metadata-only",
+            help="Also concatenate every results.csv into all_results_long.csv. This can become large.",
+        ),
+    ] = False,
+) -> None:
+    """Research alias for `iints results`: index runs, reports, images, and data files."""
+    console = Console()
+    from iints.research.results_manager import index_results
+
+    try:
+        bundle = index_results(root, output_dir, include_raw=include_raw)
+    except Exception as exc:
+        console.print(f"[bold red]Results indexing failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    _print_results_index_bundle(bundle, console)
+
+
 @research_app.command(name="export-onnx")
 def research_export_onnx(
     model: Annotated[Path, typer.Option(help="Predictor checkpoint (.pt)")] = Path("models/hupa_finetuned_v2/predictor.pt"),
@@ -9093,6 +9492,114 @@ def research_evaluate_forecast(
 
     if fail_on_gate and gate_failed:
         raise typer.Exit(code=1)
+
+
+@research_app.command(name="forecast-run")
+def research_forecast_run(
+    input_path: Annotated[
+        Path,
+        typer.Option(
+            "--input",
+            help="Run directory or CSV. Accepts results.csv, raw/steps.csv, or research/predictor_training.csv.",
+        ),
+    ],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for forecast evidence")] = Path(
+        "results/glucose_forecast"
+    ),
+    predictor_path: Annotated[
+        Optional[Path],
+        typer.Option("--predictor", help="Optional trained predictor checkpoint (.pt)"),
+    ] = None,
+    history_minutes: Annotated[int, typer.Option(help="History window in minutes")] = 240,
+    horizon_minutes: Annotated[int, typer.Option(help="Forecast horizon in minutes")] = 30,
+    time_step_minutes: Annotated[int, typer.Option(help="Expected sample interval in minutes")] = 5,
+    hidden_biology: Annotated[
+        str,
+        typer.Option(
+            "--hidden-biology",
+            help="Optional hidden-biology stress test: none or insulin-antibody.",
+        ),
+    ] = "none",
+    antibody_binding_fraction: Annotated[
+        Optional[float],
+        typer.Option(
+            "--antibody-binding-fraction",
+            help="Research-only insulin-antibody binding fraction override for --hidden-biology insulin-antibody.",
+        ),
+    ] = None,
+    antibody_release_fraction: Annotated[
+        Optional[float],
+        typer.Option(
+            "--antibody-release-fraction",
+            help="Research-only bound-insulin release fraction override for --hidden-biology insulin-antibody.",
+        ),
+    ] = None,
+    mc_samples: Annotated[int, typer.Option(help="MC dropout samples when the predictor supports uncertainty")] = 30,
+):
+    """Attach physiology-aware and optional neural glucose forecasts to a run bundle."""
+    console = Console()
+    predictor = _load_predictor_service_from_path(predictor_path, console) if predictor_path else None
+
+    from iints.research.forecasting import ForecastConfig, write_forecast_bundle
+
+    normalized_hidden_biology = hidden_biology.strip().lower().replace("_", "-")
+    feature_overrides: dict[str, float] = {}
+    if normalized_hidden_biology in {"none", "off", "disabled"}:
+        pass
+    elif normalized_hidden_biology == "insulin-antibody":
+        feature_overrides = {
+            "insulin_antibody_binding_fraction": float(
+                0.45 if antibody_binding_fraction is None else antibody_binding_fraction
+            ),
+            "insulin_antibody_release_fraction": float(
+                0.08 if antibody_release_fraction is None else antibody_release_fraction
+            ),
+        }
+    else:
+        console.print("[bold red]Unknown --hidden-biology. Use 'none' or 'insulin-antibody'.[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        bundle = write_forecast_bundle(
+            input_path,
+            output_dir,
+            predictor_service=predictor,
+            config=ForecastConfig(
+                history_minutes=history_minutes,
+                horizon_minutes=horizon_minutes,
+                time_step_minutes=time_step_minutes,
+            ),
+            feature_overrides=feature_overrides,
+            mc_samples=mc_samples,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Forecast run failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    report = bundle["report"]
+    artifacts = bundle["artifacts"]
+    table = Table(title="Glucose Forecast Research Bundle")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Rows", str(report["rows"]))
+    table.add_row("Horizon", f"{report['horizon_minutes']} min")
+    table.add_row("History", f"{report['history_minutes']} min")
+    if feature_overrides:
+        table.add_row("Hidden biology", normalized_hidden_biology)
+        table.add_row("Feature overrides", json.dumps(feature_overrides))
+    table.add_row("Predictions CSV", artifacts["predictions_csv"])
+    table.add_row("Report JSON", artifacts["report_json"])
+    table.add_row("Report Markdown", artifacts["report_md"])
+    models = report.get("models", {})
+    ai_metrics = models.get("ai") if isinstance(models, dict) else None
+    if isinstance(ai_metrics, dict):
+        table.add_row("AI MAE", f"{ai_metrics['mae']:.2f} mg/dL")
+        table.add_row("AI missed hypo", f"{ai_metrics['missed_hypo_rate_pct']:.2f}%")
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] this forecasts glucose for simulator/data analysis; "
+        "it is not treatment advice and not pump dosing logic."
+    )
 
 
 @research_app.command(name="parity-check")

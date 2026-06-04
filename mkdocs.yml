@@ -95,6 +95,7 @@ nav:
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
       - Physiology Reference: PHYSIOLOGY_REFERENCE.md
+      - Hypoglycemia Science Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
       - Real-Data Realism Gate: REAL_DATA_REALISM.md
       - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
       - Local AI Research: LOCAL_AI_RESEARCH.md
@@ -110,9 +111,10 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.10): releases/v1.5.10.md
+      - Latest (v1.5.11): releases/v1.5.11.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.10: releases/v1.5.10.md
           - v1.5.9: releases/v1.5.9.md
           - v1.5.8: releases/v1.5.8.md
           - v1.5.7: releases/v1.5.7.md

@@ -27,6 +27,12 @@ class SafetyConfig:
     severe_hypoglycemia_threshold: float = 54.0
     hyperglycemia_threshold: float = 250.0
     max_insulin_per_bolus: float = 5.0
+    # Research-only glucagon safety rails for bi-hormonal simulations.
+    # These caps prevent algorithm outputs from becoming unbounded actuator
+    # commands. They are not clinical dosing advice.
+    max_glucagon_per_step_mg: float = 1.0
+    max_glucagon_per_hour_mg: float = 2.0
+    glucagon_allowed_above_glucose_mgdl: float = 110.0
     glucose_rate_alarm: float = 5.0
     max_insulin_per_hour: float = 3.0
     max_iob: float = 4.0

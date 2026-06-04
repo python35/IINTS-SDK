@@ -66,12 +66,15 @@ class EmpiricalResidualModel:
         *,
         seed: int | None = None,
         scale: float = 1.0,
+        max_residual_rate_mgdl_per_min: float | None = 0.75,
     ) -> None:
         if not profile.templates:
             raise ValueError("Empirical residual profile must contain at least one template.")
         self.profile = profile
         self.seed = int(seed or 0)
         self.scale = float(scale)
+        self.max_residual_rate_mgdl_per_min = max_residual_rate_mgdl_per_min
+        self._templates = self._prepare_templates(profile.templates)
         self.reset()
 
     @classmethod
@@ -81,14 +84,42 @@ class EmpiricalResidualModel:
         *,
         seed: int | None = None,
         scale: float = 1.0,
+        max_residual_rate_mgdl_per_min: float | None = 0.75,
     ) -> "EmpiricalResidualModel":
-        return cls(get_empirical_residual_profile(profile_id), seed=seed, scale=scale)
+        return cls(
+            get_empirical_residual_profile(profile_id),
+            seed=seed,
+            scale=scale,
+            max_residual_rate_mgdl_per_min=max_residual_rate_mgdl_per_min,
+        )
+
+    def _prepare_templates(self, templates: list[list[float]]) -> list[list[float]]:
+        if self.max_residual_rate_mgdl_per_min is None:
+            return [[float(value) for value in template] for template in templates]
+        max_rate = max(float(self.max_residual_rate_mgdl_per_min), 0.0)
+        sample_interval = max(float(self.profile.sample_interval_minutes), 1.0)
+        scale = max(abs(float(self.scale)), 1e-9)
+        max_step = max_rate * sample_interval / scale
+
+        limited_templates: list[list[float]] = []
+        for template in templates:
+            if not template:
+                limited_templates.append([])
+                continue
+            limited = [float(template[0])]
+            for raw_value in template[1:]:
+                previous = limited[-1]
+                requested_delta = float(raw_value) - previous
+                bounded_delta = max(-max_step, min(requested_delta, max_step))
+                limited.append(previous + bounded_delta)
+            limited_templates.append(limited)
+        return limited_templates
 
     def reset(self) -> None:
         self._template_offset = self.seed % len(self.profile.templates)
 
     def _template_for_day(self, day_index: int) -> list[float]:
-        return self.profile.templates[(self._template_offset + day_index) % len(self.profile.templates)]
+        return self._templates[(self._template_offset + day_index) % len(self._templates)]
 
     def offset_at(self, current_time_minutes: float) -> float:
         sample_interval = max(float(self.profile.sample_interval_minutes), 1.0)
@@ -110,10 +141,16 @@ class EmpiricalResidualModel:
             "profile_id": self.profile.id,
             "seed": self.seed,
             "scale": self.scale,
+            "max_residual_rate_mgdl_per_min": self.max_residual_rate_mgdl_per_min,
             "template_offset": self._template_offset,
         }
 
     def set_state(self, state: dict[str, Any]) -> None:
         self.seed = int(state.get("seed", self.seed))
         self.scale = float(state.get("scale", self.scale))
+        self.max_residual_rate_mgdl_per_min = state.get(
+            "max_residual_rate_mgdl_per_min",
+            self.max_residual_rate_mgdl_per_min,
+        )
+        self._templates = self._prepare_templates(self.profile.templates)
         self._template_offset = int(state.get("template_offset", self.seed % len(self.profile.templates)))

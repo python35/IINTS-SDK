@@ -5,6 +5,8 @@ from typing import Optional, Tuple, Protocol, Sequence, TYPE_CHECKING
 
 import numpy as np
 
+from iints.research.forecasting import PhysiologyAwareBaseline
+
 _IMPORT_ERROR: Optional[BaseException]
 try:
     import torch
@@ -214,6 +216,7 @@ def evaluate_baselines(
     y: np.ndarray,
     horizon_steps: int,
     time_step_minutes: float = 5.0,
+    feature_columns: Optional[Sequence[str]] = None,
 ) -> dict:
     """
     Compute MAE and RMSE for both baseline predictors.
@@ -234,6 +237,11 @@ def evaluate_baselines(
     baselines: Sequence[BaselinePredictor] = [
         LastValueBaseline(horizon_steps),
         LinearTrendBaseline(horizon_steps, time_step_minutes),
+        PhysiologyAwareBaseline(
+            horizon_steps,
+            time_step_minutes=time_step_minutes,
+            feature_columns=feature_columns,
+        ),
     ]
     for baseline in baselines:
         preds = baseline.predict(X)

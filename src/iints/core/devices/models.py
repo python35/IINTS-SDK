@@ -24,6 +24,9 @@ class SensorModel:
         noise_std: float = 0.0,
         bias: float = 0.0,
         lag_minutes: int = 0,
+        isf_tau_minutes: float = 5.0,
+        noise_ar1_phi: float = 0.85,
+        noise_fbm_hurst: Optional[float] = None,
         dropout_prob: float = 0.0,
         seed: Optional[int] = None,
         drift_std_per_hour: float = 0.0,
@@ -40,6 +43,11 @@ class SensorModel:
         self.dropout_prob = dropout_prob
         self.drift_std_per_hour = drift_std_per_hour
         self.drift_max_abs_mgdl = drift_max_abs_mgdl
+        self.isf_tau_minutes = max(1.0, isf_tau_minutes)
+        self.noise_ar1_phi = max(0.0, min(0.99, noise_ar1_phi))
+        self.noise_fbm_hurst = (
+            None if noise_fbm_hurst is None else float(np.clip(noise_fbm_hurst, 0.5, 0.95))
+        )
         self.dropout_duration_steps = _normalize_step_window(dropout_duration_steps)
         self.compression_low_prob = compression_low_prob
         self.compression_low_max_glucose = compression_low_max_glucose
@@ -49,6 +57,9 @@ class SensorModel:
         self._history: list[tuple[float, float]] = []
         self._last_reading: Optional[float] = None
         self._last_timestamp: Optional[float] = None
+        self._current_isf: Optional[float] = None
+        self._current_colored_noise: float = 0.0
+        self._fbm_components = np.zeros(3)
         self._drift_offset = 0.0
         self._dropout_remaining_steps = 0
         self._compression_remaining_steps = 0
@@ -58,6 +69,9 @@ class SensorModel:
         self._history = []
         self._last_reading = None
         self._last_timestamp = None
+        self._current_isf = None
+        self._current_colored_noise = 0.0
+        self._fbm_components = np.zeros(3)
         self._drift_offset = 0.0
         self._dropout_remaining_steps = 0
         self._compression_remaining_steps = 0
@@ -85,24 +99,64 @@ class SensorModel:
             )
         self._last_timestamp = current_time
 
+    def _lagged_glucose(self, current_time: float) -> float:
+        """Return a delayed blood-glucose sample for the ISF compartment."""
+        if self.lag_minutes <= 0 or not self._history:
+            return self._history[-1][1]
+        target_time = current_time - float(self.lag_minutes)
+        if target_time <= self._history[0][0]:
+            return self._history[0][1]
+        previous_time, previous_value = self._history[0]
+        for sample_time, sample_value in self._history[1:]:
+            if sample_time >= target_time:
+                span = max(sample_time - previous_time, 1e-9)
+                fraction = (target_time - previous_time) / span
+                return float(previous_value + fraction * (sample_value - previous_value))
+            previous_time, previous_value = sample_time, sample_value
+        return self._history[-1][1]
+
     def read(self, true_glucose: float, current_time: float) -> SensorReading:
         self._history.append((current_time, true_glucose))
-        # Keep history window bounded
-        if self.lag_minutes > 0:
-            cutoff = current_time - (self.lag_minutes * 2)
-            self._history = [(t, v) for (t, v) in self._history if t >= cutoff]
 
-        if self.lag_minutes > 0:
-            target_time = current_time - self.lag_minutes
-            candidates = [v for (t, v) in self._history if t <= target_time]
-            base = candidates[-1] if candidates else true_glucose
-        else:
-            base = true_glucose
+        # Calculate time step
+        dt = 0.0
+        if self._last_timestamp is not None and current_time > self._last_timestamp:
+            dt = current_time - self._last_timestamp
+
+        # Interstitial Fluid (ISF) Kinetics (Physics/Math)
+        # ISF acts as a low-pass filter of blood glucose
+        lagged_glucose = self._lagged_glucose(current_time)
+        if self._current_isf is None:
+            self._current_isf = lagged_glucose
+        elif dt > 0:
+            # Explicit Euler integration for the ODE: tau * dISF/dt = BG - ISF
+            alpha = dt / self.isf_tau_minutes
+            alpha = min(alpha, 1.0) # Stability bound
+            self._current_isf = self._current_isf + alpha * (lagged_glucose - self._current_isf)
+
+        base = self._current_isf
 
         self._update_drift(current_time)
         reading = base + self.bias + self._drift_offset
+
+        # AR(1) colored noise or a long-memory, fractional-noise-style approximation.
         if self.noise_std > 0:
-            reading += float(self._rng.normal(0, self.noise_std))
+            if self.noise_fbm_hurst is not None:
+                # Fractional-Brownian-style memory via multi-scale AR(1) superposition.
+                # This is a compact CGM-noise approximation, not an exact fBM sampler.
+                phis = np.array([0.5, 0.85, 0.98])
+                scales = np.array([1.0, 6.0, 24.0])
+                hurst = float(self.noise_fbm_hurst)
+                weights = scales ** max(0.0, hurst - 0.5)
+                weights = weights / np.linalg.norm(weights) * self.noise_std
+                for i in range(3):
+                    white_noise = float(self._rng.normal(0, weights[i] * np.sqrt(1 - phis[i]**2)))
+                    self._fbm_components[i] = phis[i] * self._fbm_components[i] + white_noise
+                reading += float(np.sum(self._fbm_components))
+            else:
+                white_noise_component = float(self._rng.normal(0, self.noise_std * np.sqrt(1 - self.noise_ar1_phi**2)))
+                self._current_colored_noise = (self.noise_ar1_phi * self._current_colored_noise) + white_noise_component
+                reading += self._current_colored_noise
 
         status_parts = ["ok"]
         if (
@@ -136,6 +190,9 @@ class SensorModel:
             "noise_std": self.noise_std,
             "bias": self.bias,
             "lag_minutes": self.lag_minutes,
+            "isf_tau_minutes": self.isf_tau_minutes,
+            "noise_ar1_phi": self.noise_ar1_phi,
+            "noise_fbm_hurst": self.noise_fbm_hurst,
             "dropout_prob": self.dropout_prob,
             "drift_std_per_hour": self.drift_std_per_hour,
             "drift_max_abs_mgdl": self.drift_max_abs_mgdl,
@@ -146,17 +203,27 @@ class SensorModel:
             "compression_low_duration_steps": self.compression_low_duration_steps,
             "last_reading": self._last_reading,
             "last_timestamp": self._last_timestamp,
+            "current_isf": self._current_isf,
+            "current_colored_noise": self._current_colored_noise,
+            "fbm_components": self._fbm_components.tolist(),
             "drift_offset": self._drift_offset,
             "dropout_remaining_steps": self._dropout_remaining_steps,
             "compression_remaining_steps": self._compression_remaining_steps,
             "compression_offset": self._compression_offset,
             "history": self._history,
+            "rng_state": self._rng.bit_generator.state,
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
         self.noise_std = state.get("noise_std", self.noise_std)
         self.bias = state.get("bias", self.bias)
         self.lag_minutes = state.get("lag_minutes", self.lag_minutes)
+        self.isf_tau_minutes = max(1.0, float(state.get("isf_tau_minutes", self.isf_tau_minutes)))
+        self.noise_ar1_phi = max(0.0, min(0.99, float(state.get("noise_ar1_phi", self.noise_ar1_phi))))
+        noise_fbm_hurst = state.get("noise_fbm_hurst", self.noise_fbm_hurst)
+        self.noise_fbm_hurst = (
+            None if noise_fbm_hurst is None else float(np.clip(noise_fbm_hurst, 0.5, 0.95))
+        )
         self.dropout_prob = state.get("dropout_prob", self.dropout_prob)
         self.drift_std_per_hour = state.get("drift_std_per_hour", self.drift_std_per_hour)
         self.drift_max_abs_mgdl = state.get("drift_max_abs_mgdl", self.drift_max_abs_mgdl)
@@ -169,11 +236,16 @@ class SensorModel:
         )
         self._last_reading = state.get("last_reading")
         self._last_timestamp = state.get("last_timestamp")
+        self._current_isf = state.get("current_isf")
+        self._current_colored_noise = float(state.get("current_colored_noise", self._current_colored_noise))
+        self._fbm_components = np.array(state.get("fbm_components", self._fbm_components), dtype=float)
         self._drift_offset = state.get("drift_offset", self._drift_offset)
         self._dropout_remaining_steps = int(state.get("dropout_remaining_steps", self._dropout_remaining_steps))
         self._compression_remaining_steps = int(state.get("compression_remaining_steps", self._compression_remaining_steps))
         self._compression_offset = state.get("compression_offset", self._compression_offset)
         self._history = state.get("history", [])
+        if "rng_state" in state:
+            self._rng.bit_generator.state = state["rng_state"]
 
 
 def _normalize_step_window(value: int | Tuple[int, int] | list[int]) -> Tuple[int, int]:
@@ -191,6 +263,9 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
         "noise_std": 0.0,
         "bias": 0.0,
         "lag_minutes": 0,
+        "isf_tau_minutes": 5.0,
+        "noise_ar1_phi": 0.85,
+        "noise_fbm_hurst": None,
         "dropout_prob": 0.0,
         "drift_std_per_hour": 0.0,
         "drift_max_abs_mgdl": 0.0,
@@ -201,9 +276,12 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
         "compression_low_duration_steps": (3, 8),
     },
     "clinical_cgm": {
-        "noise_std": 7.0,
+        "noise_std": 5.0,
         "bias": 0.0,
-        "lag_minutes": 10,
+        "lag_minutes": 5,
+        "isf_tau_minutes": 10.0,
+        "noise_ar1_phi": 0.85,
+        "noise_fbm_hurst": None,
         "dropout_prob": 0.0,
         "drift_std_per_hour": 0.0,
         "drift_max_abs_mgdl": 0.0,
@@ -217,6 +295,9 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
         "noise_std": 8.0,
         "bias": 0.0,
         "lag_minutes": 10,
+        "isf_tau_minutes": 10.0,
+        "noise_ar1_phi": 0.85,
+        "noise_fbm_hurst": 0.75,
         "dropout_prob": 0.004,
         "drift_std_per_hour": 0.8,
         "drift_max_abs_mgdl": 18.0,
@@ -230,6 +311,9 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
         "noise_std": 8.5,
         "bias": 0.0,
         "lag_minutes": 12,
+        "isf_tau_minutes": 12.0,
+        "noise_ar1_phi": 0.88,
+        "noise_fbm_hurst": 0.78,
         "dropout_prob": 0.003,
         "drift_std_per_hour": 0.9,
         "drift_max_abs_mgdl": 20.0,

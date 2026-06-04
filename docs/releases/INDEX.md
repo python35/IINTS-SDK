@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.11](v1.5.11.md)
 - [v1.5.10](v1.5.10.md)
 - [v1.5.9](v1.5.9.md)
 - [v1.5.8](v1.5.8.md)

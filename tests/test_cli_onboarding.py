@@ -11,6 +11,10 @@ from iints.cli.cli import app
 runner = CliRunner()
 
 
+def _compact_stdout(text: str) -> str:
+    return " ".join(text.split())
+
+
 def test_version_flag_reports_installed_sdk_version() -> None:
     result = runner.invoke(app, ["--version"])
 
@@ -26,6 +30,86 @@ def test_update_dry_run_prints_current_environment_command() -> None:
     assert "python" in result.stdout.lower()
     assert "pip install -U" in result.stdout
     assert "iints-sdk-python35[full,mdmp,research,edge]" in result.stdout
+    assert "Auto fallback command" in result.stdout
+
+
+def test_update_repair_dry_run_prints_uninstall_and_force_reinstall() -> None:
+    result = runner.invoke(app, ["update", "--repair", "--force-reinstall", "--no-cache-dir", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Repair uninstall command" in result.stdout
+    assert "pip uninstall -y iints iints-sdk-python35" in _compact_stdout(result.stdout)
+    assert "--force-reinstall" in result.stdout
+    assert "--no-cache-dir" in result.stdout
+
+
+def test_delete_dry_run_prints_safe_cleanup_plan(monkeypatch, tmp_path) -> None:
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    plugin_home = fake_home / ".iints" / "plugins"
+    plugin_home.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.setenv("IINTS_PLUGIN_HOME", str(plugin_home))
+
+    result = runner.invoke(app, ["delete", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "IINTS delete" in result.stdout
+    assert "Delete Plan" in result.stdout
+    assert "pip uninstall -y iints iints-sdk-python35" in _compact_stdout(result.stdout)
+    assert "Dry run only" in result.stdout
+
+
+def test_delete_can_remove_explicit_iints_owned_path(monkeypatch, tmp_path) -> None:
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    target = tmp_path / "iints_owned_cache"
+    target.mkdir()
+    (target / "artifact.txt").write_text("temporary\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["delete", "--no-packages", "--no-user-data", "--path", str(target), "--yes"],
+    )
+
+    assert result.exit_code == 0
+    assert "IINTS delete completed" in result.stdout
+    assert not target.exists()
+
+
+def test_delete_refuses_current_working_directory(monkeypatch, tmp_path) -> None:
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        ["delete", "--no-packages", "--no-user-data", "--path", str(tmp_path), "--dry-run"],
+    )
+
+    assert result.exit_code == 0
+    assert "refused" in result.stdout.lower()
+    assert "blocked" in result.stdout.lower()
+
+
+def test_delete_everything_dry_run_includes_detected_source_checkout(monkeypatch, tmp_path) -> None:
+    fake_home = tmp_path / "home"
+    fake_home.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    checkout = tmp_path / "IINTS-SDK-main"
+    (checkout / "src" / "iints").mkdir(parents=True)
+    (checkout / "pyproject.toml").write_text('name = "iints-sdk-python35"\n', encoding="utf-8")
+    (checkout / "results").mkdir()
+    monkeypatch.chdir(checkout)
+
+    result = runner.invoke(app, ["delete", "--everything", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "source checkout" in result.stdout
+    assert "local generated output" in result.stdout
+    assert "blocked" not in result.stdout.lower()
 
 
 def test_run_dry_run_supports_builtin_preset(tmp_path) -> None:

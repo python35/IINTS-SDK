@@ -124,15 +124,17 @@ class BergmanPatientModel:
         self.current_glucose = initial_glucose
         self.insulin_on_board = 0.0
         self.carbs_on_board = 0.0
+        self.last_delivered_insulin_units = 0.0
         self.meal_effect_delay = 30  # kept for API compat
 
-        # ODE state vector: [G, X, I, Q_stomach, Q_gut, S1, S2]
+        # ODE state vector: [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2]
         self._state = np.array([
             initial_glucose,       # G  (mg/dL)
             0.0,                   # X  (1/min)
             self.params.Ib,        # I  (mU/L)
-            0.0,                   # Q_stomach (mg)
-            0.0,                   # Q_gut (mg)
+            0.0,                   # Q_sto1 (mg) - Solid Stomach
+            0.0,                   # Q_sto2 (mg) - Liquid Stomach
+            0.0,                   # Q_gut (mg)  - Intestine
             0.0,                   # S1 (mU)
             0.0,                   # S2 (mU)
         ], dtype=np.float64)
@@ -158,11 +160,12 @@ class BergmanPatientModel:
     def reset(self) -> None:
         """Reset to initial conditions."""
         self._state = np.array([
-            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0,
+            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0, 0.0,
         ], dtype=np.float64)
         self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
         self.carbs_on_board = 0.0
+        self.last_delivered_insulin_units = 0.0
         self.active_insulin_doses = []
         self.active_carb_intakes = []
         self.is_exercising = False
@@ -200,6 +203,7 @@ class BergmanPatientModel:
     ) -> float:
         """Advance the model by *time_step* minutes and return new glucose."""
         true_carbs = carb_intake * self.meal_mismatch_epsilon
+        self.last_delivered_insulin_units = max(0.0, float(delivered_insulin))
 
         # --- Track IOB (same bookkeeping as CustomPatientModel) ---
         if delivered_insulin > 0.001:
@@ -237,7 +241,7 @@ class BergmanPatientModel:
             # appearance pathway; this keeps large meals from producing
             # unrealistically sharp five-minute CGM jumps.
             bioavailability = max(0.0, min(float(self.params.f_bio), 1.0))
-            self._state[3] += true_carbs * bioavailability * 1000.0  # g -> mg
+            self._state[3] += true_carbs * bioavailability * 1000.0  # g -> mg (into solid stomach Q_sto1)
 
         # --- Prepare exogenous insulin rate ---
         # Convert Units to mU, spread evenly over time_step (mU/min)
@@ -281,11 +285,18 @@ class BergmanPatientModel:
             "dia_minutes": self.insulin_action_duration,
             "plasma_insulin_mU_L": float(self._state[2]),
             "remote_insulin_action": float(self._state[1]),
-            "stomach_glucose_mg": float(self._state[3]),
-            "gut_glucose_mg": float(self._state[4]),
-            "subcut_insulin_1_mU": float(self._state[5]),
-            "subcut_insulin_2_mU": float(self._state[6]),
+            "stomach_glucose_mg": float(self._state[3] + self._state[4]),
+            "stomach_solid_mg": float(self._state[3]),
+            "stomach_liquid_mg": float(self._state[4]),
+            "gut_glucose_mg": float(self._state[5]),
+            "subcut_insulin_1_mU": float(self._state[6]),
+            "subcut_insulin_2_mU": float(self._state[7]),
             "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
+            "delivered_insulin": self.last_delivered_insulin_units,
+            "last_delivered_insulin_units": self.last_delivered_insulin_units,
+            "delivered_insulin_iob": self.insulin_on_board,
+            "active_insulin": float(self._state[2]),
+            "insulin_effect": float(self._state[1]),
         }
 
     def get_ratio_state(self) -> Dict[str, float]:
@@ -318,6 +329,7 @@ class BergmanPatientModel:
             "current_glucose": self.current_glucose,
             "insulin_on_board": self.insulin_on_board,
             "carbs_on_board": self.carbs_on_board,
+            "last_delivered_insulin_units": self.last_delivered_insulin_units,
             "active_insulin_doses": self.active_insulin_doses,
             "active_carb_intakes": self.active_carb_intakes,
             "is_exercising": self.is_exercising,
@@ -334,18 +346,28 @@ class BergmanPatientModel:
             # emptied from the stomach.
             if ode_state.size == 4:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], 0.0, ode_state[3], 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], 0.0, 0.0, ode_state[3], 0.0, 0.0],
                     dtype=np.float64,
                 )
             elif ode_state.size == 5:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], ode_state[4], 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], 0.0, 0.0],
+                    dtype=np.float64,
+                )
+            elif ode_state.size == 7:
+                # Old 7-state Bergman (stomach, gut, S1, S2)
+                ode_state = np.array(
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], ode_state[5], ode_state[6]],
                     dtype=np.float64,
                 )
             self._state = ode_state
         self.current_glucose = state.get("current_glucose", self.current_glucose)
         self.insulin_on_board = state.get("insulin_on_board", self.insulin_on_board)
         self.carbs_on_board = state.get("carbs_on_board", self.carbs_on_board)
+        self.last_delivered_insulin_units = state.get(
+            "last_delivered_insulin_units",
+            state.get("delivered_insulin", self.last_delivered_insulin_units),
+        )
         self.active_insulin_doses = state.get("active_insulin_doses", [])
         self.active_carb_intakes = state.get("active_carb_intakes", [])
         self.is_exercising = state.get("is_exercising", False)
@@ -364,7 +386,7 @@ class BergmanPatientModel:
         u_insulin_mu_per_min: float,
         current_time: float,
     ) -> np.ndarray:
-        G, X, I, Q_stomach, Q_gut, S1, S2 = y
+        G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2 = y
         p = self.params
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
@@ -428,9 +450,11 @@ class BergmanPatientModel:
         secretion = p.gamma * max(G - p.h, 0.0)
         dIdt = -p.n * (I - p.Ib) + secretion + Ra_I / Vi_abs
 
-        # --- Meal transit compartments ---
+        # --- Dalla Man Multi-compartment Meal Kinetcs (Biochemistry) ---
         gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
-        dQ_stomach_dt = -gastric_emptying_rate * Q_stomach
-        dQ_gut_dt = gastric_emptying_rate * Q_stomach - p.k_abs * Q_gut
+        solid_to_liquid_rate = gastric_emptying_rate * 1.5 # Solid breaks down faster into liquid
+        dQ_sto1_dt = -solid_to_liquid_rate * Q_sto1
+        dQ_sto2_dt = solid_to_liquid_rate * Q_sto1 - gastric_emptying_rate * Q_sto2
+        dQ_gut_dt = gastric_emptying_rate * Q_sto2 - p.k_abs * Q_gut
 
-        return np.array([dGdt, dXdt, dIdt, dQ_stomach_dt, dQ_gut_dt, dS1dt, dS2dt])
+        return np.array([dGdt, dXdt, dIdt, dQ_sto1_dt, dQ_sto2_dt, dQ_gut_dt, dS1dt, dS2dt])

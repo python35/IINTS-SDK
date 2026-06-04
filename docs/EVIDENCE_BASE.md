@@ -44,6 +44,8 @@ That split is intentional:
 | `regulatory` | manufacturer or regulator-facing system reference |
 | `technical_manual` | user guide or product documentation |
 | `clinical_trial` | named trial registry or trial program page |
+| `physiology` | human physiology or organ-system mechanism source |
+| `review` | peer-reviewed review used to summarize established mechanisms |
 
 ## How Sources Map to SDK Components
 
@@ -55,7 +57,13 @@ That split is intentional:
 | Meal timing / pre-bolus scenarios | Avoid unrealistic meal-response assumptions | `cobry_2010_meal_bolus_timing` |
 | Insulin action profiles (rapid and ultra-rapid) | Parameterize onset/peak assumptions from pharmacology literature | `heise_2017_fiasp_pkpd`, `klaff_2020_urli_pkpd` |
 | Input validation and CGM lag rationale | Keep signal handling biologically plausible | `wentholt_2004_cgm_lag` |
+| Sensor long-memory noise model | Add colored, persistent CGM noise without claiming exact vendor reproduction | `mandelbrot_1968_fractional_brownian` |
 | Virtual patient meal dynamics | Ground meal disturbance dynamics in established models | `dalla_man_2007_meal_model` |
+| Bergman/Hovorka patient model foundations | Ground internal glucose, insulin, and insulin-action state variables in established mathematical physiology | `bergman_1979_minimal_model`, `hovorka_2004_nmpc_t1d`, `dalla_man_2007_meal_model` |
+| Circadian, exercise, and incretin physiology | Document experimental dawn, GLUT4/NIMGU, and GLP-1 gastric-emptying modifiers | `campbell_1985_dawn_phenomenon`, `richter_2013_glut4_exercise`, `naslund_1999_glp1_gastric_emptying` |
+| Hypoglycemia counterregulation and HAAF experimental layer | Make the body's rescue mechanisms, repeated-low memory, and hypo-awareness assumptions explicit | `gerich_1979_counterregulation`, `cryer_2013_haaf_mechanisms`, `cryer_2013_haaf_diabetes` |
+| Bi-hormonal glucagon research | Separate delivered glucagon, subcutaneous absorption, plasma appearance, and closed-loop dual-hormone context | `lv_2013_exogenous_glucagon_pk`, `haidar_2013_insulin_glucagon_pk`, `haidar_2013_dual_hormone_ap` |
+| Renal glucose clearance experimental layer | Document high-glucose renal threshold/splay behavior for whole-day mass-balance realism | `hummel_2018_renal_glucose_handling`, `defronzo_2013_renal_reabsorption_splay` |
 | Simulator realism/validation framing | Align in-silico model evaluation with accepted simulator literature | `visentin_2018_uvapadova`, `mujahid_2024_generative_t1d_simulator` |
 | Exercise stress scenarios | Use consensus guidance for exercise-related glucose behavior | `riddell_2017_exercise_consensus` |
 | Forecast training data provenance | Use publicly documented dataset references | `marling_2020_ohiot1dm` |
@@ -65,48 +73,48 @@ That split is intentional:
 
 ## Packaged Medical And Dataset Sources
 
-1. `ada_2026_glycemic_goals`  
-   ADA Professional Practice Committee. *Glycemic Goals and Hypoglycemia: Standards of Care in Diabetes—2026*.  
+1. `ada_2026_glycemic_goals`
+   ADA Professional Practice Committee. *Glycemic Goals and Hypoglycemia: Standards of Care in Diabetes—2026*.
    DOI: [10.2337/dc26-S006](https://doi.org/10.2337/dc26-S006)
 
-2. `ada_2026_diabetes_technology`  
-   ADA Professional Practice Committee. *Diabetes Technology: Standards of Care in Diabetes—2026*.  
+2. `ada_2026_diabetes_technology`
+   ADA Professional Practice Committee. *Diabetes Technology: Standards of Care in Diabetes—2026*.
    DOI: [10.2337/dc26-S007](https://doi.org/10.2337/dc26-S007)
 
-3. `attd_2019_time_in_range`  
-   Battelino T, Danne T, Bergenstal RM, et al. *Clinical Targets for Continuous Glucose Monitoring Data Interpretation*. Diabetes Care. 2019.  
+3. `attd_2019_time_in_range`
+   Battelino T, Danne T, Bergenstal RM, et al. *Clinical Targets for Continuous Glucose Monitoring Data Interpretation*. Diabetes Care. 2019.
    DOI: [10.2337/dci19-0028](https://doi.org/10.2337/dci19-0028)
 
-4. `nejm_2019_control_iq`  
-   Brown SA, et al. *Six-Month Randomized, Multicenter Trial of Closed-Loop Control in Type 1 Diabetes*. N Engl J Med. 2019.  
+4. `nejm_2019_control_iq`
+   Brown SA, et al. *Six-Month Randomized, Multicenter Trial of Closed-Loop Control in Type 1 Diabetes*. N Engl J Med. 2019.
    DOI: [10.1056/NEJMoa1907863](https://doi.org/10.1056/NEJMoa1907863)
 
-5. `adapt_2022_ahcl`  
-   Benhamou PY, et al. *Advanced hybrid closed loop therapy versus conventional treatment in adults with type 1 diabetes (ADAPT)*. Lancet Diabetes Endocrinol. 2022.  
+5. `adapt_2022_ahcl`
+   Benhamou PY, et al. *Advanced hybrid closed loop therapy versus conventional treatment in adults with type 1 diabetes (ADAPT)*. Lancet Diabetes Endocrinol. 2022.
    DOI: [10.1016/S2213-8587(22)00212-1](https://doi.org/10.1016/S2213-8587(22)00212-1)
 
-6. `cobry_2010_meal_bolus_timing`  
-   Cobry E, et al. *Timing of Meal Insulin Boluses to Achieve Optimal Postprandial Glycemic Control*. J Diabetes Sci Technol. 2010.  
+6. `cobry_2010_meal_bolus_timing`
+   Cobry E, et al. *Timing of Meal Insulin Boluses to Achieve Optimal Postprandial Glycemic Control*. J Diabetes Sci Technol. 2010.
    DOI: [10.1177/193229681000400404](https://doi.org/10.1177/193229681000400404)
 
-7. `heise_2017_fiasp_pkpd`  
-   Heise T, et al. *A Faster-Onset Formulation of Insulin Aspart*. Clin Pharmacokinet. 2017.  
+7. `heise_2017_fiasp_pkpd`
+   Heise T, et al. *A Faster-Onset Formulation of Insulin Aspart*. Clin Pharmacokinet. 2017.
    DOI: [10.1007/s40262-017-0510-8](https://doi.org/10.1007/s40262-017-0510-8)
 
-8. `klaff_2020_urli_pkpd`  
-   Klaff LJ, et al. *Ultra Rapid Lispro Demonstrates Accelerated Pharmacokinetics and Pharmacodynamics*. Diabetes Obes Metab. 2020.  
+8. `klaff_2020_urli_pkpd`
+   Klaff LJ, et al. *Ultra Rapid Lispro Demonstrates Accelerated Pharmacokinetics and Pharmacodynamics*. Diabetes Obes Metab. 2020.
    DOI: [10.1111/dom.14049](https://doi.org/10.1111/dom.14049)
 
-9. `wentholt_2004_cgm_lag`  
-   Wentholt IME, et al. *How glucose sensors can facilitate therapy in diabetes management*. Diabetes Technol Ther. 2004.  
+9. `wentholt_2004_cgm_lag`
+   Wentholt IME, et al. *How glucose sensors can facilitate therapy in diabetes management*. Diabetes Technol Ther. 2004.
    DOI: [10.1089/dia.2004.6.615](https://doi.org/10.1089/dia.2004.6.615)
 
-10. `dalla_man_2007_meal_model`  
-    Dalla Man C, Rizza RA, Cobelli C. *Meal simulation model of the glucose-insulin system*. IEEE Trans Biomed Eng. 2007.  
+10. `dalla_man_2007_meal_model`
+    Dalla Man C, Rizza RA, Cobelli C. *Meal simulation model of the glucose-insulin system*. IEEE Trans Biomed Eng. 2007.
     DOI: [10.1109/TBME.2007.893506](https://doi.org/10.1109/TBME.2007.893506)
 
-11. `visentin_2018_uvapadova`  
-    Visentin R, et al. *The University of Virginia/Padova Type 1 Diabetes Simulator Matches the 2014 DMMS.R*. J Diabetes Sci Technol. 2018.  
+11. `visentin_2018_uvapadova`
+    Visentin R, et al. *The University of Virginia/Padova Type 1 Diabetes Simulator Matches the 2014 DMMS.R*. J Diabetes Sci Technol. 2018.
     DOI: [10.1177/1932296818757747](https://doi.org/10.1177/1932296818757747)
 
 12. `mujahid_2024_generative_t1d_simulator`
@@ -114,51 +122,107 @@ That split is intentional:
     DOI: [10.1038/s43856-024-00476-0](https://doi.org/10.1038/s43856-024-00476-0)
 
 13. `riddell_2017_exercise_consensus`
-    Riddell MC, et al. *Exercise management in type 1 diabetes: a consensus statement*. Lancet Diabetes Endocrinol. 2017.  
+    Riddell MC, et al. *Exercise management in type 1 diabetes: a consensus statement*. Lancet Diabetes Endocrinol. 2017.
     DOI: [10.1016/S2213-8587(17)30014-1](https://doi.org/10.1016/S2213-8587(17)30014-1)
 
 14. `marling_2020_ohiot1dm`
-    Marling C, Bunescu R. *The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020*. CEUR Workshop Proceedings.  
+    Marling C, Bunescu R. *The OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020*. CEUR Workshop Proceedings.
     Paper: [ceur-ws.org/Vol-2675/paper2.pdf](http://ceur-ws.org/Vol-2675/paper2.pdf)
 
 15. `idc_2025_agp_report_overview`
-    HealthPartners Institute / International Diabetes Center. *Guide to Understanding the Ambulatory Glucose Profile (AGP) Report*. 2025.  
+    HealthPartners Institute / International Diabetes Center. *Guide to Understanding the Ambulatory Glucose Profile (AGP) Report*. 2025.
     PDF: [healthpartners.com](https://www.healthpartners.com/institute/wp-content/uploads/2025/05/Ambulatory-Glucose-Profile-Report-Overview.pdf)
+
+16. `bergman_1979_minimal_model`
+    Bergman RN, Ider YZ, Bowden CR, Cobelli C. *Quantitative estimation of insulin sensitivity*. Am J Physiol. 1979.
+    DOI: [10.1152/ajpendo.1979.236.6.E667](https://doi.org/10.1152/ajpendo.1979.236.6.E667)
+
+17. `hovorka_2004_nmpc_t1d`
+    Hovorka R, et al. *Nonlinear model predictive control of glucose concentration in subjects with type 1 diabetes*. Physiol Meas. 2004.
+    DOI: [10.1088/0967-3334/25/4/010](https://doi.org/10.1088/0967-3334/25/4/010)
+
+18. `gerich_1979_counterregulation`
+    Gerich J, Davis J, Lorenzi M. *Hormonal mechanisms of recovery from insulin-induced hypoglycemia in man*. Am J Physiol. 1979.
+    DOI: [10.1152/ajpendo.1979.236.4.E380](https://doi.org/10.1152/ajpendo.1979.236.4.E380)
+
+19. `cryer_2013_haaf_mechanisms`
+    Cryer PE. *Mechanisms of Hypoglycemia-Associated Autonomic Failure in Diabetes*. N Engl J Med. 2013.
+    DOI: [10.1056/NEJMra1215228](https://doi.org/10.1056/NEJMra1215228)
+
+20. `cryer_2013_haaf_diabetes`
+    Cryer PE. *Hypoglycemia-associated autonomic failure in diabetes*. Handb Clin Neurol. 2013.
+    DOI: [10.1016/B978-0-444-53491-0.00023-7](https://doi.org/10.1016/B978-0-444-53491-0.00023-7)
+
+21. `lv_2013_exogenous_glucagon_pk`
+    Lv D, Breton MD, Farhy LS. *Pharmacokinetics modeling of exogenous glucagon in type 1 diabetes mellitus patients*. Diabetes Technol Ther. 2013.
+    DOI: [10.1089/dia.2013.0150](https://doi.org/10.1089/dia.2013.0150)
+
+22. `haidar_2013_dual_hormone_ap`
+    Haidar A, et al. *Glucose-responsive insulin and glucagon delivery in adults with type 1 diabetes*. CMAJ. 2013.
+    DOI: [10.1503/cmaj.121265](https://doi.org/10.1503/cmaj.121265)
+
+23. `haidar_2013_insulin_glucagon_pk`
+    Haidar A, Duval C, Legault L, Rabasa-Lhoret R. *Pharmacokinetics of Insulin Aspart and Glucagon in Type 1 Diabetes during Closed-Loop Operation*. J Diabetes Sci Technol. 2013.
+    DOI: [10.1177/193229681300700610](https://doi.org/10.1177/193229681300700610)
+
+24. `hummel_2018_renal_glucose_handling`
+    Hummel CS, Lu C, Loo DDF, Hirayama BA, Voss AA, Wright EM. *Physiology of renal glucose handling via SGLT1, SGLT2 and GLUT2*. Diabetologia. 2018.
+    DOI: [10.1007/s00125-018-4656-5](https://doi.org/10.1007/s00125-018-4656-5)
+
+25. `defronzo_2013_renal_reabsorption_splay`
+    DeFronzo RA, et al. *Characterization of Renal Glucose Reabsorption in Response to Dapagliflozin*. Diabetes Care. 2013.
+    DOI: [10.2337/dc13-0387](https://doi.org/10.2337/dc13-0387)
+
+26. `mandelbrot_1968_fractional_brownian`
+    Mandelbrot BB, Van Ness JW. *Fractional Brownian Motions, Fractional Noises and Applications*. SIAM Review. 1968.
+    DOI: [10.1137/1010093](https://doi.org/10.1137/1010093)
+
+27. `campbell_1985_dawn_phenomenon`
+    Campbell PJ, Bolli GB, Cryer PE, Gerich JE. *Pathogenesis of the Dawn Phenomenon in Patients with Insulin-Dependent Diabetes Mellitus*. N Engl J Med. 1985.
+    DOI: [10.1056/NEJM198506063122302](https://doi.org/10.1056/NEJM198506063122302)
+
+28. `richter_2013_glut4_exercise`
+    Richter EA, Hargreaves M. *Exercise, GLUT4, and skeletal muscle glucose uptake*. Physiol Rev. 2013.
+    DOI: [10.1152/physrev.00038.2012](https://doi.org/10.1152/physrev.00038.2012)
+
+29. `naslund_1999_glp1_gastric_emptying`
+    Naslund E, et al. *GLP-1 slows solid gastric emptying and inhibits insulin, glucagon, and PYY release in humans*. Am J Physiol Regul Integr Comp Physiol. 1999.
+    DOI: [10.1152/ajpregu.1999.277.3.R910](https://doi.org/10.1152/ajpregu.1999.277.3.R910)
 
 ## Documentation-Only Local AI Setup Sources
 
 These are the official references used in the guides for installing Ollama, understanding the local Ministral 3 family, and explaining why the SDK recommends different model sizes for different hardware.
 
-1. `ollama_linux_install`  
-   Ollama. *Linux Installation Documentation*.  
+1. `ollama_linux_install`
+   Ollama. *Linux Installation Documentation*.
    URL: [docs.ollama.com/linux](https://docs.ollama.com/linux)
 
-2. `mistral_2025_ministral_3_announcement`  
-   Mistral AI. *Introducing Mistral 3*.  
+2. `mistral_2025_ministral_3_announcement`
+   Mistral AI. *Introducing Mistral 3*.
    URL: [mistral.ai/news/mistral-3](https://mistral.ai/news/mistral-3)
 
-3. `mistral_2025_ministral_3_3b`  
-   Mistral AI Docs. *Ministral 3 3B*.  
+3. `mistral_2025_ministral_3_3b`
+   Mistral AI Docs. *Ministral 3 3B*.
    URL: [docs.mistral.ai/models/ministral-3-3b-25-12](https://docs.mistral.ai/models/ministral-3-3b-25-12)
 
-4. `mistral_2025_ministral_3_8b`  
-   Mistral AI Docs. *Ministral 3 8B*.  
+4. `mistral_2025_ministral_3_8b`
+   Mistral AI Docs. *Ministral 3 8B*.
    URL: [docs.mistral.ai/models/ministral-3-8b-25-12](https://docs.mistral.ai/models/ministral-3-8b-25-12)
 
-5. `mistral_2025_ministral_3_14b`  
-   Mistral AI Docs. *Ministral 3 14B*.  
+5. `mistral_2025_ministral_3_14b`
+   Mistral AI Docs. *Ministral 3 14B*.
    URL: [docs.mistral.ai/models/ministral-3-14b-25-12](https://docs.mistral.ai/models/ministral-3-14b-25-12)
 
-6. `mistral_2026_adjustable_reasoning`  
-   Mistral AI Docs. *Adjustable Reasoning*.  
+6. `mistral_2026_adjustable_reasoning`
+   Mistral AI Docs. *Adjustable Reasoning*.
    URL: [docs.mistral.ai/studio-api/conversations/reasoning/adjustable](https://docs.mistral.ai/capabilities/reasoning/adjustable)
 
-7. `mistral_2026_small_4`  
-   Mistral AI Docs. *Mistral Small 4*.  
+7. `mistral_2026_small_4`
+   Mistral AI Docs. *Mistral Small 4*.
    URL: [docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03](https://docs.mistral.ai/models/model-cards/mistral-small-4-0-26-03)
 
-8. `mistral_2026_medium_35`  
-   Mistral AI Docs. *Mistral Medium 3.5*.  
+8. `mistral_2026_medium_35`
+   Mistral AI Docs. *Mistral Medium 3.5*.
    URL: [docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04](https://docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04)
 
 ## Documentation-Only Device Emulation References
@@ -167,52 +231,52 @@ These references are used for the best-effort emulator notes and are not claims 
 
 ### Medtronic MiniMed 780G
 
-1. `bergenstal_2020_780g`  
-   Bergenstal RM, et al. *Safety of a Hybrid Closed-Loop Insulin Delivery System in Patients With Type 1 Diabetes*.  
+1. `bergenstal_2020_780g`
+   Bergenstal RM, et al. *Safety of a Hybrid Closed-Loop Insulin Delivery System in Patients With Type 1 Diabetes*.
    DOI: [10.1056/NEJMoa2003479](https://doi.org/10.1056/NEJMoa2003479)
 
-2. `fda_k193510_780g`  
-   U.S. FDA. *510(k) K193510 - MiniMed 780G System*.  
+2. `fda_k193510_780g`
+   U.S. FDA. *510(k) K193510 - MiniMed 780G System*.
    URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
 
-3. `medtronic_780g_user_guide`  
-   Medtronic Diabetes. *MiniMed 780G User Guide / Product Documentation*.  
+3. `medtronic_780g_user_guide`
+   Medtronic Diabetes. *MiniMed 780G User Guide / Product Documentation*.
    URL: [medtronicdiabetes.com](https://www.medtronicdiabetes.com/)
 
 ### Tandem Control-IQ
 
-4. `brown_2019_control_iq_dtt`  
-   Brown SA, et al. *Performance of the Tandem t:slim X2 insulin pump with Control-IQ technology in the International Diabetes Closed-Loop trial*.  
+4. `brown_2019_control_iq_dtt`
+   Brown SA, et al. *Performance of the Tandem t:slim X2 insulin pump with Control-IQ technology in the International Diabetes Closed-Loop trial*.
    DOI: [10.1089/dia.2019.0226](https://doi.org/10.1089/dia.2019.0226)
 
-5. `fda_k191289_control_iq`  
-   U.S. FDA. *510(k) K191289 - Control-IQ System*.  
+5. `fda_k191289_control_iq`
+   U.S. FDA. *510(k) K191289 - Control-IQ System*.
    URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
 
-6. `idcl_nct03563313`  
-   ClinicalTrials.gov. *International Diabetes Closed Loop Trial*.  
+6. `idcl_nct03563313`
+   ClinicalTrials.gov. *International Diabetes Closed Loop Trial*.
    URL: [clinicaltrials.gov/ct2/show/NCT03563313](https://clinicaltrials.gov/ct2/show/NCT03563313)
 
-7. `control_iq_user_guide`  
-   Tandem Diabetes Care. *Control-IQ User Guide / Product Documentation*.  
+7. `control_iq_user_guide`
+   Tandem Diabetes Care. *Control-IQ User Guide / Product Documentation*.
    URL: [tandemdiabetes.com](https://www.tandemdiabetes.com/)
 
 ### Omnipod 5
 
-8. `assert_omnipod_5`  
-   Insulet / Omnipod. *ASSERT Trial - Omnipod 5*.  
+8. `assert_omnipod_5`
+   Insulet / Omnipod. *ASSERT Trial - Omnipod 5*.
    URL: [omnipod.com/assert-trial](https://www.omnipod.com/assert-trial)
 
-9. `onset_omnipod_5`  
-   Insulet / Omnipod. *ONSET Trial - Omnipod 5 in Type 2 Diabetes*.  
+9. `onset_omnipod_5`
+   Insulet / Omnipod. *ONSET Trial - Omnipod 5 in Type 2 Diabetes*.
    URL: [omnipod.com/onset-trial](https://www.omnipod.com/onset-trial)
 
-10. `fda_k203467_omnipod5`  
-    U.S. FDA. *510(k) K203467 - Omnipod 5 System*.  
+10. `fda_k203467_omnipod5`
+    U.S. FDA. *510(k) K203467 - Omnipod 5 System*.
     URL: [accessdata.fda.gov](https://www.accessdata.fda.gov/)
 
-11. `omnipod5_user_guide`  
-    Insulet / Omnipod. *Omnipod 5 User Guide / Product Documentation*.  
+11. `omnipod5_user_guide`
+    Insulet / Omnipod. *Omnipod 5 User Guide / Product Documentation*.
     URL: [omnipod.com](https://www.omnipod.com/)
 
 ## Reproducibility Note

@@ -133,3 +133,6 @@ class IINTSAssistant:
 
     def review_realism(self, run: dict[str, Any]) -> AIResponse:
         return self._run_task("review_realism", run)
+
+    def predict_insulin(self, payload: dict[str, Any]) -> AIResponse:
+        return self._run_task("predict_insulin", payload)

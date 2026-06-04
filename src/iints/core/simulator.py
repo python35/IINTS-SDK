@@ -120,6 +120,7 @@ class Simulator:
         self.algorithm = algorithm
         self.time_step = time_step
         self.simulation_data: List[Any] = [] # To store results
+        self.explainable_events_log: List[str] = [] # Store XAI strings
         self.stress_events: List[StressEvent] = []
         self.seed = seed
         self.safety_config = safety_config or SafetyConfig()
@@ -167,6 +168,8 @@ class Simulator:
         self._base_ratio_state: Optional[Dict[str, float]] = None
         self._previous_glucose_for_trend: Optional[float] = None
         self._glucose_trend_history: List[Tuple[float, float]] = []
+        self._xai_previous_glucose_trend: Optional[float] = None
+        self._xai_last_event_time: Dict[str, float] = {}
         self._profiling_samples: Dict[str, List[float]] = {
             "algorithm_latency_ms": [],
             "supervisor_latency_ms": [],
@@ -175,6 +178,8 @@ class Simulator:
         # Layer-1 telemetry (InputValidator)
         self._input_validator_fail_soft_count = 0
         self._input_validator_negative_insulin_clamp_count = 0
+        self._glucagon_safety_interventions_count = 0
+        self._glucagon_dose_history: List[Tuple[float, float]] = []
         self._input_validator_last_error: Optional[str] = None
         self._input_validator_last_step_fail_soft = False
         if self.audit_log_path:
@@ -351,6 +356,81 @@ class Simulator:
         except Exception as exc:
             logger.warning("on_safety_event callback raised: %s", exc)
 
+    def _evaluate_glucagon_safety(
+        self,
+        *,
+        requested_glucagon_mg: float,
+        current_glucose: float,
+        predicted_glucose_30min: float,
+        current_time: float,
+    ) -> Dict[str, Any]:
+        """Apply research-only safety rails to simulated glucagon outputs."""
+        actions: List[str] = []
+        raw_requested = requested_glucagon_mg
+        try:
+            requested = float(requested_glucagon_mg)
+        except (TypeError, ValueError):
+            requested = 0.0
+            actions.append("INVALID_GLUCAGON_REQUEST_CLAMPED")
+
+        if not np.isfinite(requested):
+            requested = 0.0
+            actions.append("NONFINITE_GLUCAGON_REQUEST_CLAMPED")
+        requested = max(0.0, requested)
+        approved = requested
+
+        if approved <= 0.0:
+            return {
+                "requested_glucagon_mg": max(0.0, float(raw_requested)) if isinstance(raw_requested, (int, float)) and np.isfinite(raw_requested) else 0.0,
+                "approved_glucagon_mg": 0.0,
+                "glucagon_reduction_mg": 0.0,
+                "glucagon_safety_triggered": bool(actions),
+                "glucagon_safety_reason": "; ".join(actions),
+                "glucagon_safety_actions": actions,
+            }
+
+        # Glucagon is only a rescue actuator in this simulator. If both the
+        # current and predicted glucose are safely above low thresholds, block it.
+        if (
+            current_glucose > float(self.safety_config.glucagon_allowed_above_glucose_mgdl)
+            and predicted_glucose_30min > float(self.safety_config.predicted_hypoglycemia_threshold)
+        ):
+            approved = 0.0
+            actions.append(
+                "GLUCAGON_BLOCKED_NOT_LOW_RISK: "
+                f"glucose {current_glucose:.1f} mg/dL, predicted {predicted_glucose_30min:.1f} mg/dL"
+            )
+
+        max_step = float(self.safety_config.max_glucagon_per_step_mg)
+        if approved > max_step:
+            approved = max_step
+            actions.append(f"GLUCAGON_STEP_CAP: capped at {max_step:.2f} mg")
+
+        self._glucagon_dose_history = [
+            (t, d) for (t, d) in self._glucagon_dose_history if current_time - t < 60.0
+        ]
+        total_last_60 = sum(d for _, d in self._glucagon_dose_history)
+        max_hour = float(self.safety_config.max_glucagon_per_hour_mg)
+        if total_last_60 + approved > max_hour:
+            approved = max(0.0, max_hour - total_last_60)
+            actions.append(f"GLUCAGON_60MIN_CAP: capped by {max_hour:.2f} mg/hour limit")
+
+        if approved > 0.0:
+            self._glucagon_dose_history.append((current_time, approved))
+
+        triggered = bool(actions) or approved < requested
+        if triggered:
+            self._glucagon_safety_interventions_count += 1
+
+        return {
+            "requested_glucagon_mg": requested,
+            "approved_glucagon_mg": approved,
+            "glucagon_reduction_mg": max(0.0, requested - approved),
+            "glucagon_safety_triggered": triggered,
+            "glucagon_safety_reason": "; ".join(actions),
+            "glucagon_safety_actions": actions,
+        }
+
     def _validate_glucose_fail_soft(
         self,
         glucose_value: float,
@@ -469,6 +549,87 @@ class Simulator:
             SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
         )
         return float(np.clip(slope, -max_rate, max_rate))
+
+    def _should_emit_xai_event(self, event_key: str, current_time: float, cooldown_minutes: float) -> bool:
+        """Return True when an explanation is new enough to avoid event spam."""
+        current = float(current_time)
+        last = self._xai_last_event_time.get(event_key)
+        if last is not None and current - last < float(cooldown_minutes):
+            return False
+        self._xai_last_event_time[event_key] = current
+        return True
+
+    def _build_explainable_events(
+        self,
+        *,
+        current_time: float,
+        actual_glucose_reading: float,
+        glucose_trend: float,
+        predicted_glucose_30: float,
+        safety_triggered: bool,
+        safety_result: Dict[str, Any],
+    ) -> List[str]:
+        """Build human-readable research explanations for notable simulation events."""
+        step_events: List[str] = []
+        time_str = f"{int(current_time // 60):02d}:{int(current_time % 60):02d}"
+        previous_trend = self._xai_previous_glucose_trend
+
+        if (
+            self.patient_model.carbs_on_board > 5.0
+            and glucose_trend > 0.5
+            and previous_trend is not None
+            and previous_trend <= 0.5
+            and self._should_emit_xai_event("meal_response", current_time, 45.0)
+        ):
+            step_events.append(f"At {time_str} glucose started rising after meal/breakfast.")
+
+        if (
+            self.patient_model.carbs_on_board > 1.0
+            and len(self._predictor_history) >= self._predictor_horizon_steps
+        ):
+            past_prediction = self._predictor_history[-self._predictor_horizon_steps].get(
+                "predicted_glucose_heuristic_30min"
+            )
+            if (
+                past_prediction is not None
+                and (actual_glucose_reading - past_prediction) > 15.0
+                and self._should_emit_xai_event("absorption_anomaly", current_time, 30.0)
+            ):
+                step_events.append(f"At {time_str} the model detected faster-than-expected absorption.")
+
+        if (
+            glucose_trend < -1.0
+            and self.patient_model.insulin_on_board > 1.0
+            and actual_glucose_reading < 120.0
+            and (previous_trend is None or previous_trend >= -1.0)
+            and self._should_emit_xai_event("hypo_risk", current_time, 30.0)
+        ):
+            step_events.append(
+                f"At {time_str} hypo risk increased because downward trend combined with active insulin."
+            )
+
+        insulin_reduction = float(safety_result.get("insulin_reduction", 0.0) or 0.0)
+        if (
+            safety_triggered
+            and insulin_reduction > 0.0
+            and self._should_emit_xai_event("supervisor_intervention", current_time, 15.0)
+        ):
+            safety_reason_text = str(safety_result.get("safety_reason", "")).lower()
+            hypo_threshold = float(self.safety_config.hypoglycemia_threshold)
+            predicted_low = predicted_glucose_30 < hypo_threshold
+            low_reason = any(token in safety_reason_text for token in ("low", "hypo", "predicted"))
+            if predicted_low or low_reason:
+                step_events.append(
+                    f"At {time_str} supervisor intervention prevented predicted glucose below "
+                    f"{hypo_threshold:.0f} mg/dL."
+                )
+            else:
+                step_events.append(
+                    f"At {time_str} supervisor intervention reduced insulin after an independent safety check."
+                )
+
+        return step_events
+
     def _apply_ratio_overrides(self, current_time: float) -> Dict[str, float]:
         if self._base_ratio_state is None:
             self._base_ratio_state = self.patient_model.get_ratio_state()
@@ -573,6 +734,9 @@ class Simulator:
         safety_report["input_validator_negative_insulin_clamp_count"] = int(
             self._input_validator_negative_insulin_clamp_count
         )
+        safety_report["glucagon_safety_interventions_count"] = int(
+            self._glucagon_safety_interventions_count
+        )
         safety_report["input_validator_last_error"] = self._input_validator_last_error
         if self.enable_profiling:
             safety_report["performance_report"] = self._build_performance_report()
@@ -592,6 +756,10 @@ class Simulator:
             "glucose_to_algo_mgdl",
             "algo_recommended_insulin_units",
             "delivered_insulin_units",
+            "algo_recommended_glucagon_mg",
+            "delivered_glucagon_mg",
+            "glucagon_safety_reason",
+            "glucagon_safety_triggered",
             "safety_reason",
             "safety_triggered",
             "supervisor_latency_ms",
@@ -655,6 +823,7 @@ class Simulator:
             if self.physiology_variation_model is not None:
                 self.physiology_variation_model.reset()
             self.simulation_data = []
+            self.explainable_events_log = []
             self.meal_queue = [] # Reset meal queue for new run
             self._predictor_history = []
             self._critical_low_minutes = 0
@@ -664,8 +833,12 @@ class Simulator:
             self._base_ratio_state = self.patient_model.get_ratio_state()
             self._previous_glucose_for_trend = None
             self._glucose_trend_history = []
+            self._xai_previous_glucose_trend = None
+            self._xai_last_event_time = {}
             self._input_validator_fail_soft_count = 0
             self._input_validator_negative_insulin_clamp_count = 0
+            self._glucagon_safety_interventions_count = 0
+            self._glucagon_dose_history = []
             self._input_validator_last_error = None
             self._input_validator_last_step_fail_soft = False
         else:
@@ -1014,14 +1187,53 @@ class Simulator:
                 "supervisor_override": overridden,
                 "final_dose": delivered_insulin,
                 "safety_reason": safety_reason,
+                "ai_glucagon_suggestion_mg": float(insulin_output.get("total_glucagon_delivered_mg", 0.0)),
                 "hidden_state_summary": self.algorithm.get_state()
             })
 
             # --- Patient Model Update ---
+            algo_recommended_glucagon_mg = float(insulin_output.get("total_glucagon_delivered_mg", 0.0))
+            glucagon_safety_result = self._evaluate_glucagon_safety(
+                requested_glucagon_mg=algo_recommended_glucagon_mg,
+                current_glucose=glucose_to_algorithm,
+                predicted_glucose_30min=predicted_glucose_30,
+                current_time=float(current_time),
+            )
+            delivered_glucagon_mg = float(glucagon_safety_result["approved_glucagon_mg"])
+            glucagon_safety_triggered = bool(glucagon_safety_result["glucagon_safety_triggered"])
+            glucagon_safety_reason = str(glucagon_safety_result["glucagon_safety_reason"])
+            glucagon_safety_actions = "; ".join(glucagon_safety_result["glucagon_safety_actions"])
+
+            if glucagon_safety_triggered:
+                self._emit_safety_event(
+                    {
+                        "source": "glucagon_supervisor",
+                        "time_minutes": current_time,
+                        "glucose_mgdl": glucose_to_algorithm,
+                        "predicted_glucose_30min": predicted_glucose_30,
+                        "ai_requested_glucagon_mg": algo_recommended_glucagon_mg,
+                        "approved_glucagon_mg": delivered_glucagon_mg,
+                        "glucagon_safety_reason": glucagon_safety_reason,
+                        "glucagon_safety_actions": glucagon_safety_actions,
+                        "iob_units": self.patient_model.insulin_on_board,
+                        "cob_grams": self.patient_model.carbs_on_board,
+                    }
+                )
+                self._write_audit_log(
+                    {
+                        "timestamp": current_time,
+                        "event": "glucagon_safety_revalidated",
+                        "requested_glucagon_mg": algo_recommended_glucagon_mg,
+                        "approved_glucagon_mg": delivered_glucagon_mg,
+                        "glucagon_safety_reason": glucagon_safety_reason,
+                    }
+                )
+
             self.patient_model.update(
                 time_step=self.time_step,
                 delivered_insulin=delivered_insulin,
                 carb_intake=patient_carb_absorbed_this_step,
+                delivered_glucagon_mg=delivered_glucagon_mg,
                 current_time=float(current_time),
             )
 
@@ -1031,6 +1243,18 @@ class Simulator:
                     float(insulin_output.get("meal_bolus", 0.0))
                     + float(insulin_output.get("correction_bolus", 0.0))
                 )
+
+            # --- XAI Engine (Explainable Events) ---
+            step_events = self._build_explainable_events(
+                current_time=float(current_time),
+                actual_glucose_reading=float(actual_glucose_reading),
+                glucose_trend=float(glucose_trend),
+                predicted_glucose_30=float(predicted_glucose_30),
+                safety_triggered=bool(safety_triggered),
+                safety_result=safety_result,
+            )
+            self._xai_previous_glucose_trend = float(glucose_trend)
+            self.explainable_events_log.extend(step_events)
 
             # --- Record Data ---
             record = {
@@ -1051,6 +1275,11 @@ class Simulator:
                 "predictor_ood_feature_fraction": predictor_meta.get("predictor_ood_feature_fraction", 0.0),
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
+                "algo_recommended_glucagon_mg": algo_recommended_glucagon_mg,
+                "delivered_glucagon_mg": delivered_glucagon_mg,
+                "glucagon_safety_triggered": glucagon_safety_triggered,
+                "glucagon_safety_reason": glucagon_safety_reason,
+                "glucagon_safety_actions": glucagon_safety_actions,
                 "sensor_status": sensor_reading.status,
                 "input_validator_fail_soft": self._input_validator_last_step_fail_soft,
                 "pump_status": pump_delivery.status,
@@ -1077,6 +1306,7 @@ class Simulator:
                 "human_intervention": bool(human_intervention),
                 "human_intervention_note": human_intervention.get("note") if isinstance(human_intervention, dict) else "",
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
+                "explainable_events": "; ".join(step_events) if step_events else "",
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
             }
 
@@ -1129,6 +1359,8 @@ class Simulator:
             "stress_events": [event.__dict__ for event in self.stress_events],
             "critical_low_minutes": self._critical_low_minutes,
             "glucose_trend_history": self._glucose_trend_history,
+            "xai_previous_glucose_trend": self._xai_previous_glucose_trend,
+            "xai_last_event_time": self._xai_last_event_time,
         }
 
     def load_state(self, state: Dict[str, Any]) -> None:
@@ -1151,6 +1383,14 @@ class Simulator:
             for item in state.get("glucose_trend_history", [])
             if isinstance(item, (list, tuple)) and len(item) == 2
         ]
+        previous_trend = state.get("xai_previous_glucose_trend")
+        self._xai_previous_glucose_trend = None if previous_trend is None else float(previous_trend)
+        xai_last_event_time = state.get("xai_last_event_time", {})
+        self._xai_last_event_time = (
+            {str(key): float(value) for key, value in xai_last_event_time.items()}
+            if isinstance(xai_last_event_time, dict)
+            else {}
+        )
         self._resume_state = True
 
     def _build_performance_report(self) -> Dict[str, Any]:

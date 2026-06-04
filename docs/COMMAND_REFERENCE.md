@@ -104,11 +104,30 @@ Common forms:
 ```bash
 iints update
 iints update --dry-run
+iints update --repair --force-reinstall --yes
+iints update --no-cache-dir --yes
 iints update --source github --yes
 iints update --extras full,mdmp,research,edge
 ```
 
-The command prints the exact `python -m pip install -U ...` invocation before it changes anything. Use `--dry-run` during a live demo setup check.
+The command prints the exact `python -m pip install -U ...` invocation before it changes anything. By default it uses `--source auto`: PyPI first, then GitHub main as a fallback if the release has not propagated yet. Use `--dry-run` during a live demo setup check.
+
+### `iints delete`
+Remove IINTS from the current machine/environment with a visible deletion plan.
+
+Common forms:
+
+```bash
+iints delete --dry-run
+iints delete --yes
+iints delete --everything --dry-run
+iints delete --everything --yes
+iints delete --source-checkout --yes
+iints delete --local-outputs --yes
+iints delete --no-packages --path results/old_iints_run --yes
+```
+
+Default behavior removes the active Python SDK packages plus user-level IINTS config, plugin, and cache folders. `--everything` also includes known generated output folders in the current directory and a detected local `IINTS-SDK` source checkout. It still does **not** guess private datasets, external-drive research archives, or unrelated virtual environments.
 
 ## Core Simulation Commands
 
@@ -341,6 +360,31 @@ iints research train-local-ai \
 
 Full workflow: [Jetson Endurance Mode](JETSON_ENDURANCE.md).
 
+## Results Management
+
+### `iints results`
+Index all run-level `results.csv` files and every generated artifact under a results root:
+
+```bash
+iints results --root results
+```
+
+This writes a compact management bundle:
+
+- `run_index.csv`
+- `artifact_inventory.csv`
+- `RESULTS_INDEX.md`
+- `result_manager_manifest.json`
+- `results_index.xlsx` when spreadsheet export is available
+
+Use `--include-raw` only when you want one combined long table for downstream local-AI/data analysis:
+
+```bash
+iints results --root results/research_realism_sweep_20260603_02 --include-raw
+```
+
+The same command is also available as `iints research results-index` for research workflows.
+
 ## Evidence Commands
 
 ### `iints run-doctor`
@@ -380,11 +424,12 @@ iints report \
   --results-csv results/one_day/results.csv \
   --style agp \
   --png \
+  --svg \
   --subject-name "stable demo run" \
   --bundle-dir results/one_day/agp_report
 ```
 
-This writes `agp_report.pdf`, `agp_summary.json`, `agp_assets/agp_profile.png`, and `agp_assets/daily_profiles.png`. The layout includes glucose statistics, time-in-ranges, an AGP-style modal-day percentile plot, and daily glucose profiles.
+This writes `agp_report.pdf`, `agp_summary.json`, `agp_assets/agp_profile.png`, `agp_assets/agp_profile.svg`, `agp_assets/daily_profiles.png`, and `agp_assets/daily_profiles.svg`. When a run contains `explainable_events`, the AGP asset folder also includes `xai_events.txt` for human review and `xai_events.json` for downstream analysis. The layout includes glucose statistics, time-in-ranges, an AGP-style modal-day percentile plot, and daily glucose profiles.
 
 ### `iints safety-visualize`
 Create a standalone HTML safety visualizer from a run CSV:

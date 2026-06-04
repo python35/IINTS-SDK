@@ -35,8 +35,10 @@ Keeping those four ideas separate is important. A glucose target, a sensor plaus
 | Insulin exposure | insulin doses, insulin-on-board (IOB), insulin action curve | Separates delivered insulin from insulin that is still active |
 | Carbohydrate exposure | meal events, delayed absorption, carbs-on-board (COB) | Prevents meals from becoming impossible instant spikes |
 | Basal physiology | homeostatic drift toward a basal target | Prevents the simplified model from drifting endlessly without disturbances |
-| Circadian variation | optional dawn phenomenon window | Lets early-morning glucose rise be represented explicitly |
+| Circadian variation | optional dawn phenomenon window; Hovorka-style runs gate the Fourier EGP oscillator behind `dawn_phenomenon_strength` | Lets early-morning glucose rise be represented explicitly without hidden always-on drift |
 | Exercise | bounded event intensity from `0.0` to `1.0` | Adds glucose-lowering stress independent of insulin dosing |
+| Stress / illness physiology | stress events, stress hormones/pseudo-hormones in supported models | Lets glucose rise without a meal because of stress-mediated insulin resistance and increased endogenous glucose production |
+| Hypoglycemia defense systems | experimental counterregulation, HAAF, glucagon, and renal-clearance layer | Makes explicit which rescue mechanisms are implemented experimentally and which assumptions still need calibration |
 | Meal mismatch | `meal_mismatch_epsilon` | Distinguishes announced carbohydrate from true carbohydrate exposure |
 | Measurement imperfections | CGM lag, bias, random noise, drift, dropout, compression lows | Lets algorithms be tested against what a sensor would report, not only perfect latent glucose |
 | Empirical residual variation | optional additive residual profile | Adds real-data-like day-scale irregularity on top of the mechanistic trajectory |
@@ -86,7 +88,7 @@ These values are deliberately conservative software controls. They protect simul
 | `insulin_action_duration` | min | Duration over which a dose remains active | `60-720` | Defines IOB decay and total insulin-action window |
 | `insulin_peak_time` | min | Time of peak activity inside the dose-action curve | `15-240`, below duration | Shapes early versus late insulin effect |
 | `meal_mismatch_epsilon` | ratio | `true carbs / announced carbs` | `0.5-1.5` | Models under- or over-estimation of meals |
-| `dawn_phenomenon_strength` | mg/dL/hour | Extra early-morning rise | `0-50` | Adds explicit circadian disturbance |
+| `dawn_phenomenon_strength` | mg/dL/hour | Extra early-morning rise or, in Hovorka-style mode, the scale of the dawn EGP oscillator | `0-50` | Adds explicit circadian disturbance |
 | `dawn_start_hour`, `dawn_end_hour` | hour of day | Dawn-effect window | `0-23`, `0-24` | Defines when dawn physiology is active |
 
 One important reading tip:
@@ -168,14 +170,14 @@ That second table matters because it shows a realistic research distinction:
 
 The algorithm normally sees CGM-like readings, not necessarily the latent glucose state.
 
-| Sensor profile | Noise SD | Lag | Dropout probability | Drift cap | Compression low behavior |
-| --- | ---: | ---: | ---: | ---: | --- |
-| `ideal` | `0 mg/dL` | `0 min` | `0` | `0 mg/dL` | none |
-| `clinical_cgm` | `7 mg/dL` | `10 min` | `0` | `0 mg/dL` | none |
-| `free_living_cgm` | `8 mg/dL` | `10 min` | `0.004` | `18 mg/dL` | occasional `10-26 mg/dL` lows |
-| `compression_prone` | `8.5 mg/dL` | `12 min` | `0.003` | `20 mg/dL` | stronger `18-42 mg/dL` compression lows |
+| Sensor profile | Noise SD | Blood-to-ISF lag | ISF tau | Noise memory | Dropout probability | Drift cap | Compression low behavior |
+| --- | ---: | ---: | ---: | --- | ---: | ---: | --- |
+| `ideal` | `0 mg/dL` | `0 min` | `5 min` | none | `0` | `0 mg/dL` | none |
+| `clinical_cgm` | `5 mg/dL` | `5 min` | `10 min` | AR(1) colored noise | `0` | `0 mg/dL` | none |
+| `free_living_cgm` | `8 mg/dL` | `10 min` | `10 min` | long-memory approximation, `H=0.75` | `0.004` | `18 mg/dL` | occasional `10-26 mg/dL` lows |
+| `compression_prone` | `8.5 mg/dL` | `12 min` | `12 min` | long-memory approximation, `H=0.78` | `0.003` | `20 mg/dL` | stronger `18-42 mg/dL` compression lows |
 
-The purpose of these profiles is not to declare one CGM brand "correct." They provide repeatable measurement stress levels for algorithms and supervisor logic.
+The purpose of these profiles is not to declare one CGM brand "correct." They provide repeatable measurement stress levels for algorithms and supervisor logic. The long-memory sensor mode is a compact multi-scale AR approximation inspired by fractional-noise theory; it is not an exact vendor CGM model or exact fBM sampler.
 
 ## 11. Model Families
 
@@ -183,6 +185,7 @@ The purpose of these profiles is not to declare one CGM brand "correct." They pr
 | --- | --- | --- | --- |
 | `CustomPatientModel` | glucose, IOB, COB, active insulin doses, active carb intakes, exercise state | fast, transparent, easy to stress-test | quick demos, regression tests, safety sweeps |
 | `BergmanPatientModel` | plasma glucose `G`, remote insulin action `X`, plasma insulin `I`, stomach glucose, gut glucose | more mechanistic ODE structure with gut compartments | physiology-focused studies |
+| `HovorkaPatientModel` | 19-state experimental ODE: glucose compartments, gut absorption, subcutaneous insulin/glucagon depots, plasma hormones, insulin action, HAAF memory, GLUT4 exercise state | richer compartmental ODE-style physiology with exposed internal states | research simulations that need active insulin, glucagon, insulin effect, exercise, stress, and hypoglycemia-defense assumptions |
 | `EmpiricalResidualModel` | additive day-scale residual template | adds real-data-like irregularity to an otherwise clean trajectory | realism studies and synthetic-mirror work |
 
 ### Bergman defaults
@@ -202,18 +205,52 @@ The purpose of these profiles is not to declare one CGM brand "correct." They pr
 
 The ODE structure is inspired by the Bergman minimal-model tradition and meal-compartment work such as Dalla Man et al.; the SDK still remains a research simulator rather than a clinical digital twin.
 
-## 12. What Is Not Fully Modeled Yet
+### Hovorka-style model notes
+
+The experimental Hovorka-style model is intended for research runs that need clearer separation between delivered insulin, subcutaneous insulin absorption, plasma insulin, delayed insulin action, exogenous glucagon, exercise-driven GLUT4/NIMGU, and hypoglycemia-defense assumptions. It is useful for AI and MPC experiments because the controller can inspect internal state variables instead of treating glucose as the only signal.
+
+Current experimental extensions:
+- GLP-1-style gastric-emptying feedback slows meal appearance when intestinal glucose is high.
+- GLUT4/NIMGU exercise state increases non-insulin-mediated muscle glucose uptake during exercise.
+- Dawn/circadian EGP uses a bounded Fourier-series modifier, but only when `dawn_phenomenon_strength` is enabled.
+- HAAF and counterregulation expose repeated-low memory and blunted rescue behavior for research discussions.
+- Renal glucose clearance uses a smooth threshold/splay-style curve instead of a hard cutoff.
+
+Important boundary:
+- the implementation is for simulation research and education
+- parameters are not personalized clinical estimates
+- stress and exercise modifiers are intentionally explicit so assumptions can be audited
+
+## 12. Experimental Or Not Fully Calibrated Yet
 
 | Not fully represented | Current SDK handling |
 | --- | --- |
-| glucagon and counterregulatory hormones | not explicitly modeled |
-| illness, infection, menstrual cycle, steroid exposure | only approximated if the user creates scenario disturbances |
+| endogenous glucagon and epinephrine counterregulation | implemented experimentally in the Hovorka-style model; current runs should not be interpreted as calibrated hormone assays |
+| HAAF and hypo-awareness memory | implemented as an experimental bounded memory state; not a clinically validated predictor of awareness or severe-hypoglycemia risk |
+| exogenous glucagon PK/PD for dual-hormone pumps | implemented as an experimental Hovorka-style depot/plasma/effect layer with simulator safety caps; not emergency-dose guidance |
+| illness, infection, menstrual cycle, steroid exposure | approximated through scenario disturbances and stress events; not a complete endocrine illness model |
 | fat/protein mixed-meal kinetics | approximated with delayed meal profiles such as `pizza_paradox` |
-| renal glucose losses | not explicitly modeled |
-| individualized pharmacokinetics for every insulin formulation | represented through configurable duration/peak parameters, not full formulation-specific PK |
+| GLP-1 / incretin physiology | represented as a bounded meal-emptying modifier, not a personalized incretin hormone assay |
+| circadian endocrine rhythms | represented as an optional dawn EGP oscillator, not a full cortisol/growth-hormone model |
+| exercise GLUT4 translocation | represented as a bounded NIMGU state, not a calibrated muscle-biopsy model |
+| renal glucose losses | implemented as a smooth threshold/splay-style clearance term; not a personalized renal function model |
+| individualized pharmacokinetics for every insulin formulation | represented through configurable duration/peak parameters, not full formulation-specific PK for every commercial insulin |
 | long-horizon adaptation in real patients | studied through scenarios and residuals, not a personalized adaptive physiological twin |
 
-## 13. How To Use This In A Presentation
+## 13. Hypoglycemia Science Layer
+
+The experimental hypoglycemia layer is organized around four explicit pillars. This is important because a simulator that only models carbohydrates and insulin can look plausible while still missing the body's rescue systems.
+
+| Pillar | Model idea | Status | Main source anchors |
+| --- | --- | --- | --- |
+| Endogenous counterregulation | Low glucose and fast downward trends drive rescue states that raise endogenous glucose production and reduce effective insulin sensitivity | experimental | `gerich_1979_counterregulation`, `cryer_2013_haaf_mechanisms` |
+| HAAF memory | Recent time-below-range increases a slow memory state that blunts later rescue response | experimental | `cryer_2013_haaf_mechanisms`, `cryer_2013_haaf_diabetes` |
+| Exogenous glucagon PK/PD | Dual-hormone research separates delivered glucagon, subcutaneous depot, plasma appearance, and delayed glucose effect | experimental | `lv_2013_exogenous_glucagon_pk`, `haidar_2013_insulin_glucagon_pk`, `haidar_2013_dual_hormone_ap` |
+| Renal glucose clearance | Hyperglycemic renal loss is represented as a smooth threshold/splay-style curve instead of an abrupt cutoff | experimental | `hummel_2018_renal_glucose_handling`, `defronzo_2013_renal_reabsorption_splay` |
+
+For the full explanation and equations, see [Hypoglycemia Science Model](HYPOGLYCEMIA_SCIENCE_MODEL.md).
+
+## 14. How To Use This In A Presentation
 
 For a doctor:
 - start with the glucose bands, hypo thresholds, and what the patient model includes
@@ -228,7 +265,7 @@ For EUCYS:
 - say that it exposes the **assumptions** behind the curves: patient ratios, meals, exercise, sensor behavior, and safety rails
 - use the day table and patient-profile table as concrete evidence that the simulator is parameterized, inspectable, and reproducible
 
-## 14. Source Trail
+## 15. Source Trail
 
 Use these pages together:
 - [Evidence Base](EVIDENCE_BASE.md) for the literature legend
@@ -240,5 +277,14 @@ Key external anchors used by this page:
 - [ADA Professional Practice Committee, *Glycemic Goals, Hypoglycemia, and Hyperglycemic Crises: Standards of Care in Diabetes-2026*](https://doi.org/10.2337/dc26-S006).
 - [Battelino et al., *Clinical Targets for Continuous Glucose Monitoring Data Interpretation*](https://doi.org/10.2337/dci19-0028).
 - [Bergman et al., *Quantitative estimation of insulin sensitivity*](https://doi.org/10.1152/ajpendo.1979.236.6.E667).
+- [Hovorka et al., *Nonlinear model predictive control of glucose concentration in subjects with type 1 diabetes*](https://doi.org/10.1088/0967-3334/25/4/010).
 - [Dalla Man et al., *Meal simulation model of the glucose-insulin system*](https://doi.org/10.1109/TBME.2007.893506).
+- [Gerich et al., *Hormonal mechanisms of recovery from insulin-induced hypoglycemia in man*](https://doi.org/10.1152/ajpendo.1979.236.4.E380).
+- [Cryer, *Mechanisms of Hypoglycemia-Associated Autonomic Failure in Diabetes*](https://doi.org/10.1056/NEJMra1215228).
+- [Lv et al., *Pharmacokinetics modeling of exogenous glucagon in type 1 diabetes mellitus patients*](https://doi.org/10.1089/dia.2013.0150).
+- [Hummel et al., *Physiology of renal glucose handling via SGLT1, SGLT2 and GLUT2*](https://doi.org/10.1007/s00125-018-4656-5).
 - [Riddell et al., *Exercise management in type 1 diabetes: a consensus statement*](https://doi.org/10.1016/S2213-8587(17)30014-1).
+- [Mandelbrot and Van Ness, *Fractional Brownian Motions, Fractional Noises and Applications*](https://doi.org/10.1137/1010093).
+- [Campbell et al., *Pathogenesis of the Dawn Phenomenon in Patients with Insulin-Dependent Diabetes Mellitus*](https://doi.org/10.1056/NEJM198506063122302).
+- [Richter and Hargreaves, *Exercise, GLUT4, and skeletal muscle glucose uptake*](https://doi.org/10.1152/physrev.00038.2012).
+- [Naslund et al., *GLP-1 slows solid gastric emptying and inhibits insulin, glucagon, and PYY release in humans*](https://doi.org/10.1152/ajpregu.1999.277.3.R910).

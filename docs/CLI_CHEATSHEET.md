@@ -17,8 +17,9 @@ After the SDK is installed, future updates are shorter:
 
 ```bash
 iints update
-iints update --source github --yes   # newest GitHub version
-iints update --dry-run               # show the exact pip command first
+iints update --dry-run                         # show PyPI + GitHub fallback commands
+iints update --source github --yes             # newest GitHub version
+iints update --repair --force-reinstall --yes  # repair stale/legacy installs
 ```
 
 If you are installing from the latest GitHub source instead of PyPI:
@@ -26,6 +27,18 @@ If you are installing from the latest GitHub source instead of PyPI:
 ```bash
 python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge] @ git+https://github.com/python35/IINTS-SDK.git"
 ```
+
+Cleanly remove IINTS from an environment:
+
+```bash
+iints delete --dry-run                  # show packages, caches, plugins, config
+iints delete --yes                      # remove SDK package + user IINTS data
+iints delete --everything --dry-run     # include local outputs + detected SDK checkout
+iints delete --everything --yes         # closest "remove all IINTS" mode
+iints delete --local-outputs --yes      # also remove generated output dirs in this folder
+```
+
+`iints delete` deliberately refuses home and root paths. It does not guess private datasets or unrelated external-drive archives. Use `--source-checkout` or `--everything` when you intentionally want a local SDK source checkout removed too.
 
 ## Fast Demo
 
@@ -143,9 +156,12 @@ iints report \
   --results-csv results/live_demo/results/01_normal_run/results.csv \
   --style agp \
   --png \
+  --svg \
   --subject-name "live demo normal run" \
   --bundle-dir results/live_demo/agp_report
 ```
+
+If the run contains XAI explanations, the AGP bundle also writes `agp_assets/xai_events.txt` and `agp_assets/xai_events.json`.
 
 Inspect one run's safety supervisor behavior:
 
@@ -173,6 +189,18 @@ Prepare supported research datasets:
 iints research prepare-hupa
 iints research prepare-azt1d
 iints research prepare-ohio
+```
+
+Prepare the full local OhioT1DM XML release:
+
+```bash
+export OHIO_T1DM_ROOT="/path/to/OhioT1DM-volledig"
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits train,test \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_all.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_all_quality_report.json
 ```
 
 Import personal/exported CGM data:
@@ -207,6 +235,30 @@ iints data eu-ai-pact-review \
   --payload results/imported_trace/certification/certification.json
 ```
 
+## Results Management
+
+Build a searchable catalogue for all local runs, reports, plots, spreadsheets, models, and exports:
+
+```bash
+iints results --root results
+```
+
+For a specific study folder:
+
+```bash
+iints results \
+  --root results/research_realism_sweep_20260603_02 \
+  --output-dir results/research_realism_sweep_20260603_02/_index
+```
+
+If you also need one combined long table for local AI/data analysis, enable the raw export:
+
+```bash
+iints results --root results/research_realism_sweep_20260603_02 --include-raw
+```
+
+This writes `run_index.csv`, `artifact_inventory.csv`, `RESULTS_INDEX.md`, `result_manager_manifest.json`, and, when spreadsheet support is available, `results_index.xlsx`.
+
 ## Local AI Research
 
 Inspect local model choices and Mistral Serverless migration targets:
@@ -232,6 +284,24 @@ Train from completed runs:
 iints research train-local-ai \
   --run day1=results/jetson_research_day \
   --output-dir results/local_ai_lab
+```
+
+Attach glucose forecasts and risk labels to one completed run:
+
+```bash
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --output-dir results/jetson_research_day_forecast
+
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --predictor models/predictor_blend/predictor.pt \
+  --output-dir results/jetson_research_day_forecast_ai
+
+iints research forecast-run \
+  --input results/jetson_research_day \
+  --hidden-biology insulin-antibody \
+  --output-dir results/jetson_research_day_forecast_antibody
 ```
 
 Controller-specific flow:

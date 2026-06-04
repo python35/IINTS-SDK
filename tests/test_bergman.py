@@ -131,6 +131,19 @@ class TestBergmanPatientModel:
         model.set_state(state)
         model.trigger_event("test", 1)  # should not raise
 
+    def test_loads_legacy_four_state_snapshot(self):
+        model = BergmanPatientModel(initial_glucose=110.0)
+
+        model.set_state(
+            {
+                "ode_state": [142.0, 0.01, 8.0, 250.0],
+                "current_glucose": 142.0,
+            }
+        )
+
+        assert len(model.get_state()["ode_state"]) == 8
+        assert model.update(5.0, 0.0, 0.0) >= 20.0
+
     def test_custom_bergman_params(self):
         params = BergmanParameters(p1=0.03, Gb=110.0)
         model = BergmanPatientModel(initial_glucose=110.0, bergman_params=params)
@@ -139,10 +152,14 @@ class TestBergmanPatientModel:
 
     def test_patient_state_extra_fields(self):
         model = BergmanPatientModel()
+        model.update(5.0, delivered_insulin=0.15, carb_intake=0.0)
         state = model.get_patient_state()
         assert "plasma_insulin_mU_L" in state
         assert "remote_insulin_action" in state
         assert "gut_glucose_mg" in state
+        assert state["delivered_insulin"] == pytest.approx(0.15)
+        assert "active_insulin" in state
+        assert "insulin_effect" in state
 
     def test_simulation_12h_stable(self):
         """A 12h simulation without events should not crash or diverge."""

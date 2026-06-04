@@ -23,7 +23,13 @@ def apply_plot_style(
     """
     try:
         import matplotlib as mpl
+        import matplotlib.pyplot as plt
         import seaborn as sns
+        try:
+            import scienceplots  # noqa: F401
+            plt.style.use(["science", "nature", "no-latex"])
+        except ImportError:
+            pass  # Fall back to the standard Seaborn-backed style below.
     except Exception as exc:  # pragma: no cover - optional dependency
         raise ImportError("Plot styling requires matplotlib and seaborn.") from exc
 
@@ -33,11 +39,14 @@ def apply_plot_style(
         else [IINTS_BLUE, IINTS_RED, IINTS_ORANGE, IINTS_TEAL, IINTS_NAVY, IINTS_GOLD]
     )
 
+    # Override specific properties for clinical/AGP output
     sns.set_theme(context="paper", style="whitegrid", palette=colors, font_scale=font_scale)
     mpl.rcParams.update(
         {
             "figure.dpi": dpi,
             "savefig.dpi": dpi,
+            "font.family": "serif",
+            "font.serif": ["DejaVu Serif", "Times New Roman", "Times", "Computer Modern Roman"],
             "axes.titlesize": 14,
             "axes.labelsize": 12,
             "legend.fontsize": 10,

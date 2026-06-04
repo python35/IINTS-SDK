@@ -26,6 +26,8 @@ results/matlab_analysis/control_analysis_*.mat
 results/clinical_reports/IINTS_Patient_*_*.pdf
 results/population_plots/*.png
 results/
+deliverables/
+digital_patient_runtime/
 
 # Official datasets (downloaded locally)
 data_packs/official/

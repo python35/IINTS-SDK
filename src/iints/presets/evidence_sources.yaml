@@ -1,5 +1,5 @@
 version: 1
-updated_utc: "2026-05-10T00:00:00Z"
+updated_utc: "2026-06-04T00:00:00Z"
 sources:
   - id: ada_2026_glycemic_goals
     category: guideline
@@ -121,3 +121,115 @@ sources:
     doi: ""
     url: "https://www.healthpartners.com/institute/wp-content/uploads/2025/05/Ambulatory-Glucose-Profile-Report-Overview.pdf"
     rationale: "Reference for AGP-style report layout: time-in-ranges, glucose metrics, modal-day percentile profile, and daily glucose profiles."
+  - id: bergman_1979_minimal_model
+    category: model
+    component: virtual_patient_dynamics
+    title: "Quantitative estimation of insulin sensitivity"
+    citation: "Bergman RN, Ider YZ, Bowden CR, Cobelli C. Am J Physiol. 1979;236(6):E667-E677."
+    doi: "10.1152/ajpendo.1979.236.6.E667"
+    url: "https://doi.org/10.1152/ajpendo.1979.236.6.E667"
+    rationale: "Foundation for the Bergman-style minimal-model insulin sensitivity and remote insulin-action states."
+  - id: hovorka_2004_nmpc_t1d
+    category: model
+    component: hovorka_patient_model
+    title: "Nonlinear model predictive control of glucose concentration in subjects with type 1 diabetes"
+    citation: "Hovorka R, et al. Physiol Meas. 2004;25(4):905-920."
+    doi: "10.1088/0967-3334/25/4/010"
+    url: "https://doi.org/10.1088/0967-3334/25/4/010"
+    rationale: "Reference for the Hovorka-style compartmental glucose, insulin, and insulin-action structure used in research-mode physiology."
+  - id: gerich_1979_counterregulation
+    category: physiology
+    component: endogenous_counterregulation
+    title: "Hormonal mechanisms of recovery from insulin-induced hypoglycemia in man"
+    citation: "Gerich J, Davis J, Lorenzi M. Am J Physiol. 1979;236(4):E380-E385."
+    doi: "10.1152/ajpendo.1979.236.4.E380"
+    url: "https://doi.org/10.1152/ajpendo.1979.236.4.E380"
+    rationale: "Primary human physiology reference for glucagon and epinephrine roles in acute recovery from insulin-induced hypoglycemia."
+  - id: cryer_2013_haaf_mechanisms
+    category: review
+    component: haaf_memory_model
+    title: "Mechanisms of Hypoglycemia-Associated Autonomic Failure in Diabetes"
+    citation: "Cryer PE. N Engl J Med. 2013;369(4):362-372."
+    doi: "10.1056/NEJMra1215228"
+    url: "https://doi.org/10.1056/NEJMra1215228"
+    rationale: "Reference for HAAF as a recurrent-hypoglycemia memory mechanism that blunts counterregulation and symptom awareness."
+  - id: cryer_2013_haaf_diabetes
+    category: review
+    component: haaf_memory_model
+    title: "Hypoglycemia-associated autonomic failure in diabetes"
+    citation: "Cryer PE. Handb Clin Neurol. 2013;117:295-307."
+    doi: "10.1016/B978-0-444-53491-0.00023-7"
+    url: "https://doi.org/10.1016/B978-0-444-53491-0.00023-7"
+    rationale: "Reference for antecedent hypoglycemia, sleep, and exercise lowering later autonomic and symptomatic responses."
+  - id: lv_2013_exogenous_glucagon_pk
+    category: pharmacology
+    component: exogenous_glucagon_pkpd
+    title: "Pharmacokinetics modeling of exogenous glucagon in type 1 diabetes mellitus patients"
+    citation: "Lv D, Breton MD, Farhy LS. Diabetes Technol Ther. 2013;15(11):935-941."
+    doi: "10.1089/dia.2013.0150"
+    url: "https://doi.org/10.1089/dia.2013.0150"
+    rationale: "Foundation for dual-hormone glucagon depot-to-plasma transport models in research simulations."
+  - id: haidar_2013_dual_hormone_ap
+    category: trial
+    component: dual_hormone_context
+    title: "Glucose-responsive insulin and glucagon delivery in adults with type 1 diabetes"
+    citation: "Haidar A, et al. CMAJ. 2013;185(4):297-305."
+    doi: "10.1503/cmaj.121265"
+    url: "https://doi.org/10.1503/cmaj.121265"
+    rationale: "Clinical research context for dual-hormone insulin-plus-glucagon closed-loop systems."
+  - id: haidar_2013_insulin_glucagon_pk
+    category: pharmacology
+    component: exogenous_glucagon_pkpd
+    title: "Pharmacokinetics of Insulin Aspart and Glucagon in Type 1 Diabetes during Closed-Loop Operation"
+    citation: "Haidar A, Duval C, Legault L, Rabasa-Lhoret R. J Diabetes Sci Technol. 2013;7(6):1507-1512."
+    doi: "10.1177/193229681300700610"
+    url: "https://doi.org/10.1177/193229681300700610"
+    rationale: "Reference for subcutaneous insulin and glucagon pharmacokinetics during closed-loop operation."
+  - id: hummel_2018_renal_glucose_handling
+    category: physiology
+    component: renal_glucose_clearance
+    title: "Physiology of renal glucose handling via SGLT1, SGLT2 and GLUT2"
+    citation: "Hummel CS, Lu C, Loo DDF, Hirayama BA, Voss AA, Wright EM. Diabetologia. 2018;61:2087-2097."
+    doi: "10.1007/s00125-018-4656-5"
+    url: "https://doi.org/10.1007/s00125-018-4656-5"
+    rationale: "Reference for renal glucose reabsorption physiology and transporter context behind smooth renal-threshold modeling."
+  - id: defronzo_2013_renal_reabsorption_splay
+    category: physiology
+    component: renal_glucose_clearance
+    title: "Characterization of Renal Glucose Reabsorption in Response to Dapagliflozin"
+    citation: "DeFronzo RA, et al. Diabetes Care. 2013;36(10):3169-3176."
+    doi: "10.2337/dc13-0387"
+    url: "https://doi.org/10.2337/dc13-0387"
+    rationale: "Reference for threshold, transport maximum, and splay concepts used when documenting renal glucose clearance."
+  - id: mandelbrot_1968_fractional_brownian
+    category: model
+    component: cgm_noise_model
+    title: "Fractional Brownian Motions, Fractional Noises and Applications"
+    citation: "Mandelbrot BB, Van Ness JW. SIAM Review. 1968;10(4):422-437."
+    doi: "10.1137/1010093"
+    url: "https://doi.org/10.1137/1010093"
+    rationale: "Mathematical anchor for long-memory, fractional-noise-style CGM noise approximations."
+  - id: campbell_1985_dawn_phenomenon
+    category: physiology
+    component: circadian_egp_model
+    title: "Pathogenesis of the Dawn Phenomenon in Patients with Insulin-Dependent Diabetes Mellitus"
+    citation: "Campbell PJ, Bolli GB, Cryer PE, Gerich JE. N Engl J Med. 1985;312(23):1473-1479."
+    doi: "10.1056/NEJM198506063122302"
+    url: "https://doi.org/10.1056/NEJM198506063122302"
+    rationale: "Reference for dawn-phenomenon physiology involving nocturnal growth hormone surges, glucose production, and impaired utilization."
+  - id: richter_2013_glut4_exercise
+    category: physiology
+    component: exercise_glut4_model
+    title: "Exercise, GLUT4, and skeletal muscle glucose uptake"
+    citation: "Richter EA, Hargreaves M. Physiol Rev. 2013;93(3):993-1017."
+    doi: "10.1152/physrev.00038.2012"
+    url: "https://doi.org/10.1152/physrev.00038.2012"
+    rationale: "Reference for exercise/contraction-stimulated GLUT4 translocation and insulin-independent skeletal-muscle glucose uptake."
+  - id: naslund_1999_glp1_gastric_emptying
+    category: physiology
+    component: glp1_gastric_emptying_model
+    title: "GLP-1 slows solid gastric emptying and inhibits insulin, glucagon, and PYY release in humans"
+    citation: "Naslund E, et al. Am J Physiol Regul Integr Comp Physiol. 1999;277(3):R910-R916."
+    doi: "10.1152/ajpregu.1999.277.3.R910"
+    url: "https://doi.org/10.1152/ajpregu.1999.277.3.R910"
+    rationale: "Reference for GLP-1-associated slowing of gastric emptying used to document nonlinear meal absorption feedback."

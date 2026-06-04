@@ -160,3 +160,25 @@ def test_assistant_review_realism_uses_same_guarded_flow() -> None:
     assert response.task == "review_realism"
     assert "research use only" in response.text.lower()
     assert guard.calls == 1
+
+
+def test_assistant_predict_insulin_uses_guarded_research_flow() -> None:
+    guard = _FakeGuard()
+    assistant = IINTSAssistant(
+        "cert.json",
+        backend=_FakeBackend(),
+        guard=guard,  # type: ignore[arg-type]
+    )
+
+    response = assistant.predict_insulin(
+        {
+            "current_glucose": 190,
+            "active_insulin": 1.5,
+            "insulin_effect": 0.01,
+            "mpc_recommended_units": 0.35,
+        }
+    )
+
+    assert response.task == "predict_insulin"
+    assert "research use only" in response.text.lower()
+    assert guard.calls == 1

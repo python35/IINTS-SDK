@@ -105,6 +105,39 @@ Note: The bundled Ohio pack in this repo contains only a few subjects. For a
 research‑grade model, add more subjects and/or pretrain on synthetic/AZT1D,
 then fine‑tune on OhioT1DM.
 
+Full local OhioT1DM XML release:
+```bash
+export OHIO_T1DM_ROOT="/path/to/OhioT1DM-volledig"
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits test \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_test_quality_report.json
+
+PYTHONPATH=src python3 research/train_predictor.py \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --config research/configs/predictor_ohio_dual_guard_v2.yaml \
+  --out models/ohio_t1dm_full
+
+PYTHONPATH=src python3 research/evaluate_predictor.py \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --model models/ohio_t1dm_full/predictor.pt \
+  --reference-data data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --subgroup-column subject_id \
+  --subgroup-column dataset_year \
+  --out results/ohio_t1dm_full_eval.json
+```
+
+Keep the raw Ohio XML files and processed CSVs out of git. The repo ignores
+`data_packs/public/`, `data_packs/**/processed/`, `models/`, and `results/`.
+
 Recommended v2 recipe details:
 - Subject-level holdout split (leakage-safe).
 - Band-weighted loss (extra emphasis for hypo/hyper ranges).

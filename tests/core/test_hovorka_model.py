@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import numpy as np
 
 from iints.core.patient.hovorka_model import HovorkaPatientModel
 from iints.core.patient.patient_factory import PatientFactory
@@ -40,7 +41,14 @@ def test_hovorka_state_round_trip_preserves_physiology_flags() -> None:
     assert clone.stress_intensity == pytest.approx(0.6)
     assert clone.is_exercising is True
     assert clone.exercise_intensity == pytest.approx(0.3)
-    assert len(clone.get_state()["ode_state"]) == 10
+    assert len(clone.get_state()["ode_state"]) == 19
+    physiology = clone.get_patient_state()
+    assert physiology["delivered_insulin"] == pytest.approx(0.1)
+    assert "active_insulin" in physiology
+    assert "insulin_effect" in physiology
+    assert "plasma_glucagon_pg_ml" in physiology
+    assert "haaf_metric" in physiology
+    assert "glut4_active" in physiology
 
 
 def test_hovorka_loads_legacy_bergman_state_shape() -> None:
@@ -56,6 +64,56 @@ def test_hovorka_loads_legacy_bergman_state_shape() -> None:
     )
 
     state = patient.get_state()
-    assert len(state["ode_state"]) == 10
+    assert len(state["ode_state"]) == 19
     assert patient.get_current_glucose() == pytest.approx(145.0)
     assert state["is_stressed"] is True
+
+
+def test_hovorka_hypoglycemia_builds_haaf_memory() -> None:
+    patient = HovorkaPatientModel(initial_glucose=65.0)
+
+    patient.update(5.0, delivered_insulin=0.0, carb_intake=0.0, current_time=0.0)
+
+    physiology = patient.get_patient_state()
+    assert physiology["haaf_metric"] > 0.0
+    assert 20.0 <= patient.get_current_glucose() <= 120.0
+
+
+def test_hovorka_tracks_exogenous_glucagon_state() -> None:
+    patient = HovorkaPatientModel(initial_glucose=62.0)
+
+    patient.update(5.0, delivered_insulin=0.0, carb_intake=0.0, delivered_glucagon_mg=0.2, current_time=0.0)
+    for minute in range(5, 35, 5):
+        patient.update(5.0, delivered_insulin=0.0, carb_intake=0.0, current_time=float(minute))
+
+    physiology = patient.get_patient_state()
+    assert patient.get_state()["last_delivered_glucagon_mg"] == pytest.approx(0.0)
+    assert physiology["plasma_glucagon_pg_ml"] > 0.0
+
+
+def test_hovorka_exercise_activates_glut4_without_insulin() -> None:
+    patient = HovorkaPatientModel(initial_glucose=130.0)
+    patient.start_exercise(0.8)
+
+    for minute in range(0, 60, 5):
+        glucose = patient.update(5.0, delivered_insulin=0.0, carb_intake=0.0, current_time=float(minute))
+
+    physiology = patient.get_patient_state()
+    assert physiology["glut4_active"] > 0.0
+    assert glucose < 130.0
+
+
+def test_hovorka_circadian_egp_is_gated_by_dawn_strength() -> None:
+    no_dawn = HovorkaPatientModel(initial_glucose=120.0, dawn_phenomenon_strength=0.0)
+    dawn = HovorkaPatientModel(initial_glucose=120.0, dawn_phenomenon_strength=8.0)
+
+    no_dawn_state = np.array(no_dawn.get_state()["ode_state"], dtype=float)
+    dawn_state = np.array(dawn.get_state()["ode_state"], dtype=float)
+
+    no_dawn_morning = no_dawn._ode(0.0, no_dawn_state, 0.0, 0.0, current_time=360.0)[0]
+    no_dawn_evening = no_dawn._ode(0.0, no_dawn_state, 0.0, 0.0, current_time=1080.0)[0]
+    dawn_morning = dawn._ode(0.0, dawn_state, 0.0, 0.0, current_time=360.0)[0]
+    dawn_evening = dawn._ode(0.0, dawn_state, 0.0, 0.0, current_time=1080.0)[0]
+
+    assert no_dawn_morning == pytest.approx(no_dawn_evening)
+    assert dawn_morning > dawn_evening

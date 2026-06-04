@@ -7,6 +7,7 @@ import platform
 import random
 import time
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -288,6 +289,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # P3-10: Feature normalisation — fit on TRAINING data only
     # -----------------------------------------------------------------------
+    X_test_raw = X_test.copy()
     scaler = FeatureScaler(strategy=training_cfg.normalization)
     X_train = scaler.fit_transform(X_train)
     X_val = scaler.transform(X_val)
@@ -351,14 +353,14 @@ def main() -> None:
         q = training_cfg.quantile
         if q is None:
             raise ValueError("training.quantile must be set when training.loss == 'quantile'")
-        criterion: nn.Module = QuantileLoss(quantile=q)
+        criterion: nn.Module = cast(nn.Module, QuantileLoss(quantile=q))
         print(f"Loss: quantile (q={q})")
     elif training_cfg.loss == "safety_weighted":
-        criterion = SafetyWeightedMSE(
+        criterion = cast(nn.Module, SafetyWeightedMSE(
             low_threshold=training_cfg.safety_weighted_low_threshold,
             alpha=training_cfg.safety_weighted_alpha,
             max_weight=training_cfg.safety_weighted_max_weight,
-        )
+        ))
         print(
             "Loss: safety_weighted "
             f"(low<{training_cfg.safety_weighted_low_threshold}, "
@@ -366,13 +368,13 @@ def main() -> None:
             f"max_weight={training_cfg.safety_weighted_max_weight})"
         )
     elif training_cfg.loss == "band_weighted":
-        criterion = BandWeightedMSE(
+        criterion = cast(nn.Module, BandWeightedMSE(
             low_threshold=training_cfg.band_weighted_low_threshold,
             high_threshold=training_cfg.band_weighted_high_threshold,
             low_weight=training_cfg.band_weighted_low_weight,
             high_weight=training_cfg.band_weighted_high_weight,
             max_weight=training_cfg.band_weighted_max_weight,
-        )
+        ))
         print(
             "Loss: band_weighted "
             f"(low<{training_cfg.band_weighted_low_threshold}, "
@@ -390,7 +392,8 @@ def main() -> None:
     # -----------------------------------------------------------------------
     if training_cfg.freeze_lstm_layers > 0:
         freeze_n = min(training_cfg.freeze_lstm_layers, training_cfg.num_layers)
-        for name, param in model.lstm.named_parameters():
+        lstm_module = cast(nn.Module, model.lstm)
+        for name, param in lstm_module.named_parameters():
             for layer_idx in range(freeze_n):
                 if f"_l{layer_idx}" in name:
                     param.requires_grad = False
@@ -472,10 +475,11 @@ def main() -> None:
     # P3-11: Baseline comparison on test set
     # -----------------------------------------------------------------------
     baselines = evaluate_baselines(
-        X_test,
+        X_test_raw,
         y_test,
         horizon_steps=predictor_cfg.horizon_steps,
         time_step_minutes=predictor_cfg.time_step_minutes,
+        feature_columns=predictor_cfg.feature_columns,
     )
     print("\nBaseline comparison (test set):")
     for bname, bmetrics in baselines.items():

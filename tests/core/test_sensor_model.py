@@ -11,6 +11,7 @@ def test_create_sensor_model_profile_exposes_free_living_artifacts() -> None:
     assert state["lag_minutes"] == 10
     assert state["noise_std"] == 8.0
     assert state["drift_std_per_hour"] > 0.0
+    assert state["noise_fbm_hurst"] == 0.75
     assert state["compression_low_prob"] > 0.0
     assert state["dropout_duration_steps"] == (2, 6)
 
@@ -54,3 +55,50 @@ def test_sensor_model_can_hold_dropouts_across_multiple_steps() -> None:
     assert second.status == "dropout_hold"
     assert first.value == 120.0
     assert second.value == first.value
+
+
+def test_sensor_model_isf_compartment_lags_blood_glucose_step_change() -> None:
+    sensor = SensorModel(
+        noise_std=0.0,
+        bias=0.0,
+        lag_minutes=0,
+        isf_tau_minutes=10.0,
+        dropout_prob=0.0,
+    )
+
+    baseline = sensor.read(100.0, 0.0)
+    after_step = sensor.read(200.0, 5.0)
+
+    assert baseline.value == 100.0
+    assert 100.0 < after_step.value < 200.0
+
+
+def test_sensor_model_uses_explicit_lag_history_before_isf_filter() -> None:
+    sensor = SensorModel(
+        noise_std=0.0,
+        bias=0.0,
+        lag_minutes=10,
+        isf_tau_minutes=1.0,
+        dropout_prob=0.0,
+    )
+
+    sensor.read(100.0, 0.0)
+    sensor.read(200.0, 5.0)
+    lagged = sensor.read(200.0, 10.0)
+
+    assert lagged.value == 100.0
+
+
+def test_sensor_model_fbm_state_round_trip_is_reproducible() -> None:
+    sensor = SensorModel(noise_std=8.0, noise_fbm_hurst=0.78, seed=11)
+    for minute in range(0, 20, 5):
+        sensor.read(120.0, float(minute))
+
+    clone = SensorModel(noise_std=8.0, noise_fbm_hurst=0.78, seed=999)
+    clone.set_state(sensor.get_state())
+
+    original_next = sensor.read(123.0, 20.0)
+    clone_next = clone.read(123.0, 20.0)
+
+    assert clone_next.status == original_next.status
+    assert clone_next.value == original_next.value

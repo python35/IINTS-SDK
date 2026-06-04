@@ -10,6 +10,7 @@ TaskName = Literal[
     "detect_anomalies",
     "generate_report",
     "review_realism",
+    "predict_insulin",
 ]
 MAX_PROMPT_PAYLOAD_CHARS = 12000
 
@@ -69,6 +70,22 @@ TASK_TEMPLATES: dict[TaskName, str] = {
         "5. What to improve next\n"
         "6. Suggested follow-up validation checks\n\n"
         "Focus on glycemic ranges, excursion patterns, insulin behavior, safety overrides, and whether the data looks internally coherent.\n\n"
+        "Input JSON:\n{data}"
+    ),
+    "predict_insulin": (
+        "You are reviewing a simulated bi-hormonal (Insulin + Glucagon) dose candidate inside the IINTS-AF research sandbox.\n"
+        "You are not controlling a real pump, not treating a patient, and not giving medical advice.\n"
+        "You will be provided with the current biological state of the patient, which now includes deep science metrics like "
+        "active_insulin, insulin_effect, plasma_glucagon_pg_ml, and the haaf_metric (Hypoglycemia-Associated Autonomic Failure memory). "
+        "You will also see a mathematically optimal insulin dose calculated by a deterministic MPC solver running differential equations.\n\n"
+        "Your task is to critique the candidate and decide on both Insulin and Glucagon doses for research simulation only. "
+        "Never increase insulin above the deterministic MPC dose or safety caps. "
+        "If glucose is low, predicted low, falling quickly, or active insulin is high, reduce the insulin dose to 0.0. "
+        "If the patient is in severe hypoglycemia risk and HAAF is high (meaning natural rescue is failing), "
+        "you may propose a simulation-only glucagon rescue candidate. The simulator will still apply hard glucagon safety caps.\n"
+        "Respond with a short explanation followed by exactly this format:\n"
+        "FINAL_DOSE: <number>\n"
+        "FINAL_GLUCAGON_DOSE_MG: <number>\n\n"
         "Input JSON:\n{data}"
     ),
 }

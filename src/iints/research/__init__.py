@@ -72,6 +72,23 @@ from .local_ai import (
     build_predictor_dataset_from_runs,
     run_local_ai_lab,
 )
+from .forecasting import (
+    DEFAULT_FORECAST_FEATURE_COLUMNS,
+    ForecastConfig,
+    PhysiologyAwareBaseline,
+    assess_forecast_risk,
+    attach_forecasts_to_frame,
+    resolve_forecast_input,
+    summarize_forecast_frame,
+    write_forecast_bundle,
+)
+from .results_manager import (
+    ResultsIndexBundle,
+    build_artifact_inventory,
+    discover_result_csvs,
+    index_results,
+    summarize_results_csv,
+)
 
 __all__ = [
     "PredictorConfig",
@@ -136,4 +153,17 @@ __all__ = [
     "review_controller_training_artifacts",
     "build_predictor_dataset_from_runs",
     "run_local_ai_lab",
+    "DEFAULT_FORECAST_FEATURE_COLUMNS",
+    "ForecastConfig",
+    "PhysiologyAwareBaseline",
+    "assess_forecast_risk",
+    "attach_forecasts_to_frame",
+    "resolve_forecast_input",
+    "summarize_forecast_frame",
+    "write_forecast_bundle",
+    "ResultsIndexBundle",
+    "build_artifact_inventory",
+    "discover_result_csvs",
+    "index_results",
+    "summarize_results_csv",
 ]
