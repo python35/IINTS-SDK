@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 @dataclass
@@ -59,7 +60,7 @@ class SensorModel:
         self._last_timestamp: Optional[float] = None
         self._current_isf: Optional[float] = None
         self._current_colored_noise: float = 0.0
-        self._fbm_components = np.zeros(3)
+        self._fbm_components: NDArray[np.float64] = np.zeros(3, dtype=np.float64)
         self._drift_offset = 0.0
         self._dropout_remaining_steps = 0
         self._compression_remaining_steps = 0
@@ -71,7 +72,7 @@ class SensorModel:
         self._last_timestamp = None
         self._current_isf = None
         self._current_colored_noise = 0.0
-        self._fbm_components = np.zeros(3)
+        self._fbm_components = np.zeros(3, dtype=np.float64)
         self._drift_offset = 0.0
         self._dropout_remaining_steps = 0
         self._compression_remaining_steps = 0
@@ -131,7 +132,7 @@ class SensorModel:
         elif dt > 0:
             # Explicit Euler integration for the ODE: tau * dISF/dt = BG - ISF
             alpha = dt / self.isf_tau_minutes
-            alpha = min(alpha, 1.0) # Stability bound
+            alpha = min(alpha, 1.0)  # Stability bound
             self._current_isf = self._current_isf + alpha * (lagged_glucose - self._current_isf)
 
         base = self._current_isf
@@ -238,7 +239,10 @@ class SensorModel:
         self._last_timestamp = state.get("last_timestamp")
         self._current_isf = state.get("current_isf")
         self._current_colored_noise = float(state.get("current_colored_noise", self._current_colored_noise))
-        self._fbm_components = np.array(state.get("fbm_components", self._fbm_components), dtype=float)
+        self._fbm_components = cast(
+            NDArray[np.float64],
+            np.asarray(state.get("fbm_components", self._fbm_components), dtype=np.float64),
+        )
         self._drift_offset = state.get("drift_offset", self._drift_offset)
         self._dropout_remaining_steps = int(state.get("dropout_remaining_steps", self._dropout_remaining_steps))
         self._compression_remaining_steps = int(state.get("compression_remaining_steps", self._compression_remaining_steps))

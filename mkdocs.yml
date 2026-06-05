@@ -111,9 +111,10 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.11): releases/v1.5.11.md
+      - Latest (v1.5.12): releases/v1.5.12.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.11: releases/v1.5.11.md
           - v1.5.10: releases/v1.5.10.md
           - v1.5.9: releases/v1.5.9.md
           - v1.5.8: releases/v1.5.8.md
