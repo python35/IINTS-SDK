@@ -52,10 +52,14 @@ class TrainingConfig:
     # P3-10: Normalization strategy.  Options: "zscore", "robust", "none".
     normalization: str = "zscore"
 
-    # P3-12: Loss function.  Options: "mse", "quantile", "safety_weighted", "band_weighted".
+    # P3-12: Loss function.  Options: "mse", "quantile", "safety_weighted", "band_weighted", "pinn".
     # For quantile loss, also set `quantile` (0 < q < 1).
     loss: str = "mse"
     quantile: Optional[float] = None  # e.g. 0.9 for 90th-percentile upper bound
+
+    # PINN (Physics-Informed Neural Network) loss parameters
+    pinn_lambda: float = 0.5
+    pinn_max_roc: float = 10.0
 
     # Fine-tuning controls
     freeze_lstm_layers: int = 0          # freeze first N LSTM layers

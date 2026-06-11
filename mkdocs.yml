@@ -99,6 +99,9 @@ nav:
       - Real-Data Realism Gate: REAL_DATA_REALISM.md
       - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
       - Local AI Research: LOCAL_AI_RESEARCH.md
+      - AI Red-Team Realism Auditor: AI_RED_TEAM_AUDITOR.md
+      - Glucose Forecast Model: GLUCOSE_MODEL.md
+      - Interpreting Glucose Models: comparison_interpretation.md
       - Local AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
       - Command Reference: COMMAND_REFERENCE.md
       - Complete Source Library: SOURCE_LIBRARY.md
@@ -111,7 +114,8 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.12): releases/v1.5.12.md
+      - Latest (v1.5.13): releases/v1.5.13.md
+      - v1.5.12: releases/v1.5.12.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
           - v1.5.11: releases/v1.5.11.md

@@ -8501,6 +8501,10 @@ def sources(
 
 research_app = typer.Typer(help="Research pipeline: dataset preparation and quality reporting.")
 app.add_typer(research_app, name="research")
+glucose_model_app = typer.Typer(
+    help="Dedicated glucose forecasting model workflow for training and Hugging Face export."
+)
+research_app.add_typer(glucose_model_app, name="glucose-model")
 
 
 @research_app.command(name="prepare-azt1d")
@@ -9599,6 +9603,302 @@ def research_forecast_run(
     console.print(
         "[yellow]Research only:[/yellow] this forecasts glucose for simulator/data analysis; "
         "it is not treatment advice and not pump dosing logic."
+    )
+
+
+@glucose_model_app.command(name="build-dataset")
+def research_glucose_model_build_dataset(
+    input_paths: Annotated[
+        List[Path],
+        typer.Option(
+            "--input",
+            "-i",
+            help="Prepared glucose dataset CSV/Parquet. Repeat for Ohio, AZT1D, simulator exports, etc.",
+        ),
+    ],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Output folder for normalized training dataset, manifest, and config."),
+    ] = Path("models/iints-glucose-forecast-v0/dataset"),
+    labels_csv: Annotated[
+        Optional[str],
+        typer.Option(
+            "--labels",
+            help="Optional comma-separated labels matching --input order, e.g. ohio_train,sim_10k.",
+        ),
+    ] = None,
+    profile: Annotated[str, typer.Option(help="Training profile: smoke, quick, long, or paper.")] = "long",
+    output_format: Annotated[str, typer.Option(help="Dataset output format: csv or parquet.")] = "csv",
+    history_minutes: Annotated[int, typer.Option(help="Model history window in minutes.")] = 360,
+    horizon_minutes: Annotated[int, typer.Option(help="Prediction horizon in minutes.")] = 120,
+    time_step_minutes: Annotated[int, typer.Option(help="Expected CGM sample interval in minutes.")] = 5,
+) -> None:
+    """Build the dedicated IINTS glucose-forecast training pack."""
+    console = Console()
+    labels = None
+    if labels_csv:
+        labels = [item.strip() for item in labels_csv.split(",") if item.strip()]
+    try:
+        from iints.research.glucose_model import build_glucose_training_pack
+
+        pack = build_glucose_training_pack(
+            input_paths,
+            output_dir,
+            labels=labels,
+            output_format=output_format,
+            profile=profile,
+            history_minutes=history_minutes,
+            horizon_minutes=horizon_minutes,
+            time_step_minutes=time_step_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model build-dataset failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Glucose Model Training Pack")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Rows", str(pack.row_count))
+    table.add_row("Subjects", str(pack.subject_count))
+    table.add_row("Sources", str(pack.source_count))
+    table.add_row("Dataset", str(pack.dataset_path))
+    table.add_row("Config", str(pack.config_path))
+    table.add_row("Manifest", str(pack.manifest_path))
+    table.add_row("Intent", str(pack.model_intent_path))
+    console.print(table)
+    console.print(
+        "[green]Next:[/green] "
+        f"iints research glucose-model train --data {pack.dataset_path} "
+        f"--config {pack.config_path} --output-dir models/iints-glucose-forecast-v0"
+    )
+
+
+@glucose_model_app.command(name="init")
+def research_glucose_model_init(
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the glucose model starter files.")] = Path(
+        "models/iints-glucose-forecast-v0"
+    ),
+    profile: Annotated[str, typer.Option(help="Training profile: smoke, quick, long, or paper.")] = "long",
+    history_minutes: Annotated[int, typer.Option(help="Model history window in minutes.")] = 360,
+    horizon_minutes: Annotated[int, typer.Option(help="Prediction horizon in minutes.")] = 120,
+    time_step_minutes: Annotated[int, typer.Option(help="Expected CGM sample interval in minutes.")] = 5,
+) -> None:
+    """Create a glucose-model config and intent file without touching data."""
+    console = Console()
+    try:
+        from iints.research.glucose_model import _render_model_intent, write_glucose_model_config
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        config_path = output_dir / "glucose_model_config.yaml"
+        payload = write_glucose_model_config(
+            config_path,
+            profile=profile,
+            history_minutes=history_minutes,
+            horizon_minutes=horizon_minutes,
+            time_step_minutes=time_step_minutes,
+        )
+        intent_payload = {
+            "row_count": "pending",
+            "subject_count": "pending",
+            "source_count": "pending",
+            "history_minutes": history_minutes,
+            "horizon_minutes": horizon_minutes,
+        }
+        intent_path = output_dir / "MODEL_INTENT.md"
+        intent_path.write_text(_render_model_intent(intent_payload))
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model init failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Config written:[/green] {config_path}")
+    console.print(f"[green]Intent written:[/green] {intent_path}")
+    console.print(f"Profile: {payload['iints_glucose_model']['profile']}")
+
+
+@glucose_model_app.command(name="train")
+def research_glucose_model_train(
+    data: Annotated[Path, typer.Option(help="Normalized glucose training dataset CSV/Parquet.")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for predictor.pt and training_report.json.")] = Path(
+        "models/iints-glucose-forecast-v0"
+    ),
+    config: Annotated[Optional[Path], typer.Option(help="Config YAML. If omitted, one is generated.")] = None,
+    profile: Annotated[str, typer.Option(help="Generated config profile: smoke, quick, long, or paper.")] = "long",
+    epochs: Annotated[Optional[int], typer.Option(help="Override training.epochs for long local runs.")] = None,
+    batch_size: Annotated[Optional[int], typer.Option(help="Override training.batch_size.")] = None,
+    learning_rate: Annotated[Optional[float], typer.Option(help="Override training.learning_rate.")] = None,
+    warm_start: Annotated[Optional[Path], typer.Option(help="Optional predictor.pt warm-start checkpoint.")] = None,
+    export_hf: Annotated[
+        bool,
+        typer.Option("--export-hf/--no-export-hf", help="Build a Hugging Face-ready folder after training."),
+    ] = True,
+    repo_id: Annotated[Optional[str], typer.Option(help="Optional Hugging Face repo id for model card hints.")] = None,
+    dataset_manifest: Annotated[Optional[Path], typer.Option(help="Optional dataset manifest for HF public metadata.")] = None,
+    comparison_dir: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional glucose-model compare output directory to bundle with the Hugging Face export."),
+    ] = None,
+) -> None:
+    """Train the dedicated IINTS glucose-forecast model using the existing predictor engine."""
+    console = Console()
+    if not data.exists():
+        console.print(f"[bold red]Dataset not found: {data}[/bold red]")
+        raise typer.Exit(code=1)
+
+    try:
+        from iints.research.glucose_model import write_glucose_model_config, write_huggingface_export_bundle
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        resolved_config = output_dir / "glucose_model_config.resolved.yaml"
+        if config is None:
+            payload = write_glucose_model_config(output_dir / "glucose_model_config.yaml", profile=profile)
+        else:
+            payload = yaml.safe_load(config.read_text())
+        if epochs is not None:
+            payload.setdefault("training", {})["epochs"] = int(epochs)
+        if batch_size is not None:
+            payload.setdefault("training", {})["batch_size"] = int(batch_size)
+        if learning_rate is not None:
+            payload.setdefault("training", {})["learning_rate"] = float(learning_rate)
+        resolved_config.write_text(yaml.safe_dump(payload, sort_keys=False))
+
+        script = Path(__file__).resolve().parents[3] / "research" / "train_predictor.py"
+        cmd = [
+            sys.executable,
+            str(script),
+            "--data",
+            str(data),
+            "--config",
+            str(resolved_config),
+            "--out",
+            str(output_dir),
+        ]
+        if warm_start is not None:
+            cmd.extend(["--warm-start", str(warm_start)])
+        subprocess.run(cmd, check=True)
+        hf_outputs = None
+        if export_hf:
+            manifest = dataset_manifest
+            if manifest is None:
+                candidate = data.parent / "glucose_dataset_manifest.json"
+                manifest = candidate if candidate.exists() else None
+            hf_outputs = write_huggingface_export_bundle(
+                model_dir=output_dir,
+                output_dir=output_dir / "huggingface",
+                repo_id=repo_id,
+                dataset_manifest=manifest,
+                comparison_dir=comparison_dir,
+            )
+    except subprocess.CalledProcessError as exc:
+        console.print(f"[bold red]glucose-model train failed with exit code {exc.returncode}[/bold red]")
+        raise typer.Exit(code=exc.returncode)
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model train failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    console.print(f"[green]Model written:[/green] {output_dir / 'predictor.pt'}")
+    console.print(f"[green]Training report:[/green] {output_dir / 'training_report.json'}")
+    if hf_outputs:
+        console.print(f"[green]Hugging Face bundle:[/green] {hf_outputs['output_dir']}")
+
+
+@glucose_model_app.command(name="export-hf")
+def research_glucose_model_export_hf(
+    model_dir: Annotated[Path, typer.Option(help="Directory containing predictor.pt and training_report.json.")] = Path(
+        "models/iints-glucose-forecast-v0"
+    ),
+    output_dir: Annotated[Path, typer.Option(help="Output directory for the Hugging Face-ready bundle.")] = Path(
+        "models/iints-glucose-forecast-v0/huggingface"
+    ),
+    repo_id: Annotated[Optional[str], typer.Option(help="Optional Hugging Face repo id, e.g. user/iints-glucose-forecast-v0.")] = None,
+    dataset_manifest: Annotated[Optional[Path], typer.Option(help="Optional private manifest to redact into public metadata.")] = None,
+    comparison_dir: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional glucose-model compare output directory to include comparison metrics and reports."),
+    ] = None,
+) -> None:
+    """Export predictor.pt plus a research-safe Hugging Face model card."""
+    console = Console()
+    try:
+        from iints.research.glucose_model import write_huggingface_export_bundle
+
+        outputs = write_huggingface_export_bundle(
+            model_dir=model_dir,
+            output_dir=output_dir,
+            repo_id=repo_id,
+            dataset_manifest=dataset_manifest,
+            comparison_dir=comparison_dir,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model export-hf failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Hugging Face Export Bundle")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path", overflow="fold")
+    for key, value in outputs.items():
+        table.add_row(key, value)
+    console.print(table)
+    console.print("[yellow]Recommended:[/yellow] upload private first, review README.md, then decide whether public is allowed.")
+
+
+@glucose_model_app.command(name="compare")
+def research_glucose_model_compare(
+    data: Annotated[Path, typer.Option(help="Normalized glucose dataset CSV/Parquet to evaluate on.")],
+    output_dir: Annotated[Path, typer.Option(help="Output directory for comparison reports.")] = Path(
+        "results/glucose_model_comparison"
+    ),
+    model_specs: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--model",
+            "-m",
+            help="Model checkpoint as label=path/to/predictor.pt. Repeat for MSE/Band/PINN models.",
+        ),
+    ] = None,
+    config: Annotated[Optional[Path], typer.Option(help="Comparison config YAML. Defaults to glucose-model quick config.")] = None,
+    include_baselines: Annotated[
+        bool,
+        typer.Option("--include-baselines/--no-baselines", help="Compare transparent LastValue/LinearTrend/Physiology baselines."),
+    ] = True,
+    mc_samples: Annotated[int, typer.Option(help="MC dropout samples for checkpoint uncertainty. Use 0 to disable.")] = 0,
+    max_roc_mgdl_min: Annotated[
+        float,
+        typer.Option(help="Maximum plausible predicted glucose rate-of-change in mg/dL/min."),
+    ] = 10.0,
+) -> None:
+    """Compare MSE/Band/PINN glucose models against baselines and physiology gates."""
+    console = Console()
+    try:
+        from iints.research.glucose_model import compare_glucose_models, parse_model_specs
+
+        bundle = compare_glucose_models(
+            data_path=data,
+            output_dir=output_dir,
+            model_specs=parse_model_specs(model_specs or []),
+            config_path=config,
+            include_baselines=include_baselines,
+            mc_samples=mc_samples,
+            max_roc_mgdl_min=max_roc_mgdl_min,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model compare failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Glucose Model Comparison")
+    table.add_column("Artifact", style="cyan")
+    table.add_column("Path / Value", overflow="fold")
+    table.add_row("Rows", str(bundle.row_count))
+    table.add_row("Models", str(bundle.model_count))
+    table.add_row("Report JSON", str(bundle.report_json))
+    table.add_row("Report Markdown", str(bundle.report_md))
+    table.add_row("Horizon metrics", str(bundle.horizon_metrics_csv))
+    table.add_row("Physiology violations", str(bundle.physiological_violations_csv))
+    table.add_row("Hypo detection", str(bundle.hypo_detection_csv))
+    table.add_row("Model-card metrics", str(bundle.model_card_metrics_json))
+    console.print(table)
+    console.print(
+        "[yellow]Promotion rule:[/yellow] do not promote a model just because MAE improves; "
+        "also inspect missed hypo rate, uncertainty, and physiological violations."
     )
 
 

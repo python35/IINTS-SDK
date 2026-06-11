@@ -329,3 +329,31 @@ critical events were recorded in the reproducible evidence bundle.
 ```
 
 Always report the exact numbers from `final/test_summary.json`; do not hard-code claims before the run is complete.
+
+## AI Red-Team Realism Audit
+
+After an endurance run, you can scan the generated CSV for impossible physiology and optionally ask local Ollama/Ministral to explain only the suspicious window:
+
+```bash
+python3 -m iints.tools.ai_realism_auditor \
+  results/jetson_7day/raw/steps.csv \
+  --report results/jetson_7day/final/AI_REALISM_AUDIT.md \
+  --no-ai
+```
+
+For the full educational AdvancedMetabolicModel stress demo with FFA and ketones:
+
+```bash
+PYTHONPATH=src python3 examples/jetson_endurance_test.py \
+  --days 14 \
+  --output results/red_team/endurance_data.csv \
+  --inject-demo-glitch
+
+PYTHONPATH=src python3 -m iints.tools.ai_realism_auditor \
+  results/red_team/endurance_data.csv \
+  --report results/red_team/AI_REALISM_AUDIT.md \
+  --no-ai
+```
+
+See `AI_RED_TEAM_AUDITOR.md` for the full workflow and LaTeX model equations.
+

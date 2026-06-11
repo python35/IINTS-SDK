@@ -9,13 +9,59 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
 
+# Import the local Ollama backend
+from iints.ai.backends.ollama import OllamaBackend
+
 class ClinicalAuditTrail:
     """Explainable AI system for clinical decision transparency"""
     
     def __init__(self):
         self.audit_log = []
         self.decision_context = {}
+        self.ollama = None
         
+    def _init_ollama(self):
+        if self.ollama is None:
+            self.ollama = OllamaBackend()
+            try:
+                self.ollama.ensure_model_ready()
+            except Exception as e:
+                print(f"Warning: Local AI not available: {e}")
+
+    def generate_ollama_insight(self, times, glucose, ffa, ketones, insulin):
+        """
+        Sends the raw physiological arrays to the local Mistral LLM via Ollama
+        for an Explainable AI clinical diagnosis.
+        """
+        self._init_ollama()
+        if not self.ollama or not self.ollama.available():
+            return "ERROR: Local Ollama AI is not running or available."
+            
+        # Format the data arrays for the LLM
+        data_summary = (
+            f"Time (min): {times[-5:]}\n"
+            f"Glucose (mg/dL): {[round(g, 1) for g in glucose[-5:]]}\n"
+            f"Insulin (U): {[round(i, 2) for i in insulin[-5:]]}\n"
+            f"FFA (mmol/L): {[round(f, 2) for f in ffa[-5:]]}\n"
+            f"Ketones (mmol/L): {[round(k, 2) for k in ketones[-5:]]}\n"
+        )
+        
+        system_prompt = (
+            "You are an Explainable AI for a Type 1 Diabetes Digital Twin. "
+            "You analyze raw mathematical arrays from the simulation and provide a clinical explanation. "
+            "Explain what the math is doing to the patient. If insulin is 0, mention hepatic glucose production. "
+            "If FFA and Ketones are rising, diagnose the lipotoxicity and Diabetic Ketoacidosis (DKA). "
+            "Keep the response professional, clinical, and under 4 sentences."
+        )
+        
+        user_prompt = f"Analyze the following patient state from the last 25 minutes of the simulation:\n{data_summary}"
+        
+        try:
+            response = self.ollama.complete(system_prompt=system_prompt, user_prompt=user_prompt)
+            return response
+        except Exception as e:
+            return f"AI Generation Failed: {e}"
+
     def log_decision(self, timestamp, glucose_current, glucose_trend, insulin_decision, 
                     algorithm_confidence, safety_override=False, context=None):
         """Log AI decision with clinical reasoning"""

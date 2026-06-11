@@ -1,0 +1,31 @@
+{
+  "study_metadata": {
+    "timestamp": "2026-06-06T23:48:43.382666",
+    "dataset": "Ohio University T1DM Dataset",
+    "patient_id": "559",
+    "framework": "IINTS-AF v1.0"
+  },
+  "clinical_benchmarks": {
+    "tir_70_180": 65.0,
+    "gmi": 7.3543936,
+    "cv_percent": 8.55176811709985
+  },
+  "algorithm_results": {
+    "rule_based": {
+      "tir_70_180": 64.67672303852284,
+      "improvement_percent": -0.32327696147716267,
+      "relative_improvement": -0.49734917150333197
+    },
+    "lstm": {
+      "tir_70_180": 74.63454834812889,
+      "improvement_percent": 9.634548348128888,
+      "relative_improvement": 14.822382074044452
+    },
+    "hybrid": {
+      "tir_70_180": 76.4205266756867,
+      "improvement_percent": 11.420526675686702,
+      "relative_improvement": 17.570041039518014
+    }
+  },
+  "citation": "Marling, C., & Bunescu, R. (2018). The OhioT1DM Dataset for Blood Glucose Level Prediction"
+}

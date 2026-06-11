@@ -267,3 +267,70 @@ def test_report_command_generates_agp_style_bundle(tmp_path) -> None:
     assert result.exit_code == 0
     assert (bundle_dir / "agp_report.pdf").is_file()
     assert (bundle_dir / "agp_summary.json").is_file()
+
+
+def test_research_glucose_model_commands_are_available() -> None:
+    result = runner.invoke(app, ["research", "glucose-model", "--help"])
+
+    assert result.exit_code == 0
+    assert "build-dataset" in result.stdout
+    assert "compare" in result.stdout
+    assert "export-hf" in result.stdout
+
+
+def test_research_glucose_model_init_writes_config(tmp_path) -> None:
+    output_dir = tmp_path / "glucose_model"
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "glucose-model",
+            "init",
+            "--output-dir",
+            str(output_dir),
+            "--profile",
+            "smoke",
+            "--history-minutes",
+            "60",
+            "--horizon-minutes",
+            "30",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "glucose_model_config.yaml").is_file()
+    assert (output_dir / "MODEL_INTENT.md").is_file()
+
+
+def test_research_glucose_model_compare_writes_research_gate_outputs(tmp_path) -> None:
+    rows = 130
+    dataset = tmp_path / "glucose.csv"
+    pd.DataFrame(
+        {
+            "time_minutes": [index * 5 for index in range(rows)],
+            "glucose": [120 + ((index % 24) - 12) * 1.5 for index in range(rows)],
+            "carbs": [35.0 if index in {20, 70} else 0.0 for index in range(rows)],
+            "insulin": [2.0 if index in {22, 72} else 0.0 for index in range(rows)],
+            "subject_id": ["demo"] * rows,
+        }
+    ).to_csv(dataset, index=False)
+    output_dir = tmp_path / "comparison"
+
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "glucose-model",
+            "compare",
+            "--data",
+            str(dataset),
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    assert (output_dir / "comparison_report.json").is_file()
+    assert (output_dir / "physiological_violation_metrics.csv").is_file()
+    report = json.loads((output_dir / "comparison_report.json").read_text())
+    assert report["model_count"] == 3

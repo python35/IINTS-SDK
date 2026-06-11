@@ -10,7 +10,7 @@ from .dataset import (
     compute_dataset_lineage,
 )
 from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
-from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
+from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss
 from .metrics import regression_metrics, band_regression_metrics, interval_coverage_metrics
 from .evaluation import (
     feature_drift_report,
@@ -89,6 +89,24 @@ from .results_manager import (
     index_results,
     summarize_results_csv,
 )
+from .glucose_model import (
+    GLUCOSE_MODEL_FEATURE_COLUMNS,
+    GLUCOSE_MODEL_ID,
+    GlucoseModelComparisonBundle,
+    GlucoseModelSpec,
+    GlucoseTrainingPack,
+    build_glucose_training_pack,
+    compare_glucose_models,
+    glucose_model_config_payload,
+    horizon_error_rows,
+    parse_model_specs,
+    physiological_violation_report,
+    public_manifest_from_private,
+    render_hf_comparison_interpretation,
+    standardize_glucose_forecast_frame,
+    write_glucose_model_config,
+    write_huggingface_export_bundle,
+)
 
 __all__ = [
     "PredictorConfig",
@@ -108,6 +126,7 @@ __all__ = [
     "QuantileLoss",
     "SafetyWeightedMSE",
     "BandWeightedMSE",
+    "PhysiologicalPINNLoss",
     "regression_metrics",
     "band_regression_metrics",
     "interval_coverage_metrics",
@@ -166,4 +185,20 @@ __all__ = [
     "discover_result_csvs",
     "index_results",
     "summarize_results_csv",
+    "GLUCOSE_MODEL_FEATURE_COLUMNS",
+    "GLUCOSE_MODEL_ID",
+    "GlucoseModelComparisonBundle",
+    "GlucoseModelSpec",
+    "GlucoseTrainingPack",
+    "build_glucose_training_pack",
+    "compare_glucose_models",
+    "glucose_model_config_payload",
+    "horizon_error_rows",
+    "parse_model_specs",
+    "physiological_violation_report",
+    "public_manifest_from_private",
+    "render_hf_comparison_interpretation",
+    "standardize_glucose_forecast_frame",
+    "write_glucose_model_config",
+    "write_huggingface_export_bundle",
 ]

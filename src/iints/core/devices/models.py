@@ -22,12 +22,12 @@ class SensorModel:
 
     def __init__(
         self,
-        noise_std: float = 0.0,
+        noise_std: float = 8.5,
         bias: float = 0.0,
-        lag_minutes: int = 0,
+        lag_minutes: int = 5,
         isf_tau_minutes: float = 5.0,
         noise_ar1_phi: float = 0.85,
-        noise_fbm_hurst: Optional[float] = None,
+        noise_fbm_hurst: Optional[float] = 0.78,
         dropout_prob: float = 0.0,
         seed: Optional[int] = None,
         drift_std_per_hour: float = 0.0,

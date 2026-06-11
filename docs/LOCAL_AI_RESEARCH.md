@@ -15,6 +15,8 @@ Do **not** confuse them:
 - A controller needs physiological inputs and numeric validation.
 - The deterministic safety supervisor still wraps experimental policy outputs.
 
+For the dedicated glucose-model workflow, start with [IINTS Glucose Forecast Model](GLUCOSE_MODEL.md). That page covers the new `iints research glucose-model ...` commands, long-training setup, and Hugging Face-safe export.
+
 ## Recommended Data Strategy
 
 Start by generating the dataset acquisition plan:

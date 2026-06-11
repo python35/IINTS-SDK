@@ -15,7 +15,7 @@ class TestBergmanPatientModel:
 
     def test_default_t1d_mode_disables_endogenous_secretion(self):
         model = BergmanPatientModel(initial_glucose=220.0)
-        d_state = model._ode(0.0, model._state.copy(), 0.0, 0.0)
+        d_state = model._ode(0.0, model._state.copy(), 0.0, 0.0, 0.0)
         assert d_state[2] == pytest.approx(0.0), "Default T1D Bergman mode should not add endogenous insulin secretion"
 
     def test_reset(self):
@@ -141,7 +141,7 @@ class TestBergmanPatientModel:
             }
         )
 
-        assert len(model.get_state()["ode_state"]) == 8
+        assert len(model.get_state()["ode_state"]) == 13
         assert model.update(5.0, 0.0, 0.0) >= 20.0
 
     def test_custom_bergman_params(self):

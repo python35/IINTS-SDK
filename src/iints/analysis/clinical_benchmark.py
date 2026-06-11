@@ -14,7 +14,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 # Add project root to path
-project_root = Path(__file__).parent.parent.parent
+project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from iints.data.adapter import DataAdapter
@@ -81,7 +81,7 @@ class ClinicalBenchmark:
         """Display benchmark results in formatted table with visualization"""
         
         # Import visualization tools
-        from tools.glucose_visualizer import GlucoseVisualizer
+        from tools.analysis.glucose_visualizer import GlucoseVisualizer
         viz = GlucoseVisualizer()
         
         # Show patient overview first

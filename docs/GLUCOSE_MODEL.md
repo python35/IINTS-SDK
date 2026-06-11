@@ -1,0 +1,275 @@
+# IINTS Glucose Forecast Model
+
+The IINTS glucose model workflow is for building a dedicated research-only model that reads glucose time-series context and predicts future glucose trends.
+
+It is designed for:
+
+- CGM trend forecasting
+- 30/60/120 minute glucose prediction experiments
+- hypoglycemia and hyperglycemia risk research
+- uncertainty and calibration studies
+- local AI experiments using OhioT1DM, AZT1D, HUPA-UCM, simulator exports, and Jetson endurance runs
+- Hugging Face model packaging without publishing private/raw dataset rows
+
+It is not designed for:
+
+- real-world treatment decisions
+- insulin or glucagon dosing authority
+- replacing a deterministic safety supervisor
+- uploading gated/private patient data to public repositories
+
+## Mental Model
+
+The workflow has four stages:
+
+```text
+prepared glucose datasets
+        ↓
+iints research glucose-model build-dataset
+        ↓
+normalized training pack + manifest + config
+        ↓
+iints research glucose-model train
+        ↓
+predictor.pt + training_report.json
+        ↓
+iints research glucose-model export-hf
+        ↓
+Hugging Face-ready model folder
+```
+
+The dedicated model line is called:
+
+```text
+iints-glucose-forecast-v0
+```
+
+This is intentionally a numeric time-series model, not a language model. LLMs can explain runs, summarize results, or manage research artifacts, but the glucose forecaster itself should be trained and evaluated as a physiological time-series predictor.
+
+The default training profile is **PINN-first**: the generated config uses `loss: pinn`, which combines forecast error with penalties for impossible glucose bounds, unrealistic rate-of-change, and suspicious IOB/COB logic.
+
+## Build A Training Pack
+
+Use one or more prepared datasets. Keep full/private OhioT1DM data outside git.
+
+```bash
+export OHIO_T1DM_ROOT="/path/to/OhioT1DM-volledig"
+
+PYTHONPATH=src python3 research/prepare_ohio_t1dm.py \
+  --input "$OHIO_T1DM_ROOT" \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+```
+
+Then normalize the training sources into the glucose-model contract:
+
+```bash
+iints research glucose-model build-dataset \
+  --input data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --input results/realism_learning_10k/research/predictor_training.csv \
+  --labels ohio_full,sim_10k \
+  --profile long \
+  --history-minutes 360 \
+  --horizon-minutes 120 \
+  --output-dir models/iints-glucose-forecast-v0/dataset
+```
+
+This writes:
+
+```text
+models/iints-glucose-forecast-v0/dataset/
+├── glucose_training_dataset.csv
+├── glucose_dataset_manifest.json
+├── glucose_model_config.yaml
+└── MODEL_INTENT.md
+```
+
+## Train The Model
+
+For a quick smoke test:
+
+```bash
+iints research glucose-model train \
+  --data models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
+  --output-dir models/iints-glucose-forecast-v0 \
+  --epochs 2
+```
+
+For a serious long local run:
+
+```bash
+iints research glucose-model train \
+  --data models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
+  --output-dir models/iints-glucose-forecast-v0 \
+  --epochs 220 \
+  --batch-size 256 \
+  --export-hf
+```
+
+The training output includes:
+
+```text
+models/iints-glucose-forecast-v0/
+├── predictor.pt
+├── training_report.json
+├── glucose_model_config.resolved.yaml
+└── huggingface/
+```
+
+## Evaluate Against Held-Out Data
+
+Use external data as a separate benchmark whenever possible:
+
+```bash
+PYTHONPATH=src python3 research/evaluate_predictor.py \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --model models/iints-glucose-forecast-v0/predictor.pt \
+  --config models/iints-glucose-forecast-v0/glucose_model_config.resolved.yaml \
+  --reference-data models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --out results/iints_glucose_forecast_v0_eval.json \
+  --mc-samples 30
+```
+
+Minimum metrics to inspect:
+
+- MAE and RMSE by forecast horizon
+- band-wise error for hypo, target, and hyper ranges
+- missed hypoglycemia rate
+- false hypoglycemia alarm rate
+- uncertainty calibration if MC dropout is used
+- subject-level split and leakage audit
+- external dataset performance, not just internal validation
+
+## Compare MSE, Band-Weighted, And PINN Models
+
+After training multiple candidates, compare them with one command:
+
+```bash
+iints research glucose-model compare \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
+  --model mse=models/glucose_mse/predictor.pt \
+  --model band=models/glucose_band/predictor.pt \
+  --model pinn=models/iints-glucose-forecast-v0/predictor.pt \
+  --mc-samples 30 \
+  --output-dir results/glucose_model_comparison
+```
+
+This writes:
+
+```text
+results/glucose_model_comparison/
+├── comparison_report.json
+├── comparison_report.md
+├── horizon_metrics.csv
+├── physiological_violation_metrics.csv
+├── hypo_detection_metrics.csv
+├── model_card_metrics.json
+└── figures/
+```
+
+The key idea is simple: do not promote a model just because MAE improved. A useful diabetes model must also reduce missed hypoglycemia, avoid overconfident uncertainty, and reduce physiologically impossible predictions.
+
+The comparison gate checks:
+
+- MAE, RMSE, bias, and within-range error
+- per-horizon metrics across the forecast window
+- missed hypoglycemia rate and false hypo alarms
+- impossible glucose predictions below 20 mg/dL or above 600 mg/dL
+- unrealistic predicted rate-of-change
+- suspicious rise with high IOB and no COB
+- suspicious drop with COB and no IOB
+
+For the scientific reasoning behind these outputs, see [Interpreting Glucose Forecast Results](comparison_interpretation.md).
+That page explains why the lowest MSE is not automatically the best research model, why PINN can be preferable, and why long-horizon forecasts are harder.
+
+## Export For Hugging Face
+
+After training:
+
+```bash
+iints research glucose-model export-hf \
+  --model-dir models/iints-glucose-forecast-v0 \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --comparison-dir results/glucose_model_comparison \
+  --repo-id YOUR_USERNAME/iints-glucose-forecast-v0 \
+  --output-dir models/iints-glucose-forecast-v0/huggingface
+```
+
+The export folder contains:
+
+```text
+huggingface/
+├── README.md
+├── PUBLISHING.md
+├── privacy.md
+├── limitations.md
+├── config.json
+├── glucose_model_config.yaml
+├── predictor.pt
+├── training_report.json
+├── dataset_manifest.public.json
+├── comparison_report.md
+├── comparison_interpretation.md
+├── comparison_report.json
+├── horizon_metrics.csv
+├── physiological_violation_metrics.csv
+├── hypo_detection_metrics.csv
+├── model_card_metrics.json
+└── examples/
+    ├── inference_example.py
+    └── sample_glucose_trace.csv
+```
+
+The public manifest redacts local source paths and raw file hashes. This is important for gated datasets such as OhioT1DM.
+The comparison files are optional, but strongly recommended before publishing because they show why the model is judged by physiology-aware safety gates, not only by MAE.
+
+## Private-First Upload
+
+Upload privately first:
+
+```bash
+cd models/iints-glucose-forecast-v0/huggingface
+huggingface-cli upload YOUR_USERNAME/iints-glucose-forecast-v0 . . --private
+```
+
+Before making it public, verify:
+
+- no raw OhioT1DM rows are included
+- no private local file paths are visible
+- the model card clearly says research-only and not for treatment
+- evaluation includes held-out subjects
+- limitations and uncertainty are documented
+
+## Feature Contract
+
+The v0 feature contract includes:
+
+```text
+glucose_actual_mgdl
+glucose_trend_mgdl_min
+patient_iob_units
+patient_cob_grams
+delivered_insulin_units
+carb_intake_grams
+effective_isf
+effective_icr
+effective_basal_rate_u_per_hr
+exercise_intensity
+stress_intensity
+steps
+heart_rate
+time_of_day_sin
+time_of_day_cos
+glucagon_mg
+haaf_memory
+```
+
+Missing optional features are filled with conservative defaults during dataset preparation. Glucose is required.
+
+## Research Boundary
+
+This model should be treated as a forecast signal only. In IINTS controller experiments, the deterministic supervisor remains the final authority. The model can inform analysis and simulation, but it must never bypass safety constraints.

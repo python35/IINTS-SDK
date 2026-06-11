@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.13](v1.5.13.md) - AI Red-Team Realism Auditor workflow
 - [v1.5.12](v1.5.12.md)
 - [v1.5.11](v1.5.11.md)
 - [v1.5.10](v1.5.10.md)

@@ -33,7 +33,7 @@ from iints.research.dataset import (
 )
 from iints.research.metrics import band_regression_metrics, regression_metrics
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
-from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE
+from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss
 from iints.research.model_registry import append_registry_entry
 
 
@@ -139,13 +139,17 @@ def _update_registry(registry_path: Path, entry: dict) -> None:
 # Evaluation helper
 # ---------------------------------------------------------------------------
 
-def _evaluate(model: LSTMPredictor, loader: DataLoader) -> float:
+def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) -> float:
     model.eval()
     total = 0.0
     with torch.no_grad():
         for batch_x, batch_y in loader:
             preds = model(batch_x)
-            total += nn.functional.mse_loss(preds, batch_y).item()
+            if isinstance(criterion, PhysiologicalPINNLoss):
+                loss = criterion(preds, batch_y, batch_x)
+            else:
+                loss = criterion(preds, batch_y)
+            total += loss.item()
     return total / max(1, len(loader))
 
 
@@ -383,6 +387,18 @@ def main() -> None:
             f"high_w={training_cfg.band_weighted_high_weight}, "
             f"max_w={training_cfg.band_weighted_max_weight})"
         )
+    elif training_cfg.loss == "pinn":
+        criterion = cast(nn.Module, PhysiologicalPINNLoss(
+            feature_columns=predictor_cfg.feature_columns,
+            pinn_lambda=training_cfg.pinn_lambda,
+            pinn_max_roc=training_cfg.pinn_max_roc,
+            time_step_minutes=predictor_cfg.time_step_minutes,
+        ))
+        print(
+            "Loss: pinn "
+            f"(lambda={training_cfg.pinn_lambda}, "
+            f"max_roc={training_cfg.pinn_max_roc})"
+        )
     else:
         criterion = nn.MSELoss()
         print("Loss: MSE")
@@ -415,19 +431,33 @@ def main() -> None:
     best_state: dict | None = None
     patience = 0
 
+    # For warm-start fine-tuning, the incoming checkpoint is a valid candidate.
+    # Without this guard, a fine-tune run can make a strong model worse even when
+    # early stopping is enabled, because only post-epoch states are considered.
+    if args.warm_start and training_cfg.early_stopping_patience > 0:
+        initial_val = _evaluate(model, val_loader, criterion)
+        best_val = initial_val
+        best_epoch = 0
+        best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        metrics["initial_val_loss"] = initial_val
+        print(f"Warm-start baseline val={initial_val:.4f}")
+
     for epoch in range(training_cfg.epochs):
         model.train()
         train_loss = 0.0
         for batch_x, batch_y in train_loader:
             optimizer.zero_grad()
             preds = model(batch_x)
-            loss = criterion(preds, batch_y)
+            if isinstance(criterion, PhysiologicalPINNLoss):
+                loss = criterion(preds, batch_y, batch_x)
+            else:
+                loss = criterion(preds, batch_y)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
         train_loss /= max(1, len(train_loader))
 
-        val_loss = _evaluate(model, val_loader)
+        val_loss = _evaluate(model, val_loader, criterion)
 
         metrics["train_loss"].append(train_loss)
         metrics["val_loss"].append(val_loss)

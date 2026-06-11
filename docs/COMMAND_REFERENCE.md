@@ -333,6 +333,55 @@ Pass `--wall-clock` here too when the generated service should preserve real-tim
 ### `iints research blend-datasets`
 Blend already prepared real datasets into one source-aware predictor dataset.
 
+### `iints research glucose-model build-dataset`
+Normalize one or more prepared glucose datasets into the dedicated `iints-glucose-forecast-v0` training contract:
+
+```bash
+iints research glucose-model build-dataset \
+  --input data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --input results/realism_learning_10k/research/predictor_training.csv \
+  --labels ohio_full,sim_10k \
+  --profile long \
+  --output-dir models/iints-glucose-forecast-v0/dataset
+```
+
+### `iints research glucose-model train`
+Train the dedicated glucose-forecast model and optionally build a Hugging Face-ready export folder:
+
+```bash
+iints research glucose-model train \
+  --data models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
+  --output-dir models/iints-glucose-forecast-v0 \
+  --epochs 220 \
+  --comparison-dir results/glucose_model_comparison \
+  --export-hf
+```
+
+### `iints research glucose-model compare`
+Compare transparent baselines and trained MSE/Band/PINN checkpoints against physiology-aware gates:
+
+```bash
+iints research glucose-model compare \
+  --data data_packs/public/ohio_t1dm_full/processed/ohio_test.csv \
+  --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
+  --model mse=models/glucose_mse/predictor.pt \
+  --model pinn=models/iints-glucose-forecast-v0/predictor.pt \
+  --mc-samples 30 \
+  --output-dir results/glucose_model_comparison
+```
+
+### `iints research glucose-model export-hf`
+Package `predictor.pt`, `training_report.json`, the model config, privacy/limitations notes, examples, comparison metrics, a research-only model card, and a redacted public dataset manifest for Hugging Face:
+
+```bash
+iints research glucose-model export-hf \
+  --model-dir models/iints-glucose-forecast-v0 \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --comparison-dir results/glucose_model_comparison \
+  --repo-id YOUR_USERNAME/iints-glucose-forecast-v0
+```
+
 ### `iints research build-control-dataset`
 Combine one or more run bundles into a supervised controller teacher dataset.
 
