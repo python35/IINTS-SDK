@@ -176,7 +176,7 @@ class AIRealismAuditor:
                     detail = f"{detail} Event marker: {event}."
                 anomalies.append(
                     Anomaly(
-                        index=int(idx),
+                        index=int(str(idx)),
                         time_min=float(row["time_min"]),
                         kind=flag[0],
                         detail=detail,

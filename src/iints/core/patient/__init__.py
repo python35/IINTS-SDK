@@ -6,6 +6,6 @@ try:
     from .advanced_metabolic_model import AdvancedMetabolicModel
 except ImportError:  # pragma: no cover - scipy may not be installed
     BergmanPatientModel = None  # type: ignore[assignment,misc]
-    AdvancedMetabolicModel = None
+    AdvancedMetabolicModel = None  # type: ignore[assignment,misc]
 
 __all__ = ["PatientProfile", "PatientModel", "BergmanPatientModel", "AdvancedMetabolicModel"]
