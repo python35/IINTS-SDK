@@ -109,14 +109,11 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         dGamma_dt = U_Gamma / V_glucagon - p.k_e_glucagon * Gamma
         dx_gluc_dt = -p.k_a_glucagon * x_gluc + p.S_glucagon * p.k_a_glucagon * Gamma
 
-        # --- Dawn phenomenon ---
-        dawn = 0.0
-        if self.dawn_phenomenon_strength > 0:
-            minutes_in_day = current_time % 1440
-            ds = self.dawn_start_hour * 60
-            de = self.dawn_end_hour * 60
-            if ds <= minutes_in_day <= de:
-                dawn = self.dawn_phenomenon_strength / 60.0  # mg/dL/min
+        # --- Circadian Rhythms & Dawn Phenomenon ---
+        # Continuous mathematical model: EGP peaks around 05:00 AM.
+        t_hours = (current_time / 60.0) % 24
+        A_circadian = 0.2 if self.dawn_phenomenon_strength > 0 else 0.0
+        circadian_multiplier = 1.0 + A_circadian * np.cos((2 * np.pi / 24) * (t_hours - 5.0))
 
         # --- Exercise & Stress Physiologic Impact ---
         exercise_p1_multiplier = 1.0
@@ -125,7 +122,8 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         if self.is_exercising:
             exercise_p1_multiplier = 1.0 + 2.0 * self.exercise_intensity
             exercise_p3_multiplier = 1.0 + 2.0 * self.exercise_intensity
-            exercise_glucose_uptake = self.exercise_intensity * self.exercise_glucose_consumption_rate
+            # Uptake is proportional to both intensity and available glucose
+            exercise_glucose_uptake = self.exercise_intensity * 0.005 * G
 
         stress_p1_multiplier = 1.0
         stress_p3_multiplier = 1.0
@@ -144,10 +142,10 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         k_haaf_decay = 1.0 / (24 * 60)
         dHAAF_dt = k_haaf_build * hypo_delta * (1.0 - HAAF) - k_haaf_decay * HAAF
 
-        # --- NEW: Beta-cell autoimmune decay ---
+        # --- Beta-cell autoimmune decay ---
         dBeta_dt = -self.autoimmune_aggressiveness * Beta
 
-        # --- NEW: FFA & Ketone Dynamics ---
+        # --- FFA & Ketone Dynamics ---
         # F basal = 0.4. Max = 2.0. Insulin sharply suppresses lipolysis.
         l_0 = 0.2
         l_1 = 0.23
@@ -173,13 +171,15 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         starvation_factor = np.exp(-0.4 * I) * (max(F, 0.4) / 0.4)
         hepatic_glucose_production_multiplier = 1.0 + 3.0 * starvation_factor
 
-        # Gb is multiplied by stress, rescue adrenaline, exogenous glucagon, and hepatic starvation
-        Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier
+        # Gb is multiplied by stress, rescue adrenaline, exogenous glucagon, hepatic starvation, and circadian rhythms
+        Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier * circadian_multiplier
 
         # --- Physiological Renal Clearance ---
-        smooth_threshold_diff = G - 162.0
+        # RTG (Renal Threshold for Glucose) = 180.0 mg/dL, c_renal = 0.005
+        # Softplus prevents stiffness for ODE solver
+        smooth_threshold_diff = G - 180.0
         softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
-        F_R = 0.003 * softplus_diff
+        RGC = 0.005 * softplus_diff
 
         # --- dG/dt (INSTABILITY UPGRADE) ---
         # In the original model: dGdt = -(p1_eff + X)*G + p1_eff*Gb_eff + ...
@@ -190,7 +190,7 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         
         # In T1D, Glucose Effectiveness at zero insulin (GEZI) is very low. 
         # We drop the automatic -p1_eff * G tissue uptake and ONLY rely on insulin (X).
-        dGdt = -X * G + EGP + Ra + dawn - exercise_glucose_uptake - F_R
+        dGdt = -X * G + EGP + Ra - exercise_glucose_uptake - RGC
 
         # --- dX/dt ---
         dXdt = -p.p2 * X + p3_eff * max(I - p.Ib, 0.0)
