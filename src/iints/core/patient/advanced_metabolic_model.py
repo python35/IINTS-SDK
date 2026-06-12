@@ -7,13 +7,14 @@ from .bergman_model import BergmanPatientModel, BergmanParameters
 class AdvancedMetabolicModel(BergmanPatientModel):
     """
     Advanced Metabolic Model for IINTS-AF.
-    Extends the 13-state Bergman model to a 16-state model including:
+    Extends the 13-state Bergman model to an 18-state model including:
     - F: Free Fatty Acids (FFA) (mmol/L)
     - K: Ketone Bodies (mmol/L)
     - Beta: Residual Beta-cell mass fraction (0.0 to 1.0)
+    - Q_fat: Fat stomach pool (grams)
+    - Q_prot: Protein stomach pool (grams)
     
-    Includes lipotoxicity (high FFA causes insulin resistance) and 
-    DKA (Ketone production under extreme insulin deficiency).
+    Includes lipotoxicity, DKA, illness, menstrual cycles, and cannula degradation.
     """
 
     def __init__(
@@ -31,10 +32,19 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         self.initial_ketones = initial_ketones
         self.gamma_healthy = gamma_healthy
         
+        # --- NEW GAMECHANGER STATES & FLAGS ---
+        self.is_ill = False
+        self.illness_severity = 0.0  # 0.0 to 1.0
+        
+        self.menstrual_cycle_active = False
+        self.cycle_start_time_minutes = 0.0  # Time offset for the 28-day wave
+        
+        self.pump_cannula_age_minutes = 0.0  # Tracks lipohypertrophy
+        
         super().__init__(**kwargs)
         
-        # Override the 13-state with 16-state
-        # State vector: [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta]
+        # Override the 13-state with 18-state
+        # State vector: [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta, Q_fat, Q_prot]
         self._state = np.array([
             self.initial_glucose,  # 0: G
             0.0,                   # 1: X
@@ -52,14 +62,17 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             self.initial_ffa,      # 13: F (FFA)
             self.initial_ketones,  # 14: K (Ketones)
             self.initial_beta_mass,# 15: Beta
+            0.0,                   # 16: Q_fat
+            0.0,                   # 17: Q_prot
         ], dtype=np.float64)
 
     def reset(self) -> None:
         super().reset()
         self._state = np.array([
             self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, self.initial_ffa, self.initial_ketones, self.initial_beta_mass
+            0.0, 0.0, 0.0, 0.0, 0.0, self.initial_ffa, self.initial_ketones, self.initial_beta_mass, 0.0, 0.0
         ], dtype=np.float64)
+        self.pump_cannula_age_minutes = 0.0
 
     def get_patient_state(self) -> Dict[str, float]:
         state_dict = super().get_patient_state()
@@ -67,6 +80,8 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             "plasma_ffa_mmol_L": float(self._state[13]),
             "plasma_ketones_mmol_L": float(self._state[14]),
             "residual_beta_cell_mass": float(self._state[15]),
+            "fat_pool_g": float(self._state[16]),
+            "protein_pool_g": float(self._state[17]),
         })
         return state_dict
 
@@ -74,14 +89,40 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         if "ode_state" in state:
             ode_state = np.array(state["ode_state"], dtype=np.float64)
             if ode_state.size == 13:
-                # Upgrade legacy 13-state to 16-state
-                ode_state = np.append(ode_state, [self.initial_ffa, self.initial_ketones, self.initial_beta_mass])
+                # Upgrade legacy 13-state to 18-state
+                ode_state = np.append(ode_state, [self.initial_ffa, self.initial_ketones, self.initial_beta_mass, 0.0, 0.0])
+            elif ode_state.size == 16:
+                # Upgrade legacy 16-state to 18-state
+                ode_state = np.append(ode_state, [0.0, 0.0])
             self._state = ode_state
         # Call super for the rest, but temporarly pop ode_state so super doesn't overwrite it
         st_copy = state.copy()
         if "ode_state" in st_copy:
             del st_copy["ode_state"]
         super().set_state(st_copy)
+
+    def update(
+        self,
+        dt_minutes: float,
+        delivered_insulin: float = 0.0,
+        delivered_glucagon: float = 0.0,
+        carb_intake: float = 0.0,
+        fat_intake: float = 0.0,
+        protein_intake: float = 0.0,
+        current_time_minutes: Optional[float] = None,
+    ) -> float:
+        # Pre-update: Add macronutrients and age the cannula
+        self._state[16] += fat_intake
+        self._state[17] += protein_intake
+        self.pump_cannula_age_minutes += dt_minutes
+        
+        return super().update(
+            dt_minutes=dt_minutes,
+            delivered_insulin=delivered_insulin,
+            delivered_glucagon=delivered_glucagon,
+            carb_intake=carb_intake,
+            current_time_minutes=current_time_minutes,
+        )
 
     def _ode(
         self,
@@ -91,13 +132,26 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         u_glucagon_pg_per_min: float,
         current_time: float,
     ) -> np.ndarray:
-        # Unpack 16 states
-        G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta = y
+        # Unpack 18 states
+        G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta, Q_fat, Q_prot = y
         p = self.params
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
         Vi_abs = p.Vi * p.body_weight_kg    # L
         V_glucagon = p.V_glucagon_per_kg * p.body_weight_kg
+        
+        # --- Fat & Protein Macronutrient Kinetics ---
+        # Fat decays very slowly, Half-life ~4 hours
+        k_fat = 1.0 / 240.0
+        dQ_fat_dt = -k_fat * Q_fat
+        
+        # Protein decays very slowly, Half-life ~5 hours
+        k_prot = 1.0 / 300.0
+        dQ_prot_dt = -k_prot * Q_prot
+        
+        # Protein Gluconeogenesis: ~50% of protein becomes glucose very slowly.
+        # R_a_prot adds to EGP. (Convert grams to mg, divide by Vg_abs to get mg/dL/min)
+        Ra_prot = 0.5 * k_prot * Q_prot * 1000.0 / Vg_abs
 
         # --- Glucose rate of appearance from gut ---
         Ra = (p.k_abs * Q_gut) / Vg_abs  # mg/dL/min
@@ -110,7 +164,6 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         dx_gluc_dt = -p.k_a_glucagon * x_gluc + p.S_glucagon * p.k_a_glucagon * Gamma
 
         # --- Circadian Rhythms & Dawn Phenomenon ---
-        # Continuous mathematical model: EGP peaks around 05:00 AM.
         t_hours = (current_time / 60.0) % 24
         A_circadian = 0.2 if self.dawn_phenomenon_strength > 0 else 0.0
         circadian_multiplier = 1.0 + A_circadian * np.cos((2 * np.pi / 24) * (t_hours - 5.0))
@@ -122,7 +175,6 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         if self.is_exercising:
             exercise_p1_multiplier = 1.0 + 2.0 * self.exercise_intensity
             exercise_p3_multiplier = 1.0 + 2.0 * self.exercise_intensity
-            # Uptake is proportional to both intensity and available glucose
             exercise_glucose_uptake = self.exercise_intensity * 0.005 * G
 
         stress_p1_multiplier = 1.0
@@ -132,6 +184,18 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             stress_p1_multiplier = 1.0 - 0.2 * self.stress_intensity
             stress_p3_multiplier = 1.0 - 0.7 * self.stress_intensity
             stress_Gb_multiplier = 1.0 + 0.5 * self.stress_intensity
+            
+        # --- Illness / Cytokine Resistance ---
+        illness_Gb_multiplier = 1.0 + 0.8 * self.illness_severity if self.is_ill else 1.0
+        illness_p3_multiplier = 1.0 - 0.5 * self.illness_severity if self.is_ill else 1.0
+        
+        # --- Menstrual Cycle Hormonal Drifts ---
+        cycle_p3_multiplier = 1.0
+        if self.menstrual_cycle_active:
+            # 28 days = 40320 minutes
+            cycle_time = (current_time - self.cycle_start_time_minutes) % 40320
+            # Sine wave peaking in resistance (lowest p3) around day 21 (luteal phase)
+            cycle_p3_multiplier = 1.0 - 0.25 * np.sin(2 * np.pi * cycle_time / 40320.0)
 
         # --- Endogenous Rescue & HAAF ---
         hypo_delta = max(0.0, 70.0 - G)
@@ -146,74 +210,59 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         dBeta_dt = -self.autoimmune_aggressiveness * Beta
 
         # --- FFA & Ketone Dynamics ---
-        # F basal = 0.4. Max = 2.0. Insulin sharply suppresses lipolysis.
-        l_0 = 0.2
-        l_1 = 0.23
-        k_f = 0.1
+        l_0, l_1, k_f = 0.2, 0.23, 0.1
         dF_dt = l_0 * np.exp(-l_1 * I) - k_f * F
 
-        # K basal = 0.1. Max = 5.0. Ketone production driven by high F and very low I.
-        k_0 = 0.125
-        k_1 = 0.33
-        k_2 = 0.05
+        k_0, k_1, k_2 = 0.125, 0.33, 0.05
         dK_dt = k_0 * F * np.exp(-k_1 * I) - k_2 * K
 
         # --- Lipotoxicity (Insulin Resistance via FFAs) ---
-        # Normal F is 0.4. If F rises to 2.0, sensitivity (p3) drops to 0.4 / 2.0 = 20%
         lipotoxicity_factor = 0.4 / max(0.4, F)
 
         p1_eff = p.p1 * exercise_p1_multiplier * stress_p1_multiplier
-        p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier * lipotoxicity_factor
+        # Total p3 is degraded by lipotoxicity, acute illness, and menstrual hormonal drifts
+        p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier * lipotoxicity_factor * illness_p3_multiplier * cycle_p3_multiplier
         
-        # In T1D with zero insulin, the liver aggressively produces glucose (EGP).
-        # We model this by increasing the basal glucose target Gb_eff exponentially 
-        # as insulin drops and FFAs rise (hepatic insulin resistance).
         starvation_factor = np.exp(-0.4 * I) * (max(F, 0.4) / 0.4)
         hepatic_glucose_production_multiplier = 1.0 + 3.0 * starvation_factor
 
-        # Gb is multiplied by stress, rescue adrenaline, exogenous glucagon, hepatic starvation, and circadian rhythms
-        Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier * circadian_multiplier
+        # Gb is multiplied by stress, rescue adrenaline, exogenous glucagon, hepatic starvation, circadian rhythms, and illness
+        Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier * circadian_multiplier * illness_Gb_multiplier
 
         # --- Physiological Renal Clearance ---
-        # RTG (Renal Threshold for Glucose) = 180.0 mg/dL, c_renal = 0.05
-        # Softplus prevents stiffness for ODE solver
         smooth_threshold_diff = G - 180.0
         softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
         RGC = 0.05 * softplus_diff
 
         # --- dG/dt (INSTABILITY UPGRADE) ---
-        # In the original model: dGdt = -(p1_eff + X)*G + p1_eff*Gb_eff + ...
-        # This forces G to magically return to Gb_eff (Homeostasis).
-        # We decouple this to make it a true T1D unstable model.
-        # Basal Endogenous Glucose Production:
         EGP = p1_eff * Gb_eff
-        
-        # In T1D, Glucose Effectiveness at zero insulin (GEZI) is very low. 
-        # We drop the automatic -p1_eff * G tissue uptake and ONLY rely on insulin (X).
-        dGdt = -X * G + EGP + Ra - exercise_glucose_uptake - RGC
+        dGdt = -X * G + EGP + Ra + Ra_prot - exercise_glucose_uptake - RGC
 
         # --- dX/dt ---
         dXdt = -p.p2 * X + p3_eff * max(I - p.Ib, 0.0)
+        
+        # --- Cannula Degradation / Lipohypertrophy ---
+        # After 48 hours (2880 mins), absorption drops linearly by up to 30%
+        cannula_degradation_factor = 1.0 - 0.3 * min(1.0, max(0.0, (self.pump_cannula_age_minutes - 2880) / 2880.0))
+        ka_eff = p.k_a * cannula_degradation_factor
 
         # --- dS1/dt, dS2/dt (Subcutaneous Insulin Absorption) ---
-        dS1dt = u_insulin_mu_per_min - p.k_a * S1
-        dS2dt = p.k_a * S1 - p.k_a * S2
+        dS1dt = u_insulin_mu_per_min - ka_eff * S1
+        dS2dt = ka_eff * S1 - ka_eff * S2
 
         # Rate of appearance of insulin into plasma (mU/min)
-        Ra_I = p.k_a * S2
+        Ra_I = ka_eff * S2
 
         # --- dI/dt (Including residual beta-cell endogenous secretion) ---
-        # Beta is fraction of healthy beta cells.
         endogenous_secretion = Beta * self.gamma_healthy * max(G - p.h, 0.0)
-        
-        # In T1D, basal endogenous insulin (p.Ib) should be proportional to Beta mass.
-        # If Beta = 0, and pump is off, insulin should decay to ZERO, not p.Ib.
         target_Ib = p.Ib * Beta
         
         dIdt = -p.n * (I - target_Ib) + endogenous_secretion + Ra_I / Vi_abs
 
-        # --- Dalla Man Multi-compartment Meal Kinetcs ---
-        gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
+        # --- Dalla Man Multi-compartment Meal Kinetcs (Fat-Delayed) ---
+        # Fat massively delays gastric emptying.
+        fat_delay_factor = np.exp(-0.02 * Q_fat) 
+        gastric_emptying_rate = (1.0 / max(float(p.tau_meal), 1.0)) * fat_delay_factor
         solid_to_liquid_rate = gastric_emptying_rate * 1.5 
         dQ_sto1_dt = -solid_to_liquid_rate * Q_sto1
         dQ_sto2_dt = solid_to_liquid_rate * Q_sto1 - gastric_emptying_rate * Q_sto2
@@ -222,5 +271,5 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         return np.array([
             dGdt, dXdt, dIdt, dQ_sto1_dt, dQ_sto2_dt, dQ_gut_dt, 
             dS1dt, dS2dt, dY1_dt, dY2_dt, dGamma_dt, dx_gluc_dt, 
-            dHAAF_dt, dF_dt, dK_dt, dBeta_dt
+            dHAAF_dt, dF_dt, dK_dt, dBeta_dt, dQ_fat_dt, dQ_prot_dt
         ])

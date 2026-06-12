@@ -50,7 +50,23 @@ The simulation engine is primarily built on the `AdvancedMetabolicModel`, an ext
 **Foundation:** Emergency hormonal rescue.
 **Key Feature:** Simulates the pharmacokinetics of a glucagon injection (via compartments $Y_1, Y_2, \Gamma$) and its immediate physiological trigger on hepatic glycogen release to rescue the digital twin from severe hypoglycemia.
 
+## 12. Multi-Macronutrient Gastric Emptying
+**Foundation:** Advanced meal composition modeling.
+**Key Feature:** Moving beyond simple carbohydrate counting, the SDK models fat and protein intake ($Q_{fat}, Q_{prot}$). Fat intake applies a massive exponential delay to the gastric emptying rate ($k_{emp}$), trapping food in the stomach longer. Protein slowly undergoes gluconeogenesis, feeding a delayed glucose rate of appearance ($R_{a,prot}$) up to 6 hours later.
+
+## 13. Cannula Degradation & Lipohypertrophy
+**Foundation:** Mechanical tissue resistance.
+**Key Feature:** In the real world, insulin pump sites degrade over time. The SDK tracks the age of the inserted cannula. After 48 hours, the subcutaneous insulin absorption constants ($k_{a1}, k_{a2}$) begin to degrade linearly by up to 30%, mathematically simulating tissue scarring (lipohypertrophy) and causing late-stage insulin resistance in endurance simulations.
+
+## 14. Menstrual Cycle Hormonal Drifts
+**Foundation:** Female biology and long-term hormonal cyclical resistance.
+**Key Feature:** The SDK overlays a 28-day low-frequency sinusoidal wave onto the base insulin sensitivity parameter ($p_3$). This perfectly models the massive fluctuations in insulin requirements across the Follicular and Luteal phases, enabling true month-long algorithmic stress testing for female patients.
+
+## 15. Acute Illness & Cytokine Resistance
+**Foundation:** Immune system stress response.
+**Key Feature:** When the digital twin enters a state of acute illness (e.g., flu or bacterial infection), the release of cytokines triggers a massive spike in counter-regulatory stress hormones. The SDK simulates this by violently suppressing insulin sensitivity ($p_3$) while simultaneously spiking Basal Glucose Production ($Gb$), acting as the ultimate catalyst for spontaneous Diabetic Ketoacidosis.
+
 ---
 
 ### Conclusion
-By blending these **11 isolated physiological theories** into a single cohesive, interacting 16-state mathematical framework, IINTS-AF successfully creates a true-to-life Digital Twin capable of predicting real-world biological chaos.
+By blending these **15 isolated physiological theories** into a single cohesive, interacting 18-state mathematical framework, IINTS-AF successfully creates a true-to-life Digital Twin capable of predicting real-world biological chaos.
