@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v1.5.15
+
+Release date: 2026-06-13
+
+### Fixed
+
+- fixed the `AdvancedMetabolicModel.update()` signature so it remains compatible with `BergmanPatientModel.update()` under mypy
+- kept `fat_intake`, `protein_intake`, `dt_minutes`, `delivered_glucagon`, and `current_time_minutes` support through keyword arguments
+
+### Verified
+
+- `mypy src/iints/`: no issues found in 182 source files
+- advanced metabolic/scientific fidelity tests: `8 passed`
+
+
 ## v1.5.14
 
 Release date: 2026-06-12
