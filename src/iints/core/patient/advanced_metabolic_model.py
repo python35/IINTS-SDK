@@ -175,11 +175,11 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier * circadian_multiplier
 
         # --- Physiological Renal Clearance ---
-        # RTG (Renal Threshold for Glucose) = 180.0 mg/dL, c_renal = 0.005
+        # RTG (Renal Threshold for Glucose) = 180.0 mg/dL, c_renal = 0.05
         # Softplus prevents stiffness for ODE solver
         smooth_threshold_diff = G - 180.0
         softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
-        RGC = 0.005 * softplus_diff
+        RGC = 0.05 * softplus_diff
 
         # --- dG/dt (INSTABILITY UPGRADE) ---
         # In the original model: dGdt = -(p1_eff + X)*G + p1_eff*Gb_eff + ...
