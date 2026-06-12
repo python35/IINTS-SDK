@@ -27,7 +27,7 @@ def test_advanced_metabolic_model_backward_compatible_aliases():
     patient = AdvancedMetabolicModel(initial_glucose=120.0)
 
     glucose = patient.update(
-        5.0,
+        dt_minutes=5.0,
         delivered_insulin=0.8,
         delivered_glucagon=0.0,
         current_time_minutes=15.0,

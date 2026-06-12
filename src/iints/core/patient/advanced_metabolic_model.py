@@ -108,19 +108,20 @@ class AdvancedMetabolicModel(BergmanPatientModel):
 
     def update(
         self,
-        time_step: float,
+        time_step: float = 0.0,
         delivered_insulin: float = 0.0,
         carb_intake: float = 0.0,
         delivered_glucagon_mg: float = 0.0,
-        fat_intake: float = 0.0,
-        protein_intake: float = 0.0,
         current_time: Optional[float] = None,
         **kwargs: Any,
     ) -> float:
         """Advance the 18-state metabolic model by ``time_step`` minutes.
 
-        Backward-compatible aliases are accepted for earlier scratch scripts:
-        ``dt_minutes``, ``delivered_glucagon``, and ``current_time_minutes``.
+        The public signature stays compatible with ``BergmanPatientModel``.
+        Advanced-only inputs are accepted as keyword arguments:
+        ``fat_intake`` and ``protein_intake``. Backward-compatible aliases are
+        accepted for earlier scratch scripts: ``dt_minutes``,
+        ``delivered_glucagon``, and ``current_time_minutes``.
         """
         if "dt_minutes" in kwargs:
             time_step = float(kwargs.pop("dt_minutes"))
@@ -129,9 +130,12 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         if "current_time_minutes" in kwargs:
             current_time = float(kwargs.pop("current_time_minutes"))
 
+        fat_intake = float(kwargs.pop("fat_intake", 0.0))
+        protein_intake = float(kwargs.pop("protein_intake", 0.0))
+
         # Add macronutrients and age the cannula before solving this step.
-        self._state[16] += max(0.0, float(fat_intake))
-        self._state[17] += max(0.0, float(protein_intake))
+        self._state[16] += max(0.0, fat_intake)
+        self._state[17] += max(0.0, protein_intake)
         self.pump_cannula_age_minutes += max(0.0, float(time_step))
 
         return super().update(
@@ -140,6 +144,7 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             carb_intake=carb_intake,
             delivered_glucagon_mg=delivered_glucagon_mg,
             current_time=current_time,
+            **kwargs,
         )
 
     def start_illness(self, severity: float) -> None:
