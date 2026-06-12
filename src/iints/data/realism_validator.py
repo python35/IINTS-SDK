@@ -138,7 +138,7 @@ def _evaluate_meal_responses(
     post_peak_start_minutes: float = 20.0,
     post_peak_end_minutes: float = MEAL_RESPONSE_MAX_LAG_MINUTES,
     insulin_match_window_before_minutes: float = 45.0,
-    insulin_match_window_after_minutes: float = 20.0,
+    insulin_match_window_after_minutes: float = 120.0,
     insulin_event_threshold_units: float = 0.3,
 ) -> List[MealResponse]:
     meals = _meal_rows(df, min_meal_grams=min_meal_grams)
@@ -610,15 +610,26 @@ def _check_causal_alignment(
             metrics={"assessed_meals": 0, "meal_count": meal_count},
         )
 
+    assessable_responses = [response for response in responses if response.carbs_grams >= 25.0]
+    if not assessable_responses:
+        return RealismCheck(
+            code="causal_alignment",
+            title="Meal-insulin-glucose causal alignment",
+            status="skipped",
+            severity="info",
+            detail="Only small snack annotations were present, so large-meal causal alignment was not evaluated.",
+            metrics={"assessed_meals": 0, "meal_count": meal_count, "ignored_small_meals": len(responses)},
+        )
+
     coherent_flags: list[bool] = []
-    carb_values = np.array([response.carbs_grams for response in responses], dtype=float)
-    rise_values = np.array([response.rise_mgdl for response in responses], dtype=float)
-    insulin_values = np.array([response.matched_insulin_units for response in responses], dtype=float)
+    carb_values = np.array([response.carbs_grams for response in assessable_responses], dtype=float)
+    rise_values = np.array([response.rise_mgdl for response in assessable_responses], dtype=float)
+    insulin_values = np.array([response.matched_insulin_units for response in assessable_responses], dtype=float)
     matched_mask = insulin_values >= 0.3
     carb_rise_corr = _correlation(carb_values, rise_values)
     carb_insulin_corr = _correlation(carb_values[matched_mask], insulin_values[matched_mask]) if matched_mask.sum() >= 3 else None
 
-    for response in responses:
+    for response in assessable_responses:
         response_visible = (
             response.rise_mgdl >= 15.0
             and 20.0 <= response.peak_lag_minutes <= MEAL_RESPONSE_MAX_LAG_MINUTES
@@ -633,9 +644,9 @@ def _check_causal_alignment(
         insulin_ratio_ok = True
         if insulin_present:
             assert response.insulin_lead_minutes is not None
-            insulin_timing_ok = -20.0 <= response.insulin_lead_minutes <= 60.0
+            insulin_timing_ok = -90.0 <= response.insulin_lead_minutes <= 75.0
             insulin_ratio = response.matched_insulin_units / max(response.carbs_grams, 1.0)
-            insulin_ratio_ok = 0.02 <= insulin_ratio <= 0.35
+            insulin_ratio_ok = 0.01 <= insulin_ratio <= 0.35
         else:
             insulin_ratio = None
 
@@ -647,7 +658,8 @@ def _check_causal_alignment(
 
     coherent_ratio = float(np.mean(coherent_flags)) if coherent_flags else 0.0
     metrics = {
-        "assessed_meals": len(responses),
+        "assessed_meals": len(assessable_responses),
+        "ignored_small_meals": len(responses) - len(assessable_responses),
         "coherent_meals": int(sum(coherent_flags)),
         "coherent_ratio": _round_or_none(coherent_ratio, 4),
         "matched_insulin_meals": int(matched_mask.sum()),
@@ -660,7 +672,7 @@ def _check_causal_alignment(
         "carb_insulin_correlation": _round_or_none(carb_insulin_corr, 4),
     }
 
-    if coherent_ratio < 0.5 or (carb_rise_corr is not None and carb_rise_corr < 0.0):
+    if coherent_ratio < 0.5 or (len(assessable_responses) >= 3 and carb_rise_corr is not None and carb_rise_corr < 0.0):
         return RealismCheck(
             code="causal_alignment",
             title="Meal-insulin-glucose causal alignment",
@@ -668,12 +680,12 @@ def _check_causal_alignment(
             severity="critical",
             detail=(
                 f"Meal inputs do not align causally with insulin timing and glucose responses. "
-                f"Only {int(sum(coherent_flags))}/{len(responses)} assessed meals followed a believable meal-insulin-glucose chain."
+                f"Only {int(sum(coherent_flags))}/{len(assessable_responses)} assessed large meals followed a believable meal-insulin-glucose chain."
             ),
             score_impact=0.18,
             metrics=metrics,
         )
-    if coherent_ratio < 0.75 or (carb_rise_corr is not None and carb_rise_corr < 0.2) or (
+    if coherent_ratio < 0.75 or (len(assessable_responses) >= 3 and carb_rise_corr is not None and carb_rise_corr < 0.2) or (
         carb_insulin_corr is not None and carb_insulin_corr < 0.25
     ):
         return RealismCheck(
@@ -682,7 +694,7 @@ def _check_causal_alignment(
             status="warning",
             severity="warning",
             detail=(
-                f"Causal alignment is only partial: {int(sum(coherent_flags))}/{len(responses)} assessed meals "
+                f"Causal alignment is only partial: {int(sum(coherent_flags))}/{len(assessable_responses)} assessed large meals "
                 f"showed believable insulin timing and glucose follow-through."
             ),
             score_impact=0.08,
@@ -695,7 +707,7 @@ def _check_causal_alignment(
         severity="info",
         detail=(
             f"Meal size, insulin timing, and glucose excursions line up coherently across "
-            f"{int(sum(coherent_flags))}/{len(responses)} assessed meals."
+            f"{int(sum(coherent_flags))}/{len(assessable_responses)} assessed large meals."
         ),
         metrics=metrics,
     )

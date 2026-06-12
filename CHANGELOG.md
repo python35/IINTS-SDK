@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## v1.5.14
+
+Release date: 2026-06-12
+
+### Fixed
+
+- fixed `AdvancedMetabolicModel.update()` compatibility with simulator and scratch-script keyword names
+- exposed the advanced 18-state model through `PatientFactory`
+- routed simulator illness events to illness-aware patient models
+- tuned the realism validator so large meals are assessed causally while small snacks do not create false failures
+- corrected 16-state/18-state documentation drift and softened over-strong clinical claims
+
+### Verified
+
+- full suite: `549 passed, 4 skipped`
+- package build: `iints_sdk_python35-1.5.14`
+
+
 ## v1.5.6
 
 Release date: 2026-05-18

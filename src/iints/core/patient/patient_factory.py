@@ -16,6 +16,14 @@ except Exception:
     HovorkaPatientModel = None  # type: ignore[assignment,misc]
     HOVORKA_AVAILABLE = False
 
+
+try:
+    from .advanced_metabolic_model import AdvancedMetabolicModel
+    ADVANCED_METABOLIC_AVAILABLE = True
+except Exception:
+    AdvancedMetabolicModel = None  # type: ignore[assignment,misc]
+    ADVANCED_METABOLIC_AVAILABLE = False
+
 try:
     from simglucose.simulation.env import T1DSimEnv
     from simglucose.patient.t1dpatient import T1DPatient
@@ -55,6 +63,13 @@ class PatientFactory:
                 print("Warning: Bergman model not available, falling back to custom model")
                 return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
             return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
+        elif patient_type in {'advanced', 'advanced_metabolic'}:
+            if not ADVANCED_METABOLIC_AVAILABLE or AdvancedMetabolicModel is None:
+                print("Warning: Advanced metabolic model not available, falling back to bergman/custom model")
+                if BERGMAN_AVAILABLE and BergmanPatientModel is not None:
+                    return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
+                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+            return AdvancedMetabolicModel(initial_glucose=initial_glucose, **kwargs)
         elif patient_type == 'hovorka':
             if not HOVORKA_AVAILABLE or HovorkaPatientModel is None:
                 print("Warning: Hovorka model not available, falling back to custom model")

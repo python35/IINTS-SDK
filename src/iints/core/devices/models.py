@@ -393,9 +393,9 @@ class PumpModel:
             reason = f"max_units_per_step {self.max_units_per_step:.2f}"
 
         if self.quantization_units:
-            # SCIENTIFIC UPGRADE: Clinical Micro-stepper Quantization (Johnson-Cook / Rotor Physics)
-            # Medical pumps use discrete mechanical rotors. Gaussian noise is an unscientific heuristic.
-            # True delivery error comes from mechanical backlash and rotor step-skips.
+            # SCIENTIFIC UPGRADE: discrete micro-stepper quantization.
+            # The pump delivers integer motor steps; optional noise is modeled as
+            # missed or extra steps instead of continuous Gaussian dose drift.
             micro_steps = round(delivered / self.quantization_units)
             
             if self.delivery_noise_std > 0:

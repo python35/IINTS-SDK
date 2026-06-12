@@ -100,29 +100,85 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         if "ode_state" in st_copy:
             del st_copy["ode_state"]
         super().set_state(st_copy)
+        self.is_ill = bool(state.get("is_ill", self.is_ill))
+        self.illness_severity = float(state.get("illness_severity", self.illness_severity))
+        self.menstrual_cycle_active = bool(state.get("menstrual_cycle_active", self.menstrual_cycle_active))
+        self.cycle_start_time_minutes = float(state.get("cycle_start_time_minutes", self.cycle_start_time_minutes))
+        self.pump_cannula_age_minutes = float(state.get("pump_cannula_age_minutes", self.pump_cannula_age_minutes))
 
     def update(
         self,
-        dt_minutes: float,
+        time_step: float,
         delivered_insulin: float = 0.0,
-        delivered_glucagon: float = 0.0,
         carb_intake: float = 0.0,
+        delivered_glucagon_mg: float = 0.0,
         fat_intake: float = 0.0,
         protein_intake: float = 0.0,
-        current_time_minutes: Optional[float] = None,
+        current_time: Optional[float] = None,
+        **kwargs: Any,
     ) -> float:
-        # Pre-update: Add macronutrients and age the cannula
-        self._state[16] += fat_intake
-        self._state[17] += protein_intake
-        self.pump_cannula_age_minutes += dt_minutes
-        
+        """Advance the 18-state metabolic model by ``time_step`` minutes.
+
+        Backward-compatible aliases are accepted for earlier scratch scripts:
+        ``dt_minutes``, ``delivered_glucagon``, and ``current_time_minutes``.
+        """
+        if "dt_minutes" in kwargs:
+            time_step = float(kwargs.pop("dt_minutes"))
+        if "delivered_glucagon" in kwargs:
+            delivered_glucagon_mg = float(kwargs.pop("delivered_glucagon"))
+        if "current_time_minutes" in kwargs:
+            current_time = float(kwargs.pop("current_time_minutes"))
+
+        # Add macronutrients and age the cannula before solving this step.
+        self._state[16] += max(0.0, float(fat_intake))
+        self._state[17] += max(0.0, float(protein_intake))
+        self.pump_cannula_age_minutes += max(0.0, float(time_step))
+
         return super().update(
-            dt_minutes=dt_minutes,
+            time_step=time_step,
             delivered_insulin=delivered_insulin,
-            delivered_glucagon=delivered_glucagon,
             carb_intake=carb_intake,
-            current_time_minutes=current_time_minutes,
+            delivered_glucagon_mg=delivered_glucagon_mg,
+            current_time=current_time,
         )
+
+    def start_illness(self, severity: float) -> None:
+        self.is_ill = True
+        self.illness_severity = float(np.clip(severity, 0.0, 1.0))
+
+    def stop_illness(self) -> None:
+        self.is_ill = False
+        self.illness_severity = 0.0
+
+    def start_menstrual_cycle(self, current_time_minutes: float = 0.0) -> None:
+        self.menstrual_cycle_active = True
+        self.cycle_start_time_minutes = float(current_time_minutes)
+
+    def stop_menstrual_cycle(self) -> None:
+        self.menstrual_cycle_active = False
+
+    def trigger_event(self, event_type: str, value: Any) -> None:
+        if event_type == "illness":
+            self.start_illness(float(value))
+        elif event_type == "illness_end":
+            self.stop_illness()
+        elif event_type == "menstrual_cycle":
+            self.start_menstrual_cycle(float(value or 0.0))
+        elif event_type == "menstrual_cycle_end":
+            self.stop_menstrual_cycle()
+        else:
+            super().trigger_event(event_type, value)
+
+    def get_state(self) -> Dict[str, Any]:
+        state = super().get_state()
+        state.update({
+            "is_ill": self.is_ill,
+            "illness_severity": self.illness_severity,
+            "menstrual_cycle_active": self.menstrual_cycle_active,
+            "cycle_start_time_minutes": self.cycle_start_time_minutes,
+            "pump_cannula_age_minutes": self.pump_cannula_age_minutes,
+        })
+        return state
 
     def _ode(
         self,

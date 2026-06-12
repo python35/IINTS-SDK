@@ -104,10 +104,10 @@ The deterministic filter flags:
 
 ## Mathematical Model Summary
 
-The current advanced model extends the Bergman-style state vector to 16 states:
+The current advanced model extends the Bergman-style state vector to 18 states:
 
 \[
-y = [G, X, I, Q_{sto1}, Q_{sto2}, Q_{gut}, S_1, S_2, Y_1, Y_2, \Gamma, x_{gluc}, HAAF, F, K, \Beta]
+y = [G, X, I, Q_{sto1}, Q_{sto2}, Q_{gut}, S_1, S_2, Y_1, Y_2, \Gamma, x_{gluc}, HAAF, F, K, \beta, Q_{fat}, Q_{prot}]
 \]
 
 where:
@@ -117,7 +117,9 @@ where:
 - \(I\): plasma insulin
 - \(F\): free fatty acids (FFA)
 - \(K\): ketones
-- \(\Beta\): residual beta-cell mass fraction
+- \(\beta\): residual beta-cell mass fraction
+- \(Q_{fat}\): slow fat stomach pool
+- \(Q_{prot}\): slow protein pool
 
 ### Free Fatty Acids
 
@@ -166,7 +168,7 @@ p_{3,eff} = p_3 \cdot M_{exercise} \cdot M_{stress} \cdot L(F)
 Residual beta-cell mass decays exponentially:
 
 \[
-\frac{d\Beta}{dt} = -a \Beta
+\frac{d\beta}{dt} = -a \beta
 \]
 
 where \(a\) is `autoimmune_aggressiveness`.

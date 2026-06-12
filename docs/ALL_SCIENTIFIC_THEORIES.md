@@ -1,8 +1,8 @@
 # Complete Scientific Theories in IINTS-AF
 
-This document provides a comprehensive list of every scientific, physiological, and mathematical theory encoded within the core simulation engine of the IINTS-AF Digital Twin SDK. This serves as the ultimate scientific foundation for the EUCYS presentation.
+This document summarizes the physiological and mathematical mechanisms currently implemented or exposed for pre-clinical simulation in the IINTS-AF Digital Twin SDK. It is an implementation reference for EUCYS-style explanation, not clinical validation.
 
-The simulation engine is primarily built on the `AdvancedMetabolicModel`, an extended 18-state differential equation solver that upgrades the classical Bergman Minimal Model into a full-scale clinical Type 1 Diabetes Digital Twin.
+The simulation engine includes the `AdvancedMetabolicModel`, an extended 18-state differential-equation model derived from the Bergman-style core and expanded with research-oriented metabolic stress states.
 
 ---
 
@@ -74,10 +74,10 @@ $$
 p_{3, eff} = p_3 \times \frac{0.4}{\max(0.4, F)}
 $$
 
-**Practical Impact:** Causes an extreme, exponential form of insulin resistance when an insulin pump fails or is occluded for hours, making subsequent correction boluses heavily ineffective.
+**Practical Impact:** Models a strong insulin-resistance pressure when an insulin pump fails or is occluded for hours, so later correction boluses may become less effective in the simulation.
 
 ## 5. Ketogenesis & Diabetic Ketoacidosis (DKA)
-**Foundation:** The lethal cascade of insulin deficiency.
+**Foundation:** The ketone-production cascade under insulin deficiency.
 
 **Mathematics:** Ketone ($K$) production is driven by extreme FFA levels and near-zero insulin:
 
@@ -85,7 +85,7 @@ $$
 \frac{dK}{dt} = k_0 \cdot F \cdot e^{-k_1 I} - k_2 K
 $$
 
-**Practical Impact:** Allows the AI system to predict life-threatening blood acidification (Diabetic Ketoacidosis) during severe pump failure or extreme acute illness.
+**Practical Impact:** Allows the simulator and audit tools to flag DKA-risk trajectories during severe pump failure or acute illness scenarios.
 
 ## 6. Hypoglycemia-Associated Autonomic Failure (HAAF)
 **Foundation:** Cryer's theory of defective counter-regulation.
@@ -127,7 +127,7 @@ $$
 ## 9. Exercise Physiology & Stress
 **Foundation:** Metabolic shifts during physical exertion.
 
-**Mathematics:** Exercise intensity ($E$) massively amplifies insulin sensitivity ($p_3$) and drives insulin-independent muscle uptake:
+**Mathematics:** Exercise intensity ($E$) increases insulin sensitivity ($p_3$) and drives insulin-independent muscle uptake:
 
 $$
 p_{3,eff} = p_3 \cdot (1 + 2E)
@@ -137,7 +137,7 @@ $$
 \text{Uptake}_{muscle} = E \cdot 0.005 \cdot G
 $$
 
-**Practical Impact:** Forces blood glucose to drop extremely rapidly during sports. This acts as the ultimate algorithmic stress test for predicting and preventing exertion-induced hypoglycemia.
+**Practical Impact:** Creates exercise-driven downward glucose pressure for testing whether algorithms reduce insulin early enough during exertion-induced hypoglycemia risk.
 
 ## 10. Residual Beta-Cell Autoimmune Decay
 **Foundation:** The T1D "Honeymoon Phase".
@@ -163,7 +163,7 @@ $$
 \frac{dY_1}{dt} = u_{gluc} - \frac{Y_1}{\tau} \quad \rightarrow \quad \frac{d\Gamma}{dt} = \frac{Y_2}{\tau \cdot V_{gluc}} - k_e \Gamma
 $$
 
-**Practical Impact:** Enables the testing of state-of-the-art "bi-hormonal pumps" (which deliver both insulin and glucagon) to autonomously avert fatal hypoglycemia.
+**Practical Impact:** Enables pre-clinical testing of bi-hormonal pump logic that can deliver both insulin and glucagon in low-glucose-risk scenarios.
 
 ## 12. Multi-Macronutrient Gastric Emptying
 **Foundation:** Advanced meal composition (Fat & Protein).
@@ -205,7 +205,7 @@ $$
 ## 15. Acute Illness & Cytokine Resistance
 **Foundation:** Immune system stress response.
 
-**Mathematics:** A sickness severity factor ($\zeta$) violently spikes Basal Glucose Production ($G_b$) while crushing tissue sensitivity:
+**Mathematics:** A sickness severity factor ($\zeta$) increases basal glucose production ($G_b$) while reducing tissue sensitivity:
 
 $$
 Gb_{eff} = Gb \cdot (1 + 0.8 \cdot \zeta)
@@ -215,9 +215,9 @@ $$
 p_{3,eff} = p_3 \cdot (1 - 0.5 \cdot \zeta)
 $$
 
-**Practical Impact:** Designed as the ultimate hyper-stress test. As soon as a digital twin catches a fever or infection, the body demands up to 2x more insulin. The algorithm must autonomously recognize and aggressively correct this to prevent ketoacidosis.
+**Practical Impact:** Designed as a hyperglycemia stress test. Illness scenarios can increase simulated insulin requirements, so algorithms must adapt without violating safety limits.
 
 ---
 
 ### Conclusion
-By blending these **15 isolated physiological theories** into a single cohesive, interacting 18-state mathematical framework, IINTS-AF successfully creates a true-to-life Digital Twin capable of predicting real-world biological chaos.
+Together, these mechanisms form a cohesive 18-state pre-clinical Digital Twin for stress-testing insulin algorithms under controlled, documented assumptions.

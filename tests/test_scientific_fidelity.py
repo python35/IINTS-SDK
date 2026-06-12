@@ -81,7 +81,7 @@ def test_pid_pharmacokinetic_feedforward():
 def test_pump_microstepper_quantization():
     """
     Test that the PumpModel uses discrete mechanical rotor simulations
-    instead of continuous Gaussian noise when delivering insulin.
+    instead of continuous Gaussian dose drift when quantization is configured.
     """
     pump = PumpModel(quantization_units=0.05, delivery_noise_std=0.15, seed=42)
     
@@ -93,6 +93,5 @@ def test_pump_microstepper_quantization():
     # The final delivered units must be an EXACT multiple of quantization_units (0.05)
     # It cannot be a floating point Gaussian value like 0.081234
     
-    assert delivery.delivered_units % 0.05 == 0.0
-    # Because of float precision (e.g. 0.10000000000000002 % 0.05), we check via rounding
+    # Because of binary float precision, compare to the nearest integer micro-step.
     assert abs(round(delivery.delivered_units / 0.05) * 0.05 - delivery.delivered_units) < 1e-9

@@ -195,7 +195,7 @@ class IndependentSupervisor:
         max_safe_bolus = max(0.0, self.max_iob - current_iob)
         if proposed_insulin > max_safe_bolus:
             proposed_insulin = max_safe_bolus
-            actions_taken.append(f"PD_CLEARANCE_LIMIT: Active IOB {current_iob:.2f}U restricts max safe bolus to {max_safe_bolus:.2f}U")
+            actions_taken.append(f"PD_CLEARANCE_LIMIT / High IOB: Active IOB {current_iob:.2f}U restricts max safe bolus to {max_safe_bolus:.2f}U")
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 5. Insulin Dose Limits
