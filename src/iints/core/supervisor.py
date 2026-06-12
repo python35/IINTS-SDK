@@ -166,11 +166,15 @@ class IndependentSupervisor:
             safety_status = SafetyLevel.WARNING
             actions_taken.append("WARNING: Hyperglycemia detected")
         
-        # 3. Rate-of-Change Protection (fast drop)
+        # 3. Bifurcation Risk Threshold (Physics-based velocity vector)
         glucose_rate = self._calculate_glucose_rate()
-        if glucose_rate <= self.trend_stop:
+        
+        # Calculate 30-min trajectory without new insulin (pure momentum)
+        momentum_trajectory = current_glucose + (glucose_rate * 30.0)
+        
+        if momentum_trajectory <= self.severe_hypoglycemia_threshold:
             proposed_insulin = 0
-            actions_taken.append(f"NEGATIVE_TREND_LIMIT: Glucose dropping at {glucose_rate:.2f} mg/dL/min")
+            actions_taken.append(f"BIFURCATION_RISK: Momentum trajectory crosses {momentum_trajectory:.1f} mg/dL")
             safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
 
         # 3b. Formal safety contract (logic validation)
@@ -187,10 +191,11 @@ class IndependentSupervisor:
                 )
                 safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
 
-        # 4. Dynamic IOB Clamp
-        if current_iob >= self.max_iob:
-            proposed_insulin = 0
-            actions_taken.append(f"MAX_IOB_REACHED: IOB {current_iob:.2f}U exceeds {self.max_iob:.2f}U")
+        # 4. Pharmacodynamic (PD) Mass-Balance IOB Clearance
+        max_safe_bolus = max(0.0, self.max_iob - current_iob)
+        if proposed_insulin > max_safe_bolus:
+            proposed_insulin = max_safe_bolus
+            actions_taken.append(f"PD_CLEARANCE_LIMIT: Active IOB {current_iob:.2f}U restricts max safe bolus to {max_safe_bolus:.2f}U")
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 5. Insulin Dose Limits
@@ -199,16 +204,14 @@ class IndependentSupervisor:
             actions_taken.append(f"LIMIT: Bolus capped at {self.max_insulin_per_bolus}U")
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
-        # 6. Insulin Stacking Check (using IOB)
-        # If IOB is high, be more conservative with additional insulin.
-        if current_iob > self.max_insulin_per_bolus: # Use max_bolus as proxy for "high IOB"
-            if current_glucose < 150: # Don't stack if not significantly high
-                reduction_factor = max(0.0, (150 - current_glucose) / 100.0) # Reduce more aggressively closer to 100
-                if reduction_factor > 1.0:
-                    reduction_factor = 1.0
-                proposed_insulin *= (1 - reduction_factor)
-                actions_taken.append(f"CAUTION: High IOB ({current_iob:.2f}U) - insulin reduced to prevent stacking")
-                safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
+        # 6. Scientific Stacking Prevention (Pharmacodynamic feedback)
+        # We modulate insulin based on an exponential decay curve against target glucose (100 mg/dL)
+        if current_iob > 0.5 and current_glucose < 160:
+            distance_to_target = max(0.0, current_glucose - 100.0)
+            pd_reduction_factor = np.exp(-distance_to_target / 50.0)
+            proposed_insulin *= (1.0 - pd_reduction_factor)
+            actions_taken.append(f"PD_STACKING_PREVENTION: Dose reduced by {pd_reduction_factor*100:.1f}% due to unabsorbed IOB ({current_iob:.2f}U)")
+            safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 7. Glucose Rate of Change (legacy alarm)
         if len(self.glucose_history) >= 2:

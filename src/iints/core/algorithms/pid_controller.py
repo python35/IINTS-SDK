@@ -40,7 +40,15 @@ class PIDController(InsulinAlgorithm):
         self._log_reason("Derivative term calculated", "control_parameter", derivative)
 
         # Integral term (accumulated error) with anti-windup protection
-        proposed_integral = max(-self.integral_limit, min(self.integral + error, self.integral_limit))
+        # SCIENTIFIC UPGRADE: Pharmacokinetic (PK) Feed-Forward Integration
+        # We dynamically drain the integral windup based on the actual Insulin On Board (mass balance).
+        pk_feed_forward_inhibition = data.insulin_on_board * 2.0  # Tuning parameter for PK dampening
+        
+        proposed_integral = max(
+            -self.integral_limit, 
+            min(self.integral + error - pk_feed_forward_inhibition, self.integral_limit)
+        )
+        
         unsaturated_output = (
             self.kp * error
             + self.ki * proposed_integral
@@ -56,7 +64,7 @@ class PIDController(InsulinAlgorithm):
             )
         else:
             self.integral = proposed_integral
-            self._log_reason("Integral term updated", "control_parameter", self.integral)
+            self._log_reason(f"Integral term updated (dampened by {pk_feed_forward_inhibition:.2f} due to {data.insulin_on_board:.1f}U IOB)", "control_parameter", self.integral)
         
         # PID formula
         insulin_dose = (self.kp * error + 

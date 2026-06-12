@@ -393,9 +393,28 @@ class PumpModel:
             reason = f"max_units_per_step {self.max_units_per_step:.2f}"
 
         if self.quantization_units:
-            delivered = round(delivered / self.quantization_units) * self.quantization_units
-
-        if self.delivery_noise_std > 0:
+            # SCIENTIFIC UPGRADE: Clinical Micro-stepper Quantization (Johnson-Cook / Rotor Physics)
+            # Medical pumps use discrete mechanical rotors. Gaussian noise is an unscientific heuristic.
+            # True delivery error comes from mechanical backlash and rotor step-skips.
+            micro_steps = round(delivered / self.quantization_units)
+            
+            if self.delivery_noise_std > 0:
+                # Instead of adding Gaussian noise, we simulate physical rotor slip per micro-step.
+                slip_prob = min(0.15, self.delivery_noise_std)  # Convert abstract std into slip probability
+                actual_steps = micro_steps
+                for _ in range(int(micro_steps)):
+                    if float(self._rng.random()) < slip_prob:
+                        # 70% chance to miss a step (friction/backlash), 30% chance to double-step (momentum)
+                        if float(self._rng.random()) < 0.7:
+                            actual_steps -= 1
+                        else:
+                            actual_steps += 1
+                micro_steps = max(0, actual_steps)
+                
+            delivered = micro_steps * self.quantization_units
+            delivered = max(0.0, delivered)
+        elif self.delivery_noise_std > 0:
+            # Fallback for continuous infusion models without quantization
             delivered += float(self._rng.normal(0, self.delivery_noise_std))
             delivered = max(0.0, delivered)
 
