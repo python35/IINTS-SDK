@@ -133,133 +133,15 @@ This adds:
 
 ## 10) Pick Your Next Workflow
 
-### Import Personal Pump / CGM Data
+The IINTS-AF SDK supports many advanced workflows that are outside the scope of a basic simulation, including:
 
-```bash
-iints import-carelink \
-  --input-csv "/path/to/CareLink export.csv" \
-  --output-dir results/imported_carelink
-```
+- **Importing personal pump/CGM data** (CareLink, Tidepool, Nightscout).
+- **Running local AI Models** (Ollama) to automatically audit and explain simulation runs.
+- **Generating Poster Summaries** for academic conferences.
+- **Deploying to Edge devices** like the Raspberry Pi or Arduino UNO Q for live hardware testing.
 
-Or build the full personal-data workspace at once:
-
-```bash
-iints carelink-workbench \
-  --input-csv "/path/to/CareLink export.csv" \
-  --output-dir results/personal_carelink
-```
-
-### Enable The Optional Local AI Assistant
-
-```bash
-iints ai models
-ollama pull ministral-3:8b
-iints ai local-check --model ministral-3:8b
-iints ai prepare results/<run_id>
-iints ai report results/<run_id>
-```
-
-If `iints ai local-check` reports that Ollama closed the connection, the most likely causes are a restarting daemon or insufficient memory. In that case, try `ministral-3:3b`.
-
-### Build A Poster From Existing Run Bundles
-
-```bash
-iints poster \
-  --run-dir results/normal_run \
-  --run-dir results/meal_stress \
-  --run-dir results/supervisor_override \
-  --label "Normal Run" \
-  --label "Meal Stress Test" \
-  --label "Supervisor Override" \
-  --output-path results/posters/iints_results_poster.png
-```
-
-### Run A Prepared Presentation Demo
-
-```bash
-iints demo-live --output-dir results/live_demo
-```
-
-This is the easiest option for Zoom calls, jury meetings, or sponsor walkthroughs: it prints a short opening explanation first, exports showable Python code, runs the demo, writes `PRESENTER_GUIDE.md`, and then tells you which poster and proof artifacts to open next.
-
-If you want the opening framed for a specific audience:
-
-```bash
-iints demo-live --output-dir results/live_demo_clinical --audience clinical
-iints demo-live --output-dir results/live_demo_engineering --audience engineering
-```
-
-If you are working from the repository and want the older script-only flow, you can still use:
-
-```bash
-./scripts/run_live_stage_demo.sh
-```
-
-If the machine only has the installed SDK and not the repository checkout, export the same demo code first:
-
-```bash
-iints demo-export --output-dir iints_demo
-cd iints_demo
-python 07_live_stage_demo.py
-```
-
-### Run A Persistent Digital Patient On Raspberry Pi
-
-```bash
-iints quickstart --project-name iints_pi_demo
-cd iints_pi_demo
-iints patient scenarios
-iints patient start \
-  --algo algorithms/example_algorithm.py \
-  --workspace patient_runtime \
-  --scenario-profile normal_day \
-  --mode demo-time \
-  --speed 60x
-iints patient status --workspace patient_runtime
-```
-
-That flow gives you:
-- a persistent SQLite-backed runtime
-- a live dashboard on `http://127.0.0.1:8765/dashboard`
-- a run-like bundle under `patient_runtime/live_bundle/`
-
-Security default:
-
-- the dashboard stays on loopback by default
-- for remote presentation, prefer Raspberry Pi Connect instead of opening the API to the LAN
-- if you truly need a non-loopback bind, use `--allow-remote-api` together with `--api-token-env` or `--api-token-file`
-
-Full guide: [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
-
-### Build An Edge-Ready SBC Project
-
-```bash
-iints edge quickstart --board raspberry_pi
-cd iints_pi_demo
-```
-
-For Arduino UNO Q, use the same easy path:
-
-```bash
-iints edge quickstart --board uno_q
-cd iints_uno_q_demo
-```
-
-Then upload `uno_q_bridge/iints_supervisor_bridge.ino` once and run `./test_uno_q_bridge.sh`.
-
-Export the live runtime back to a workstation with:
-
-```bash
-iints patient kiosk --workspace patient_runtime
-iints edge status --workspace patient_runtime
-iints edge bundle --workspace patient_runtime --output results/edge_runtime_bundle.zip
-```
-
-That edge flow gives you:
-- a generated edge project scaffold
-- a service file and update script for the board
-- a kiosk dashboard URL for Raspberry Pi Connect screen sharing
-- a ZIP bundle for workstation-side analysis and reporting
+To keep this Getting Started guide clean, all these advanced flows have been moved to their respective guides. 
+Please refer to the [Workflow Hub](WORKFLOWS.md), [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md), or the [AI Assistant](AI_ASSISTANT.md) guide for full commands on these topics.
 
 ## Where To Go Next
 

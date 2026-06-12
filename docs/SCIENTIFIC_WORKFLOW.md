@@ -17,7 +17,7 @@ The study engine is built around:
 - shared seeds across all comparisons
 - automatic summaries, comparisons, and poster assets
 
-That lets you compare a candidate algorithm against baselines, safety conditions, and corrupted-data ablations without hand-stitching folders afterward.
+That lets you compare a candidate algorithm against baselines, safety conditions, and [corrupted-data ablations](PLAIN_LANGUAGE_GUIDE.md) without hand-stitching folders afterward.
 
 ## Main Commands
 

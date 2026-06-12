@@ -16,7 +16,7 @@ It is the long-form architecture manual for the IINTS-AF SDK: installation, proj
 - `Forecast model`: optional AI predictor signal (advisory only).
 - `Safety Supervisor`: deterministic rule layer that can override unsafe dosing.
 - `Run bundle`: output package (`results.csv`, reports, audit artifacts, metadata).
-- `MDMP`: dataset quality protocol with contract validation + grading.
+- `[MDMP](PLAIN_LANGUAGE_GUIDE.md)`: dataset quality protocol with contract validation + grading.
 
 ## Section Structure
 
@@ -542,14 +542,14 @@ PYTHONPATH=src python3 research/train_predictor.py \
 
 ## 13. Development Workflow
 
-### 12.1 Versioning
+### 13.1 Versioning
 
 The SDK uses semantic versioning. The current version is defined in `pyproject.toml`.
 
 *   To update the version for a new release, edit the `version` field in `pyproject.toml` (e.g., from `0.1.0` to `0.1.1`).
 *   It is good practice to use `git tag vX.Y.Z` to mark releases in your version control history.
 
-### 12.2 Continuous Integration (CI) with GitHub Actions
+### 13.2 Continuous Integration (CI) with GitHub Actions
 
 A GitHub Actions workflow (`.github/workflows/python-package.yml`) has been set up to automate the build and testing process.
 
@@ -559,7 +559,7 @@ A GitHub Actions workflow (`.github/workflows/python-package.yml`) has been set 
 
 This ensures that every change to the codebase is automatically validated, preventing regressions and maintaining code quality.
 
-### 12.3 Change Log
+### 13.3 Change Log
 
 A `CHANGELOG.md` file has been created in the project root. It is recommended to update this file with a concise summary of changes for each new version, helping users understand what's new or fixed in each release.
 
@@ -749,9 +749,8 @@ The report includes:
 
 ## 20. API Documentation
 
-Comprehensive API documentation, generated using Sphinx, is available in HTML format.
+Comprehensive API documentation is automatically generated from Python docstrings and is available via MkDocs.
 
-*   **Location**: `docssphinx/_build/html/index.html`
-*   **How to Build**: From the `docssphinx/` directory, run `make html`. Ensure your Python environment (or the `PYTHONPATH` if building manually) is correctly configured to include the project's `src` directory.
+*   **How to Build/View**: From the root of the repository, run `mkdocs serve`. This will start a local development server where you can view the complete API documentation.
 
-This documentation details all classes, methods, and functions within the `iints` package, extracted directly from their docstrings.
+This documentation details all classes, methods, and functions within the `iints` package, extracting types and documentation directly from the source code.
