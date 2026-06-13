@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import random
+from pathlib import Path
 
-from iints.research.jetson_hf_trainer import _trial_config, model_score
+from iints.research.jetson_hf_trainer import _normalize_downloaded_hf_model, _trial_config, model_score
 
 
 def test_model_score_penalizes_physiology_and_hypo_risk() -> None:
@@ -57,3 +58,17 @@ def test_trial_config_preserves_warm_start_architecture() -> None:
     assert cfg["training"]["batch_size"] == 32
     assert 1e-5 <= cfg["training"]["learning_rate"] <= 1e-4
     assert 0.1 <= cfg["training"]["pinn_lambda"] <= 0.2
+
+
+def test_normalize_downloaded_hf_model_copies_nested_bundle(tmp_path: Path) -> None:
+    nested = tmp_path / "huggingface"
+    nested.mkdir()
+    (nested / "predictor.pt").write_bytes(b"checkpoint")
+    (nested / "glucose_model_config.yaml").write_text("predictor: {}\ntraining: {}\n")
+    (nested / "training_report.json").write_text("{}\n")
+
+    _normalize_downloaded_hf_model(tmp_path)
+
+    assert (tmp_path / "predictor.pt").read_bytes() == b"checkpoint"
+    assert (tmp_path / "glucose_model_config.yaml").is_file()
+    assert (tmp_path / "training_report.json").is_file()

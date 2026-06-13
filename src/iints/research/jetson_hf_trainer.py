@@ -155,17 +155,65 @@ def _download_hf_model(
         "--include",
         "predictor.pt",
         "--include",
+        "**/predictor.pt",
+        "--include",
         "glucose_model_config.yaml",
+        "--include",
+        "**/glucose_model_config.yaml",
+        "--include",
+        "glucose_model_config.resolved.yaml",
+        "--include",
+        "**/glucose_model_config.resolved.yaml",
         "--include",
         "config.json",
         "--include",
+        "**/config.json",
+        "--include",
         "training_report.json",
         "--include",
+        "**/training_report.json",
+        "--include",
         "dataset_manifest.public.json",
+        "--include",
+        "**/dataset_manifest.public.json",
     ]
     if revision:
         cmd.extend(["--revision", revision])
     run_logged(cmd, log_path=output_dir / "hf_download.log", env=_hf_env(hf_home), timeout_minutes=30)
+    _normalize_downloaded_hf_model(output_dir)
+
+
+def _copy_first_nested(output_dir: Path, filename: str) -> Optional[Path]:
+    target = output_dir / filename
+    if target.exists():
+        return target
+    for candidate in sorted(output_dir.rglob(filename)):
+        if candidate == target or not candidate.is_file():
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(candidate, target)
+        return target
+    return None
+
+
+def _normalize_downloaded_hf_model(output_dir: Path) -> None:
+    """Normalize HF repo layouts where the model bundle lives in a subfolder."""
+    copied_checkpoint = _copy_first_nested(output_dir, "predictor.pt")
+    for filename in (
+        "glucose_model_config.yaml",
+        "glucose_model_config.resolved.yaml",
+        "training_report.json",
+        "dataset_manifest.public.json",
+    ):
+        _copy_first_nested(output_dir, filename)
+    if copied_checkpoint is None:
+        available = sorted(str(path.relative_to(output_dir)) for path in output_dir.rglob("*") if path.is_file())
+        preview = ", ".join(available[:20]) if available else "no files downloaded"
+        raise FileNotFoundError(
+            "Hugging Face repo download did not contain predictor.pt. "
+            "Expected the IINTS glucose model bundle to include predictor.pt at the root or in a subfolder. "
+            f"Downloaded files: {preview}"
+        )
 
 
 def _load_yaml_if_exists(path: Path) -> Optional[dict[str, Any]]:
