@@ -87,6 +87,7 @@ nav:
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
       - Jetson Endurance Mode: JETSON_ENDURANCE.md
       - Jetson Theory Stress Lab: THEORY_STRESS_LAB.md
+      - Jetson AutoML Factory: JETSON_AUTOML_FACTORY.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
       - Maker Faire Checklist: MAKERFAIRE_PI_CHECKLIST.md

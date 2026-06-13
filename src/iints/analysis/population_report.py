@@ -17,6 +17,13 @@ import numpy as np
 import pandas as pd
 from fpdf import FPDF
 
+from iints.utils.academic_artifacts import (
+    add_academic_footer,
+    add_academic_header,
+    add_academic_section,
+    add_key_value_table,
+    setup_academic_pdf,
+)
 from iints.utils.plotting import apply_plot_style, IINTS_BLUE, IINTS_RED, IINTS_TEAL
 
 
@@ -37,22 +44,19 @@ class PopulationReportGenerator:
         plots = self._generate_plots(summary_df, output_dir)
 
         pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
+        setup_academic_pdf(pdf, title=title)
 
         # --- Title page ---
         pdf.add_page()
-        pdf.set_font("Helvetica", "B", 18)
-        pdf.cell(0, 12, title, new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(4)
-
-        pdf.set_font("Helvetica", "", 11)
-        pdf.cell(0, 7, f"Population size: {len(summary_df)}", new_x="LMARGIN", new_y="NEXT")
+        add_academic_header(
+            pdf,
+            title,
+            subtitle="Monte Carlo population evaluation - pre-clinical simulation only",
+            metadata={"Population size": len(summary_df)},
+        )
 
         # --- Aggregate clinical metrics ---
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 9, "Aggregate Clinical Metrics (95% CI)", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 9)
+        add_academic_section(pdf, "Aggregate clinical metrics (95% CI)")
 
         _METRIC_LABELS = {
             "tir_70_180": "TIR 70-180 mg/dL (%)",
@@ -64,24 +68,19 @@ class PopulationReportGenerator:
             "gmi": "Glucose Management Indicator (%)",
         }
 
+        metric_rows = []
         for key, stats in aggregate_metrics.items():
             label = _METRIC_LABELS.get(key, key)
-            line = f"  {label}: {stats['mean']:.1f}  [{stats['ci_lower']:.1f}, {stats['ci_upper']:.1f}]"
-            pdf.cell(0, 6, line, new_x="LMARGIN", new_y="NEXT")
+            metric_rows.append((label, f"{stats['mean']:.1f}  [{stats['ci_lower']:.1f}, {stats['ci_upper']:.1f}]"))
+        add_key_value_table(pdf, metric_rows)
 
         # --- Safety summary ---
-        pdf.ln(4)
-        pdf.set_font("Helvetica", "B", 13)
-        pdf.cell(0, 9, "Population Safety Summary", new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("Helvetica", "", 9)
+        add_academic_section(pdf, "Population safety summary")
 
+        safety_rows = []
         si = aggregate_safety.get("safety_index", {})
         if si:
-            pdf.cell(
-                0, 6,
-                f"  Safety Index: {si['mean']:.1f}  [{si['ci_lower']:.1f}, {si['ci_upper']:.1f}]",
-                new_x="LMARGIN", new_y="NEXT",
-            )
+            safety_rows.append(("Safety Index", f"{si['mean']:.1f}  [{si['ci_lower']:.1f}, {si['ci_upper']:.1f}]"))
 
         grade_dist = aggregate_safety.get("grade_distribution", {})
         if grade_dist:
@@ -89,19 +88,21 @@ class PopulationReportGenerator:
             for grade in sorted(grade_dist):
                 count = grade_dist[grade]
                 pct = count / n * 100 if n else 0
-                pdf.cell(0, 6, f"  Grade {grade}: {count} ({pct:.1f}%)", new_x="LMARGIN", new_y="NEXT")
+                safety_rows.append((f"Grade {grade}", f"{count} ({pct:.1f}%)"))
 
         etr = aggregate_safety.get("early_termination_rate")
         if etr is not None:
-            pdf.cell(0, 6, f"  Early termination rate: {etr * 100:.1f}%", new_x="LMARGIN", new_y="NEXT")
+            safety_rows.append(("Early termination rate", f"{etr * 100:.1f}%"))
+        add_key_value_table(pdf, safety_rows)
+        add_academic_footer(pdf)
 
         # --- Plots ---
         for plot_label, plot_path in plots.items():
             if Path(plot_path).exists():
                 pdf.add_page()
-                pdf.set_font("Helvetica", "B", 12)
-                pdf.cell(0, 9, plot_label, new_x="LMARGIN", new_y="NEXT")
+                add_academic_header(pdf, plot_label, subtitle="Population evaluation figure")
                 pdf.image(plot_path, x=10, w=190)
+                add_academic_footer(pdf)
 
         pdf.output(output_path)
         return output_path

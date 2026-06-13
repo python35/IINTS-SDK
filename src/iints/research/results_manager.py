@@ -17,6 +17,8 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from iints.utils.academic_artifacts import style_excel_workbook
+
 
 GLUCOSE_COLUMNS = (
     "glucose_actual_mgdl",
@@ -499,6 +501,7 @@ def index_results(
                     .sort_values("run_count", ascending=False)
                 )
                 overview.to_excel(writer, sheet_name="quality_overview", index=False)
+        style_excel_workbook(workbook_path, title="IINTS-AF Research Results Index")
     except Exception:
         workbook_xlsx = None
 
