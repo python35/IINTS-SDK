@@ -3,7 +3,11 @@ from __future__ import annotations
 import random
 from pathlib import Path
 
+import pandas as pd
+
+from iints.research.config import PredictorConfig
 from iints.research.jetson_hf_trainer import _normalize_downloaded_hf_model, _trial_config, model_score
+from research.train_predictor import _fill_missing_training_features
 
 
 def test_model_score_penalizes_physiology_and_hypo_risk() -> None:
@@ -72,3 +76,16 @@ def test_normalize_downloaded_hf_model_copies_nested_bundle(tmp_path: Path) -> N
     assert (tmp_path / "predictor.pt").read_bytes() == b"checkpoint"
     assert (tmp_path / "glucose_model_config.yaml").is_file()
     assert (tmp_path / "training_report.json").is_file()
+
+
+def test_training_fills_missing_legacy_optional_features() -> None:
+    frame = pd.DataFrame({"glucose_actual_mgdl": [100.0, 101.0]})
+    cfg = PredictorConfig(
+        feature_columns=["glucose_actual_mgdl", "calories", "sleep_minutes"],
+        target_column="glucose_actual_mgdl",
+    )
+
+    filled = _fill_missing_training_features(frame, cfg)
+
+    assert filled["calories"].tolist() == [0.0, 0.0]
+    assert filled["sleep_minutes"].tolist() == [0.0, 0.0]

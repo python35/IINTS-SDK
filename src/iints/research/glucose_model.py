@@ -74,6 +74,8 @@ _ALIAS_COLUMNS: Mapping[str, Sequence[str]] = {
     "stress_intensity": ("stress_intensity", "illness_intensity", "stress"),
     "steps": ("steps", "step_count"),
     "heart_rate": ("heart_rate", "hr", "heartrate"),
+    "calories": ("calories", "energy_kcal", "kcal"),
+    "sleep_minutes": ("sleep_minutes", "sleep_min", "sleep_duration_minutes"),
     "glucagon_mg": ("glucagon_mg", "delivered_glucagon_mg", "glucagon_dose_mg"),
     "haaf_memory": ("haaf_memory", "haaf_state", "hypo_awareness_failure"),
 }
@@ -91,6 +93,8 @@ _DEFAULT_FEATURE_VALUES: Mapping[str, float] = {
     "stress_intensity": 0.0,
     "steps": 0.0,
     "heart_rate": 0.0,
+    "calories": 0.0,
+    "sleep_minutes": 0.0,
     "time_of_day_sin": 0.0,
     "time_of_day_cos": 1.0,
     "glucagon_mg": 0.0,

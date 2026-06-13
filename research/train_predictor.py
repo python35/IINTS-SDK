@@ -37,6 +37,29 @@ from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedM
 from iints.research.model_registry import append_registry_entry
 
 
+TRAINING_FEATURE_DEFAULTS: dict[str, float] = {
+    "glucose_trend_mgdl_min": 0.0,
+    "patient_iob_units": 0.0,
+    "patient_cob_grams": 0.0,
+    "delivered_insulin_units": 0.0,
+    "carb_intake_grams": 0.0,
+    "effective_isf": 50.0,
+    "effective_icr": 10.0,
+    "effective_basal_rate_u_per_hr": 0.8,
+    "exercise_intensity": 0.0,
+    "stress_intensity": 0.0,
+    "steps": 0.0,
+    "heart_rate": 0.0,
+    "calories": 0.0,
+    "sleep_minutes": 0.0,
+    "time_of_day_sin": 0.0,
+    "time_of_day_cos": 1.0,
+    "glucagon_mg": 0.0,
+    "haaf_memory": 0.0,
+    "meal_announcement_grams": 0.0,
+}
+
+
 class TrainingDataError(ValueError):
     """User-facing training data problem that should not print a traceback."""
 
@@ -108,6 +131,20 @@ def _apply_meal_announcement(
         )
     else:
         df[feature] = df[source].shift(-shift_steps).fillna(0.0)
+    return df
+
+
+def _fill_missing_training_features(df: pd.DataFrame, predictor_cfg: PredictorConfig) -> pd.DataFrame:
+    missing = [column for column in predictor_cfg.feature_columns if column not in df.columns]
+    if not missing:
+        return df
+    df = df.copy()
+    for column in missing:
+        df[column] = TRAINING_FEATURE_DEFAULTS.get(column, 0.0)
+    print(
+        "WARNING: Filled missing optional feature columns with safe defaults: "
+        + ", ".join(missing)
+    )
     return df
 
 
@@ -305,6 +342,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     df = load_dataset(args.data)
     df = _apply_meal_announcement(df, predictor_cfg, training_cfg)
+    df = _fill_missing_training_features(df, predictor_cfg)
     dataset_lineage = compute_dataset_lineage(df, source_path=args.data)
 
     # P1-5: Compute dataset hash for reproducibility tracking
