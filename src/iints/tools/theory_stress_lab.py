@@ -209,12 +209,16 @@ def _simulate_patient(
         else:
             patient.stop_illness()
 
-        scheduled_insulin = float(insulin_schedule.get(minute, 0.0))
+        scheduled_bolus = float(insulin_schedule.get(minute, 0.0))
         scheduled_carbs = float(carb_schedule.get(minute, 0.0))
         scheduled_fat = float(fat_schedule.get(minute, 0.0))
         scheduled_protein = float(protein_schedule.get(minute, 0.0))
         dropout = any(start <= minute < end for start, end in pump_dropout_windows)
-        delivered_insulin = 0.0 if dropout else scheduled_insulin
+
+        # basal_insulin_rate is U/hour; update() expects units delivered this step.
+        # Without this conversion, normal scenarios accidentally become pump-failure scenarios.
+        basal_for_step = max(0.0, float(basal_insulin_rate)) * float(time_step) / 60.0
+        delivered_insulin = 0.0 if dropout else scheduled_bolus + basal_for_step
 
         glucose = float(
             patient.update(
