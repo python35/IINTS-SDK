@@ -57,8 +57,12 @@ class JetsonHFTrainingResult:
     champion_dir: Path
     leaderboard: Path
     trial_count: int
+    success_count: int
+    failed_count: int
     accepted_count: int
     best_score: Optional[float]
+    last_trial_dir: Optional[Path]
+    last_error: str
     upload_mode: str
     uploaded: bool
 
@@ -497,15 +501,20 @@ def run_jetson_hf_training(
 
     rng = random.Random(seed)
     accepted_count = 0
+    success_count = 0
+    failed_count = 0
     uploaded = False
     best_score: Optional[float] = None
     trial_index = 0
+    last_trial_dir: Optional[Path] = None
+    last_error = ""
 
     try:
         while max_trials <= 0 or trial_index < max_trials:
             trial_index += 1
             trial_id = f"trial_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}_{trial_index:05d}"
             trial_dir = trials_dir / trial_id
+            last_trial_dir = trial_dir
             trial_dir.mkdir(parents=True, exist_ok=True)
             warm_start = champion_dir / "predictor.pt"
             config = _trial_config(
@@ -604,6 +613,11 @@ def run_jetson_hf_training(
             except Exception as exc:
                 status = "failed"
                 error = str(exc)
+            if status == "success":
+                success_count += 1
+            else:
+                failed_count += 1
+            last_error = error
 
             training = config.get("training", {})
             append_leaderboard_row(
@@ -652,8 +666,12 @@ def run_jetson_hf_training(
         champion_dir=champion_dir,
         leaderboard=leaderboard,
         trial_count=trial_index,
+        success_count=success_count,
+        failed_count=failed_count,
         accepted_count=accepted_count,
         best_score=best_score,
+        last_trial_dir=last_trial_dir,
+        last_error=last_error,
         upload_mode=upload_mode,
         uploaded=uploaded,
     )

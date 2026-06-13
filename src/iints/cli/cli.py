@@ -10025,8 +10025,14 @@ def research_glucose_model_jetson_train_hf(
     table.add_row("Champion", str(result.champion_dir))
     table.add_row("Leaderboard", str(result.leaderboard))
     table.add_row("Trials", str(result.trial_count))
+    table.add_row("Successful", str(result.success_count))
+    table.add_row("Failed", str(result.failed_count))
     table.add_row("Accepted", str(result.accepted_count))
     table.add_row("Best score", "n/a" if result.best_score is None else f"{result.best_score:.4f}")
+    if result.last_trial_dir is not None:
+        table.add_row("Last trial", str(result.last_trial_dir))
+    if result.last_error:
+        table.add_row("Last error", result.last_error)
     table.add_row("Upload mode", result.upload_mode)
     table.add_row("Uploaded", str(result.uploaded))
     console.print(table)
@@ -10034,6 +10040,18 @@ def research_glucose_model_jetson_train_hf(
         "[yellow]Research only:[/yellow] this fine-tunes a glucose forecast model for simulation and benchmarking; "
         "it is not a medical device and must not be used for treatment decisions."
     )
+    if result.failed_count:
+        console.print("[yellow]Some Jetson training trials failed. Inspect the trial logs before starting a long run.[/yellow]")
+        if result.last_trial_dir is not None:
+            train_log = result.last_trial_dir / "train_stdout_stderr.log"
+            compare_log = result.last_trial_dir / "comparison" / "compare_stdout_stderr.log"
+            console.print(f"  tail -n 120 {shlex.quote(str(train_log))}")
+            console.print(f"  tail -n 120 {shlex.quote(str(compare_log))}")
+    if result.trial_count > 0 and result.success_count == 0:
+        console.print(
+            "[bold red]No valid training/comparison trial completed; do not start a long run yet.[/bold red]"
+        )
+        raise typer.Exit(code=2)
 
 
 @research_app.command(name="parity-check")
