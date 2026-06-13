@@ -231,7 +231,10 @@ def _checkpoint_config(path: Path) -> dict[str, Any]:
     except Exception:
         return {}
     try:
-        payload = torch.load(path, map_location="cpu")
+        try:
+            payload = torch.load(path, map_location="cpu", weights_only=True)
+        except TypeError:
+            payload = torch.load(path, map_location="cpu")
     except Exception:
         return {}
     if not isinstance(payload, Mapping):
