@@ -333,6 +333,17 @@ Pass `--wall-clock` here too when the generated service should preserve real-tim
 ### `iints research blend-datasets`
 Blend already prepared real datasets into one source-aware predictor dataset.
 
+### `iints research prepare-ohio`
+Prepare a local OhioT1DM XML folder into a gitignored processed dataset. Do not commit the raw `OhioT1DM-volledig/` folder to GitHub:
+
+```bash
+iints research prepare-ohio \
+  --input-dir /path/to/OhioT1DM-volledig \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+```
+
 ### `iints research glucose-model build-dataset`
 Normalize one or more prepared glucose datasets into the dedicated `iints-glucose-forecast-v0` training contract:
 
@@ -379,8 +390,25 @@ iints research glucose-model export-hf \
   --model-dir models/iints-glucose-forecast-v0 \
   --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
   --comparison-dir results/glucose_model_comparison \
-  --repo-id YOUR_USERNAME/iints-glucose-forecast-v0
+  --repo-id IINTS/iints-glucose-forecast-v0
 ```
+
+### `iints research glucose-model jetson-train-hf`
+Continue training an existing Hugging Face glucose model on Jetson with warm-start, candidate comparison, and local champion promotion:
+
+```bash
+iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --work-dir models/jetson_hf_training \
+  --max-trials 1 \
+  --epochs 2 \
+  --batch-size 64 \
+  --upload-mode none
+```
+
+Use `--upload-mode pr` after review to upload a promoted champion as a Hugging Face pull request. The command uploads model artifacts and redacted metadata only, not raw private dataset rows.
 
 ### `iints research build-control-dataset`
 Combine one or more run bundles into a supervised controller teacher dataset.

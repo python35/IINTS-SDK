@@ -37,6 +37,10 @@ from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedM
 from iints.research.model_registry import append_registry_entry
 
 
+class TrainingDataError(ValueError):
+    """User-facing training data problem that should not print a traceback."""
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -105,6 +109,134 @@ def _apply_meal_announcement(
     else:
         df[feature] = df[source].shift(-shift_steps).fillna(0.0)
     return df
+
+
+def _sort_time_series_frame(df: pd.DataFrame) -> pd.DataFrame:
+    sort_cols = [col for col in ("subject_id", "segment", "time_minutes", "timestamp") if col in df.columns]
+    if not sort_cols:
+        return df.reset_index(drop=True)
+    return df.sort_values(sort_cols).reset_index(drop=True)
+
+
+def _minimum_rows_per_split(predictor_cfg: PredictorConfig) -> int:
+    return predictor_cfg.history_steps + predictor_cfg.horizon_steps
+
+
+def _small_dataset_message(
+    *,
+    total_rows: int,
+    min_rows_per_split: int,
+    predictor_cfg: PredictorConfig,
+    data_path: Path,
+) -> str:
+    minimum_total = min_rows_per_split * 3
+    return (
+        "Not enough rows to train this glucose predictor configuration.\n"
+        f"Dataset: {data_path}\n"
+        f"Rows available: {total_rows}\n"
+        f"Rows needed: at least {minimum_total} total rows "
+        f"({min_rows_per_split} rows for each train/validation/test split).\n"
+        f"Current window: history={predictor_cfg.history_minutes} minutes "
+        f"({predictor_cfg.history_steps} steps), horizon={predictor_cfg.horizon_minutes} minutes "
+        f"({predictor_cfg.horizon_steps} steps), time_step={predictor_cfg.time_step_minutes} minutes.\n\n"
+        "Fix options:\n"
+        "1. Build a longer dataset, for example a 14-day Jetson endurance export:\n"
+        "   iints jetson endurance start --algo algorithms/example_algorithm.py "
+        "--duration 14d --output-dir results/jetson_14d --accelerated "
+        "--research-export --no-finalize-research\n"
+        "2. Rebuild the glucose dataset from results/jetson_14d/research/predictor_training.csv.\n"
+        "3. For a tiny smoke test only, reduce --history-minutes and --horizon-minutes when building the dataset."
+    )
+
+
+def _row_level_time_series_split(
+    df: pd.DataFrame,
+    *,
+    predictor_cfg: PredictorConfig,
+    training_cfg: TrainingConfig,
+    data_path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Fallback split for one-subject datasets without destroying temporal order."""
+    df = _sort_time_series_frame(df)
+    total_rows = len(df)
+    min_rows = _minimum_rows_per_split(predictor_cfg)
+    if total_rows < min_rows * 3:
+        raise TrainingDataError(
+            _small_dataset_message(
+                total_rows=total_rows,
+                min_rows_per_split=min_rows,
+                predictor_cfg=predictor_cfg,
+                data_path=data_path,
+            )
+        )
+
+    n_test = max(min_rows, round(total_rows * training_cfg.test_split))
+    n_val = max(min_rows, round(total_rows * training_cfg.validation_split))
+    if n_test + n_val > total_rows - min_rows:
+        # Keep all three splits sequence-buildable even for small smoke datasets.
+        n_test = min_rows
+        n_val = min_rows
+
+    train_end = total_rows - n_val - n_test
+    val_end = total_rows - n_test
+    train_df = df.iloc[:train_end].reset_index(drop=True)
+    val_df = df.iloc[train_end:val_end].reset_index(drop=True)
+    test_df = df.iloc[val_end:].reset_index(drop=True)
+    print(
+        "Row-level chronological split — "
+        f"train: {len(train_df)} rows, val: {len(val_df)} rows, test: {len(test_df)} rows"
+    )
+    return train_df, val_df, test_df
+
+
+def _build_split_sequences(
+    train_df: pd.DataFrame,
+    val_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    *,
+    predictor_cfg: PredictorConfig,
+    segment_column: str | None,
+    data_path: Path,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    min_rows = _minimum_rows_per_split(predictor_cfg)
+    try:
+        X_train, y_train = build_sequences(
+            train_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+        X_val, y_val = build_sequences(
+            val_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+        X_test, y_test = build_sequences(
+            test_df,
+            history_steps=predictor_cfg.history_steps,
+            horizon_steps=predictor_cfg.horizon_steps,
+            feature_columns=predictor_cfg.feature_columns,
+            target_column=predictor_cfg.target_column,
+            segment_column=segment_column,
+        )
+    except ValueError as exc:
+        if "Not enough rows" not in str(exc):
+            raise
+        total_rows = len(train_df) + len(val_df) + len(test_df)
+        raise TrainingDataError(
+            _small_dataset_message(
+                total_rows=total_rows,
+                min_rows_per_split=min_rows,
+                predictor_cfg=predictor_cfg,
+                data_path=data_path,
+            )
+        ) from exc
+    return X_train, y_train, X_val, y_val, X_test, y_test
 
 
 
@@ -183,7 +315,7 @@ def main() -> None:
     # P0-2: Subject-level split
     # -----------------------------------------------------------------------
     if training_cfg.subject_level_split and "subject_id" in df.columns:
-        min_rows = predictor_cfg.history_steps + predictor_cfg.horizon_steps + 1
+        min_rows = _minimum_rows_per_split(predictor_cfg)
         counts = df.groupby("subject_id").size()
         eligible = counts[counts >= min_rows].index
         dropped = sorted(set(counts.index) - set(eligible))
@@ -191,7 +323,7 @@ def main() -> None:
             print(f"Dropping {len(dropped)} subjects with < {min_rows} rows: {dropped}")
         df = df[df["subject_id"].isin(eligible)].reset_index(drop=True)
         if df["subject_id"].nunique() < 3:
-            print("WARNING: Too few eligible subjects for subject-level split; using row-level split.")
+            print("WARNING: Too few eligible subjects for subject-level split; using row-level chronological split.")
             training_cfg.subject_level_split = False
 
     if training_cfg.subject_level_split and "subject_id" in df.columns:
@@ -211,17 +343,16 @@ def main() -> None:
             f"test: {len(test_subjects)} subjects"
         )
     else:
-        # Fallback: row-level random split (no subject column or explicitly disabled)
-        print("WARNING: Using row-level random split. "
+        # Fallback: row-level chronological split (no subject column or explicitly disabled).
+        print("WARNING: Using row-level chronological split. "
               "Set subject_level_split=true and ensure 'subject_id' column is present "
               "to avoid data leakage.")
-        rng = np.random.default_rng(training_cfg.seed)
-        idx = rng.permutation(len(df))
-        n_test = max(1, round(len(df) * training_cfg.test_split))
-        n_val = max(1, round(len(df) * training_cfg.validation_split))
-        test_df = df.iloc[idx[:n_test]].reset_index(drop=True)
-        val_df = df.iloc[idx[n_test: n_test + n_val]].reset_index(drop=True)
-        train_df = df.iloc[idx[n_test + n_val:]].reset_index(drop=True)
+        train_df, val_df, test_df = _row_level_time_series_split(
+            df,
+            predictor_cfg=predictor_cfg,
+            training_cfg=training_cfg,
+            data_path=args.data,
+        )
         train_subjects = val_subjects = test_subjects = []
 
     # -----------------------------------------------------------------------
@@ -229,63 +360,33 @@ def main() -> None:
     # -----------------------------------------------------------------------
     segment_column = "segment" if "segment" in df.columns else None
     try:
-        X_train, y_train = build_sequences(
+        X_train, y_train, X_val, y_val, X_test, y_test = _build_split_sequences(
             train_df,
-            history_steps=predictor_cfg.history_steps,
-            horizon_steps=predictor_cfg.horizon_steps,
-            feature_columns=predictor_cfg.feature_columns,
-            target_column=predictor_cfg.target_column,
-            segment_column=segment_column,
-        )
-        X_val, y_val = build_sequences(
             val_df,
-            history_steps=predictor_cfg.history_steps,
-            horizon_steps=predictor_cfg.horizon_steps,
-            feature_columns=predictor_cfg.feature_columns,
-            target_column=predictor_cfg.target_column,
-            segment_column=segment_column,
-        )
-        X_test, y_test = build_sequences(
             test_df,
-            history_steps=predictor_cfg.history_steps,
-            horizon_steps=predictor_cfg.horizon_steps,
-            feature_columns=predictor_cfg.feature_columns,
-            target_column=predictor_cfg.target_column,
+            predictor_cfg=predictor_cfg,
             segment_column=segment_column,
+            data_path=args.data,
         )
-    except ValueError as exc:
+    except TrainingDataError as exc:
         if training_cfg.subject_level_split:
-            print(f"WARNING: subject-level split yielded insufficient sequences ({exc}). Falling back to row-level split.")
-            rng = np.random.default_rng(training_cfg.seed)
-            idx = rng.permutation(len(df))
-            n_test = max(1, round(len(df) * training_cfg.test_split))
-            n_val = max(1, round(len(df) * training_cfg.validation_split))
-            test_df = df.iloc[idx[:n_test]].reset_index(drop=True)
-            val_df = df.iloc[idx[n_test: n_test + n_val]].reset_index(drop=True)
-            train_df = df.iloc[idx[n_test + n_val:]].reset_index(drop=True)
-            X_train, y_train = build_sequences(
+            print(
+                "WARNING: subject-level split yielded insufficient sequences. "
+                "Falling back to row-level chronological split."
+            )
+            train_df, val_df, test_df = _row_level_time_series_split(
+                df,
+                predictor_cfg=predictor_cfg,
+                training_cfg=training_cfg,
+                data_path=args.data,
+            )
+            X_train, y_train, X_val, y_val, X_test, y_test = _build_split_sequences(
                 train_df,
-                history_steps=predictor_cfg.history_steps,
-                horizon_steps=predictor_cfg.horizon_steps,
-                feature_columns=predictor_cfg.feature_columns,
-                target_column=predictor_cfg.target_column,
-                segment_column=segment_column,
-            )
-            X_val, y_val = build_sequences(
                 val_df,
-                history_steps=predictor_cfg.history_steps,
-                horizon_steps=predictor_cfg.horizon_steps,
-                feature_columns=predictor_cfg.feature_columns,
-                target_column=predictor_cfg.target_column,
-                segment_column=segment_column,
-            )
-            X_test, y_test = build_sequences(
                 test_df,
-                history_steps=predictor_cfg.history_steps,
-                horizon_steps=predictor_cfg.horizon_steps,
-                feature_columns=predictor_cfg.feature_columns,
-                target_column=predictor_cfg.target_column,
+                predictor_cfg=predictor_cfg,
                 segment_column=segment_column,
+                data_path=args.data,
             )
         else:
             raise
@@ -617,4 +718,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except TrainingDataError as exc:
+        raise SystemExit(f"ERROR: {exc}") from None

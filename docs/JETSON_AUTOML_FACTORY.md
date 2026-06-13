@@ -1,9 +1,10 @@
-# Jetson AutoML Factory
+# Jetson / Hugging Face Glucose Training Factory
 
-The Jetson AutoML Factory is a research-only script for continuously training
-IINTS glucose-forecast model candidates on edge hardware. It mutates a small
-set of hyperparameters, trains one candidate in a subprocess, logs every trial,
-and promotes only the best valid model to `models/jetson_champion/`.
+The recommended Jetson flow is `iints research glucose-model jetson-train-hf`.
+It treats the Jetson as a research-only fine-tuning worker for your Hugging
+Face glucose-forecast model. It downloads the current model, trains candidates
+with warm-start, compares each candidate against the current local champion,
+and promotes only candidates that improve a physiology-aware composite score.
 
 It is not a treatment system and does not perform online medical control.
 
@@ -16,10 +17,37 @@ source .venv/bin/activate
 iints --help
 ```
 
-You also need a normalized glucose training dataset, normally:
+Install and login to the modern Hugging Face CLI:
+
+```bash
+hf --version
+HF_HOME="$PWD/.cache/huggingface" hf auth login
+```
+
+You also need a normalized glucose training dataset:
 
 ```text
-models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.parquet
+models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv
+```
+
+If you use OhioT1DM, keep the raw `OhioT1DM-volledig/` folder outside GitHub.
+Copy it to the Jetson via SSD, `rsync`, or another access-controlled method,
+then prepare it locally:
+
+```bash
+iints research prepare-ohio \
+  --input-dir /path/to/OhioT1DM-volledig \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+
+iints research glucose-model build-dataset \
+  --input data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --labels ohio_full \
+  --profile long \
+  --history-minutes 360 \
+  --horizon-minutes 120 \
+  --output-dir models/iints-glucose-forecast-v0/dataset
 ```
 
 ## Safe First Run
@@ -27,45 +55,86 @@ models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.parquet
 Run one trial first:
 
 ```bash
-python scratch/jetson_automl_trainer.py --max-trials 1 --timeout-minutes 45
+iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --work-dir models/jetson_hf_training \
+  --max-trials 1 \
+  --epochs 2 \
+  --batch-size 64 \
+  --upload-mode none
 ```
 
 If it succeeds, inspect:
 
 ```bash
-cat jetson_leaderboard.csv
-ls models/jetson_champion
+cat models/jetson_hf_training/jetson_hf_leaderboard.csv
+ls models/jetson_hf_training/champion
 ```
 
 ## Overnight Run
 
 ```bash
-python scratch/jetson_automl_trainer.py \
+nohup iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --work-dir models/jetson_hf_training \
+  --max-trials 0 \
   --timeout-minutes 45 \
-  --cooldown-seconds 10 \
-  --epochs 15 \
-  --batch-size 128
+  --cooldown-seconds 20 \
+  --epochs 8 \
+  --batch-size 64 \
+  --upload-mode none \
+  > jetson_hf_training.log 2>&1 &
 ```
 
-Stop safely with `Ctrl+C`. The leaderboard and champion folder are preserved.
+Stop safely with `Ctrl+C` if running in the foreground, or stop the process if
+using `nohup`. The leaderboard and champion folder are preserved.
 
 ## What Gets Logged
 
-- `jetson_leaderboard.csv`: every successful or failed trial
-- `models/jetson_trials/<trial_id>/trial_config.yaml`: exact config used
-- `models/jetson_trials/<trial_id>/train_stdout_stderr.log`: subprocess log
-- `models/jetson_champion/predictor.pt`: best candidate checkpoint
-- `models/jetson_champion/champion_metadata.json`: score and provenance
+- `models/jetson_hf_training/jetson_hf_leaderboard.csv`: every successful or failed trial
+- `models/jetson_hf_training/hf_base/`: downloaded Hugging Face starting model
+- `models/jetson_hf_training/trials/<trial_id>/trial_config.yaml`: exact config used
+- `models/jetson_hf_training/trials/<trial_id>/train_stdout_stderr.log`: training log
+- `models/jetson_hf_training/trials/<trial_id>/comparison/`: current champion vs candidate metrics
+- `models/jetson_hf_training/champion/predictor.pt`: best accepted local checkpoint
+- `models/jetson_hf_training/champion/huggingface/`: HF-ready champion bundle
 
-Champion selection uses the first available lower-is-better metric:
+Champion selection uses a lower-is-better composite:
 
-1. `test_rmse`
-2. `val_loss_final`
-3. `test_mae`
-4. `train_loss_final`
+```text
+MAE + physiology_weight * physiology_violation_pct + hypo_weight * missed_hypo_rate_pct
+```
+
+The default is intentionally conservative. A model is not promoted just because
+the raw MAE looks slightly better if it creates more impossible physiology or
+worse hypoglycemia behavior.
+
+## Uploading Back To Hugging Face
+
+Default behavior is local-only. To upload a promoted champion as a pull request:
+
+```bash
+iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --work-dir models/jetson_hf_training \
+  --max-trials 1 \
+  --upload-mode pr
+```
+
+Use `--upload-mode direct` only after reviewing the generated model card,
+privacy notes, limitations, and comparison metrics.
 
 ## Jetson Notes
 
-The script sets conservative thread limits and runs each training job in a child
-process so memory is reclaimed after every trial. On a Nano, keep
-`--batch-size 128` unless you have verified stable thermals and memory.
+The command sets conservative thread limits for subprocesses and compares every
+candidate before promotion. On a Nano, start with `--batch-size 64`; increase
+only after you have verified stable thermals and memory.
+
+The older `scratch/jetson_automl_trainer.py` script is still useful for local
+experiments, but the HF-first command is the preferred path when your model
+already lives on Hugging Face.

@@ -8587,34 +8587,45 @@ def research_prepare_azt1d(
 
 @research_app.command(name="prepare-ohio")
 def research_prepare_ohio(
-    input_dir: Annotated[Path, typer.Option(help="Root directory containing OhioT1DM patient_* folders")] = Path("data_packs/public/ohio_t1dm"),
-    output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/ohio_t1dm/processed/ohio_t1dm_merged.csv"),
-    report: Annotated[Path, typer.Option(help="Quality report output path")] = Path("data_packs/public/ohio_t1dm/quality_report.json"),
+    input_dir: Annotated[
+        Path,
+        typer.Option(help="Local OhioT1DM root containing 2018/2020 train/test XML folders. Do not commit this folder."),
+    ] = Path("OhioT1DM-volledig"),
+    output: Annotated[Path, typer.Option(help="Output dataset path (CSV or Parquet)")] = Path("data_packs/public/ohio_t1dm_full/processed/ohio_train.csv"),
+    report: Annotated[Path, typer.Option(help="Quality report output path")] = Path("data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json"),
+    years: Annotated[str, typer.Option(help="Comma-separated years to include, e.g. 2018,2020")] = "2018,2020",
+    splits: Annotated[str, typer.Option(help="Comma-separated Ohio splits to include: train,test")] = "train",
     time_step: Annotated[int, typer.Option(help="Expected CGM sample interval (minutes)")] = 5,
     max_gap_multiplier: Annotated[float, typer.Option(help="Segment-break gap multiplier")] = 2.5,
     dia_minutes: Annotated[float, typer.Option(help="Insulin action duration (minutes)")] = 240.0,
     peak_minutes: Annotated[float, typer.Option(help="IOB peak time (minutes, OpenAPS bilinear)")] = 75.0,
     carb_absorb_minutes: Annotated[float, typer.Option(help="Carb absorption duration (minutes)")] = 120.0,
-    max_insulin: Annotated[float, typer.Option(help="Clip insulin units above this")] = 30.0,
+    max_basal: Annotated[float, typer.Option(help="Clip basal values above this (U/hr)")] = 20.0,
+    max_bolus: Annotated[float, typer.Option(help="Clip bolus insulin units above this")] = 30.0,
     max_carbs: Annotated[float, typer.Option(help="Clip carb grams above this")] = 200.0,
     icr_default: Annotated[float, typer.Option(help="Fallback ICR (g/U)")] = 10.0,
     isf_default: Annotated[float, typer.Option(help="Fallback ISF (mg/dL per U)")] = 50.0,
-    basal_default: Annotated[float, typer.Option(help="Fallback basal rate (U/hr)")] = 0.0,
-    meal_window_min: Annotated[float, typer.Option(help="Meal→insulin matching window (minutes)")] = 30.0,
-    isf_window_min: Annotated[float, typer.Option(help="ISF estimation window (minutes)")] = 60.0,
-    min_meal_carbs: Annotated[float, typer.Option(help="Minimum carbs to consider a meal (g)")] = 5.0,
-    min_bolus: Annotated[float, typer.Option(help="Minimum insulin to consider a bolus (U)")] = 0.1,
+    filter_meals_without_rise: Annotated[
+        bool,
+        typer.Option(
+            "--filter-meals-without-rise/--keep-all-meals",
+            help="Filter meal events that do not show a post-meal glucose rise.",
+        ),
+    ] = True,
+    meal_rise_threshold: Annotated[float, typer.Option(help="Minimum post-meal glucose rise to keep a meal event.")] = 10.0,
+    meal_pre_window: Annotated[float, typer.Option(help="Minutes before meal used for baseline glucose.")] = 10.0,
+    meal_post_window: Annotated[float, typer.Option(help="Minutes after meal used for rise detection.")] = 90.0,
 ):
     """
     Prepare the OhioT1DM dataset for LSTM predictor training.
 
-    Reads per-patient CSVs, derives IOB/COB using the OpenAPS bilinear model,
-    estimates effective ISF/ICR/basal per subject, adds time-of-day features,
-    and writes the merged dataset plus a quality report.
+    Reads the local gated/raw OhioT1DM XML files, derives IOB/COB using the
+    OpenAPS bilinear model, adds time-of-day features, and writes a gitignored
+    processed dataset plus a quality report.
 
     Example
     -------
-    iints research prepare-ohio --input-dir data_packs/public/ohio_t1dm --output ohio.parquet
+    iints research prepare-ohio --input-dir /path/to/OhioT1DM-volledig
     """
     console = Console()
     if not input_dir.exists():
@@ -8628,21 +8639,24 @@ def research_prepare_ohio(
         "--input", str(input_dir),
         "--output", str(output),
         "--report", str(report),
+        "--years", str(years),
+        "--splits", str(splits),
         "--time-step", str(time_step),
         "--max-gap-multiplier", str(max_gap_multiplier),
         "--dia-minutes", str(dia_minutes),
         "--peak-minutes", str(peak_minutes),
         "--carb-absorb-minutes", str(carb_absorb_minutes),
-        "--max-insulin", str(max_insulin),
+        "--max-basal", str(max_basal),
+        "--max-bolus", str(max_bolus),
         "--max-carbs", str(max_carbs),
-        "--icr-default", str(icr_default),
         "--isf-default", str(isf_default),
-        "--basal-default", str(basal_default),
-        "--meal-window-min", str(meal_window_min),
-        "--isf-window-min", str(isf_window_min),
-        "--min-meal-carbs", str(min_meal_carbs),
-        "--min-bolus", str(min_bolus),
+        "--icr-default", str(icr_default),
+        "--meal-rise-threshold", str(meal_rise_threshold),
+        "--meal-pre-window", str(meal_pre_window),
+        "--meal-post-window", str(meal_post_window),
     ]
+    if not filter_meals_without_rise:
+        cmd.append("--no-filter-meals-without-rise")
     try:
         import importlib.util as _ilu
         spec = _ilu.spec_from_file_location(
@@ -9901,6 +9915,124 @@ def research_glucose_model_compare(
     console.print(
         "[yellow]Promotion rule:[/yellow] do not promote a model just because MAE improves; "
         "also inspect missed hypo rate, uncertainty, and physiological violations."
+    )
+
+
+@glucose_model_app.command(name="jetson-train-hf")
+def research_glucose_model_jetson_train_hf(
+    dataset: Annotated[
+        Path,
+        typer.Option(help="Normalized glucose training dataset CSV/Parquet built by glucose-model build-dataset."),
+    ] = Path("models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv"),
+    repo_id: Annotated[
+        Optional[str],
+        typer.Option("--repo-id", help="Hugging Face model repo id, e.g. username/iints-glucose-forecast-v0."),
+    ] = "IINTS/iints-glucose-forecast-v0",
+    local_base_dir: Annotated[
+        Optional[Path],
+        typer.Option(help="Use an already downloaded base model folder instead of downloading from Hugging Face."),
+    ] = None,
+    work_dir: Annotated[
+        Path,
+        typer.Option(help="Jetson training workspace for downloads, trials, champion, and leaderboard."),
+    ] = Path("models/jetson_hf_training"),
+    revision: Annotated[Optional[str], typer.Option(help="Optional Hugging Face revision/tag/branch to download.")] = None,
+    profile: Annotated[str, typer.Option(help="Fallback config profile when the HF repo has no glucose_model_config.yaml.")] = "quick",
+    max_trials: Annotated[int, typer.Option(help="Number of trials. Use 0 to keep training until Ctrl+C.")] = 1,
+    epochs: Annotated[int, typer.Option(help="Fine-tune epochs per trial.")] = 8,
+    batch_size: Annotated[int, typer.Option(help="Batch size per trial; keep modest on Jetson Nano.")] = 64,
+    timeout_minutes: Annotated[float, typer.Option(help="Timeout for each train/compare subprocess.")] = 45.0,
+    cooldown_seconds: Annotated[float, typer.Option(help="Pause between trials to keep Jetson thermals stable.")] = 10.0,
+    min_lr: Annotated[float, typer.Option(help="Minimum sampled learning rate for fine-tuning.")] = 1e-5,
+    max_lr: Annotated[float, typer.Option(help="Maximum sampled learning rate for fine-tuning.")] = 5e-4,
+    min_pinn_lambda: Annotated[float, typer.Option(help="Minimum sampled PINN loss weight.")] = 0.05,
+    max_pinn_lambda: Annotated[float, typer.Option(help="Maximum sampled PINN loss weight.")] = 0.8,
+    min_score_improvement: Annotated[
+        float,
+        typer.Option(help="Required composite-score improvement before replacing the local champion."),
+    ] = 0.0,
+    physiology_weight: Annotated[
+        float,
+        typer.Option(help="Composite score penalty weight for physiological violations."),
+    ] = 0.10,
+    hypo_weight: Annotated[
+        float,
+        typer.Option(help="Composite score penalty weight for missed/false hypo behavior."),
+    ] = 0.20,
+    seed: Annotated[int, typer.Option(help="Random seed for reproducible trial configs.")] = 42,
+    dataset_manifest: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional dataset manifest to redact into the HF export bundle."),
+    ] = None,
+    upload_mode: Annotated[
+        str,
+        typer.Option(help="Upload behavior: none, pr, or direct. Default is safe local-only."),
+    ] = "none",
+    private_upload: Annotated[
+        bool,
+        typer.Option("--private-upload/--public-upload", help="Mark HF upload private when upload is enabled."),
+    ] = True,
+    force_download: Annotated[
+        bool,
+        typer.Option("--force-download/--reuse-download", help="Re-download the HF base model even if cached locally."),
+    ] = False,
+    hf_home: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional HF_HOME cache directory. Defaults inside the Jetson work dir."),
+    ] = None,
+) -> None:
+    """Fine-tune your Hugging Face glucose model on a Jetson with safe promotion gates."""
+    console = Console()
+    try:
+        from iints.research.jetson_hf_trainer import run_jetson_hf_training
+
+        result = run_jetson_hf_training(
+            repo_id=repo_id,
+            dataset=dataset,
+            work_dir=work_dir,
+            local_base_dir=local_base_dir,
+            revision=revision,
+            profile=profile,
+            max_trials=max_trials,
+            timeout_minutes=timeout_minutes,
+            cooldown_seconds=cooldown_seconds,
+            epochs=epochs,
+            batch_size=batch_size,
+            seed=seed,
+            min_lr=min_lr,
+            max_lr=max_lr,
+            min_pinn_lambda=min_pinn_lambda,
+            max_pinn_lambda=max_pinn_lambda,
+            min_score_improvement=min_score_improvement,
+            physiology_weight=physiology_weight,
+            hypo_weight=hypo_weight,
+            dataset_manifest=dataset_manifest,
+            upload_mode=upload_mode,
+            private_upload=private_upload,
+            force_download=force_download,
+            hf_home=hf_home,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]glucose-model jetson-train-hf failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="Jetson HF Glucose Training")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Repo", result.repo_id or "local base model")
+    table.add_row("Work dir", str(result.work_dir))
+    table.add_row("Base dir", str(result.base_dir))
+    table.add_row("Champion", str(result.champion_dir))
+    table.add_row("Leaderboard", str(result.leaderboard))
+    table.add_row("Trials", str(result.trial_count))
+    table.add_row("Accepted", str(result.accepted_count))
+    table.add_row("Best score", "n/a" if result.best_score is None else f"{result.best_score:.4f}")
+    table.add_row("Upload mode", result.upload_mode)
+    table.add_row("Uploaded", str(result.uploaded))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] this fine-tunes a glucose forecast model for simulation and benchmarking; "
+        "it is not a medical device and must not be used for treatment decisions."
     )
 
 

@@ -82,6 +82,11 @@ from .forecasting import (
     summarize_forecast_frame,
     write_forecast_bundle,
 )
+from .jetson_hf_trainer import (
+    JetsonHFTrainingResult,
+    model_score as jetson_hf_model_score,
+    run_jetson_hf_training,
+)
 from .results_manager import (
     ResultsIndexBundle,
     build_artifact_inventory,
@@ -201,4 +206,7 @@ __all__ = [
     "standardize_glucose_forecast_frame",
     "write_glucose_model_config",
     "write_huggingface_export_bundle",
+    "JetsonHFTrainingResult",
+    "jetson_hf_model_score",
+    "run_jetson_hf_training",
 ]

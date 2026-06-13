@@ -85,6 +85,38 @@ models/iints-glucose-forecast-v0/dataset/
 └── MODEL_INTENT.md
 ```
 
+## OhioT1DM On Jetson Without Pushing Raw Data
+
+Do not commit the full raw OhioT1DM folder to GitHub. Keep it on a local SSD,
+Jetson disk, or another access-controlled storage location. The repository
+contains the preparation code and training commands, not the gated/raw dataset.
+
+If the raw folder is available on the Jetson, prepare it locally:
+
+```bash
+iints research prepare-ohio \
+  --input-dir /path/to/OhioT1DM-volledig \
+  --splits train \
+  --output data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --report data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json
+```
+
+Then build the normalized glucose-model dataset:
+
+```bash
+iints research glucose-model build-dataset \
+  --input data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --labels ohio_full \
+  --profile long \
+  --history-minutes 360 \
+  --horizon-minutes 120 \
+  --output-dir models/iints-glucose-forecast-v0/dataset
+```
+
+The generated processed files live under gitignored folders (`data_packs/` and
+`models/`). They are available to the Jetson for training, but they are not
+accidentally published to GitHub.
+
 ## Train The Model
 
 For a quick smoke test:
@@ -195,7 +227,7 @@ iints research glucose-model export-hf \
   --model-dir models/iints-glucose-forecast-v0 \
   --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
   --comparison-dir results/glucose_model_comparison \
-  --repo-id YOUR_USERNAME/iints-glucose-forecast-v0 \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
   --output-dir models/iints-glucose-forecast-v0/huggingface
 ```
 
@@ -227,13 +259,82 @@ huggingface/
 The public manifest redacts local source paths and raw file hashes. This is important for gated datasets such as OhioT1DM.
 The comparison files are optional, but strongly recommended before publishing because they show why the model is judged by physiology-aware safety gates, not only by MAE.
 
+## Continue Training On Jetson From Hugging Face
+
+If your model already exists on Hugging Face, use the Jetson as a conservative
+fine-tuning worker. The SDK downloads the current model, trains candidates with
+warm-start, compares the candidate against the current local champion, and only
+promotes the candidate when a physiology-aware composite score improves.
+
+Login once on the Jetson:
+
+```bash
+HF_HOME="$PWD/.cache/huggingface" hf auth login
+```
+
+Run one safe smoke trial:
+
+```bash
+iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --work-dir models/jetson_hf_training \
+  --max-trials 1 \
+  --epochs 2 \
+  --batch-size 64 \
+  --upload-mode none
+```
+
+If that succeeds, start a longer run:
+
+```bash
+nohup iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --dataset-manifest models/iints-glucose-forecast-v0/dataset/glucose_dataset_manifest.json \
+  --work-dir models/jetson_hf_training \
+  --max-trials 0 \
+  --epochs 8 \
+  --batch-size 64 \
+  --timeout-minutes 45 \
+  --cooldown-seconds 20 \
+  --upload-mode none \
+  > jetson_hf_training.log 2>&1 &
+```
+
+Monitor progress:
+
+```bash
+tail -f jetson_hf_training.log
+cat models/jetson_hf_training/jetson_hf_leaderboard.csv
+ls models/jetson_hf_training/champion
+```
+
+When you are ready to send a candidate to Hugging Face, prefer a pull request:
+
+```bash
+iints research glucose-model jetson-train-hf \
+  --repo-id IINTS/iints-glucose-forecast-v0 \
+  --dataset models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --work-dir models/jetson_hf_training \
+  --max-trials 1 \
+  --epochs 8 \
+  --batch-size 64 \
+  --upload-mode pr
+```
+
+This command does not upload raw OhioT1DM rows. It uploads the champion model
+bundle only when a candidate is promoted, with the research-only model card,
+privacy notes, limitations, comparison artifacts, and example inference script.
+
 ## Private-First Upload
 
 Upload privately first:
 
 ```bash
 cd models/iints-glucose-forecast-v0/huggingface
-huggingface-cli upload YOUR_USERNAME/iints-glucose-forecast-v0 . . --private
+hf upload IINTS/iints-glucose-forecast-v0 . . --type model --private
 ```
 
 Before making it public, verify:

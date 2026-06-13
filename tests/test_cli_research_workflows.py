@@ -276,6 +276,7 @@ def test_research_glucose_model_commands_are_available() -> None:
     assert "build-dataset" in result.stdout
     assert "compare" in result.stdout
     assert "export-hf" in result.stdout
+    assert "jetson-train-hf" in result.stdout
 
 
 def test_research_glucose_model_init_writes_config(tmp_path) -> None:

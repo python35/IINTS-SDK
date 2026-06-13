@@ -37,10 +37,16 @@ data_packs/sample/
 data_packs/synthetic/
 # Public datasets (downloaded locally)
 data_packs/public/
+data_packs/*.parquet
+data_packs/ohio_merged.parquet
 # Processed training artifacts
 data_packs/**/processed/
 # Trained model outputs
 models/
+
+# Private/gated diabetes datasets. Keep raw data local; never commit these.
+OhioT1DM-volledig/
+**/OhioT1DM-volledig/
 
 # Coverage
 .coverage
