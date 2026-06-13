@@ -7,7 +7,7 @@ import platform
 import random
 import time
 from pathlib import Path
-from typing import cast
+from typing import Optional, cast
 
 import numpy as np
 import pandas as pd
@@ -18,9 +18,13 @@ try:
     from torch import nn
     from torch.utils.data import DataLoader, TensorDataset
 except Exception as exc:
-    raise SystemExit(
-        "Torch is required for training. Install with `pip install iints-sdk-python35[research]`."
-    ) from exc
+    torch = None  # type: ignore[assignment]
+    nn = None  # type: ignore[assignment]
+    DataLoader = None  # type: ignore[assignment,misc]
+    TensorDataset = None  # type: ignore[assignment,misc]
+    _TORCH_IMPORT_ERROR: Optional[BaseException] = exc
+else:
+    _TORCH_IMPORT_ERROR = None
 
 import iints
 from iints.research.config import PredictorConfig, TrainingConfig
@@ -62,6 +66,17 @@ TRAINING_FEATURE_DEFAULTS: dict[str, float] = {
 
 class TrainingDataError(ValueError):
     """User-facing training data problem that should not print a traceback."""
+
+
+class TrainingDependencyError(RuntimeError):
+    """Missing optional research dependency required for actual training."""
+
+
+def _require_torch() -> None:
+    if torch is None or nn is None or DataLoader is None or TensorDataset is None:
+        raise TrainingDependencyError(
+            "Torch is required for training. Install with `pip install iints-sdk-python35[research]`."
+        ) from _TORCH_IMPORT_ERROR
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +343,12 @@ def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) ->
 
 def main() -> None:
     args = parse_args()
+    _require_torch()
+    assert torch is not None
+    assert nn is not None
+    assert DataLoader is not None
+    assert TensorDataset is not None
+
     config_text = args.config.read_text()
     config = yaml.safe_load(config_text)
     predictor_cfg = PredictorConfig(**config["predictor"])
@@ -758,5 +779,5 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except TrainingDataError as exc:
+    except (TrainingDataError, TrainingDependencyError) as exc:
         raise SystemExit(f"ERROR: {exc}") from None
