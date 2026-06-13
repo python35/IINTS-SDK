@@ -4,6 +4,8 @@ site_url: https://python35.github.io/IINTS-SDK/
 repo_url: https://github.com/python35/IINTS-SDK
 repo_name: python35/IINTS-SDK
 edit_uri: edit/main/docs/
+exclude_docs: |
+  obsidian/**
 
 theme:
   name: material
@@ -84,6 +86,7 @@ nav:
       - Medtronic Direct Pump Transport: MEDTRONIC_DIRECT_PUMP_TRANSPORT.md
       - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
       - Jetson Endurance Mode: JETSON_ENDURANCE.md
+      - Jetson Theory Stress Lab: THEORY_STRESS_LAB.md
       - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
       - Maker Faire Checklist: MAKERFAIRE_PI_CHECKLIST.md
@@ -113,6 +116,10 @@ nav:
       - Complete Source Library: SOURCE_LIBRARY.md
       - Evidence Base: EVIDENCE_BASE.md
       - MDMP Specification: MDMP.md
+      - Governance:
+          - API Stability: governance/API_STABILITY.md
+          - Privacy Policy: governance/PRIVACY_POLICY.md
+          - Terms of Use: governance/TERMS_OF_USE.md
       - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md
       - Emulation Notes: emulation_references.md
       - Documentation By Role: DOCUMENTATION_INDEX.md
@@ -120,10 +127,12 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.13): releases/v1.5.13.md
-      - v1.5.12: releases/v1.5.12.md
+      - Latest (v1.5.15): releases/v1.5.15.md
+      - v1.5.14: releases/v1.5.14.md
+      - v1.5.13: releases/v1.5.13.md
       - Release Archive: releases/INDEX.md
       - Older Releases:
+          - v1.5.12: releases/v1.5.12.md
           - v1.5.11: releases/v1.5.11.md
           - v1.5.10: releases/v1.5.10.md
           - v1.5.9: releases/v1.5.9.md

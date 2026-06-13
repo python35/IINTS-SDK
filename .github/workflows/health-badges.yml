@@ -1,16 +1,13 @@
 name: Health Badges
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   badges:
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip health badges]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -76,16 +73,8 @@ jobs:
           print(output)
           PY
 
-      - name: Commit badges
-        run: |
-          git add badges
-          if git diff --cached --quiet --exit-code; then
-            echo "No badge changes to commit."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update health badges [skip health badges]"
-          git pull --rebase origin main
-          git push origin main
+      - name: Upload badge artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-badges
+          path: badges/*.svg

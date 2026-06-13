@@ -30,7 +30,7 @@ After downloading:
 
 After this repository is pushed, the vault can also be browsed directly on GitHub:
 
-[Browse the public vault folder](https://github.com/python35/IINTS-SDK/tree/main/obsidian/public/IINTS%20SDK%20Public%20Vault)
+[Browse the public vault folder](https://github.com/python35/IINTS-SDK/tree/main/docs/obsidian/public/IINTS%20SDK%20Public%20Vault)
 
 ## Obsidian Publish
 
@@ -38,7 +38,7 @@ This public vault is prepared as an Obsidian Publish package. Publishing still r
 
 If you publish it:
 
-- publish the folder `obsidian/public/IINTS SDK Public Vault`
+- publish the folder `docs/obsidian/public/IINTS SDK Public Vault`
 - do not publish the private/internal vault
 - keep private notes, credentials, local results, and personal meeting notes out of the public vault
 

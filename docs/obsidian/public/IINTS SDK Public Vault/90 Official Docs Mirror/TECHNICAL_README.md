@@ -873,4 +873,4 @@ tools/docs/build_manuals.sh
 * March 27, 2026: Official Launch & Live Expo Demo
 
 ## API Stability
-See `API_STABILITY.md` for semver and deprecation policy.
+See `governance/API_STABILITY.md` for semver and deprecation policy.

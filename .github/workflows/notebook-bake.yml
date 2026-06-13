@@ -1,16 +1,13 @@
 name: Notebook Bake
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   bake:
-    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip notebook bake]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -59,15 +56,11 @@ jobs:
         run: |
           rm -rf results
 
-      - name: Commit baked notebooks
+      - name: Check notebook drift
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add examples/notebooks
-            git commit -m "chore: bake notebooks [skip notebook bake]"
-            git pull --rebase -X theirs origin main
-            git push origin main
-          else
-            echo "No notebook changes to commit."
+          if [ -n "$(git status --porcelain examples/notebooks)" ]; then
+            echo "Notebook outputs changed during bake. Run the bake locally and commit intentionally."
+            git status --short examples/notebooks
+            exit 1
           fi
+          echo "No notebook drift detected."

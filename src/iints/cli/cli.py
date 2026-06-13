@@ -283,6 +283,7 @@ fpga_app = typer.Typer(help="FPGA safety-core and hardware-logic research workfl
 makerfaire_app = typer.Typer(help="Maker Faire booth startup helpers for the physical virtual patient setup.")
 jetson_app = typer.Typer(help="NVIDIA Jetson headless research tooling.")
 jetson_endurance_app = typer.Typer(help="Headless long-running adversarial endurance tests.")
+jetson_theory_stress_app = typer.Typer(help="Scientific theory stress tests for physiology and safety assumptions.")
 app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
@@ -303,6 +304,7 @@ app.add_typer(makerfaire_app, name="makerfaire")
 app.add_typer(patient_app, name="patient")
 app.add_typer(jetson_app, name="jetson")
 jetson_app.add_typer(jetson_endurance_app, name="endurance")
+jetson_app.add_typer(jetson_theory_stress_app, name="theory-stress")
 
 
 @app.callback(invoke_without_command=True)
@@ -8622,7 +8624,7 @@ def research_prepare_ohio(
     import subprocess, sys  # noqa: E401
     cmd = [
         sys.executable,
-        str(Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py"),
+        str(Path(__file__).parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py"),
         "--input", str(input_dir),
         "--output", str(output),
         "--report", str(report),
@@ -8645,7 +8647,7 @@ def research_prepare_ohio(
         import importlib.util as _ilu
         spec = _ilu.spec_from_file_location(
             "_prepare_ohio_t1dm",
-            Path(__file__).parent.parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py",
+            Path(__file__).parent.parent.parent.parent / "research" / "prepare_ohio_t1dm.py",
         )
         if spec is not None and spec.loader is not None:
             import sys as _sys
@@ -10899,6 +10901,50 @@ def jetson_doctor():
     table.add_row("tegrastats", str(info.get("tegrastats") or "not available"))
     table.add_row("Thermal zones", json.dumps(info.get("thermal_zones", []), indent=2))
     console.print(table)
+
+
+@jetson_theory_stress_app.command(name="run")
+def jetson_theory_stress_run(
+    output_dir: Annotated[Path, typer.Option(help="Output directory for Theory Stress Lab artifacts")] = Path("results/theory_stress_lab"),
+    profile: Annotated[str, typer.Option(help="Run profile: jetson, ci, or deep")] = "jetson",
+    seed: Annotated[int, typer.Option(help="Deterministic seed for reproducible scenario generation")] = 42,
+    repeats: Annotated[int, typer.Option(help="Repeat the configured check suite with shifted seeds")] = 1,
+    duration_minutes: Annotated[float, typer.Option(help="Labelled run duration for the report metadata")] = 30.0,
+    fail_on_weakness: Annotated[bool, typer.Option(help="Exit with code 1 when any invariant fails")] = False,
+):
+    """Run the scientific Theory Stress Lab and write weakness reports."""
+    console = Console()
+    try:
+        if repeats <= 0:
+            raise typer.BadParameter("--repeats must be greater than zero")
+        if duration_minutes <= 0:
+            raise typer.BadParameter("--duration-minutes must be greater than zero")
+        if profile not in {"jetson", "ci", "deep"}:
+            raise typer.BadParameter("--profile must be one of: jetson, ci, deep")
+        from iints.tools.theory_stress_lab import run_theory_stress_lab
+
+        report = run_theory_stress_lab(
+            output_dir=output_dir,
+            profile=profile,
+            seed=seed,
+            repeats=repeats,
+            duration_minutes=duration_minutes,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Theory Stress Lab failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS-AF Theory Stress Lab")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Verdict", report.verdict)
+    table.add_row("Overall score", f"{report.overall_score:.3f}")
+    table.add_row("Checks", str(len(report.checks)))
+    table.add_row("Output", str(output_dir))
+    table.add_row("Summary", str(output_dir / "summary.md"))
+    console.print(table)
+    if fail_on_weakness and report.verdict == "weak_points_found":
+        raise typer.Exit(code=1)
 
 
 @jetson_endurance_app.command(name="start")

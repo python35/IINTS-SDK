@@ -51,7 +51,7 @@ For non-technical readers, start with:
 - **Technical details**: `TECHNICAL_README.md`
 - **Data protocol (MDMP draft)**: `MDMP.md`
 - **Evidence base**: `EVIDENCE_BASE.md`
-- **API stability**: `../API_STABILITY.md`
+- **API stability**: `governance/API_STABILITY.md`
 - **Change history**: `../CHANGELOG.md`
 
 ### Technical Architecture

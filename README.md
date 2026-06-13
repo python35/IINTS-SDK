@@ -11,6 +11,27 @@ Open-source research platform for insulin delivery algorithm simulation and vali
 
 ---
 
+## Repository Map
+
+| Path | Purpose |
+| --- | --- |
+| `src/iints/` | installable SDK source code |
+| `docs/` | public documentation, governance, release notes, and Obsidian vault mirror |
+| `examples/` | runnable examples and notebooks |
+| `tests/` | unit, CLI, system, and realism tests |
+| `research/` | research artifacts and benchmark snapshots |
+| `tools/` | maintainer scripts for docs, CI, and release workflows |
+| `data_packs/` | small bundled/demo data packs |
+| `algorithms/` | example insulin algorithm entry points |
+
+Important starting points:
+
+- `docs/THEORY_STRESS_LAB.md` — Jetson scientific stress-test mode
+- `docs/governance/API_STABILITY.md` — semver and API policy
+- `docs/governance/PRIVACY_POLICY.md` and `docs/governance/TERMS_OF_USE.md` — public legal docs
+
+---
+
 ## What It Does
 
 - **Simulate** virtual patients across thousands of scenarios before any algorithm reaches a real device
