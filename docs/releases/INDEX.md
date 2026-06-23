@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.17](v1.5.17.md) - reporting NumPy typing CI fix
 - [v1.5.16](v1.5.16.md) - architecture boundary hardening and dependency cleanup
 - [v1.5.13](v1.5.13.md) - AI Red-Team Realism Auditor workflow
 - [v1.5.12](v1.5.12.md)

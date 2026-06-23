@@ -4,13 +4,14 @@ import logging
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "iints-matplotlib"))
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
@@ -777,11 +778,18 @@ class ClinicalReportGenerator:
         working = df.copy()
         if "time_minutes" not in working.columns:
             working["time_minutes"] = np.arange(len(working), dtype=float) * self._infer_step_minutes(working)
-        x_hours = pd.to_numeric(working["time_minutes"], errors="coerce").fillna(0.0).to_numpy(dtype=float) / 60.0
-        glucose = pd.to_numeric(working["glucose_actual_mgdl"], errors="coerce").to_numpy(dtype=float)
+        x_hours = cast(
+            NDArray[np.float64],
+            pd.to_numeric(working["time_minutes"], errors="coerce").fillna(0.0).to_numpy(dtype=np.float64)
+            / 60.0,
+        )
+        glucose = cast(
+            NDArray[np.float64],
+            pd.to_numeric(working["glucose_actual_mgdl"], errors="coerce").to_numpy(dtype=np.float64),
+        )
         if len(glucose) == 0:
-            glucose = np.array([0.0])
-            x_hours = np.array([0.0])
+            glucose = np.asarray([0.0], dtype=np.float64)
+            x_hours = np.asarray([0.0], dtype=np.float64)
 
         fig, ax = plt.subplots(figsize=(10.8, 5.2))
         x_min = float(np.nanmin(x_hours))
