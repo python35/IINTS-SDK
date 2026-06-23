@@ -243,6 +243,7 @@ class AIRealismAuditor:
             f"**Input CSV:** `{self.csv_path}`",
             f"**Rows Scanned:** {len(self.df)}",
             f"**Anomalies Detected by Filter:** {len(anomalies)}",
+            f"**Local AI Verdicts:** **{'enabled' if self.ai_ready else 'offline / disabled'}**",
             f"**Optional AI Explanations:** **{'enabled' if self.ai_ready else 'offline / disabled'}**",
             "",
         ]
