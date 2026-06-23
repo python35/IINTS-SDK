@@ -48,6 +48,7 @@ def _default_prepared_payload(task: str, ai_dir: Path) -> Path:
         "explain": ["step_riskiest.json", "step_latest.json"],
         "trends": ["trends_payload.json"],
         "anomalies": ["anomalies_payload.json"],
+        "insights": ["insights_payload.json", "report_payload.json"],
         "report": ["report_payload.json"],
         "review": ["review_payload.json", "report_payload.json"],
     }.get(task, [])
@@ -78,7 +79,7 @@ def _resolve_cli_inputs(
         ai_dir = input_path / "ai"
         if (
             not ai_dir.exists()
-            or not any((ai_dir / candidate).is_file() for candidate in ("report_payload.json", "trends_payload.json", "anomalies_payload.json", "step_riskiest.json", "review_payload.json"))
+            or not any((ai_dir / candidate).is_file() for candidate in ("report_payload.json", "trends_payload.json", "anomalies_payload.json", "insights_payload.json", "step_riskiest.json", "review_payload.json"))
             or (resolved_cert is None and not (ai_dir / "report.signed.mdmp").is_file())
         ):
             prepare_ai_ready_artifacts(
@@ -119,6 +120,14 @@ def _default_output_for_review(input_path: Path, output: Path | None) -> Path | 
     return None
 
 
+def _default_output_for_insights(input_path: Path, output: Path | None) -> Path | None:
+    if output is not None:
+        return output
+    if input_path.is_dir():
+        return input_path / "ai" / "insights.md"
+    return None
+
+
 def _render_response(console: Console, title: str, response: AIResponse, output: Path | None) -> None:
     console.print(Panel(response.text, title=title, border_style="cyan"))
     console.print(
@@ -136,6 +145,8 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
     ready = bool(status.get("ready"))
     resolved_model = status.get("resolved_model") or "not found"
     smoke_text = status.get("smoke_test") or "not run"
+    options = status.get("generation_options")
+    options_text = json.dumps(options, sort_keys=True) if isinstance(options, dict) else "default"
     console.print(
         Panel(
             "\n".join(
@@ -145,6 +156,7 @@ def _render_local_check(console: Console, status: dict[str, object]) -> None:
                     f"Resolved local model: {resolved_model}",
                     f"Server version: {status.get('server_version') or 'unknown'}",
                     f"Timeout (s): {status.get('timeout_seconds')}",
+                    f"Insight generation options: {options_text}",
                     f"Installed models: {installed_text}",
                     (
                         f"Pull command: {status.get('pull_command')}"
@@ -439,6 +451,48 @@ def anomalies(
         response = assistant.detect_anomalies(payload)
         _write_output(output, response)
         _render_response(console, "IINTS AI Anomalies", response, output)
+    except Exception as exc:
+        console.print(f"[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@app.command(name="insights")
+def insights(
+    input_json: Annotated[Path, typer.Argument(help="Prepared run directory or JSON file with run-level simulation outputs.")],
+    mdmp_cert: Annotated[Optional[Path], typer.Option(help="Signed MDMP artifact required before AI analysis can run.")] = None,
+    mode: Annotated[str, typer.Option(help="AI backend mode. Use 'local' for Ollama/Ministral.")] = "auto",
+    model: Annotated[str, typer.Option(help="Ollama model name to use.")] = DEFAULT_MINISTRAL_MODEL,
+    minimum_grade: Annotated[str, typer.Option(help="Minimum MDMP grade required to allow analysis.")] = "research_grade",
+    public_key: Annotated[Optional[Path], typer.Option(help="Explicit MDMP public key for verification.")] = None,
+    trust_store: Annotated[Optional[Path], typer.Option(help="MDMP trust store for verification.")] = None,
+    ollama_host: Annotated[Optional[str], typer.Option(help="Override the Ollama base URL.")] = None,
+    timeout_seconds: Annotated[float, typer.Option(help="HTTP timeout for Ollama generation requests.")] = 120.0,
+    output: Annotated[Optional[Path], typer.Option(help="Optional file path to save the insight brief.")] = None,
+) -> None:
+    console = Console()
+    try:
+        resolved_input, resolved_cert, resolved_public_key = _resolve_cli_inputs(
+            task="insights",
+            input_path=input_json,
+            mdmp_cert=mdmp_cert,
+            public_key=public_key,
+            trust_store=trust_store,
+        )
+        payload = _load_json_payload(resolved_input, "Input JSON")
+        assistant = _build_assistant(
+            mdmp_cert=resolved_cert,
+            mode=mode,
+            model=model,
+            minimum_grade=minimum_grade,
+            public_key=resolved_public_key,
+            trust_store=trust_store,
+            ollama_host=ollama_host,
+            timeout_seconds=timeout_seconds,
+        )
+        resolved_output = _default_output_for_insights(input_json, output)
+        response = assistant.generate_insights(payload)
+        _write_output(resolved_output, response)
+        _render_response(console, "IINTS AI Insights", response, resolved_output)
     except Exception as exc:
         console.print(f"[bold red]Error:[/bold red] {exc}")
         raise typer.Exit(code=1)

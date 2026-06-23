@@ -7,11 +7,18 @@ except Exception:  # pragma: no cover - optional dependency
     nn = None  # type: ignore
     _TORCH_AVAILABLE = False
 import os
+import math
 import numpy as np
 from typing import Dict, Any, List, Optional
 from collections import deque
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from .correction_bolus import CorrectionBolus
+from iints.core.safety.config import (
+    CONTROLLER_FALLING_TREND_GUARD_MGDL_MIN,
+    CONTROLLER_HIGH_IOB_GUARD_UNITS,
+    CONTROLLER_HYPO_GUARD_MGDL,
+    ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS,
+)
 
 if _TORCH_AVAILABLE:
     # Define the LSTM model with Dropout
@@ -52,6 +59,9 @@ if _TORCH_AVAILABLE:
                 "model_path": os.path.join(os.path.dirname(__file__), 'trained_lstm_model.pth'),
                 "mc_samples": 50,
                 "uncertainty_threshold": 0.5, # This threshold may need tuning
+                "mc_seed": 42,
+                "model_output_scale_units": 1.0,
+                "max_model_candidate_units": ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS,
             }
             self.settings = {**self.default_settings, **(settings or {})}
 
@@ -62,12 +72,21 @@ if _TORCH_AVAILABLE:
                 self.settings["dropout_prob"]
             )
             
-            # Load the trained model if it exists
+            self.model_loaded = False
+            # A missing checkpoint must fail closed. Randomly initialized
+            # networks are never allowed to produce an insulin candidate.
             if os.path.exists(self.settings['model_path']):
                 print(f"Loading trained model from {self.settings['model_path']}")
-                self.model.load_state_dict(torch.load(self.settings['model_path'], weights_only=True))
+                self.model.load_state_dict(
+                    torch.load(self.settings['model_path'], map_location="cpu", weights_only=True)
+                )
+                self.model.eval()
+                self.model_loaded = True
             else:
-                print(f"Warning: Trained model not found at {self.settings['model_path']}. LSTM will make random predictions.")
+                print(
+                    f"Warning: Trained model not found at {self.settings['model_path']}. "
+                    "LSTM dosing is disabled; deterministic fallback will be used."
+                )
 
             # Instantiate fallback algorithm
             self.fallback_algo = CorrectionBolus()
@@ -77,51 +96,109 @@ if _TORCH_AVAILABLE:
             """Resets the algorithm's internal state."""
             super().reset()
 
+        def _fallback(self, data: AlgorithmInput, reason: str) -> Dict[str, Any]:
+            self._log_reason(reason, "safety_fallback", reason)
+            if reason == "fixed_controller_safety_guard":
+                result: Dict[str, Any] = {
+                    "total_insulin_delivered": 0.0,
+                    "bolus_insulin": 0.0,
+                    "basal_insulin": 0.0,
+                }
+            else:
+                result = self.fallback_algo.predict_insulin(data)
+            result["fallback_triggered"] = True
+            result["fallback_reason"] = reason
+            result["model_checkpoint_loaded"] = self.model_loaded
+            if reason != "fixed_controller_safety_guard":
+                self.why_log.extend(self.fallback_algo.get_why_log())
+            return result
+
+        def _feature_tensor(self, data: AlgorithmInput):
+            features = [
+                float(data.current_glucose),
+                float(data.glucose_trend_mgdl_min or 0.0),
+                float(data.predicted_glucose_30min or data.current_glucose),
+                float(data.carb_intake),
+                float(data.insulin_on_board),
+                float(data.isf or self.isf),
+                float(data.icr or self.icr),
+            ]
+            if len(features) != int(self.settings["input_features"]):
+                raise ValueError("LSTM input_features must match the seven documented SDK features")
+            return torch.tensor(features, dtype=torch.float32).reshape(1, 1, len(features))
+
+        def _deterministic_uncertainty(self, input_tensor) -> float:
+            predictions = []
+            with torch.random.fork_rng(devices=[]):
+                torch.manual_seed(int(self.settings["mc_seed"]))
+                self.model.train()
+                with torch.no_grad():
+                    for _ in range(int(self.settings["mc_samples"])):
+                        predictions.append(float(self.model(input_tensor).item()))
+            self.model.eval()
+            return float(np.std(np.asarray(predictions, dtype=float)))
+
         def predict_insulin(self, data: AlgorithmInput) -> Dict[str, Any]:
             self.why_log = [] # Clear the log for this prediction cycle
 
-            placeholder_input = [3, data.current_glucose, 72, 29, 32, 0.47, 33]
-            input_tensor = torch.tensor(placeholder_input, dtype=torch.float32).reshape(1, 1, self.settings['input_features'])
+            if not self.model_loaded:
+                return self._fallback(data, "missing_model_checkpoint")
+
+            trend = float(data.glucose_trend_mgdl_min or 0.0)
+            predicted = float(data.predicted_glucose_30min or data.current_glucose)
+            if (
+                float(data.current_glucose) <= CONTROLLER_HYPO_GUARD_MGDL
+                or predicted <= CONTROLLER_HYPO_GUARD_MGDL
+                or trend <= CONTROLLER_FALLING_TREND_GUARD_MGDL_MIN
+                or float(data.insulin_on_board) >= CONTROLLER_HIGH_IOB_GUARD_UNITS
+            ):
+                return self._fallback(data, "fixed_controller_safety_guard")
+
+            input_tensor = self._feature_tensor(data)
 
             self._log_reason("LSTM input tensor created", "data_preparation", input_tensor.tolist())
 
-            # --- Monte Carlo Dropout ---
-            self.model.train() # Enable dropout
-            predictions = []
+            # The point prediction is deterministic. MC dropout is used only
+            # as a seeded uncertainty gate and never as the delivered value.
+            self.model.eval()
             with torch.no_grad():
-                for _ in range(self.settings['mc_samples']):
-                    pred = self.model(input_tensor).item()
-                    predictions.append(pred)
-            self.model.eval() # Disable dropout for future use if any
+                raw_prediction = float(self.model(input_tensor).item())
+            std_dev = self._deterministic_uncertainty(input_tensor)
+            self._log_reason(
+                f"Seeded uncertainty estimate generated (std dev: {std_dev:.4f})",
+                "uncertainty_quantification",
+                {"std_dev": std_dev, "seed": int(self.settings["mc_seed"])},
+            )
 
-            mc_predictions_array = np.array(predictions)
-            mean_prediction = np.mean(mc_predictions_array)
-            std_dev = np.std(mc_predictions_array)
-            self._log_reason(f"Monte Carlo Dropout predictions generated (mean: {mean_prediction:.4f}, std dev: {std_dev:.4f})", "uncertainty_quantification", {'mean': mean_prediction, 'std_dev': std_dev})
-
-
-            # --- Hybrid Safety Controller ---
+            if not math.isfinite(raw_prediction) or not math.isfinite(std_dev):
+                return self._fallback(data, "non_finite_model_output")
             if std_dev > self.settings['uncertainty_threshold']:
-                self._log_reason(f"High uncertainty detected ({std_dev:.3f} > {self.settings['uncertainty_threshold']}). Falling back to rule-based algorithm.", "safety_fallback", std_dev)
-                fallback_result = self.fallback_algo.predict_insulin(data)
-                fallback_result['uncertainty'] = std_dev
-                fallback_result['fallback_triggered'] = True
-                # Extend fallback algo's log
-                self.why_log.extend(self.fallback_algo.get_why_log())
-                return fallback_result
+                result = self._fallback(data, "uncertainty_above_fixed_threshold")
+                result["uncertainty"] = std_dev
+                return result
 
-            total_insulin_delivered = max(0.0, mean_prediction * 10) # Arbitrary scaling for demo
-            self._log_reason(f"LSTM prediction accepted (uncertainty: {std_dev:.4f}). Delivered insulin scaled from raw prediction.", "lstm_prediction", total_insulin_delivered)
+            scaled_candidate = raw_prediction * float(self.settings["model_output_scale_units"])
+            max_candidate = max(0.0, float(self.settings["max_model_candidate_units"]))
+            total_insulin_delivered = min(max_candidate, max(0.0, scaled_candidate))
+            self._log_reason(
+                "Loaded LSTM candidate accepted after deterministic scaling and hard cap",
+                "lstm_prediction",
+                total_insulin_delivered,
+            )
 
             self.state['last_prediction'] = total_insulin_delivered
-            self.state['raw_prediction'] = mean_prediction
+            self.state['raw_prediction'] = raw_prediction
             self.state['uncertainty'] = std_dev
 
             return {
                 "total_insulin_delivered": total_insulin_delivered,
-                "predicted_insulin_raw": mean_prediction,
+                "predicted_insulin_raw": raw_prediction,
                 "uncertainty": std_dev,
-                "fallback_triggered": False
+                "fallback_triggered": False,
+                "model_checkpoint_loaded": True,
+                "uncertainty_seed": int(self.settings["mc_seed"]),
+                "model_output_scale_units": float(self.settings["model_output_scale_units"]),
+                "hard_cap_units_per_step": max_candidate,
             }
 
         def __str__(self):

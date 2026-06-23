@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-IINTS-AF Learning System
-Implements real learning with parameter adaptation and validation
+IINTS-AF Legacy Learning Storage
+Stores externally validated parameters; mock learning is intentionally disabled.
 """
 
 import json
-import numpy as np
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 
 class LearningSystem:
-    """Real learning system that adapts to patient-specific patterns"""
+    """Store externally produced research parameters with validation metadata."""
     
     def __init__(self):
         self.models_dir = Path("models/learned_parameters")
@@ -55,38 +54,12 @@ class LearningSystem:
             return json.load(f)
     
     def simulate_learning_process(self, patient_id: str, glucose_data: List[float]) -> Tuple[Dict, List[float]]:
-        """Simulate neural network learning with weight adaptation"""
-        
-        # Mock neural network parameters
-        initial_weights = {
-            "insulin_sensitivity": np.random.uniform(0.8, 1.2),
-            "carb_ratio": np.random.uniform(10, 15),
-            "correction_factor": np.random.uniform(40, 60),
-            "basal_rate": np.random.uniform(0.8, 1.5)
-        }
-        
-        # Simulate learning iterations
-        learning_curve = []
-        current_loss = np.random.uniform(0.8, 1.2)  # Initial high loss
-        
-        for iteration in range(10):
-            # Simulate gradient descent
-            current_loss *= np.random.uniform(0.85, 0.95)  # Loss decreases
-            learning_curve.append(current_loss)
-            
-            # Update weights (mock adaptation)
-            for param in initial_weights:
-                initial_weights[param] *= np.random.uniform(0.98, 1.02)
-        
-        # Final adapted parameters
-        adapted_parameters = {
-            "neural_weights": initial_weights,
-            "final_loss": current_loss,
-            "learning_iterations": 10,
-            "convergence_achieved": current_loss < 0.3
-        }
-        
-        return adapted_parameters, learning_curve
+        """Reject the former random mock so it cannot create research claims."""
+
+        raise RuntimeError(
+            "Random mock learning is disabled. Use the deterministic calibration engine or "
+            "the versioned glucose-model training pipeline with measured validation data."
+        )
     
     def validate_learning_safety(self, parameters: Dict, patient_id: str) -> Tuple[bool, str]:
         """Safety validation of learned parameters"""

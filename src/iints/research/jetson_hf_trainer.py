@@ -235,12 +235,14 @@ def _checkpoint_config(path: Path) -> dict[str, Any]:
     except Exception:
         return {}
     try:
-        try:
-            payload = torch.load(path, map_location="cpu", weights_only=True)
-        except TypeError:
-            payload = torch.load(path, map_location="cpu")
-    except Exception:
-        return {}
+        payload = torch.load(path, map_location="cpu", weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "Secure checkpoint inspection requires torch.load(weights_only=True). "
+            "Upgrade PyTorch or convert the checkpoint in a trusted environment."
+        ) from exc
+    except Exception as exc:
+        raise RuntimeError(f"Could not securely inspect checkpoint {path}: {exc}") from exc
     if not isinstance(payload, Mapping):
         return {}
     config = payload.get("config")

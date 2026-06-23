@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 try:
     import torch
@@ -22,10 +22,20 @@ if nn is None:  # pragma: no cover
                 "Torch is required for QuantileLoss. Install with `pip install iints-sdk-python35[research]`."
             ) from _IMPORT_ERROR
 
+        def __call__(self, *args: object, **kwargs: object) -> Any:
+            raise ImportError(
+                "Torch is required for QuantileLoss. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
     class SafetyWeightedMSE:  # type: ignore[no-redef]
         """MSE with extra weight on low-glucose targets (safety-critical)."""
 
         def __init__(self, *args: object, **kwargs: object) -> None:
+            raise ImportError(
+                "Torch is required for SafetyWeightedMSE. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
+        def __call__(self, *args: object, **kwargs: object) -> Any:
             raise ImportError(
                 "Torch is required for SafetyWeightedMSE. Install with `pip install iints-sdk-python35[research]`."
             ) from _IMPORT_ERROR
@@ -38,12 +48,42 @@ if nn is None:  # pragma: no cover
                 "Torch is required for BandWeightedMSE. Install with `pip install iints-sdk-python35[research]`."
             ) from _IMPORT_ERROR
 
+        def __call__(self, *args: object, **kwargs: object) -> Any:
+            raise ImportError(
+                "Torch is required for BandWeightedMSE. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
     class PhysiologicalPINNLoss:  # type: ignore[no-redef]
         """PINN loss for physiological boundaries."""
+
+        pinn_lambda: float
 
         def __init__(self, *args: object, **kwargs: object) -> None:
             raise ImportError(
                 "Torch is required for PhysiologicalPINNLoss. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
+        def __call__(self, *args: object, **kwargs: object) -> Any:
+            raise ImportError(
+                "Torch is required for PhysiologicalPINNLoss. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
+        def physiology_penalty(self, *args: object, **kwargs: object) -> Any:
+            raise ImportError(
+                "Torch is required for PhysiologicalPINNLoss. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
+    class BandWeightedPINNLoss:  # type: ignore[no-redef]
+        """Band-weighted MSE plus physiology-informed penalties."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            raise ImportError(
+                "Torch is required for BandWeightedPINNLoss. Install with `pip install iints-sdk-python35[research]`."
+            ) from _IMPORT_ERROR
+
+        def __call__(self, *args: object, **kwargs: object) -> Any:
+            raise ImportError(
+                "Torch is required for BandWeightedPINNLoss. Install with `pip install iints-sdk-python35[research]`."
             ) from _IMPORT_ERROR
 else:
     class QuantileLoss(nn.Module):  # type: ignore[misc,no-redef]
@@ -129,16 +169,13 @@ else:
 
             self.mse = nn.MSELoss()
 
-        def forward(self, preds: "torch.Tensor", targets: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
+        def physiology_penalty(self, preds: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
             """
             inputs shape: (batch, history_steps, features)
             preds shape: (batch, horizon_steps) OR (batch, 1)
-            targets shape: (batch, horizon_steps) OR (batch, 1)
             """
-            mse_loss = self.mse(preds, targets)
-
             if self.idx_glucose == -1:
-                return mse_loss  # Cannot apply PINN without glucose history
+                return torch.tensor(0.0, device=preds.device)
 
             # Extract the last known state from inputs (time step = -1)
             # inputs is (batch, history, features)
@@ -185,6 +222,57 @@ else:
             no_iob_mask = (iob < 0.5).float()
             suspicious_drop = torch.relu((-roc) - 2.0)
             pinn_penalty += (suspicious_drop * cob_mask * no_iob_mask).mean() * 2.0
+            return pinn_penalty
+
+        def forward(self, preds: "torch.Tensor", targets: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
+            """
+            inputs shape: (batch, history_steps, features)
+            preds shape: (batch, horizon_steps) OR (batch, 1)
+            targets shape: (batch, horizon_steps) OR (batch, 1)
+            """
+            mse_loss = self.mse(preds, targets)
+            pinn_penalty = self.physiology_penalty(preds, inputs)
 
             total_loss = mse_loss + self.pinn_lambda * pinn_penalty
             return total_loss
+
+    class BandWeightedPINNLoss(PhysiologicalPINNLoss):  # type: ignore[misc,no-redef]
+        """
+        Band-weighted glucose forecasting loss with PINN safety constraints.
+
+        This is the recommended long-run training objective for the public
+        IINTS glucose forecaster: band weighting keeps the optimizer focused on
+        hypo/hyper ranges, while the PINN term discourages biologically
+        impossible trajectories.
+        """
+
+        def __init__(
+            self,
+            feature_columns: list[str],
+            pinn_lambda: float = 0.5,
+            pinn_max_roc: float = 10.0,
+            time_step_minutes: int = 5,
+            low_threshold: float = 70.0,
+            high_threshold: float = 180.0,
+            low_weight: float = 2.0,
+            high_weight: float = 1.5,
+            max_weight: float = 5.0,
+        ) -> None:
+            super().__init__(
+                feature_columns=feature_columns,
+                pinn_lambda=pinn_lambda,
+                pinn_max_roc=pinn_max_roc,
+                time_step_minutes=time_step_minutes,
+            )
+            self.band_loss = BandWeightedMSE(
+                low_threshold=low_threshold,
+                high_threshold=high_threshold,
+                low_weight=low_weight,
+                high_weight=high_weight,
+                max_weight=max_weight,
+            )
+
+        def forward(self, preds: "torch.Tensor", targets: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
+            band_loss = self.band_loss(preds, targets)
+            pinn_penalty = self.physiology_penalty(preds, inputs)
+            return band_loss + self.pinn_lambda * pinn_penalty

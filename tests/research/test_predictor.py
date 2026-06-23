@@ -26,7 +26,11 @@ from iints.research.predictor import (
     evaluate_baselines,
     load_predictor,
 )
-from iints.research.losses import SafetyWeightedMSE
+from iints.research.losses import (
+    BandWeightedPINNLoss,
+    PhysiologicalPINNLoss,
+    SafetyWeightedMSE,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +88,39 @@ def test_safety_weighted_mse_weights_low_targets():
     targets = torch.tensor([[70.0, 70.0], [110.0, 110.0]])
     loss = loss_fn(preds, targets)
     # Loss should be finite and > 0
+    assert loss.item() > 0.0
+
+
+def test_pinn_exposes_physiology_penalty_separately():
+    loss_fn = PhysiologicalPINNLoss(
+        feature_columns=["glucose_actual_mgdl", "patient_iob_units", "patient_cob_grams"],
+        pinn_lambda=0.5,
+        pinn_max_roc=8.0,
+        time_step_minutes=5,
+    )
+    inputs = torch.tensor([[[120.0, 2.0, 0.0]]])
+    preds = torch.tensor([[200.0]])
+
+    penalty = loss_fn.physiology_penalty(preds, inputs)
+
+    assert penalty.item() > 0.0
+
+
+def test_band_pinn_combines_range_weighting_and_physiology_penalty():
+    loss_fn = BandWeightedPINNLoss(
+        feature_columns=["glucose_actual_mgdl", "patient_iob_units", "patient_cob_grams"],
+        pinn_lambda=0.5,
+        pinn_max_roc=8.0,
+        time_step_minutes=5,
+        low_weight=2.5,
+        high_weight=1.8,
+    )
+    inputs = torch.tensor([[[120.0, 2.0, 0.0]], [[120.0, 0.0, 30.0]]])
+    targets = torch.tensor([[190.0], [65.0]])
+    preds = torch.tensor([[220.0], [30.0]])
+
+    loss = loss_fn(preds, targets, inputs)
+
     assert loss.item() > 0.0
 
 

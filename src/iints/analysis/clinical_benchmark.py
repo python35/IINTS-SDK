@@ -72,7 +72,19 @@ class ClinicalBenchmark:
             
             progress.update(task, completed=True)
         
-        # Display results
+        measured = {
+            name: metrics
+            for name, metrics in results['algorithm_results'].items()
+            if metrics.get('status') == 'measured'
+        }
+        if not measured:
+            self.console.print(
+                "[yellow]No evaluated algorithm traces were supplied. "
+                "The SDK will not fabricate benchmark improvements.[/yellow]"
+            )
+            return results
+
+        # Display measured results
         self._display_benchmark_results(results)
         
         return results
@@ -113,6 +125,9 @@ class ClinicalBenchmark:
         table.add_column("Clinical Impact", justify="center")
         
         for algo, metrics in results['algorithm_results'].items():
+            if metrics.get('status') != 'measured':
+                table.add_row(algo.upper(), "not evaluated", "n/a", "", "[dim]No measured trace[/dim]")
+                continue
             tir = metrics['tir_70_180']
             improvement = metrics['improvement_percent']
             
@@ -141,8 +156,12 @@ class ClinicalBenchmark:
         self.console.print(table)
         
         # Clinical interpretation with visual elements
-        best_algo = max(results['algorithm_results'].items(), 
-                       key=lambda x: x[1]['improvement_percent'])
+        measured_results = {
+            name: metrics
+            for name, metrics in results['algorithm_results'].items()
+            if metrics.get('status') == 'measured'
+        }
+        best_algo = max(measured_results.items(), key=lambda x: x[1]['improvement_percent'])
         
         # Create improvement visualization
         original_tir = original['tir_70_180']

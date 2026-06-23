@@ -219,15 +219,17 @@ class Simulator:
                 "in_distribution": True,
                 "max_zscore": 0.0,
                 "feature_fraction_over_threshold": 0.0,
+                "status_reason": "predictor_disabled",
             }
         scaler = getattr(self.predictor, "scaler", None)
         center = getattr(scaler, "_center", None)
         scale = getattr(scaler, "_scale", None)
         if center is None or scale is None:
             return {
-                "in_distribution": True,
+                "in_distribution": False,
                 "max_zscore": 0.0,
                 "feature_fraction_over_threshold": 0.0,
+                "status_reason": "missing_scaler_metadata",
             }
 
         safe_scale = np.where(np.abs(scale) < 1e-8, 1.0, np.abs(scale))
@@ -246,6 +248,7 @@ class Simulator:
             "in_distribution": in_distribution,
             "max_zscore": max_zscore,
             "feature_fraction_over_threshold": fraction,
+            "status_reason": "within_training_distribution" if in_distribution else "zscore_gate",
         }
 
     def _predict_with_model(self, feature_row: Dict[str, float], fallback: float) -> Tuple[float, float, Dict[str, Any]]:
@@ -260,6 +263,8 @@ class Simulator:
             "predictor_in_distribution": True,
             "predictor_ood_max_zscore": 0.0,
             "predictor_ood_feature_fraction": 0.0,
+            "predictor_ood_status_reason": "not_checked",
+            "predictor_error": None,
         }
         self._predictor_history.append(feature_row)
         if len(self._predictor_history) < self._predictor_history_steps:
@@ -279,8 +284,9 @@ class Simulator:
             meta["predictor_in_distribution"] = bool(ood_status["in_distribution"])
             meta["predictor_ood_max_zscore"] = float(ood_status["max_zscore"])
             meta["predictor_ood_feature_fraction"] = float(ood_status["feature_fraction_over_threshold"])
+            meta["predictor_ood_status_reason"] = str(ood_status["status_reason"])
             if not bool(ood_status["in_distribution"]):
-                meta["predictor_gate_reason"] = "ood_gate"
+                meta["predictor_gate_reason"] = str(ood_status["status_reason"])
                 return fallback, fallback, meta
 
             uncertainty_std: Optional[float] = None
@@ -298,6 +304,9 @@ class Simulator:
                     candidate = float(mean_arr[-1])
                 else:
                     candidate = float(fallback)
+                if not np.isfinite(candidate):
+                    meta["predictor_gate_reason"] = "non_finite_prediction"
+                    return fallback, fallback, meta
                 if std_arr.ndim == 2:
                     uncertainty_std = float(std_arr[0, -1])
                 elif std_arr.ndim == 1:
@@ -323,19 +332,33 @@ class Simulator:
             if hasattr(output, "shape"):
                 output_arr = np.array(output, dtype=float)
                 if output_arr.ndim == 2:
+                    if not np.isfinite(output_arr[0, -1]):
+                        meta["predictor_gate_reason"] = "non_finite_prediction"
+                        return fallback, fallback, meta
                     meta["predictor_used"] = True
                     return float(output_arr[0, -1]), fallback, meta
                 if output_arr.ndim == 1:
+                    if not np.isfinite(output_arr[-1]):
+                        meta["predictor_gate_reason"] = "non_finite_prediction"
+                        return fallback, fallback, meta
                     meta["predictor_used"] = True
                     return float(output_arr[-1]), fallback, meta
             if isinstance(output, (list, tuple)) and output:
+                if not np.isfinite(float(output[-1])):
+                    meta["predictor_gate_reason"] = "non_finite_prediction"
+                    return fallback, fallback, meta
                 meta["predictor_used"] = True
                 return float(output[-1]), fallback, meta
             if isinstance(output, (float, int)):
+                if not np.isfinite(float(output)):
+                    meta["predictor_gate_reason"] = "non_finite_prediction"
+                    return fallback, fallback, meta
                 meta["predictor_used"] = True
                 return float(output), fallback, meta
-        except Exception:
+        except Exception as exc:
             meta["predictor_gate_reason"] = "predictor_exception"
+            meta["predictor_error"] = f"{type(exc).__name__}: {exc}"
+            logger.warning("Predictor failed closed: %s", meta["predictor_error"])
             return fallback, fallback, meta
         return fallback, fallback, meta
 
@@ -1007,6 +1030,8 @@ class Simulator:
                 "predictor_in_distribution": True,
                 "predictor_ood_max_zscore": 0.0,
                 "predictor_ood_feature_fraction": 0.0,
+                "predictor_ood_status_reason": "predictor_disabled",
+                "predictor_error": None,
             }
             if self.predictor is not None:
                 feature_row = {
@@ -1285,6 +1310,10 @@ class Simulator:
                 "predictor_in_distribution": predictor_meta.get("predictor_in_distribution", True),
                 "predictor_ood_max_zscore": predictor_meta.get("predictor_ood_max_zscore", 0.0),
                 "predictor_ood_feature_fraction": predictor_meta.get("predictor_ood_feature_fraction", 0.0),
+                "predictor_ood_status_reason": predictor_meta.get(
+                    "predictor_ood_status_reason", "not_checked"
+                ),
+                "predictor_error": predictor_meta.get("predictor_error"),
                 "delivered_insulin_units": delivered_insulin,
                 "algo_recommended_insulin_units": algo_recommended_insulin,
                 "algo_recommended_glucagon_mg": algo_recommended_glucagon_mg,
@@ -1362,6 +1391,8 @@ class Simulator:
             "input_validator_state": self.input_validator.get_state(),
             "sensor_state": self.sensor_model.get_state(),
             "pump_state": self.pump_model.get_state(),
+            "safety_config": self.safety_config.to_versioned_dict(),
+            "safety_config_fingerprint_sha256": self.safety_config.fingerprint_sha256(),
             "physiology_variation_state": (
                 self.physiology_variation_model.get_state()
                 if self.physiology_variation_model is not None

@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.core.clinical_metrics import ClinicalMetricsCalculator
 
 from .importer import import_cgm_csv
 from .quality_checker import DataQualityChecker

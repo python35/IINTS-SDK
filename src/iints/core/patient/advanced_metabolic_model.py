@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from scipy.integrate import solve_ivp
 
 from .bergman_model import BergmanPatientModel, BergmanParameters
+from .physiology import renal_glucose_clearance_concentration
 
 class AdvancedMetabolicModel(BergmanPatientModel):
     """
@@ -202,11 +203,11 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         V_glucagon = p.V_glucagon_per_kg * p.body_weight_kg
         
         # --- Fat & Protein Macronutrient Kinetics ---
-        # Fat decays very slowly, Half-life ~4 hours
+        # Fat decays slowly with a ~4 h model time constant.
         k_fat = 1.0 / 240.0
         dQ_fat_dt = -k_fat * Q_fat
         
-        # Protein decays very slowly, Half-life ~5 hours
+        # Protein decays slowly with a ~5 h model time constant.
         k_prot = 1.0 / 300.0
         dQ_prot_dt = -k_prot * Q_prot
         
@@ -291,9 +292,7 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc) * hepatic_glucose_production_multiplier * circadian_multiplier * illness_Gb_multiplier
 
         # --- Physiological Renal Clearance ---
-        smooth_threshold_diff = G - 180.0
-        softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
-        RGC = 0.05 * softplus_diff
+        RGC = renal_glucose_clearance_concentration(G, threshold_mgdl=180.0, gain=0.05, splay_mgdl=10.0)
 
         # --- dG/dt (INSTABILITY UPGRADE) ---
         EGP = p1_eff * Gb_eff

@@ -43,6 +43,7 @@ if TYPE_CHECKING:
             self,
             x: "torch.Tensor",
             n_samples: int = 50,
+            seed: int = 42,
         ) -> Tuple["torch.Tensor", "torch.Tensor"]: ...
 else:
     if nn is None:  # pragma: no cover
@@ -87,6 +88,7 @@ else:
                 self,
                 x: "torch.Tensor",
                 n_samples: int = 50,
+                seed: int = 42,
             ) -> Tuple["torch.Tensor", "torch.Tensor"]:
                 """
                 Run MC Dropout inference to estimate predictive uncertainty.
@@ -107,10 +109,14 @@ else:
                 mean : torch.Tensor of shape [B, horizon_steps]
                 std  : torch.Tensor of shape [B, horizon_steps]
                 """
-                # Keep dropout active during inference
-                self.train()
-                with torch.no_grad():
-                    preds = torch.stack([self.forward(x) for _ in range(n_samples)], dim=0)
+                # Keep dropout active during inference, but isolate and seed the
+                # RNG so identical model/input/config produces identical output.
+                devices = [x.device.index] if x.is_cuda and x.device.index is not None else []
+                with torch.random.fork_rng(devices=devices):
+                    torch.manual_seed(int(seed))
+                    self.train()
+                    with torch.no_grad():
+                        preds = torch.stack([self.forward(x) for _ in range(n_samples)], dim=0)
                 self.eval()
                 return preds.mean(dim=0), preds.std(dim=0)
 
@@ -262,6 +268,7 @@ class PredictorService:
         self.feature_columns = list(config.get("feature_columns", []))
         self.history_steps = int(config.get("history_steps", 1))
         self.horizon_steps = int(config.get("horizon_steps", 1))
+        self.uncertainty_seed = int(config.get("uncertainty_seed", 42))
 
         # Restore scaler if present in checkpoint
         from iints.research.dataset import FeatureScaler
@@ -292,7 +299,11 @@ class PredictorService:
         if self.scaler is not None:
             x = self.scaler.transform(x)
         tensor = torch.from_numpy(x.astype(np.float32))
-        mean_t, std_t = self.model.predict_with_uncertainty(tensor, n_samples=n_samples)
+        mean_t, std_t = self.model.predict_with_uncertainty(
+            tensor,
+            n_samples=n_samples,
+            seed=self.uncertainty_seed,
+        )
         return mean_t.detach().cpu().numpy(), std_t.detach().cpu().numpy()
 
 

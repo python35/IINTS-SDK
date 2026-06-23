@@ -34,6 +34,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from .physiology import smooth_threshold_excess
+
 
 @dataclass
 class BergmanParameters:
@@ -82,6 +84,7 @@ class BergmanPatientModel:
         insulin_sensitivity: float = 50.0,
         carb_factor: float = 10.0,
         initial_glucose: float = 120.0,
+        basal_glucose_target: Optional[float] = None,
         glucose_decay_rate: float = 0.05,
         glucose_absorption_rate: float = 0.03,
         insulin_action_duration: float = 300.0,
@@ -99,6 +102,7 @@ class BergmanPatientModel:
         self.insulin_sensitivity = insulin_sensitivity
         self.carb_factor = carb_factor
         self.initial_glucose = initial_glucose
+        self.basal_glucose_target = basal_glucose_target
         self.glucose_decay_rate = glucose_decay_rate
         self.glucose_absorption_rate = glucose_absorption_rate
         self.insulin_action_duration = insulin_action_duration
@@ -111,8 +115,10 @@ class BergmanPatientModel:
         self.max_glucose_rate_mgdl_per_min = max_glucose_rate_mgdl_per_min
 
         # Bergman ODE parameters
+        basal_target = float(initial_glucose) if basal_glucose_target is None else float(basal_glucose_target)
+        gb_default = min(float(initial_glucose), 115.0) if basal_glucose_target is None else float(np.clip(basal_target, 80.0, 220.0))
         self.params = bergman_params if bergman_params else BergmanParameters(
-            Gb=min(float(initial_glucose), 115.0),
+            Gb=gb_default,
             tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
             k_abs=max(0.015, min(float(glucose_absorption_rate), 0.035)),
         )
@@ -279,6 +285,7 @@ class BergmanPatientModel:
         # Clamp non-negative for other compartments
         for i in range(1, len(self._state)):
             self._state[i] = max(0.0, self._state[i])
+        self._state[12] = float(np.clip(self._state[12], 0.0, 1.0))
 
         self.current_glucose = float(self._state[0])
         return self.current_glucose
@@ -468,8 +475,7 @@ class BergmanPatientModel:
         Gb_eff = p.Gb * stress_Gb_multiplier * rescue_multiplier * max(0.0, 1.0 + x_gluc)
 
         # --- Physiological Renal Clearance ---
-        smooth_threshold_diff = G - 162.0
-        softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
+        softplus_diff = smooth_threshold_excess(G, threshold=162.0, splay=10.0)
         F_R = 0.003 * softplus_diff
 
         # --- dG/dt ---

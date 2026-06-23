@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 
@@ -10,6 +11,18 @@ def _load_governance_module():
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_architecture_module():
+    module_path = Path(__file__).resolve().parents[1] / "tools" / "ci" / "check_architecture_boundaries.py"
+    spec = importlib.util.spec_from_file_location("check_architecture_boundaries", module_path)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -26,3 +39,9 @@ def test_governance_uses_repo_root_for_license(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(outside_dir)
 
     assert module._check_license() == []
+
+
+def test_architecture_boundaries_have_no_current_violations() -> None:
+    module = _load_architecture_module()
+
+    assert module.find_violations() == []

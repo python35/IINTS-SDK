@@ -7,7 +7,7 @@ The simulation engine includes the `AdvancedMetabolicModel`, an extended 18-stat
 ---
 
 ## 1. The Bergman Minimal Model
-**Foundation:** The core system relies on the classical Bergman minimal model (1989) which uses a 3-compartment design to track Plasma Glucose ($G$), Plasma Insulin ($I$), and Insulin Action ($X$).
+**Foundation:** The core system is inspired by the classical Bergman minimal model (1979) tradition, using a compact compartmental structure to track Plasma Glucose ($G$), Plasma Insulin ($I$), and Insulin Action ($X$).
 
 **Mathematics:**
 
@@ -24,7 +24,7 @@ $$
 **Practical Impact:** Determines the fundamental balance between how fast glucose falls due to the body's natural metabolism versus the action of administered insulin.
 
 ## 2. Multi-Compartment Gastric Emptying (Dalla Man)
-**Foundation:** The Dalla Man (2006) absorption model.
+**Foundation:** Dalla Man, Rizza, and Cobelli's meal simulation model (2007).
 
 **Mathematics:** Rather than assuming immediate absorption, carbohydrates flow through three delayed compartments:
 

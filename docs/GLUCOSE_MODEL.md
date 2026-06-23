@@ -46,7 +46,7 @@ iints-glucose-forecast-v0
 
 This is intentionally a numeric time-series model, not a language model. LLMs can explain runs, summarize results, or manage research artifacts, but the glucose forecaster itself should be trained and evaluated as a physiological time-series predictor.
 
-The default training profile is **PINN-first**: the generated config uses `loss: pinn`, which combines forecast error with penalties for impossible glucose bounds, unrealistic rate-of-change, and suspicious IOB/COB logic.
+The default training profile is **band-PINN first**: the generated config uses `loss: band_pinn`, which combines hypo/hyper range weighting with penalties for impossible glucose bounds, unrealistic rate-of-change, and suspicious IOB/COB logic.
 
 ## Build A Training Pack
 
@@ -141,6 +141,23 @@ iints research glucose-model train \
   --export-hf
 ```
 
+For the current recommended OhioT1DM fine-tune path, start from the best
+band-weighted 120-minute checkpoint and continue with the combined band-PINN
+objective:
+
+```bash
+iints research glucose-model train \
+  --data models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv \
+  --config research/configs/predictor_ohio_band_pinn_v3.yaml \
+  --output-dir models/iints-glucose-forecast-v0-band-pinn-v3 \
+  --warm-start models/iints-glucose-forecast-v0-ohio-safe-band/predictor.pt \
+  --export-hf
+```
+
+Promote this model only if the comparison report improves the 120-minute
+trade-off: MAE/RMSE should stay competitive while physiological violations,
+missed hypoglycemia, and suspicious IOB/COB trajectories decrease.
+
 The training output includes:
 
 ```text
@@ -175,7 +192,7 @@ Minimum metrics to inspect:
 - subject-level split and leakage audit
 - external dataset performance, not just internal validation
 
-## Compare MSE, Band-Weighted, And PINN Models
+## Compare MSE, Band-Weighted, PINN, And Band-PINN Models
 
 After training multiple candidates, compare them with one command:
 
@@ -185,7 +202,8 @@ iints research glucose-model compare \
   --config models/iints-glucose-forecast-v0/dataset/glucose_model_config.yaml \
   --model mse=models/glucose_mse/predictor.pt \
   --model band=models/glucose_band/predictor.pt \
-  --model pinn=models/iints-glucose-forecast-v0/predictor.pt \
+  --model pinn=models/glucose_pinn/predictor.pt \
+  --model band_pinn=models/iints-glucose-forecast-v0/predictor.pt \
   --mc-samples 30 \
   --output-dir results/glucose_model_comparison
 ```

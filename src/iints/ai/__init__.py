@@ -1,5 +1,12 @@
 from .assistant import AIResponse, IINTSAssistant
 from .backends import DEFAULT_MINISTRAL_MODEL, DEFAULT_OLLAMA_HOST, OllamaBackend
+from .deterministic import (
+    DETERMINISTIC_DOSE_VERSION,
+    DeterministicDoseResult,
+    DoseSafetyLimits,
+    calculate_deterministic_dose,
+)
+from .insights import AI_INSIGHT_CONTEXT_VERSION, build_insight_context
 from .mdmp_guard import GuardResult, MDMPGuard
 from .model_catalog import (
     DEFAULT_MISTRAL_API_MODEL,
@@ -18,6 +25,12 @@ __all__ = [
     "DEFAULT_MINISTRAL_MODEL",
     "DEFAULT_OLLAMA_HOST",
     "OllamaBackend",
+    "DETERMINISTIC_DOSE_VERSION",
+    "DeterministicDoseResult",
+    "DoseSafetyLimits",
+    "calculate_deterministic_dose",
+    "AI_INSIGHT_CONTEXT_VERSION",
+    "build_insight_context",
     "GuardResult",
     "MDMPGuard",
     "DEFAULT_MISTRAL_API_MODEL",

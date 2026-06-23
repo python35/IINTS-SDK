@@ -31,9 +31,8 @@ class AIRealismAuditor:
 
     1. A deterministic, fast heuristic filter scans the whole CSV for impossible
        or physiologically suspicious values.
-    2. Optionally, a local Ollama model receives only the small data windows
-       around flagged events and explains whether the event is a plausible
-       physiological extreme or likely a mathematical/data bug.
+    2. Optionally, a local Ollama model explains the already-fixed heuristic
+       flag. It has no classification or numerical authority.
 
     It supports both the scratch AdvancedMetabolicModel CSV format
     (``time_min``, ``glucose``, ``insulin_delivered``, ``ketones``) and the
@@ -218,14 +217,16 @@ class AIRealismAuditor:
             return ""
 
         system_prompt = (
-            "You are an expert physiological red-team auditor reviewing a Type 1 Diabetes Digital Twin. "
-            "Classify the flagged event as PHYSIOLOGICAL EXTREME or MATHEMATICAL/DATA BUG. "
-            "Use the glucose, insulin, FFA, ketone, and event-marker context. "
-            "Be strict: negative glucose, negative insulin, NaN values, and instantaneous impossible jumps are bugs. "
-            "Keep the answer under 4 sentences."
+            "You are a research-only wording assistant. Explain the deterministic anomaly flag supplied by the SDK. "
+            "Do not calculate, reclassify, diagnose, introduce new numbers, or override the deterministic flag. "
+            "Keep the explanation under 4 sentences and label it non-authoritative."
         )
         data_str = window[["time_min", "glucose", "insulin_delivered", "ffa", "ketones", "event"]].to_string(index=False)
-        user_prompt = f"Anomaly Type: {anomaly.kind}\nDetail: {anomaly.detail}\nData Window:\n{data_str}\n\nDiagnosis:"
+        user_prompt = (
+            f"Immutable anomaly type: {anomaly.kind}\n"
+            f"Deterministic detail: {anomaly.detail}\n"
+            f"Supporting data window:\n{data_str}\n\nExplain the existing flag only:"
+        )
         return self.ollama.complete(system_prompt=system_prompt, user_prompt=user_prompt)
 
     def run_audit(self, report_path: str | Path) -> dict[str, Any]:
@@ -242,7 +243,7 @@ class AIRealismAuditor:
             f"**Input CSV:** `{self.csv_path}`",
             f"**Rows Scanned:** {len(self.df)}",
             f"**Anomalies Detected by Filter:** {len(anomalies)}",
-            f"**Local AI Verdicts:** **{'enabled' if self.ai_ready else 'offline / disabled'}**",
+            f"**Optional AI Explanations:** **{'enabled' if self.ai_ready else 'offline / disabled'}**",
             "",
         ]
 
@@ -275,7 +276,7 @@ class AIRealismAuditor:
                     verdict = self._ai_verdict(anomaly, window)
                 except Exception as exc:
                     verdict = f"AI Error: {exc}"
-                lines.extend(["### AI Verdict", "", f"> {verdict}", ""])
+                lines.extend(["### Optional AI Explanation (Non-authoritative)", "", f"> {verdict}", ""])
 
             lines.extend([
                 "### Raw Data Window",

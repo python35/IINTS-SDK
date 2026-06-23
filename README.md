@@ -81,5 +81,5 @@ Use `iints demo doctor` for clinical feedback conversations and `iints demo boot
 
 ---
 
-> Research software. Not a medical device. MIT Licensed.  
+> Research software. Not a medical device. Apache-2.0 licensed, with legacy MIT notices where applicable.
 > *Built by a 17-year-old with type 1 diabetes.*

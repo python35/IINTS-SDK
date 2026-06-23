@@ -39,6 +39,16 @@ def test_simulator_uses_critical_thresholds_from_config():
     assert simulator.critical_glucose_duration_minutes == 15
 
 
+def test_safety_config_has_stable_versioned_fingerprint():
+    first = SafetyConfig()
+    second = SafetyConfig()
+
+    assert first.to_versioned_dict()["formula_version"] == "iints-safety-formulas-v1"
+    assert first.to_versioned_dict()["units"]["glucose"] == "mg/dL"
+    assert first.fingerprint_sha256() == second.fingerprint_sha256()
+    assert first.fingerprint_sha256() != SafetyConfig(max_iob=3.5).fingerprint_sha256()
+
+
 def test_simulator_keeps_raw_and_sensor_validation_history_separate():
     patient = PatientModel(initial_glucose=120.0)
     simulator = Simulator(

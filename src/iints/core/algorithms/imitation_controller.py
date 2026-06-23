@@ -6,7 +6,20 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 from iints.api.base_algorithm import AlgorithmInput, AlgorithmMetadata, InsulinAlgorithm
-from iints.research.control import load_linear_controller
+
+
+def _load_linear_controller(model_path: Path) -> Dict[str, Any]:
+    """Load the optional research controller without coupling core imports to research."""
+    from importlib import import_module
+
+    try:
+        module = import_module("iints.research.control")
+    except Exception as exc:  # pragma: no cover - depends on optional research stack
+        raise RuntimeError(
+            "ExperimentalImitationController requires the research stack. "
+            "Install the SDK with research extras or use a non-ML algorithm."
+        ) from exc
+    return module.load_linear_controller(model_path)
 
 
 class ExperimentalImitationController(InsulinAlgorithm):
@@ -18,7 +31,7 @@ class ExperimentalImitationController(InsulinAlgorithm):
         if not model_path:
             raise ValueError("ExperimentalImitationController requires settings['model_path'].")
         self.model_path = Path(str(model_path))
-        self.model = load_linear_controller(self.model_path)
+        self.model = _load_linear_controller(self.model_path)
         self.max_output_units = float(self.settings.get("max_output_units", 5.0))
         self.set_algorithm_metadata(
             AlgorithmMetadata(

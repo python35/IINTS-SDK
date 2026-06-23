@@ -8683,6 +8683,95 @@ def research_prepare_ohio(
     console.print(f"[green]Quality report   :[/green] {report}")
 
 
+@research_app.command(name="physiology-calibrate")
+def research_physiology_calibrate(
+    real_data: Annotated[Path, typer.Option(help="Real/prepared CGM dataset CSV or Parquet, e.g. processed OhioT1DM.")],
+    output_json: Annotated[Path, typer.Option(help="Calibration audit JSON output path")] = Path("results/physiology_calibration/physiology_calibration_report.json"),
+    output_profile: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional YAML file containing conservative patient profile parameter hints."),
+    ] = None,
+    simulation_data: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional simulator result CSV/Parquet to compare against the real dataset."),
+    ] = None,
+    time_column: Annotated[Optional[str], typer.Option(help="Override time column name.")] = None,
+    glucose_column: Annotated[Optional[str], typer.Option(help="Override glucose column name.")] = None,
+    carb_column: Annotated[Optional[str], typer.Option(help="Override carb column name.")] = None,
+    insulin_column: Annotated[Optional[str], typer.Option(help="Override insulin column name.")] = None,
+    exercise_column: Annotated[Optional[str], typer.Option(help="Override exercise/activity column name.")] = None,
+    subject_column: Annotated[Optional[str], typer.Option(help="Override subject id column name.")] = None,
+) -> None:
+    """
+    Audit real CGM data and produce conservative physiology calibration hints.
+
+    This command is intended for pre-clinical research calibration. It does not
+    identify a clinical digital twin and must not be used for treatment.
+    """
+    console = Console()
+    if not real_data.exists():
+        console.print(f"[bold red]Real dataset not found: {real_data}[/bold red]")
+        raise typer.Exit(code=1)
+    if simulation_data is not None and not simulation_data.exists():
+        console.print(f"[bold red]Simulation dataset not found: {simulation_data}[/bold red]")
+        raise typer.Exit(code=1)
+
+    from iints.research.physiology_calibration import (
+        CalibrationColumns,
+        load_calibration_dataframe,
+        physiology_calibration_report,
+        resolve_calibration_columns,
+    )
+
+    try:
+        real_df = load_calibration_dataframe(real_data)
+        real_columns = resolve_calibration_columns(
+            real_df,
+            time_column=time_column,
+            glucose_column=glucose_column,
+            carb_column=carb_column,
+            insulin_column=insulin_column,
+            exercise_column=exercise_column,
+            subject_column=subject_column,
+        )
+        sim_df = load_calibration_dataframe(simulation_data) if simulation_data is not None else None
+        sim_columns: Optional[CalibrationColumns] = None
+        if sim_df is not None:
+            sim_columns = resolve_calibration_columns(sim_df)
+        report = physiology_calibration_report(
+            real_df,
+            simulation_dataframe=sim_df,
+            columns=real_columns,
+            simulation_columns=sim_columns,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]physiology-calibrate failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    output_json.parent.mkdir(parents=True, exist_ok=True)
+    output_json.write_text(json.dumps(report, indent=2))
+
+    hints = report["calibration"]["patient_profile_hints"]
+    table = Table(title="Physiology Calibration Audit")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Rows", str(report["real_dataset"]["glucose_summary"]["rows"]))
+    table.add_row("Subjects", str(report["real_dataset"]["glucose_summary"]["subjects"]))
+    table.add_row("Mean glucose", f"{report['real_dataset']['glucose_summary']['mean_glucose_mgdl']} mg/dL")
+    table.add_row("TIR 70-180", f"{report['real_dataset']['glucose_summary']['tir_70_180_pct']}%")
+    table.add_row("Median meal peak time", str(report["real_dataset"]["meal_response_summary"]["median_time_to_peak_min"]))
+    table.add_row("Suggested initial glucose", str(hints["initial_glucose"]))
+    table.add_row("Suggested max ROC guard", str(hints["max_glucose_rate_mgdl_per_min"]))
+    table.add_row("Report", str(output_json))
+    console.print(table)
+    console.print("[yellow]Research-only calibration hints; not a clinical digital twin.[/yellow]")
+
+    if output_profile is not None:
+        output_profile.parent.mkdir(parents=True, exist_ok=True)
+        output_profile.write_text(yaml.safe_dump(hints, sort_keys=False))
+        console.print(f"[green]Patient profile hints written:[/green] {output_profile}")
+
+
 @research_app.command(name="prepare-hupa")
 def research_prepare_hupa(
     input_dir: Annotated[Path, typer.Option(help="Root directory containing HUPA-UCM CSV files")] = Path("data_packs/public/hupa_ucm"),

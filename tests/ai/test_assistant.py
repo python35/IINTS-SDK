@@ -16,10 +16,14 @@ class _FakeBackend:
     model_name = DEFAULT_MINISTRAL_MODEL
     resolved_model_name = "ministral-3:8b"
 
+    def __init__(self) -> None:
+        self.calls = 0
+
     def available(self) -> bool:
         return True
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
+        self.calls += 1
         assert "research use only" in system_prompt.lower()
         assert "glucose" in user_prompt.lower() or "simulation" in user_prompt.lower()
         return "Research-only explanation."
@@ -59,6 +63,8 @@ def test_assistant_runs_with_injected_backend_and_guard() -> None:
     assert response.backend == "fake"
     assert response.model == "ministral-3:8b"
     assert response.certification.grade == "research_grade"
+    assert response.insight_context is not None
+    assert response.insight_context["authority"]["ai_numeric_authority"] is False
     assert guard.calls == 1
 
 
@@ -162,11 +168,38 @@ def test_assistant_review_realism_uses_same_guarded_flow() -> None:
     assert guard.calls == 1
 
 
-def test_assistant_predict_insulin_uses_guarded_research_flow() -> None:
+def test_assistant_generate_insights_adds_deterministic_context() -> None:
     guard = _FakeGuard()
     assistant = IINTSAssistant(
         "cert.json",
         backend=_FakeBackend(),
+        guard=guard,  # type: ignore[arg-type]
+    )
+
+    response = assistant.generate_insights(
+        {
+            "summary": {"mean_glucose_mgdl": 160},
+            "trace_sample": [
+                {"time_minutes": 0, "glucose_actual_mgdl": 120},
+                {"time_minutes": 5, "glucose_actual_mgdl": 185},
+                {"time_minutes": 10, "glucose_actual_mgdl": 251, "safety_triggered": True},
+            ],
+        }
+    )
+
+    assert response.task == "generate_insights"
+    assert response.insight_context is not None
+    assert "very_high_glucose_above_250" in response.insight_context["deterministic_flags"]
+    assert response.to_dict()["insight_context"]["input_coverage"]["glucose_points"] == 3
+    assert guard.calls == 1
+
+
+def test_assistant_predict_insulin_is_deterministic_and_never_calls_ai() -> None:
+    guard = _FakeGuard()
+    backend = _FakeBackend()
+    assistant = IINTSAssistant(
+        "cert.json",
+        backend=backend,
         guard=guard,  # type: ignore[arg-type]
     )
 
@@ -180,5 +213,11 @@ def test_assistant_predict_insulin_uses_guarded_research_flow() -> None:
     )
 
     assert response.task == "predict_insulin"
+    assert response.backend == "deterministic"
+    assert response.deterministic_result is not None
+    assert response.deterministic_result["final_insulin_units"] == 0.35
+    assert response.deterministic_result["ai_numeric_authority"] is False
+    assert "FINAL_DOSE: 0.350000" in response.text
     assert "research use only" in response.text.lower()
     assert guard.calls == 1
+    assert backend.calls == 0

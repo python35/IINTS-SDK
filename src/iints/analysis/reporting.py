@@ -2,6 +2,7 @@ import os
 import tempfile
 import logging
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -35,6 +36,11 @@ AGP_TIR_STACK = [
     ("high_181_250", "High", "181-250 mg/dL", "#FFD54F", "black"),
     ("very_high_gt_250", "Very High", ">250 mg/dL", "#F57C00", "black"),
 ]
+
+BRAND_GREEN = (31, 139, 36)
+BRAND_GREEN_DARK = (21, 112, 28)
+SOFT_BLUE_PANEL = (238, 246, 255)
+TEXT_DARK = (18, 28, 36)
 
 
 class ClinicalReportGenerator:
@@ -668,6 +674,229 @@ class ClinicalReportGenerator:
         sorted_reasons = sorted(reasons.items(), key=lambda item: item[1], reverse=True)
         return dict(sorted_reasons[:limit])
 
+    @staticmethod
+    def _legacy_report_footer(pdf: FPDF) -> None:
+        pdf.set_xy(0, 286)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.set_text_color(120, 120, 120)
+        pdf.cell(0, 5, f"Page {pdf.page_no()}", align="C")
+        pdf.set_text_color(*TEXT_DARK)
+
+    def _legacy_report_header(
+        self,
+        pdf: FPDF,
+        *,
+        title: str = "IINTS-AF Clinical Validation Report",
+        subtitle: str = "AI-Powered Glucose Control Analysis",
+    ) -> None:
+        pdf.set_text_color(*TEXT_DARK)
+        # The legacy clinical report used a simple green identity block.
+        # Keep this deterministic instead of depending on optional logo assets.
+        pdf.set_fill_color(*BRAND_GREEN)
+        pdf.rect(12, 10, 29, 11, style="F")
+        pdf.set_xy(12, 12.5)
+        pdf.set_font("Helvetica", "B", 7)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(29, 4, "IINTS-AF", align="C")
+
+        pdf.set_xy(48, 10)
+        pdf.set_text_color(*BRAND_GREEN)
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 7, title)
+        pdf.set_xy(48, 18)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 10.5)
+        pdf.cell(0, 5, subtitle)
+        pdf.set_draw_color(*BRAND_GREEN_DARK)
+        pdf.set_line_width(0.45)
+        pdf.line(10, 30, 200, 30)
+        self._legacy_report_footer(pdf)
+
+    @staticmethod
+    def _legacy_section_title(pdf: FPDF, title: str, y: Optional[float] = None) -> None:
+        if y is not None:
+            pdf.set_y(y)
+        pdf.set_text_color(*BRAND_GREEN)
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.cell(0, 9, title, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(*TEXT_DARK)
+
+    @staticmethod
+    def _legacy_metric_card(pdf: FPDF, x: float, y: float, w: float, label: str, value: str, note: str = "") -> None:
+        pdf.set_draw_color(210, 222, 210)
+        pdf.set_fill_color(247, 252, 247)
+        pdf.rect(x, y, w, 24, style="DF")
+        pdf.set_xy(x + 3, y + 3)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*BRAND_GREEN_DARK)
+        pdf.cell(w - 6, 4, label)
+        pdf.set_xy(x + 3, y + 9)
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(w - 6, 7, value)
+        if note:
+            pdf.set_xy(x + 3, y + 17)
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(90, 95, 95)
+            pdf.cell(w - 6, 4, note)
+        pdf.set_text_color(*TEXT_DARK)
+
+    @staticmethod
+    def _legacy_progress_bar(
+        pdf: FPDF,
+        *,
+        x: float,
+        y: float,
+        label: str,
+        value: float,
+        color: tuple[int, int, int],
+        max_value: float = 100.0,
+    ) -> None:
+        pdf.set_xy(x, y)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(0, 0, 0)
+        pdf.cell(50, 6, label)
+        bar_x = x + 52
+        bar_w = 96
+        pdf.set_fill_color(235, 238, 235)
+        pdf.rect(bar_x, y + 1, bar_w, 5.4, style="F")
+        pdf.set_fill_color(*color)
+        pdf.rect(bar_x, y + 1, bar_w * max(0.0, min(value, max_value)) / max_value, 5.4, style="F")
+        pdf.set_xy(bar_x + bar_w + 4, y)
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.cell(22, 6, f"{value:.1f}%", align="R")
+
+    def _plot_clinical_validation_pattern(
+        self,
+        df: pd.DataFrame,
+        output_path: Path,
+        *,
+        title: str = "24-Hour Glycemic Pattern Analysis - Clinical Audit",
+    ) -> None:
+        apply_plot_style()
+        working = df.copy()
+        if "time_minutes" not in working.columns:
+            working["time_minutes"] = np.arange(len(working), dtype=float) * self._infer_step_minutes(working)
+        x_hours = pd.to_numeric(working["time_minutes"], errors="coerce").fillna(0.0).to_numpy(dtype=float) / 60.0
+        glucose = pd.to_numeric(working["glucose_actual_mgdl"], errors="coerce").to_numpy(dtype=float)
+        if len(glucose) == 0:
+            glucose = np.array([0.0])
+            x_hours = np.array([0.0])
+
+        fig, ax = plt.subplots(figsize=(10.8, 5.2))
+        x_min = float(np.nanmin(x_hours))
+        x_max = max(float(np.nanmax(x_hours)), x_min + 1.0)
+
+        ax.axhspan(250, 360, color="#f8b4c4", alpha=0.55, label="Severe hyperglycemia (>250)")
+        ax.axhspan(180, 250, color="#fff1b8", alpha=0.85, label="Hyperglycemia (180-250)")
+        ax.axhspan(70, 180, color="#d7ecd2", alpha=0.95, label="Target range (70-180)")
+        ax.axhspan(54, 70, color="#ffd9bd", alpha=0.78, label="Hypoglycemia (54-70)")
+        ax.axhspan(20, 54, color="#f5b7b1", alpha=0.65, label="Severe hypoglycemia (<54)")
+
+        smooth = pd.Series(glucose).rolling(window=3, min_periods=1, center=True).mean().to_numpy()
+        ax.plot(x_hours, smooth, color="#1f8b24", linewidth=2.4, label="IINTS run")
+        ax.plot(x_hours, glucose, color="#70b66a", linewidth=0.8, alpha=0.45, label="CGM/simulation samples")
+
+        prediction_columns = [
+            "glucose_predicted_mgdl",
+            "predicted_glucose_mgdl",
+            "glucose_forecast_mgdl",
+        ]
+        for column in prediction_columns:
+            if column in working.columns:
+                predicted = pd.to_numeric(working[column], errors="coerce").to_numpy(dtype=float)
+                ax.plot(x_hours, predicted, color="#b01818", linestyle="--", linewidth=1.8, label="Model forecast")
+                break
+
+        meal_col = "carb_intake_grams" if "carb_intake_grams" in working.columns else "carbs"
+        if meal_col in working.columns:
+            meal_mask = pd.to_numeric(working[meal_col], errors="coerce").fillna(0.0) > 0
+            meal_times = x_hours[meal_mask.to_numpy()]
+            for idx, meal_time in enumerate(meal_times[:8]):
+                ax.axvline(meal_time, color="#ff9800", linestyle=":", linewidth=1.1, alpha=0.9)
+                if idx < 4:
+                    ax.text(
+                        meal_time,
+                        331,
+                        "Meal",
+                        ha="center",
+                        va="top",
+                        fontsize=7,
+                        bbox=dict(boxstyle="round,pad=0.2", facecolor="#ffcc80", edgecolor="#cc7a00"),
+                    )
+
+        if "safety_triggered" in working.columns:
+            safety_mask = working["safety_triggered"].astype(bool).to_numpy()
+            if safety_mask.any():
+                ax.scatter(
+                    x_hours[safety_mask],
+                    glucose[safety_mask],
+                    s=30,
+                    color="#c62828",
+                    edgecolor="white",
+                    linewidth=0.6,
+                    zorder=5,
+                    label="Safety intervention",
+                )
+
+        ax.set_xlim(x_min, x_max)
+        ax.set_ylim(45, max(310, float(np.nanmax(glucose)) + 30))
+        ax.set_title(title, color="#1f8b24", fontweight="bold")
+        ax.set_xlabel("Time (hours)")
+        ax.set_ylabel("Sensor glucose (mg/dL)")
+        ax.grid(True, alpha=0.22)
+        ax.legend(loc="upper left", fontsize=7, frameon=True)
+        fig.tight_layout()
+        fig.savefig(output_path, dpi=260, bbox_inches="tight")
+        plt.close(fig)
+
+    @staticmethod
+    def _metric_delta(current: float, target: float, higher_is_better: bool = True) -> str:
+        delta = current - target
+        if not higher_is_better:
+            delta = target - current
+        sign = "+" if delta >= 0 else ""
+        return f"{sign}{delta:.1f}"
+
+    def _legacy_clinical_metrics_table(self, pdf: FPDF, metrics: Dict[str, Any]) -> None:
+        pdf.set_text_color(*BRAND_GREEN)
+        pdf.set_font("Helvetica", "B", 13)
+        pdf.cell(0, 8, "Clinical Metrics Summary", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_text_color(0, 0, 0)
+
+        rows = [
+            ("Time in Range", f"{metrics.get('tir_70_180', 0):.1f}%", ">=70%", self._metric_delta(metrics.get("tir_70_180", 0), 70.0), "Primary CGM target metric"),
+            ("Mean Glucose", f"{metrics.get('mean_glucose', 0):.0f} mg/dL", "research range", "-", "Average glycemic exposure"),
+            ("Hypoglycemia", f"{metrics.get('tir_below_70', 0):.1f}%", "<4%", self._metric_delta(4.0, metrics.get("tir_below_70", 0)), "Low-glucose exposure"),
+            ("Variability (CV)", f"{metrics.get('cv', 0):.1f}%", "<36%", self._metric_delta(36.0, metrics.get("cv", 0)), "Glycemic stability"),
+        ]
+        widths = [38, 27, 28, 28, 69]
+        headers = ["Metric", "Result", "Reference", "Delta", "Clinical note"]
+        pdf.set_fill_color(*BRAND_GREEN)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 8.5)
+        for idx, header in enumerate(headers):
+            pdf.cell(widths[idx], 8, header, border=1, align="C", fill=True)
+        pdf.ln()
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Helvetica", "", 8)
+        for row in rows:
+            for idx, value in enumerate(row):
+                pdf.cell(widths[idx], 8, str(value)[:42], border=1, align="C" if idx in {1, 2, 3} else "L")
+            pdf.ln()
+
+    def _legacy_safety_summary_lines(self, safety_report: Dict[str, Any], df: pd.DataFrame) -> List[str]:
+        lines = [
+            f"Total safety violations: {safety_report.get('total_violations', 0)}",
+            f"Bolus interventions: {safety_report.get('bolus_interventions_count', 0)}",
+            f"Terminated early: {bool(safety_report.get('terminated_early', False))}",
+            "Research boundary: not a medical device and not for treatment decisions.",
+        ]
+        top_reasons = self._top_safety_reasons(df)
+        for reason, count in top_reasons.items():
+            lines.append(f"Top intervention: {reason} ({count})")
+        return lines
+
     def generate_pdf(
         self,
         simulation_data: pd.DataFrame,
@@ -678,103 +907,138 @@ class ClinicalReportGenerator:
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
+        if "glucose_actual_mgdl" not in simulation_data.columns:
+            raise ValueError("Clinical PDF report requires a glucose_actual_mgdl column.")
+        if "time_minutes" not in simulation_data.columns:
+            simulation_data = simulation_data.copy()
+            simulation_data["time_minutes"] = np.arange(len(simulation_data), dtype=float) * self._infer_step_minutes(
+                simulation_data
+            )
+
         metrics = self.metrics_calculator.calculate(
             glucose=simulation_data["glucose_actual_mgdl"],
-            duration_hours=(simulation_data["time_minutes"].max() / 60.0),
+            duration_hours=max(float(simulation_data["time_minutes"].max() / 60.0), 0.01),
         ).to_dict()
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_dir_path = Path(tmp_dir)
-            glucose_plot = tmp_dir_path / "glucose.png"
+            clinical_plot = tmp_dir_path / "clinical_validation_pattern.png"
             insulin_plot = tmp_dir_path / "insulin.png"
-            self._plot_glucose(simulation_data, glucose_plot)
+            self._plot_clinical_validation_pattern(simulation_data, clinical_plot)
             self._plot_insulin(simulation_data, insulin_plot)
 
-            pdf = FPDF()
-            setup_academic_pdf(pdf, title=title)
-            pdf.add_page()
-            self._render_logo(pdf)
+            pdf = FPDF(format="A4")
+            pdf.set_auto_page_break(auto=False)
+            pdf.set_margins(10, 10, 10)
 
             duration_hours = float(simulation_data["time_minutes"].max() / 60.0)
-            add_academic_header(
+            session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+            report_title = "IINTS-AF Clinical Validation Report"
+            report_subtitle = "AI-Powered Glucose Control Analysis"
+
+            pdf.add_page()
+            self._legacy_report_header(pdf, title=report_title, subtitle=report_subtitle)
+            pdf.set_y(82)
+            pdf.set_text_color(*BRAND_GREEN)
+            pdf.set_font("Helvetica", "B", 22)
+            pdf.cell(0, 10, "IINTS-AF", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font("Helvetica", "B", 16)
+            pdf.cell(0, 10, title, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.ln(20)
+            pdf.set_font("Helvetica", "", 12)
+            pdf.cell(0, 8, f"Session ID: {session_id}", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(0, 8, f"Duration: {duration_hours:.1f} hours", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(0, 8, f"Data points: {len(simulation_data)}", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.cell(0, 8, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}", align="C")
+
+            pdf.set_fill_color(*SOFT_BLUE_PANEL)
+            pdf.rect(20, 210, 170, 48, style="F")
+            pdf.set_xy(20, 217)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.cell(170, 7, "RESEARCH RUN SUMMARY", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Helvetica", "", 9.5)
+            summary_lines = [
+                f"Time in range reached {metrics.get('tir_70_180', 0):.1f}% with mean glucose {metrics.get('mean_glucose', 0):.0f} mg/dL.",
+                f"Glucose variability was {metrics.get('cv', 0):.1f}% CV and GMI was {metrics.get('gmi', 0):.1f}%.",
+                "All outputs are for simulation, research review, and education only.",
+                "Not a medical device. Not for treatment, diagnosis, or dosing decisions.",
+            ]
+            for line in summary_lines:
+                pdf.set_x(24)
+                pdf.cell(162, 6, line, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+            pdf.add_page()
+            self._legacy_report_header(pdf, title=report_title, subtitle=report_subtitle)
+            self._legacy_section_title(pdf, "ALGORITHMIC PERFORMANCE ANALYSIS", y=48)
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_text_color(*BRAND_GREEN_DARK)
+            pdf.cell(0, 8, "Time in Range Comparison", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            self._legacy_progress_bar(
                 pdf,
-                title,
-                metadata={
-                    "Duration": f"{duration_hours:.1f} h",
-                    "Data points": len(simulation_data),
-                },
+                x=12,
+                y=70,
+                label="IINTS run:",
+                value=float(metrics.get("tir_70_180", 0.0)),
+                color=(188, 245, 188),
             )
-
-            add_academic_section(pdf, "Clinical metrics")
-            add_metric_cards(
+            self._legacy_progress_bar(
                 pdf,
-                [
-                    ("TIR 70-180", f"{metrics.get('tir_70_180', 0):.1f}%"),
-                    ("Time below 70", f"{metrics.get('tir_below_70', 0):.1f}%"),
-                    ("Time above 180", f"{metrics.get('tir_above_180', 0):.1f}%"),
-                    ("CV", f"{metrics.get('cv', 0):.1f}%"),
-                    ("GMI", f"{metrics.get('gmi', 0):.1f}%"),
-                    ("Mean glucose", f"{metrics.get('mean_glucose', 0):.1f} mg/dL"),
-                ],
+                x=12,
+                y=82,
+                label="Research target:",
+                value=70.0,
+                color=(255, 197, 197),
             )
+            self._legacy_metric_card(pdf, 12, 110, 42, "TIR 70-180", f"{metrics.get('tir_70_180', 0):.1f}%", "target framing")
+            self._legacy_metric_card(pdf, 59, 110, 42, "Mean glucose", f"{metrics.get('mean_glucose', 0):.0f}", "mg/dL")
+            self._legacy_metric_card(pdf, 106, 110, 42, "CV", f"{metrics.get('cv', 0):.1f}%", "variability")
+            self._legacy_metric_card(pdf, 153, 110, 42, "Overrides", str(safety_report.get("bolus_interventions_count", 0)), "safety")
 
-            add_academic_section(pdf, "Safety summary")
-            add_key_value_table(
-                pdf,
-                [
-                    ("Total violations", str(safety_report.get("total_violations", 0))),
-                    ("Bolus interventions", str(safety_report.get("bolus_interventions_count", 0))),
-                    ("Terminated early", str(bool(safety_report.get("terminated_early", False)))),
-                ],
+            pdf.set_xy(12, 152)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(0, 8, "Research Interpretation", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Helvetica", "", 9.5)
+            interpretation = (
+                "This report shows whether a simulated glucose-control run stayed within common CGM research "
+                "targets, how much hypoglycemia/hyperglycemia appeared, and whether the deterministic safety "
+                "supervisor intervened. It is designed for pre-clinical discussion, not patient care."
             )
-            top_reasons = self._top_safety_reasons(simulation_data)
-            if top_reasons:
-                pdf.ln(1)
-                pdf.set_font("Helvetica", "B", 10)
-                pdf.cell(0, 6, "Top intervention reasons:", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-                pdf.set_font("Helvetica", "", 10)
-                for reason, count in top_reasons.items():
-                    pdf.cell(0, 5, f"- {reason}: {count}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.multi_cell(184, 5.5, interpretation)
 
-            baseline = safety_report.get("baseline_comparison")
-            if baseline and baseline.get("rows"):
-                pdf.ln(3)
-                add_academic_section(pdf, "Head-to-head comparison")
-                pdf.set_font("Helvetica", "B", 9)
-                col_widths = [52, 26, 26, 26, 30]
-                headers = ["Algorithm", "TIR 70-180", "Time <70", "Time >180", "Safety Overrides"]
-                for idx, header in enumerate(headers):
-                    pdf.cell(col_widths[idx], 6, header, border=1, align="C")
-                pdf.ln()
+            pdf.add_page()
+            self._legacy_report_header(pdf, title=report_title, subtitle=report_subtitle)
+            pdf.image(str(clinical_plot), x=10, y=43, w=190)
+            pdf.set_xy(10, 178)
+            self._legacy_clinical_metrics_table(pdf, metrics)
 
-                pdf.set_font("Helvetica", "", 9)
-                for row in baseline["rows"]:
-                    pdf.cell(col_widths[0], 6, str(row.get("algorithm", ""))[:24], border=1)
-                    pdf.cell(col_widths[1], 6, f"{row.get('tir_70_180', 0):.1f}%", border=1, align="C")
-                    pdf.cell(col_widths[2], 6, f"{row.get('tir_below_70', 0):.1f}%", border=1, align="C")
-                    pdf.cell(col_widths[3], 6, f"{row.get('tir_above_180', 0):.1f}%", border=1, align="C")
-                    pdf.cell(col_widths[4], 6, str(row.get("bolus_interventions", 0)), border=1, align="C")
-                    pdf.ln()
+            pdf.add_page()
+            self._legacy_report_header(pdf, title=report_title, subtitle=report_subtitle)
+            self._legacy_section_title(pdf, "SAFETY VALIDATION RESULTS", y=48)
+            pdf.set_xy(12, 72)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(0, 7, "Deterministic Safety Supervisor", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Helvetica", "", 10)
+            for line in self._legacy_safety_summary_lines(safety_report, simulation_data):
+                pdf.set_x(12)
+                pdf.cell(0, 7, f"- {line}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-            pdf.ln(3)
+            pdf.ln(6)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 7, "Insulin Delivery Trace", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.image(str(insulin_plot), x=16, y=130, w=178)
+
+            pdf.set_xy(12, 252)
             pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(80, 80, 80)
             pdf.multi_cell(
-                0,
+                184,
                 4,
                 "Research-use framing follows ADA 2026 glycemic goals and ATTD Time-in-Range consensus. "
                 "See docs/EVIDENCE_BASE.md and `iints sources` for full citations.",
             )
-
-            pdf.ln(4)
-            add_academic_section(pdf, "Glucose trace")
-            pdf.image(str(glucose_plot), w=180)
-
-            pdf.ln(4)
-            add_academic_section(pdf, "Insulin delivery")
-            pdf.image(str(insulin_plot), w=180)
-
-            add_academic_footer(pdf)
-
             pdf.output(str(output_file))
 
         return str(output_file)

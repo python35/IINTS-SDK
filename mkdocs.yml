@@ -94,6 +94,7 @@ nav:
   - Developers:
       - Developer Portal: DEVELOPER_PORTAL.md
       - Visual Architecture: ARCHITECTURE_OVERVIEW.md
+      - Architecture Hardening Plan: ARCHITECTURE_HARDENING.md
       - API Reference: API_REFERENCE.md
       - Contribute Safely: CONTRIBUTING_SAFELY.md
       - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
@@ -103,6 +104,7 @@ nav:
       - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
+      - Paper Technical Dossier: PAPER_TECHNICAL_DOSSIER.md
       - Complete Science List: ALL_SCIENTIFIC_THEORIES.md
       - Physiology Reference: PHYSIOLOGY_REFERENCE.md
       - Hypoglycemia Science Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
@@ -128,7 +130,7 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.15): releases/v1.5.15.md
+      - Latest (v1.5.16): releases/v1.5.16.md
       - v1.5.14: releases/v1.5.14.md
       - v1.5.13: releases/v1.5.13.md
       - Release Archive: releases/INDEX.md

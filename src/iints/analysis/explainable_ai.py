@@ -30,37 +30,58 @@ class ClinicalAuditTrail:
 
     def generate_ollama_insight(self, times, glucose, ffa, ketones, insulin):
         """
-        Sends the raw physiological arrays to the local Mistral LLM via Ollama
-        for an Explainable AI clinical diagnosis.
+        Explain a deterministic metabolic assessment with optional local AI.
+
+        The deterministic assessment remains authoritative. The LLM is never
+        asked to diagnose or calculate from raw arrays.
         """
+        assessment = self._deterministic_metabolic_assessment(glucose, ffa, ketones, insulin)
         self._init_ollama()
         if not self.ollama or not self.ollama.available():
-            return "ERROR: Local Ollama AI is not running or available."
-            
-        # Format the data arrays for the LLM
-        data_summary = (
-            f"Time (min): {times[-5:]}\n"
-            f"Glucose (mg/dL): {[round(g, 1) for g in glucose[-5:]]}\n"
-            f"Insulin (U): {[round(i, 2) for i in insulin[-5:]]}\n"
-            f"FFA (mmol/L): {[round(f, 2) for f in ffa[-5:]]}\n"
-            f"Ketones (mmol/L): {[round(k, 2) for k in ketones[-5:]]}\n"
-        )
-        
+            return assessment
+
         system_prompt = (
-            "You are an Explainable AI for a Type 1 Diabetes Digital Twin. "
-            "You analyze raw mathematical arrays from the simulation and provide a clinical explanation. "
-            "Explain what the math is doing to the patient. If insulin is 0, mention hepatic glucose production. "
-            "If FFA and Ketones are rising, diagnose the lipotoxicity and Diabetic Ketoacidosis (DKA). "
-            "Keep the response professional, clinical, and under 4 sentences."
+            "You are a research-only wording assistant. Paraphrase only the supplied deterministic findings. "
+            "Do not calculate, diagnose, introduce new numbers, infer DKA, or change the verdict. "
+            "Keep the response under 4 sentences and state that it is a simulated research interpretation."
         )
-        
-        user_prompt = f"Analyze the following patient state from the last 25 minutes of the simulation:\n{data_summary}"
-        
+        user_prompt = f"Deterministic SDK findings:\n{assessment}\n\nParaphrase without adding claims:"
+
         try:
             response = self.ollama.complete(system_prompt=system_prompt, user_prompt=user_prompt)
-            return response
+            return f"{assessment}\n\nOptional non-authoritative AI wording:\n{response}"
         except Exception as e:
-            return f"AI Generation Failed: {e}"
+            return f"{assessment}\n\nOptional AI wording unavailable: {e}"
+
+    @staticmethod
+    def _deterministic_metabolic_assessment(glucose, ffa, ketones, insulin) -> str:
+        """Return fixed research flags; never a diagnosis."""
+
+        def _last(values, default=0.0):
+            return float(values[-1]) if values is not None and len(values) else float(default)
+
+        glucose_now = _last(glucose)
+        ketones_now = _last(ketones)
+        insulin_now = _last(insulin)
+        ffa_rising = bool(ffa is not None and len(ffa) >= 2 and float(ffa[-1]) > float(ffa[-2]))
+
+        findings = []
+        if glucose_now < 70.0:
+            findings.append("fixed_glucose_flag=hypoglycemia_range")
+        elif glucose_now > 250.0:
+            findings.append("fixed_glucose_flag=marked_hyperglycemia_range")
+        else:
+            findings.append("fixed_glucose_flag=no_extreme_glucose_threshold_crossed")
+        if ketones_now >= 3.0:
+            findings.append("fixed_ketone_flag=high_simulated_ketones")
+        elif ketones_now >= 1.5:
+            findings.append("fixed_ketone_flag=elevated_simulated_ketones")
+        else:
+            findings.append("fixed_ketone_flag=no_elevated_ketone_threshold_crossed")
+        findings.append(f"fixed_ffa_trend_flag={'rising' if ffa_rising else 'not_rising'}")
+        findings.append(f"fixed_insulin_flag={'zero' if insulin_now == 0.0 else 'present'}")
+        findings.append("diagnostic_authority=none; DKA cannot be diagnosed from this simulator output")
+        return "\n".join(findings)
 
     def log_decision(self, timestamp, glucose_current, glucose_trend, insulin_decision, 
                     algorithm_confidence, safety_override=False, context=None):

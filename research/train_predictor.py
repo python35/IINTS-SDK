@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import platform
 import random
 import time
@@ -37,7 +38,13 @@ from iints.research.dataset import (
 )
 from iints.research.metrics import band_regression_metrics, regression_metrics
 from iints.research.predictor import LSTMPredictor, evaluate_baselines
-from iints.research.losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss
+from iints.research.losses import (
+    BandWeightedMSE,
+    BandWeightedPINNLoss,
+    PhysiologicalPINNLoss,
+    QuantileLoss,
+    SafetyWeightedMSE,
+)
 from iints.research.model_registry import append_registry_entry
 
 
@@ -323,13 +330,17 @@ def _update_registry(registry_path: Path, entry: dict) -> None:
 # Evaluation helper
 # ---------------------------------------------------------------------------
 
+def _loss_needs_inputs(criterion: nn.Module) -> bool:
+    return isinstance(criterion, (PhysiologicalPINNLoss, BandWeightedPINNLoss))
+
+
 def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) -> float:
     model.eval()
     total = 0.0
     with torch.no_grad():
         for batch_x, batch_y in loader:
             preds = model(batch_x)
-            if isinstance(criterion, PhysiologicalPINNLoss):
+            if _loss_needs_inputs(criterion):
                 loss = criterion(preds, batch_y, batch_x)
             else:
                 loss = criterion(preds, batch_y)
@@ -357,6 +368,13 @@ def main() -> None:
     random.seed(training_cfg.seed)
     np.random.seed(training_cfg.seed)
     torch.manual_seed(training_cfg.seed)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.use_deterministic_algorithms(True)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(training_cfg.seed)
+    if hasattr(torch.backends, "cudnn"):
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
     # -----------------------------------------------------------------------
     # Load data
@@ -463,10 +481,12 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # DataLoaders
     # -----------------------------------------------------------------------
+    loader_generator = torch.Generator().manual_seed(training_cfg.seed)
     train_loader = DataLoader(
         TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train)),
         batch_size=training_cfg.batch_size,
         shuffle=True,
+        generator=loader_generator,
     )
     val_loader = DataLoader(
         TensorDataset(torch.from_numpy(X_val), torch.from_numpy(y_val)),
@@ -490,7 +510,12 @@ def main() -> None:
 
     # Optional warm-start from a pretrained checkpoint (same input size & horizon)
     if args.warm_start:
-        ckpt = torch.load(args.warm_start, map_location="cpu")
+        try:
+            ckpt = torch.load(args.warm_start, map_location="cpu", weights_only=True)
+        except TypeError as exc:
+            raise RuntimeError(
+                "Secure warm-start loading requires torch.load(weights_only=True). Upgrade PyTorch."
+            ) from exc
         state = ckpt.get("state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
         ckpt_cfg = ckpt.get("config") if isinstance(ckpt, dict) else None
         if ckpt_cfg:
@@ -559,6 +584,28 @@ def main() -> None:
             f"(lambda={training_cfg.pinn_lambda}, "
             f"max_roc={training_cfg.pinn_max_roc})"
         )
+    elif training_cfg.loss == "band_pinn":
+        criterion = cast(nn.Module, BandWeightedPINNLoss(
+            feature_columns=predictor_cfg.feature_columns,
+            pinn_lambda=training_cfg.pinn_lambda,
+            pinn_max_roc=training_cfg.pinn_max_roc,
+            time_step_minutes=predictor_cfg.time_step_minutes,
+            low_threshold=training_cfg.band_weighted_low_threshold,
+            high_threshold=training_cfg.band_weighted_high_threshold,
+            low_weight=training_cfg.band_weighted_low_weight,
+            high_weight=training_cfg.band_weighted_high_weight,
+            max_weight=training_cfg.band_weighted_max_weight,
+        ))
+        print(
+            "Loss: band_pinn "
+            f"(low<{training_cfg.band_weighted_low_threshold}, "
+            f"high>{training_cfg.band_weighted_high_threshold}, "
+            f"low_w={training_cfg.band_weighted_low_weight}, "
+            f"high_w={training_cfg.band_weighted_high_weight}, "
+            f"max_w={training_cfg.band_weighted_max_weight}, "
+            f"lambda={training_cfg.pinn_lambda}, "
+            f"max_roc={training_cfg.pinn_max_roc})"
+        )
     else:
         criterion = nn.MSELoss()
         print("Loss: MSE")
@@ -608,7 +655,7 @@ def main() -> None:
         for batch_x, batch_y in train_loader:
             optimizer.zero_grad()
             preds = model(batch_x)
-            if isinstance(criterion, PhysiologicalPINNLoss):
+            if _loss_needs_inputs(criterion):
                 loss = criterion(preds, batch_y, batch_x)
             else:
                 loss = criterion(preds, batch_y)
@@ -695,9 +742,11 @@ def main() -> None:
             "target_column": predictor_cfg.target_column,
             "scaler": scaler.to_dict(),   # P3-10: embed scaler for inference
             "dataset_schema_id": dataset_lineage["schema_id"],
+            "uncertainty_seed": training_cfg.seed,
         },
     }
     torch.save(payload, model_path)
+    model_sha256 = _sha256_file(model_path)
 
     # -----------------------------------------------------------------------
     # P1-5: Training report with full reproducibility metadata
@@ -710,6 +759,10 @@ def main() -> None:
         "torch_version": torch.__version__,
         "timestamp_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "seed": training_cfg.seed,
+        "deterministic_algorithms": True,
+        "cudnn_deterministic": bool(getattr(torch.backends.cudnn, "deterministic", False)),
+        "cudnn_benchmark": bool(getattr(torch.backends.cudnn, "benchmark", False)),
+        "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
         # Dataset
         "data_path": str(args.data),
         "data_sha256": data_sha256,
@@ -717,6 +770,8 @@ def main() -> None:
         "config_path": str(args.config),
         "config_sha256": config_sha256,
         "warm_start": str(args.warm_start) if args.warm_start else None,
+        "warm_start_sha256": _sha256_file(args.warm_start) if args.warm_start else None,
+        "model_sha256": model_sha256,
         # Split
         "subject_level_split": training_cfg.subject_level_split,
         "train_subjects": train_subjects,
@@ -760,6 +815,7 @@ def main() -> None:
         "sdk_version": report["sdk_version"],
         "data_sha256": data_sha256,
         "config_sha256": config_sha256,
+        "model_sha256": model_sha256,
         "seed": training_cfg.seed,
         "epochs": training_cfg.epochs,
         "val_loss_final": metrics["val_loss"][-1],

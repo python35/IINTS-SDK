@@ -6,7 +6,6 @@ Professional data import layer with schema validation
 
 import json
 import pandas as pd
-import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 
@@ -104,8 +103,17 @@ class DataAdapter:
         
         return sorted(patients)
     
-    def clinical_benchmark_comparison(self, patient_id: str, algorithms: List[str]) -> Dict[str, Any]:
-        """Compare algorithms against Ohio T1DM clinical benchmarks"""
+    def clinical_benchmark_comparison(
+        self,
+        patient_id: str,
+        algorithms: List[str],
+        evaluated_outputs: Optional[Dict[str, Union[pd.DataFrame, str, Path]]] = None,
+    ) -> Dict[str, Any]:
+        """Compare measured algorithm traces against Ohio T1DM benchmarks.
+
+        No synthetic improvement is generated. Algorithms without an evaluated
+        output trace are returned as ``not_evaluated``.
+        """
         df = self.load_ohio_dataset(patient_id)
         benchmarks = df.attrs.get('clinical_benchmarks', {})
         
@@ -116,28 +124,53 @@ class DataAdapter:
                 'gmi': benchmarks.get('original_gmi', 0),
                 'cv_percent': benchmarks.get('original_cv', 0)
             },
-            'algorithm_results': {}
+            'algorithm_results': {},
+            'methodology': 'measured_trace_only',
+            'synthetic_improvements_used': False,
         }
-        
-        # Simulate algorithm performance improvements
-        baseline_tir = benchmarks.get('original_tir', 70)
-        
+
+        baseline_tir = float(benchmarks.get('original_tir', 0.0))
+        evaluated_outputs = evaluated_outputs or {}
         for algorithm in algorithms:
-            if algorithm == 'lstm':
-                improvement = np.random.uniform(0.05, 0.15)  # 5-15% improvement
-            elif algorithm == 'hybrid':
-                improvement = np.random.uniform(0.08, 0.18)  # 8-18% improvement
-            else:  # rule_based
-                improvement = np.random.uniform(-0.02, 0.05)  # -2% to 5%
-            
-            new_tir = min(95, baseline_tir * (1 + improvement))
-            
+            source = evaluated_outputs.get(algorithm)
+            if source is None:
+                results['algorithm_results'][algorithm] = {
+                    'status': 'not_evaluated',
+                    'tir_70_180': None,
+                    'improvement_percent': None,
+                    'relative_improvement': None,
+                }
+                continue
+
+            output_df = source.copy() if isinstance(source, pd.DataFrame) else pd.read_csv(Path(source))
+            glucose_column = next(
+                (
+                    candidate
+                    for candidate in ('glucose_actual_mgdl', 'glucose', 'glucose_mg_dl', 'cgm')
+                    if candidate in output_df.columns
+                ),
+                None,
+            )
+            if glucose_column is None:
+                raise ValueError(
+                    f"Evaluated output for '{algorithm}' has no supported glucose column"
+                )
+            glucose = pd.to_numeric(output_df[glucose_column], errors='coerce').dropna()
+            if glucose.empty:
+                raise ValueError(f"Evaluated output for '{algorithm}' contains no valid glucose values")
+            measured_tir = float(((glucose >= 70.0) & (glucose <= 180.0)).mean() * 100.0)
+            improvement_points = measured_tir - baseline_tir
+            relative_improvement = (
+                improvement_points / baseline_tir * 100.0 if baseline_tir > 0.0 else None
+            )
             results['algorithm_results'][algorithm] = {
-                'tir_70_180': new_tir,
-                'improvement_percent': (new_tir - baseline_tir),
-                'relative_improvement': improvement * 100
+                'status': 'measured',
+                'tir_70_180': measured_tir,
+                'improvement_percent': improvement_points,
+                'relative_improvement': relative_improvement,
+                'rows_evaluated': int(len(glucose)),
             }
-        
+
         return results
 
 def main():

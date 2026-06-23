@@ -45,6 +45,8 @@ In the current SDK implementation, the physiological penalty includes:
 
 This can make a PINN model trade a small amount of average error for fewer implausible or safety-relevant failures. That tradeoff is intentional: in medical-device research, a model that is slightly less optimal on average but more physiologically conservative can be more useful for simulation and safety-supervisor experiments.
 
+The recommended `band_pinn` objective keeps the same physiological penalty, but replaces plain MSE with band-weighted MSE. That keeps extra attention on hypo and hyperglycemia windows while still discouraging impossible glucose trajectories.
+
 ## 4. Why Longer Horizons Are Harder
 
 Short horizons, such as 15 or 30 minutes, are often dominated by recent glucose trend and sensor continuity. Longer horizons, such as 60 or 120 minutes, depend much more on delayed meal absorption, insulin pharmacodynamics, activity, stress, circadian effects, and sensor lag.
@@ -66,6 +68,8 @@ Do not promote a model only because it has the lowest MAE or RMSE. Use this orde
 ## 6. Pitch-Friendly Explanation
 
 A normal AI model learns to be close on average. IINTS-AF also asks whether the prediction still behaves like glucose in a human body. The PINN loss adds a mathematical penalty when the model predicts values or rates that are physiologically implausible, and the comparison report checks those errors separately from normal MAE/RMSE.
+
+The current recommended training recipe is `band_pinn`: it asks the model to care more about clinically important low/high glucose ranges while preserving the PINN physiology guardrails.
 
 ## 7. Boundary
 

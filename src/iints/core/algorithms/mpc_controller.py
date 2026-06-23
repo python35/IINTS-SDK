@@ -14,6 +14,11 @@ from scipy.optimize import minimize
 
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.patient.bergman_model import BergmanPatientModel
+from iints.core.safety.config import (
+    CONTROLLER_FALLING_TREND_GUARD_MGDL_MIN,
+    CONTROLLER_HIGH_IOB_GUARD_UNITS,
+    CONTROLLER_HYPO_GUARD_MGDL,
+)
 
 
 class MPCController(InsulinAlgorithm):
@@ -30,9 +35,18 @@ class MPCController(InsulinAlgorithm):
 
         self.max_insulin_u_per_step = float(self.settings.get("max_insulin_u_per_step", 1.2))
         self.min_insulin_u_per_step = 0.0
-        self.hypo_guard_glucose = float(self.settings.get("hypo_guard_glucose", 90.0))
-        self.falling_trend_guard = float(self.settings.get("falling_trend_guard_mgdl_min", -1.0))
-        self.high_iob_guard_units = float(self.settings.get("high_iob_guard_units", 4.0))
+        self.hypo_guard_glucose = float(
+            self.settings.get("hypo_guard_glucose", CONTROLLER_HYPO_GUARD_MGDL)
+        )
+        self.falling_trend_guard = float(
+            self.settings.get(
+                "falling_trend_guard_mgdl_min",
+                CONTROLLER_FALLING_TREND_GUARD_MGDL_MIN,
+            )
+        )
+        self.high_iob_guard_units = float(
+            self.settings.get("high_iob_guard_units", CONTROLLER_HIGH_IOB_GUARD_UNITS)
+        )
         self.iob_taper_start_units = float(self.settings.get("iob_taper_start_units", 2.0))
 
         # We keep an internal Bergman model running in parallel to the real patient
@@ -189,7 +203,7 @@ class MPCController(InsulinAlgorithm):
             'bolus_insulin': optimal_current_dose,
             'basal_insulin': 0.0,
             'mpc_recommended_units': optimal_current_dose,
-            # We also pass the mathematical physics state outward so the Mistral AI can read it
+            # Expose the mathematical state for deterministic audit and optional explanation.
             'mpc_physics_state': self.internal_model.get_patient_state(),
             'research_only': True,
         }

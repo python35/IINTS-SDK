@@ -5,6 +5,11 @@ from typing import Dict, List, Tuple, Any
 import numpy as np
 import pandas as pd
 
+from iints.core.safety.config import (
+    CONTROLLER_HYPO_GUARD_MGDL,
+    ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS,
+)
+
 try:
     import torch  # type: ignore
     import torch.nn as nn  # type: ignore
@@ -29,19 +34,20 @@ def _safe_torch_load_weights(path: str):
 
 @dataclass
 class ClinicalConstraints:
-    """Physiological constraints based on medical literature."""
+    """Research-sandbox constraints; not clinical dosing guidance."""
     max_glucose_rate = 5.0  # mg/dL per minute (ISPAD guidelines)
     min_glucose = 54  # mg/dL (severe hypoglycemia threshold)
     max_glucose = 400  # mg/dL (DKA threshold)
-    max_insulin_bolus = 15.0  # Units (safety limit)
+    max_insulin_bolus = ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS
     target_range = (70, 180)  # mg/dL (ADA guidelines)
 
 
 if _TORCH_AVAILABLE:
     class ClinicalTeacher:
-        """Teaches AI using validated clinical protocols."""
+        """Generate deterministic synthetic rule labels for sandbox tests."""
 
-        def __init__(self):
+        def __init__(self, seed: int = 42):
+            self.seed = int(seed)
             self.clinical_protocols = {
                 'correction_factor': 50,  # mg/dL per unit (adult)
                 'carb_ratio': 15,  # grams per unit
@@ -51,24 +57,30 @@ if _TORCH_AVAILABLE:
             }
 
         def generate_clinical_training_data(self, n_samples: int = 1000) -> Tuple[np.ndarray, np.ndarray]:
-            """Generate training data based on clinical protocols."""
+            """Generate reproducible synthetic labels; never clinical evidence."""
+            rng = np.random.default_rng(self.seed)
             X = []
             y = []
 
             for _ in range(n_samples):
-                glucose = np.clip(np.random.normal(150, 40), 70, 350)
-                time_since_meal = np.random.exponential(60)
-                carbs = np.random.choice([0, 30, 45, 60, 75])
+                glucose = float(np.clip(rng.normal(150, 40), 70, 350))
+                carbs = float(rng.choice([0, 30, 45, 60, 75]))
+                trend = float(rng.uniform(-2.0, 2.0))
+                predicted = glucose + trend * 30.0
+                iob = float(rng.uniform(0.0, 4.0))
 
                 correction = max(0, (glucose - self.clinical_protocols['target_glucose']) /
                                  self.clinical_protocols['correction_factor'])
                 meal_bolus = carbs / self.clinical_protocols['carb_ratio'] if carbs > 0 else 0
-                total_insulin = min(correction + meal_bolus, 15.0)
+                total_insulin = min(
+                    correction + meal_bolus,
+                    ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS,
+                )
 
-                if glucose < self.clinical_protocols['hypoglycemia_threshold']:
+                if glucose <= CONTROLLER_HYPO_GUARD_MGDL or predicted <= CONTROLLER_HYPO_GUARD_MGDL:
                     total_insulin = 0
 
-                X.append([3, glucose, 72, 29, 32, 0.47, 33])  # LSTM input format
+                X.append([glucose, trend, predicted, carbs, iob, 50.0, 15.0])
                 y.append(total_insulin)
 
             return np.array(X), np.array(y)
@@ -85,14 +97,14 @@ if _TORCH_AVAILABLE:
             if glucose < 70 and predicted_insulin > 0.5:
                 safety_score -= 20
 
-            if predicted_insulin > 15.0 or predicted_insulin < 0:
+            if predicted_insulin > ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS or predicted_insulin < 0:
                 safety_score -= 50
 
             return max(0, safety_score)
 
 
     class AutonomousLearningSystem:
-        """Self-improving AI system with clinical safety constraints."""
+        """Research-only candidate trainer; it never promotes a model to deployment."""
 
         def __init__(self, model_path: str):
             self.model_path = model_path
@@ -101,8 +113,11 @@ if _TORCH_AVAILABLE:
             self.safety_threshold = 70.0
 
         def continuous_learning_cycle(self, validation_errors: List[Dict]) -> bool:
-            """Perform autonomous learning from validation errors."""
+            """Train a deterministic candidate that still requires external review."""
             print("Starting autonomous learning cycle...")
+
+            torch.manual_seed(42)
+            torch.use_deterministic_algorithms(True)
 
             clinical_X, clinical_y = self.clinical_teacher.generate_clinical_training_data(500)
 
@@ -116,13 +131,16 @@ if _TORCH_AVAILABLE:
             safety_score = self._validate_clinical_safety(improved_model, clinical_X, clinical_y)
 
             if safety_score > self.safety_threshold:
-                torch.save(improved_model.state_dict(), self.model_path + '.improved')
+                torch.save(improved_model.state_dict(), self.model_path + '.candidate')
                 self.learning_history.append({
                     'timestamp': pd.Timestamp.now(),
                     'safety_score': safety_score,
                     'scenarios_learned': len(validation_errors)
                 })
-                print(f"Model improved! Safety score: {safety_score:.1f}%")
+                print(
+                    f"Research candidate saved for external validation. "
+                    f"Heuristic score: {safety_score:.1f}%"
+                )
                 return True
 
             print(f"Model not improved. Safety score: {safety_score:.1f}%")
@@ -152,19 +170,15 @@ if _TORCH_AVAILABLE:
 
         def _calculate_safety_penalty(self, predictions: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
             """Calculate penalty for unsafe predictions."""
-            penalty = torch.tensor(0.0, requires_grad=True)
-
-            for i in range(len(predictions)):
-                pred_insulin = predictions[i].item()
-                glucose = X[i, 0, 1].item()  # Second feature is glucose
-
-                if glucose < 70 and pred_insulin > 0.1:
-                    penalty = penalty + torch.tensor(10.0, requires_grad=True)
-
-                if pred_insulin > 15.0:
-                    penalty = penalty + torch.tensor(5.0, requires_grad=True)
-
-            return penalty / len(predictions)
+            glucose = X[:, 0, 0]
+            pred_insulin = predictions[:, 0]
+            low_glucose_penalty = torch.relu(pred_insulin - 0.1) * (
+                glucose < CONTROLLER_HYPO_GUARD_MGDL
+            ).float() * 10.0
+            cap_penalty = torch.relu(
+                pred_insulin - ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS
+            ) * 5.0
+            return (low_glucose_penalty + cap_penalty).mean()
 
         def _validate_clinical_safety(self, model: nn.Module, X: np.ndarray, y: np.ndarray) -> float:
             """Validate model against clinical safety criteria."""
@@ -177,7 +191,7 @@ if _TORCH_AVAILABLE:
 
                 for i in range(len(predictions)):
                     pred_insulin = predictions[i].item()
-                    glucose = X[i, 1]
+                    glucose = X[i, 0]
 
                     safety_score = self.clinical_teacher.evaluate_clinical_safety(pred_insulin, glucose)
                     safety_scores.append(safety_score)

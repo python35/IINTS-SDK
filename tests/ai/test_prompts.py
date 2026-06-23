@@ -26,8 +26,8 @@ def test_review_realism_prompt_requests_structured_feedback_sections() -> None:
     assert "What to improve next" in user_prompt
 
 
-def test_predict_insulin_prompt_is_research_only_and_cannot_increase_mpc_dose() -> None:
-    _, user_prompt = build_prompt(
+def test_predict_insulin_prompt_forbids_ai_numerical_authority() -> None:
+    system_prompt, user_prompt = build_prompt(
         "predict_insulin",
         {
             "current_glucose": 185,
@@ -38,9 +38,24 @@ def test_predict_insulin_prompt_is_research_only_and_cannot_increase_mpc_dose() 
     )
 
     lowered = user_prompt.lower()
+    assert "never calculate" in system_prompt.lower()
     assert "research sandbox" in lowered
-    assert "not controlling a real pump" in lowered
-    assert "never increase insulin above the deterministic mpc dose" in lowered
-    assert "simulator will still apply hard glucagon safety caps" in lowered
-    assert "FINAL_DOSE" in user_prompt
-    assert "FINAL_GLUCAGON_DOSE_MG" in user_prompt
+    assert "do not calculate a dose" in lowered
+    assert "fixed mpc and safety layers retain all numerical authority" in lowered
+    assert '"ai_numeric_authority": false' in lowered
+    assert "FINAL_DOSE" not in user_prompt
+    assert "FINAL_GLUCAGON_DOSE_MG" not in user_prompt
+
+
+def test_prompts_include_static_formula_registry_context() -> None:
+    system_prompt, user_prompt = build_prompt(
+        "generate_insights",
+        {"summary": {"mean_glucose_mgdl": 145}, "trace_sample": [{"glucose_actual_mgdl": 145}]},
+    )
+
+    lowered = user_prompt.lower()
+    assert "formula_registry" in lowered
+    assert "f01_bergman_glucose_rhs" in lowered
+    assert '"ai_formula_authority": false' in lowered
+    assert "never invent a formula" in system_prompt.lower()
+    assert "do not derive or solve formulas" in lowered

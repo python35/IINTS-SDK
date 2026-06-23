@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 import yaml
 
-from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.core.clinical_metrics import ClinicalMetricsCalculator
 from iints.analysis.safety_index import compute_safety_index
 
 Comparator = Callable[[float, float], bool]

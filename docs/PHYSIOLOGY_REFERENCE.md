@@ -117,7 +117,7 @@ These profiles are shipped with the SDK for studies, demos, and physiological co
 | `clinic_safe_hyper_challenge` | `150` | `0.55` | `45` | `9` | none | post-meal high-glucose challenge |
 | `clinic_safe_midnight` | `125` | `0.45` | `65` | `11` | none | exercise-after-evening-meal challenge |
 | `clinic_safe_pizza` | `135` | `0.50` | `50` | `10` | none | delayed-meal challenge |
-| `reference_free_living_t1d` | `130` | `0.50` | `50` | `10` | dawn rise `8 mg/dL/h`, meal mismatch `0.95` | empirical free-living reference |
+| `reference_free_living_t1d` | `151.7` | `0.50` | `50` | `10` | Ohio-informed basal target `138`, carb tail `280 min`, meal mismatch `0.83` | empirical free-living reference |
 | `reference_azt1d_t1d` | `135` | `0.50` | `50` | `10` | dawn rise `4 mg/dL/h`, meal mismatch `0.95` | AZT1D-oriented reference |
 | `reference_hupa_ucm_t1d` | `130` | `0.50` | `50` | `10` | dawn rise `8 mg/dL/h`, meal mismatch `0.95` | HUPA-UCM-oriented reference |
 | `default_patient` | `120` | `0.80` | `50` | `10` | legacy simplified defaults | compatibility, not the best first demo choice |
@@ -221,7 +221,39 @@ Important boundary:
 - parameters are not personalized clinical estimates
 - stress and exercise modifiers are intentionally explicit so assumptions can be audited
 
-## 12. Experimental Or Not Fully Calibrated Yet
+## 12. Real-Data Physiology Calibration
+
+The SDK now includes a calibration-audit step for processed real CGM datasets such as OhioT1DM. This does not identify a clinical digital twin. It measures empirical glucose-shape features and turns them into conservative simulator parameter hints.
+
+Example:
+
+```bash
+iints research physiology-calibrate \
+  --real-data data_packs/public/ohio_t1dm_full/processed/ohio_train.csv \
+  --output-json results/physiology_calibration/ohio_report.json \
+  --output-profile results/physiology_calibration/ohio_profile_hints.yaml
+```
+
+The report computes:
+- dataset-level mean, CV, time-in-range, hypo/high percentages, and rate-of-change tails
+- post-meal peak timing and peak amplitude when carbohydrate events are available
+- exercise-response summaries when exercise/activity flags are available
+- dawn rise estimates from overnight versus early-morning CGM medians
+
+The generated profile hints include:
+- `initial_glucose`
+- `basal_glucose_target`
+- `carb_absorption_duration_minutes`
+- `glucose_absorption_rate`
+- `max_glucose_rate_mgdl_per_min`
+- `dawn_phenomenon_strength`
+
+Interpretation rule:
+- use the hints as starting points for simulator presets
+- validate the resulting simulator runs with realism checks and AGP/report outputs
+- do not present the hints as individualized clinical parameters
+
+## 13. Experimental Or Not Fully Calibrated Yet
 
 | Not fully represented | Current SDK handling |
 | --- | --- |
@@ -237,7 +269,7 @@ Important boundary:
 | individualized pharmacokinetics for every insulin formulation | represented through configurable duration/peak parameters, not full formulation-specific PK for every commercial insulin |
 | long-horizon adaptation in real patients | studied through scenarios and residuals, not a personalized adaptive physiological twin |
 
-## 13. Hypoglycemia Science Layer
+## 14. Hypoglycemia Science Layer
 
 The experimental hypoglycemia layer is organized around four explicit pillars. This is important because a simulator that only models carbohydrates and insulin can look plausible while still missing the body's rescue systems.
 
@@ -250,7 +282,7 @@ The experimental hypoglycemia layer is organized around four explicit pillars. T
 
 For the full explanation and equations, see [Hypoglycemia Science Model](HYPOGLYCEMIA_SCIENCE_MODEL.md).
 
-## 14. How To Use This In A Presentation
+## 15. How To Use This In A Presentation
 
 For a doctor:
 - start with the glucose bands, hypo thresholds, and what the patient model includes
@@ -265,7 +297,7 @@ For EUCYS:
 - say that it exposes the **assumptions** behind the curves: patient ratios, meals, exercise, sensor behavior, and safety rails
 - use the day table and patient-profile table as concrete evidence that the simulator is parameterized, inspectable, and reproducible
 
-## 15. Source Trail
+## 16. Source Trail
 
 Use these pages together:
 - [Evidence Base](EVIDENCE_BASE.md) for the literature legend

@@ -3,11 +3,16 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
+from iints.core.formula_registry import formula_context_for_ai
+
+from .insights import build_insight_context
+
 
 TaskName = Literal[
     "explain_decision",
     "analyze_trends",
     "detect_anomalies",
+    "generate_insights",
     "generate_report",
     "review_realism",
     "predict_insulin",
@@ -19,6 +24,12 @@ SYSTEM_PROMPT = (
     "and imported glucose datasets. "
     "Explain glycemic behavior clearly, conservatively, and in plain language. "
     "Do not give medical advice, treatment instructions, or patient-specific recommendations. "
+    "Never calculate, estimate, derive, correct, or alter numerical values. "
+    "All metrics and controller outputs must come from deterministic SDK code. "
+    "Use supplied numbers exactly as written; if a value is missing, say that it is unavailable. "
+    "Base your response on the supplied insight_context first, then the raw payload. "
+    "Use the supplied formula_registry as immutable context; never invent a formula. "
+    "Separate evidence from hypotheses; label hypotheses as non-diagnostic research ideas. "
     "State uncertainty when the input is incomplete. "
     "For research use only."
 )
@@ -49,6 +60,20 @@ TASK_TEMPLATES: dict[TaskName, str] = {
         "- Whether follow-up validation is recommended\n\n"
         "Summary JSON:\n{data}"
     ),
+    "generate_insights": (
+        "Create a useful research insight brief from this IINTS-AF run or glucose dataset.\n"
+        "Use the deterministic insight_context as the evidence backbone.\n"
+        "Do not create new metrics or alter supplied values.\n\n"
+        "Respond in markdown with these sections:\n"
+        "1. Key finding\n"
+        "2. Evidence from the SDK context\n"
+        "3. Likely mechanisms to inspect (research hypotheses only)\n"
+        "4. Safety/supervisor signals\n"
+        "5. Data quality or realism concerns\n"
+        "6. Next validation experiments\n"
+        "7. Research-only limitation\n\n"
+        "Input JSON:\n{data}"
+    ),
     "generate_report": (
         "Write a concise markdown report for this IINTS-AF simulation run or imported personal glucose dataset.\n"
         "Include sections:\n"
@@ -73,19 +98,11 @@ TASK_TEMPLATES: dict[TaskName, str] = {
         "Input JSON:\n{data}"
     ),
     "predict_insulin": (
-        "You are reviewing a simulated bi-hormonal (Insulin + Glucagon) dose candidate inside the IINTS-AF research sandbox.\n"
-        "You are not controlling a real pump, not treating a patient, and not giving medical advice.\n"
-        "You will be provided with the current biological state of the patient, which now includes deep science metrics like "
-        "active_insulin, insulin_effect, plasma_glucagon_pg_ml, and the haaf_metric (Hypoglycemia-Associated Autonomic Failure memory). "
-        "You will also see a mathematically optimal insulin dose calculated by a deterministic MPC solver running differential equations.\n\n"
-        "Your task is to critique the candidate and decide on both Insulin and Glucagon doses for research simulation only. "
-        "Never increase insulin above the deterministic MPC dose or safety caps. "
-        "If glucose is low, predicted low, falling quickly, or active insulin is high, reduce the insulin dose to 0.0. "
-        "If the patient is in severe hypoglycemia risk and HAAF is high (meaning natural rescue is failing), "
-        "you may propose a simulation-only glucagon rescue candidate. The simulator will still apply hard glucagon safety caps.\n"
-        "Respond with a short explanation followed by exactly this format:\n"
-        "FINAL_DOSE: <number>\n"
-        "FINAL_GLUCAGON_DOSE_MG: <number>\n\n"
+        "Explain an immutable, deterministically calculated dose result inside the IINTS-AF research sandbox.\n"
+        "You are not controlling a real pump, treating a patient, or giving medical advice.\n"
+        "Do not calculate a dose, suggest another dose, modify a supplied number, or emit a new numeric result. "
+        "The fixed MPC and safety layers retain all numerical authority. "
+        "Explain only which deterministic rules were applied and why the recorded result was accepted, clamped, or held.\n\n"
         "Input JSON:\n{data}"
     ),
 }
@@ -108,4 +125,15 @@ def _serialize_payload(payload: Any) -> str:
 
 def build_prompt(task: TaskName, payload: Any) -> tuple[str, str]:
     template = TASK_TEMPLATES[task]
-    return SYSTEM_PROMPT, template.format(data=_serialize_payload(payload))
+    insight_context = build_insight_context(task, payload)
+    guarded_payload = {
+        "calculation_policy": {
+            "mode": "deterministic_sdk_only",
+            "ai_numeric_authority": False,
+            "instruction": "Explain supplied values only; never calculate or alter numbers.",
+        },
+        "insight_context": insight_context,
+        "formula_registry": formula_context_for_ai(),
+        "payload": payload,
+    }
+    return SYSTEM_PROMPT, template.format(data=_serialize_payload(guarded_payload))

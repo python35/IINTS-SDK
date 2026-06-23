@@ -638,19 +638,19 @@ def demo_clinical_cockpit():
     print("=" * 70)
     
     # Generate sample data
-    np.random.seed(42)
+    rng = np.random.default_rng(42)
     n_points = 97
     
     timestamps = np.arange(0, n_points * 5, 5)
-    glucose = 120 + 30 * np.sin(timestamps / (24 * 12 / (2 * np.pi))) + np.random.normal(0, 15, n_points)
+    glucose = 120 + 30 * np.sin(timestamps / (24 * 12 / (2 * np.pi))) + rng.normal(0, 15, n_points)
     glucose = np.clip(glucose, 40, 350)
     
     simulation_data = pd.DataFrame({
         'time_minutes': timestamps,
         'glucose_actual_mgdl': glucose,
-        'delivered_insulin_units': np.random.uniform(0, 1, n_points),
-        'patient_iob_units': np.cumsum(np.random.uniform(0, 0.1, n_points)),
-        'uncertainty': np.random.uniform(0.1, 0.4, n_points)
+        'delivered_insulin_units': rng.uniform(0, 1, n_points),
+        'patient_iob_units': np.cumsum(rng.uniform(0, 0.1, n_points)),
+        'uncertainty': rng.uniform(0.1, 0.4, n_points)
     })
     
     # Create cockpit

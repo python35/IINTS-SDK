@@ -33,6 +33,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from .physiology import smooth_threshold_excess
+
 
 @dataclass
 class HovorkaParameters:
@@ -87,6 +89,7 @@ class HovorkaPatientModel:
         insulin_sensitivity: float = 50.0,
         carb_factor: float = 10.0,
         initial_glucose: float = 120.0,
+        basal_glucose_target: Optional[float] = None,
         glucose_decay_rate: float = 0.05,
         glucose_absorption_rate: float = 0.03,
         insulin_action_duration: float = 300.0,
@@ -103,6 +106,7 @@ class HovorkaPatientModel:
         self.insulin_sensitivity = insulin_sensitivity
         self.carb_factor = carb_factor
         self.initial_glucose = initial_glucose
+        self.basal_glucose_target = basal_glucose_target
         self.glucose_decay_rate = glucose_decay_rate
         self.glucose_absorption_rate = glucose_absorption_rate
         self.insulin_action_duration = insulin_action_duration
@@ -308,6 +312,7 @@ class HovorkaPatientModel:
         # Clamp positive
         for i in range(len(self._state)):
             self._state[i] = max(0.0, self._state[i])
+        self._state[17] = float(np.clip(self._state[17], 0.0, 1.0))
 
         return self.current_glucose
 
@@ -476,8 +481,8 @@ class HovorkaPatientModel:
         target_stress = self.stress_intensity if self.is_stressed else 0.0
         target_exercise = self.exercise_intensity if self.is_exercising else 0.0
 
-        dH_stress_dt = (target_stress - H_stress) / 20.0 # 20 min half-life for stress hormones
-        dH_exercise_dt = (target_exercise - H_exercise) / 10.0 # 10 min half-life for exercise pathways
+        dH_stress_dt = (target_stress - H_stress) / 20.0  # 20 min model time constant.
+        dH_exercise_dt = (target_exercise - H_exercise) / 10.0  # 10 min model time constant.
 
         stress_sens_multiplier = 1.0 - 0.7 * H_stress
         stress_EGP_multiplier = 1.0 + 0.5 * H_stress
@@ -529,9 +534,7 @@ class HovorkaPatientModel:
 
         # Physiological Renal Clearance (Sigmoid GFR curve instead of hard cutoff)
         # Smoothly increases glucosuria above 162 mg/dL
-        smooth_threshold_diff = G - 162.0
-        # log1p(exp(x)) is a softplus, preventing non-differentiable corners
-        softplus_diff = 10.0 * np.log1p(np.exp(smooth_threshold_diff / 10.0))
+        softplus_diff = smooth_threshold_excess(G, threshold=162.0, splay=10.0)
         F_R = 0.003 * V_G_dL * softplus_diff
 
         # Mass balance ODEs for Glucose Compartments

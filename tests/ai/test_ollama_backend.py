@@ -20,6 +20,8 @@ def test_ollama_backend_complete_returns_response(monkeypatch) -> None:
         assert path == "/api/generate"
         assert payload["model"] == "ministral-3:8b"
         assert payload["stream"] is False
+        assert payload["options"]["temperature"] == 0.0
+        assert payload["options"]["num_predict"] == 900
         assert method == "POST"
         return {"response": "Local explanation from Ollama."}
 

@@ -253,8 +253,9 @@ def test_compare_glucose_models_derives_meal_announcement_feature(tmp_path: Path
     assert "meal_announcement_grams" in report["feature_columns"]
 
 
-def test_glucose_model_config_is_pinn_first_for_dedicated_training() -> None:
+def test_glucose_model_config_is_band_pinn_first_for_dedicated_training() -> None:
     pack = glucose_model_config_payload(profile="smoke")
 
-    assert pack["training"]["loss"] == "pinn"
+    assert pack["training"]["loss"] == "band_pinn"
     assert pack["training"]["pinn_lambda"] > 0
+    assert pack["training"]["band_weighted_low_weight"] > 0

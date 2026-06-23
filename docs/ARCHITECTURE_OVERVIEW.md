@@ -86,5 +86,6 @@ The microcontroller bridge is intentionally thin. The main simulation state, saf
 
 - [Developer Portal](DEVELOPER_PORTAL.md)
 - [API Reference](API_REFERENCE.md)
+- [Architecture Hardening Plan](ARCHITECTURE_HARDENING.md)
 - [Architecture & Module Guide](COMPREHENSIVE_GUIDE.md)
 - [Contribute Safely](CONTRIBUTING_SAFELY.md)

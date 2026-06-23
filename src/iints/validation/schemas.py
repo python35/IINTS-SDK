@@ -91,6 +91,7 @@ class PatientConfigModel(BaseModel):
     carb_factor: float = Field(default=10.0, ge=3.0, le=30.0)
     glucose_decay_rate: float = Field(default=0.001, ge=0.0, le=0.2)
     initial_glucose: float = Field(default=120.0, ge=40.0, le=400.0)
+    basal_glucose_target: Optional[float] = Field(default=None, ge=40.0, le=400.0)
     glucose_absorption_rate: float = Field(default=0.03, ge=0.0, le=0.2)
     insulin_action_duration: float = Field(default=300.0, ge=60.0, le=720.0)
     insulin_peak_time: float = Field(default=75.0, ge=15.0, le=240.0)

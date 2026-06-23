@@ -35,11 +35,19 @@ class OllamaBackend:
         model_name: str = DEFAULT_MINISTRAL_MODEL,
         base_url: str | None = None,
         timeout_seconds: float = 120.0,
+        temperature: float = 0.0,
+        top_p: float = 0.85,
+        num_predict: int = 900,
+        num_ctx: int = 8192,
     ) -> None:
         self.model_name = model_name
         raw_base_url = base_url or os.getenv("OLLAMA_HOST") or DEFAULT_OLLAMA_HOST
         self.base_url = self._validate_base_url(raw_base_url)
         self.timeout_seconds = timeout_seconds
+        self.temperature = temperature
+        self.top_p = top_p
+        self.num_predict = num_predict
+        self.num_ctx = num_ctx
         self.resolved_model_name: str | None = None
 
     @staticmethod
@@ -280,8 +288,17 @@ class OllamaBackend:
             "ready": resolved is not None,
             "pull_command": None if resolved is not None else self._pull_hint(),
             "timeout_seconds": self.timeout_seconds,
+            "generation_options": self._generation_options(),
             "server_version": version,
             "version_ok": version_ok,
+        }
+
+    def _generation_options(self) -> dict[str, int | float]:
+        return {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "num_predict": self.num_predict,
+            "num_ctx": self.num_ctx,
         }
 
     def smoke_test(self) -> dict[str, object]:
@@ -328,6 +345,7 @@ class OllamaBackend:
             "system": system_prompt,
             "prompt": user_prompt,
             "stream": False,
+            "options": self._generation_options(),
         }
         last_error: Exception | None = None
         for attempt in range(2):

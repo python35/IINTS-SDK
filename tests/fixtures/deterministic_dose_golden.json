@@ -1,0 +1,61 @@
+[
+  {
+    "name": "stable_mpc_candidate",
+    "input": {
+      "current_glucose": 185.0,
+      "predicted_glucose_30min": 170.0,
+      "glucose_trend_mgdl_min": 0.4,
+      "insulin_on_board": 1.2,
+      "mpc_recommended_units": 0.45
+    },
+    "expected": {
+      "final_insulin_units": 0.45,
+      "final_glucagon_mg": 0.0,
+      "safety_hold": false
+    }
+  },
+  {
+    "name": "predicted_low_holds_insulin",
+    "input": {
+      "current_glucose": 105.0,
+      "predicted_glucose_30min": 82.0,
+      "glucose_trend_mgdl_min": -0.4,
+      "insulin_on_board": 2.0,
+      "mpc_recommended_units": 0.7
+    },
+    "expected": {
+      "final_insulin_units": 0.0,
+      "final_glucagon_mg": 0.0,
+      "safety_hold": true
+    }
+  },
+  {
+    "name": "hard_caps_are_applied",
+    "input": {
+      "current_glucose": 190.0,
+      "mpc_recommended_units": 1.1,
+      "hard_max_insulin_units": 0.6,
+      "deterministic_glucagon_candidate_mg": 0.25,
+      "hard_max_glucagon_mg": 0.1
+    },
+    "expected": {
+      "final_insulin_units": 0.6,
+      "final_glucagon_mg": 0.1,
+      "safety_hold": false
+    }
+  },
+  {
+    "name": "deterministic_glucagon_is_preserved_during_low_guard",
+    "input": {
+      "current_glucose": 65.0,
+      "mpc_recommended_units": 0.2,
+      "deterministic_glucagon_candidate_mg": 0.2,
+      "hard_max_glucagon_mg": 0.3
+    },
+    "expected": {
+      "final_insulin_units": 0.0,
+      "final_glucagon_mg": 0.2,
+      "safety_hold": true
+    }
+  }
+]

@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from .backends import DEFAULT_MINISTRAL_MODEL, CompletionBackend, MistralAPIBackend, OllamaBackend
+from .deterministic import DETERMINISTIC_DOSE_VERSION, calculate_deterministic_dose
+from .insights import build_insight_context
 from .mdmp_guard import GuardResult, MDMPGuard
 from .prompts import TaskName, build_prompt
 
@@ -16,15 +18,22 @@ class AIResponse:
     backend: str
     model: str
     certification: GuardResult
+    deterministic_result: dict[str, Any] | None = None
+    insight_context: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload = {
             "task": self.task,
             "text": self.text,
             "backend": self.backend,
             "model": self.model,
             "certification": self.certification.to_dict(),
         }
+        if self.deterministic_result is not None:
+            payload["deterministic_result"] = self.deterministic_result
+        if self.insight_context is not None:
+            payload["insight_context"] = self.insight_context
+        return payload
 
 
 class IINTSAssistant:
@@ -101,6 +110,7 @@ class IINTSAssistant:
 
     def _run_task(self, task: TaskName, payload: Any) -> AIResponse:
         certification = self.guard.check()
+        insight_context = build_insight_context(task, payload)
         system_prompt, user_prompt = build_prompt(task, payload)
         text = self.guard.wrap(
             self.backend.complete(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -117,6 +127,7 @@ class IINTSAssistant:
             backend=getattr(self.backend, "backend_name", type(self.backend).__name__),
             model=response_model,
             certification=certification,
+            insight_context=insight_context,
         )
 
     def explain_decision(self, step: dict[str, Any]) -> AIResponse:
@@ -128,6 +139,9 @@ class IINTSAssistant:
     def detect_anomalies(self, results: dict[str, Any]) -> AIResponse:
         return self._run_task("detect_anomalies", results)
 
+    def generate_insights(self, run: dict[str, Any]) -> AIResponse:
+        return self._run_task("generate_insights", run)
+
     def generate_report(self, run: dict[str, Any]) -> AIResponse:
         return self._run_task("generate_report", run)
 
@@ -135,4 +149,29 @@ class IINTSAssistant:
         return self._run_task("review_realism", run)
 
     def predict_insulin(self, payload: dict[str, Any]) -> AIResponse:
-        return self._run_task("predict_insulin", payload)
+        """Resolve a fixed research dose without invoking the language model.
+
+        Kept for API compatibility. The numerical result comes exclusively
+        from deterministic controller output and transparent safety guards.
+        """
+
+        certification = self.guard.check()
+        result = calculate_deterministic_dose(payload)
+        reasons = ", ".join(result.reasons)
+        text = self.guard.wrap(
+            "Deterministic research-sandbox calculation. The language model was not invoked "
+            "and has no numerical authority.\n\n"
+            f"Calculation version: {result.calculation_version}\n"
+            f"Safety hold: {str(result.safety_hold).lower()}\n"
+            f"Reasons: {reasons}\n"
+            f"FINAL_DOSE: {result.final_insulin_units:.6f}\n"
+            f"FINAL_GLUCAGON_DOSE_MG: {result.final_glucagon_mg:.6f}"
+        )
+        return AIResponse(
+            task="predict_insulin",
+            text=text,
+            backend="deterministic",
+            model=DETERMINISTIC_DOSE_VERSION,
+            certification=certification,
+            deterministic_result=result.to_dict(),
+        )

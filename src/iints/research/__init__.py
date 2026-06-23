@@ -10,7 +10,13 @@ from .dataset import (
     compute_dataset_lineage,
 )
 from .predictor import LSTMPredictor, load_predictor, PredictorService, load_predictor_service
-from .losses import QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss
+from .losses import (
+    BandWeightedMSE,
+    BandWeightedPINNLoss,
+    PhysiologicalPINNLoss,
+    QuantileLoss,
+    SafetyWeightedMSE,
+)
 from .metrics import regression_metrics, band_regression_metrics, interval_coverage_metrics
 from .evaluation import (
     feature_drift_report,
@@ -132,6 +138,7 @@ __all__ = [
     "SafetyWeightedMSE",
     "BandWeightedMSE",
     "PhysiologicalPINNLoss",
+    "BandWeightedPINNLoss",
     "regression_metrics",
     "band_regression_metrics",
     "interval_coverage_metrics",

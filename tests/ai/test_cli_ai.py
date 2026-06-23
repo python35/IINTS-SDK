@@ -341,3 +341,47 @@ def test_ai_review_command_auto_writes_feedback_file_for_run_dir(tmp_path, monke
     review_path = ai_dir / "realism_review.md"
     assert review_path.is_file()
     assert "Likely realistic" in review_path.read_text(encoding="utf-8")
+
+
+def test_ai_insights_command_auto_writes_insight_file_for_run_dir(tmp_path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    ai_dir = run_dir / "ai"
+    key_dir = ai_dir / "keys"
+    key_dir.mkdir(parents=True)
+    (ai_dir / "insights_payload.json").write_text(
+        json.dumps({"summary": {"steps": 10}, "trace_sample": [{"glucose_actual_mgdl": 140}]}),
+        encoding="utf-8",
+    )
+    (ai_dir / "report.signed.mdmp").write_text(json.dumps({"signature": "demo"}), encoding="utf-8")
+    (key_dir / "mdmp_pub_v1.pem").write_text("public", encoding="utf-8")
+
+    class _FakeAssistant:
+        def __init__(self, mdmp_cert, **kwargs) -> None:
+            assert str(mdmp_cert).endswith("report.signed.mdmp")
+            assert str(kwargs["public_key_path"]).endswith("mdmp_pub_v1.pem")
+
+        def generate_insights(self, payload):
+            assert payload["summary"]["steps"] == 10
+            return AIResponse(
+                task="generate_insights",
+                text="## Key finding\n\nGlucose behavior is reviewable from deterministic context.",
+                backend="fake",
+                model="ministral-3:8b",
+                certification=GuardResult(
+                    cert_path=str(ai_dir / "report.signed.mdmp"),
+                    grade="research_grade",
+                    issued_by="IINTS-Local-AI",
+                    verification_mode="explicit_key",
+                    key_id="iints_local_ai_v1",
+                    raw_result={"valid": True},
+                ),
+            )
+
+    monkeypatch.setattr("iints.ai.cli.IINTSAssistant", _FakeAssistant)
+
+    result = runner.invoke(app, ["ai", "insights", str(run_dir)])
+
+    assert result.exit_code == 0
+    insight_path = ai_dir / "insights.md"
+    assert insight_path.is_file()
+    assert "Key finding" in insight_path.read_text(encoding="utf-8")

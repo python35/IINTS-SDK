@@ -23,6 +23,9 @@ USAGE
 }
 
 run_quick() {
+  echo "[IINTS] quick: architecture boundaries"
+  python3 tools/ci/check_architecture_boundaries.py
+
   echo "[IINTS] quick: targeted tests"
   python3 -m pytest \
     tests/core/test_numeric_guards.py \

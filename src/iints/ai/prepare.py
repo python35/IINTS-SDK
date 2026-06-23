@@ -12,6 +12,9 @@ import pandas as pd
 from iints.utils.run_io import compute_sha256
 
 
+DETERMINISTIC_METRICS_VERSION = "iints-ai-metrics-v1"
+
+
 def _now_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -207,6 +210,12 @@ def _build_payloads(
         "algorithm": run_metadata.get("config", {}).get("algorithm", {}),
         "scenario": run_metadata.get("config", {}).get("scenario"),
         "summary": summary,
+        "calculation_provenance": {
+            "mode": "deterministic_python",
+            "metrics_version": DETERMINISTIC_METRICS_VERSION,
+            "ai_numeric_authority": False,
+            "calculated_fields": sorted(summary),
+        },
     }
 
     payloads: dict[str, dict[str, Any]] = {
@@ -254,6 +263,23 @@ def _build_payloads(
                 ],
             },
             "run_manifest": run_manifest,
+        },
+        "insights_payload.json": {
+            **common,
+            "audit_summary": audit_summary,
+            "baseline_comparison": baseline_comparison,
+            "trace_sample": trace_sample,
+            "run_manifest": run_manifest,
+            "insight_focus": {
+                "goal": "Produce an evidence-first research briefing for local Ollama without giving treatment advice.",
+                "must_cover": [
+                    "main glucose pattern",
+                    "safety supervisor signals",
+                    "possible physiology or data-quality mechanisms to inspect",
+                    "limitations and next validation experiments",
+                ],
+                "ai_numeric_authority": False,
+            },
         },
         "step_riskiest.json": {
             **common,

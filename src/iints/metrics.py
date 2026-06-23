@@ -4,7 +4,7 @@ from typing import Tuple, Optional
 
 import pandas as pd
 
-from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.core.clinical_metrics import ClinicalMetricsCalculator
 
 
 _calculator = ClinicalMetricsCalculator()

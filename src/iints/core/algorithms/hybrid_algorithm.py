@@ -4,7 +4,6 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     torch = None  # type: ignore
     _TORCH_AVAILABLE = False
-import numpy as np
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from .lstm_algorithm import LSTMInsulinAlgorithm
 from .correction_bolus import CorrectionBolus
@@ -15,7 +14,12 @@ if _TORCH_AVAILABLE:
         
         def __init__(self, uncertainty_threshold=0.15, mc_samples=30):
             super().__init__()
-            self.lstm_algo = LSTMInsulinAlgorithm()
+            self.lstm_algo = LSTMInsulinAlgorithm(
+                settings={
+                    "uncertainty_threshold": uncertainty_threshold,
+                    "mc_samples": mc_samples,
+                }
+            )
             self.rule_algo = CorrectionBolus()
             self.uncertainty_threshold = uncertainty_threshold
             self.mc_samples = mc_samples
@@ -23,47 +27,52 @@ if _TORCH_AVAILABLE:
             self.lstm_count = 0
             
         def calculate_uncertainty(self, data: AlgorithmInput):
-            """Calculate uncertainty using MC Dropout."""
-            if not hasattr(self.lstm_algo, 'model') or self.lstm_algo.model is None:
-                return 1.0  # High uncertainty if model not loaded
-                
-            # Use the same input format as LSTM algorithm
-            placeholder_input = [3, data.current_glucose, 72, 29, 32, 0.47, 33]
-            input_tensor = torch.tensor(placeholder_input, dtype=torch.float32).reshape(1, 1, 7)
-            
-            self.lstm_algo.model.train()  # Enable dropout
-            predictions = []
-            
-            with torch.no_grad():
-                for _ in range(self.mc_samples):
-                    pred = self.lstm_algo.model(input_tensor).item()
-                    predictions.append(pred)
-            
-            self.lstm_algo.model.eval()  # Disable dropout
-            return np.std(predictions) / (np.mean(predictions) + 1e-8)  # Coefficient of variation
+            """Calculate seeded uncertainty using the LSTM's documented inputs."""
+            if not self.lstm_algo.model_loaded:
+                return float("inf")
+            input_tensor = self.lstm_algo._feature_tensor(data)
+            return self.lstm_algo._deterministic_uncertainty(input_tensor)
         
         def predict_insulin(self, data: AlgorithmInput):
             self.why_log = [] # Clear the log for this prediction cycle
 
-            uncertainty = self.calculate_uncertainty(data)
-            self._log_reason(f"Calculated uncertainty: {uncertainty:.4f}", "uncertainty_quantification", uncertainty)
-            
-            if uncertainty > self.uncertainty_threshold:
+            if not self.lstm_algo.model_loaded:
                 self.switch_count += 1
-                self._log_reason(f"Uncertainty ({uncertainty:.4f}) exceeds threshold ({self.uncertainty_threshold:.4f}). Switching to Rule-Based Algorithm.", "decision_switch", "Rule-Based")
+                self._log_reason(
+                    "LSTM checkpoint unavailable; switching to deterministic rule-based algorithm",
+                    "decision_switch",
+                    "Rule-Based",
+                )
                 insulin_output = self.rule_algo.predict_insulin(data)
-                insulin_output["uncertainty"] = uncertainty
-                # Append child algorithm's why_log to hybrid's why_log
+                insulin_output["uncertainty"] = None
+                insulin_output["fallback_triggered"] = True
+                insulin_output["fallback_reason"] = "missing_model_checkpoint"
                 self.why_log.extend(self.rule_algo.get_why_log())
                 return insulin_output
+
+            insulin_output = self.lstm_algo.predict_insulin(data)
+            uncertainty = insulin_output.get("uncertainty")
+            self._log_reason(
+                f"Seeded uncertainty result: {uncertainty}",
+                "uncertainty_quantification",
+                uncertainty,
+            )
+            if bool(insulin_output.get("fallback_triggered")):
+                self.switch_count += 1
+                self._log_reason(
+                    "LSTM safety gate selected deterministic fallback",
+                    "decision_switch",
+                    "Rule-Based",
+                )
             else:
                 self.lstm_count += 1
-                self._log_reason(f"Uncertainty ({uncertainty:.4f}) is within threshold ({self.uncertainty_threshold:.4f}). Using LSTM Algorithm.", "decision_switch", "LSTM")
-                insulin_output = self.lstm_algo.predict_insulin(data)
-                insulin_output["uncertainty"] = uncertainty
-                # Append child algorithm's why_log to hybrid's why_log
-                self.why_log.extend(self.lstm_algo.get_why_log())
-                return insulin_output
+                self._log_reason(
+                    "Loaded LSTM candidate passed deterministic gates",
+                    "decision_switch",
+                    "LSTM",
+                )
+            self.why_log.extend(self.lstm_algo.get_why_log())
+            return insulin_output
         
         def reset(self):
             self.lstm_algo.reset()

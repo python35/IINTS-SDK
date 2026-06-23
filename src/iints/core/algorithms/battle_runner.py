@@ -2,7 +2,7 @@ import pandas as pd
 from typing import List, Dict, Any, Optional, Tuple
 
 from iints.core.simulator import Simulator, StressEvent
-from iints.analysis.clinical_metrics import ClinicalMetricsCalculator
+from iints.core.clinical_metrics import ClinicalMetricsCalculator
 from iints.core.patient.models import PatientModel
 
 class BattleRunner:

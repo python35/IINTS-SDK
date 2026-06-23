@@ -6,10 +6,33 @@ from typing import Any, Dict, Optional
 import numpy as np
 
 from iints.api.base_algorithm import AlgorithmInput, AlgorithmMetadata, InsulinAlgorithm
-from iints.research.neural_control import (
-    instantiate_neural_controller_model,
-    load_neural_controller,
-)
+
+
+def _load_neural_controller_payload(model_path: Path) -> Dict[str, Any]:
+    """Load optional PyTorch research helpers without importing research at module import."""
+    from importlib import import_module
+
+    try:
+        module = import_module("iints.research.neural_control")
+    except Exception as exc:  # pragma: no cover - depends on optional research stack
+        raise RuntimeError(
+            "ExperimentalNeuralController requires the research stack. "
+            "Install the SDK with research extras or use a non-ML algorithm."
+        ) from exc
+    return module.load_neural_controller(model_path)
+
+
+def _instantiate_neural_controller_model(payload: Dict[str, Any]) -> Any:
+    from importlib import import_module
+
+    try:
+        module = import_module("iints.research.neural_control")
+    except Exception as exc:  # pragma: no cover - depends on optional research stack
+        raise RuntimeError(
+            "ExperimentalNeuralController requires the research stack. "
+            "Install the SDK with research extras or use a non-ML algorithm."
+        ) from exc
+    return module.instantiate_neural_controller_model(payload)
 
 
 class ExperimentalNeuralController(InsulinAlgorithm):
@@ -21,8 +44,8 @@ class ExperimentalNeuralController(InsulinAlgorithm):
         if not model_path:
             raise ValueError("ExperimentalNeuralController requires settings['model_path'].")
         self.model_path = Path(str(model_path))
-        self.payload = load_neural_controller(self.model_path)
-        self.model = instantiate_neural_controller_model(self.payload)
+        self.payload = _load_neural_controller_payload(self.model_path)
+        self.model = _instantiate_neural_controller_model(self.payload)
         self.max_output_units = float(self.settings.get("max_output_units", self.payload["max_output_units"]))
         self.set_algorithm_metadata(
             AlgorithmMetadata(
