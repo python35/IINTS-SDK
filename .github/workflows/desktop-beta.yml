@@ -65,6 +65,7 @@ jobs:
       - name: Install desktop dependencies
         run: |
           python -m pip install --upgrade pip wheel setuptools
+          python -m pip install pytest
           python -m pip install -U -e ".[full,desktop-qt,mdmp]"
 
       - name: Run desktop unit tests
@@ -99,12 +100,40 @@ jobs:
             --platform-label "${{ matrix.platform_label }}" \
             --output-dir desktop-dist
 
+      - name: Write debug summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p desktop-debug
+          {
+            echo "runner=$RUNNER_OS"
+            python --version
+            python -m pip --version
+            echo
+            echo "installed packages:"
+            python -m pip freeze | sort
+            echo
+            echo "dist files:"
+            find dist -maxdepth 3 -type f -print 2>/dev/null | sort || true
+            echo
+            echo "desktop-dist files:"
+            find desktop-dist -maxdepth 2 -type f -print 2>/dev/null | sort || true
+          } > "desktop-debug/desktop-build-debug-${{ matrix.platform_label }}.txt"
+
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform_label }}
           path: desktop-dist/*
           if-no-files-found: error
+
+      - name: Upload desktop debug artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-debug-${{ matrix.platform_label }}
+          path: desktop-debug/*
+          if-no-files-found: ignore
 
   release:
     name: Publish desktop prerelease
