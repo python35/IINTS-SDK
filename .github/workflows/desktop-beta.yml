@@ -106,12 +106,7 @@ jobs:
           "$exe" --smoke
 
       - name: Package release archive
-        run: |
-          python tools/desktop/package_desktop_bundle.py \
-            --dist-dir dist \
-            --app-name "${{ env.APP_NAME }}" \
-            --platform-label "${{ matrix.platform_label }}" \
-            --output-dir desktop-dist
+        run: python tools/desktop/package_desktop_bundle.py --dist-dir dist --app-name "${{ env.APP_NAME }}" --platform-label "${{ matrix.platform_label }}" --output-dir desktop-dist
 
       - name: Write debug summary
         if: always()
