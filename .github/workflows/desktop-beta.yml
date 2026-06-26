@@ -1,0 +1,165 @@
+name: Desktop Beta Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "GitHub prerelease tag to create/update"
+        required: true
+        default: "desktop-beta"
+      draft:
+        description: "Create the GitHub release as a draft"
+        type: boolean
+        required: true
+        default: true
+      upload_release:
+        description: "Upload build artifacts to a GitHub prerelease"
+        type: boolean
+        required: true
+        default: true
+  push:
+    tags:
+      - "desktop-beta*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-beta-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  APP_NAME: "IINTS-AF-Desktop-Beta"
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform_label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform_label: windows-x64
+          - runner: macos-latest
+            platform_label: macos
+          - runner: ubuntu-latest
+            platform_label: linux-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Linux Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0
+
+      - name: Install desktop dependencies
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+
+      - name: Run desktop unit tests
+        run: |
+          python -m pytest tests/test_desktop_app.py -q
+
+      - name: Build PySide desktop bundle
+        run: |
+          python tools/desktop/build_qt_desktop_app.py --onedir --name "${{ env.APP_NAME }}"
+
+      - name: Smoke test bundled app
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            exe="dist/${APP_NAME}/${APP_NAME}.exe"
+          elif [[ "$RUNNER_OS" == "macOS" && -x "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}" ]]; then
+            exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+          else
+            exe="dist/${APP_NAME}/${APP_NAME}"
+          fi
+          echo "Smoke testing: $exe"
+          "$exe" --smoke
+
+      - name: Package release archive
+        run: |
+          python tools/desktop/package_desktop_bundle.py \
+            --dist-dir dist \
+            --app-name "${{ env.APP_NAME }}" \
+            --platform-label "${{ matrix.platform_label }}" \
+            --output-dir desktop-dist
+
+      - name: Upload desktop artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform_label }}
+          path: desktop-dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish desktop prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/desktop-beta') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: release
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            echo "draft=${{ inputs.draft }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          cat > desktop-beta-release-notes.md <<'EOF'
+          # IINTS-AF Desktop Beta
+
+          This prerelease contains experimental native desktop builds for the IINTS-AF SDK research workbench.
+
+          ## Downloads
+
+          - `IINTS-AF-Desktop-Beta-windows-x64.zip` contains the Windows `.exe` bundle.
+          - `IINTS-AF-Desktop-Beta-macos.zip` contains the macOS app bundle.
+          - `IINTS-AF-Desktop-Beta-linux-x64.zip` contains the Linux executable bundle.
+
+          ## Scope
+
+          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, and display bundled AlphaFold structures.
+
+          ## Safety
+
+          Research and education only. This is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
+          EOF
+
+      - name: Create or update GitHub prerelease
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: IINTS-AF Desktop Beta (${{ steps.release.outputs.tag }})
+          body_path: desktop-beta-release-notes.md
+          files: release-assets/*
+          draft: ${{ steps.release.outputs.draft }}
+          prerelease: true
+          make_latest: false

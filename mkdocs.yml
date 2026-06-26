@@ -61,6 +61,7 @@ nav:
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Project Boundaries: PROJECT_BOUNDARIES.md
       - 5-Minute Quickstart: QUICKSTART.md
+      - Desktop App: DESKTOP_APP.md
       - Command Cheatsheet: CLI_CHEATSHEET.md
       - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md

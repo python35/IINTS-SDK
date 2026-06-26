@@ -82,9 +82,19 @@ research = [
 mdmp = [
   "cryptography>=42.0.0,<50.0.0",
 ]
+desktop = [
+  "pyinstaller>=6.0.0,<7.0.0",
+]
+desktop-qt = [
+  "pyinstaller>=6.0.0,<7.0.0",
+  "PySide6>=6.7.0,<7.0.0",
+]
 
 [project.scripts]
 iints = "iints.cli.cli:app"
+iints-desktop = "iints_desktop.launcher:main"
+iints-desktop-tk = "iints_desktop.app:main"
+iints-desktop-qt = "iints_desktop.qt_app:main"
 iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 
 [project.entry-points."iints.algorithms"]
@@ -102,6 +112,10 @@ iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
+iints_desktop = [
+  "assets/alphafold/*.png",
+  "assets/alphafold/*.cif",
+]
 iints = [
   "templates/*.py",
   "templates/scenarios/*.json",

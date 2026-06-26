@@ -19,6 +19,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.spec
 
 # Generated Results (keep structure, ignore content)
 results/IINTS_Summary_*.xlsx
@@ -67,6 +68,8 @@ data_packs/generated/
 .cache_demo/
 .cache_eucys/
 .cache/
+.pyinstaller-cache/
+.mplt_desktop_build/
 iints_uno_q_demo/
 docs/manuals/.tectonic-cache/
 docs/manuals/.cache/
