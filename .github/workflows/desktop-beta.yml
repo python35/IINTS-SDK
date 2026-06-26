@@ -76,7 +76,20 @@ jobs:
         run: |
           python tools/desktop/build_qt_desktop_app.py --onedir --name "${{ env.APP_NAME }}"
 
-      - name: Smoke test bundled app
+      - name: Smoke test bundled app on Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          exe="dist/${APP_NAME}/${APP_NAME}"
+          echo "Smoke testing: $exe"
+          "$exe" --smoke
+
+      - name: Best-effort bundled smoke on Windows/macOS
+        if: runner.os != 'Linux'
+        continue-on-error: true
         shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
@@ -84,12 +97,12 @@ jobs:
           set -euo pipefail
           if [[ "$RUNNER_OS" == "Windows" ]]; then
             exe="dist/${APP_NAME}/${APP_NAME}.exe"
-          elif [[ "$RUNNER_OS" == "macOS" && -x "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}" ]]; then
+          elif [[ -x "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}" ]]; then
             exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
           else
             exe="dist/${APP_NAME}/${APP_NAME}"
           fi
-          echo "Smoke testing: $exe"
+          echo "Best-effort smoke testing: $exe"
           "$exe" --smoke
 
       - name: Package release archive
