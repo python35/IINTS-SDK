@@ -31,16 +31,16 @@ Current beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-macos.dmg) |
 | Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-linux-x64) |
 
-### 🛡️ Waarom zie ik een beveiligingswaarschuwing? (Security Warnings)
-Omdat de IINTS-AF Desktop App gratis en open-source academische software is, is deze niet cryptografisch ondertekend met dure commerciële ontwikkelaarscertificaten van Apple of Microsoft. Hierdoor geven besturingssystemen uit voorzorg een standaard waarschuwing (Gatekeeper op Mac, SmartScreen op Windows). **Dit is volkomen normaal voor open-source tools.**
+### 🛡️ Why am I seeing a security warning? (Gatekeeper / SmartScreen)
+Because the IINTS-AF Desktop App is free, open-source academic software, it is not cryptografically signed with expensive commercial developer certificates from Apple or Microsoft. As a result, operating systems flag it with a default precaution warning. **This is completely normal for indie open-source tools.**
 
 * **macOS ("Apple cannot check it for malicious software")**:
-  Sinds recente macOS-updates blokkeert Apple soms de "Rechtermuisknop -> Open" optie. Je hebt twee simpele oplossingen:
-  1. **Makkelijkst**: Ga naar je Mac's *Systeeminstellingen* -> *Privacy en beveiliging* (Privacy & Security). Scroll naar beneden, en je ziet een melding over IINTS-AF met een knop **"Open Anyway"** (Toch openen).
-  2. **Via Terminal**: Open de "Terminal" app en wis de quarantaine-vlag met dit commando: 
-     `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` (pas het pad aan als hij ergens anders staat).
+  Since recent macOS updates, Apple often blocks the traditional "Right-click -> Open" bypass. You have two easy workarounds:
+  1. **Easiest**: Open your Mac's **System Settings** -> **Privacy & Security**. Scroll down, and you will see a message that IINTS-AF was blocked. Click the **"Open Anyway"** button.
+  2. **Via Terminal**: Open the "Terminal" app and run the following command to clear the quarantine flag: 
+     `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` (adjust the path if the app is located elsewhere).
 * **Windows ("Windows protected your PC")**:
-  Klik op **More info** (Meer informatie) en vervolgens op **Run anyway** (Toch uitvoeren).
+  Click on **More info**, and then click on **Run anyway**.
 
 The app is strictly research-only and runs entirely locally using the same SDK engine as the command-line tools. No data is sent externally.
 
