@@ -34,7 +34,7 @@ Add these repository secrets:
 | `MACOS_CERTIFICATE_P12_BASE64` | Base64-encoded exported Developer ID Application `.p12` certificate. |
 | `MACOS_CERTIFICATE_PASSWORD` | Password for the `.p12` certificate. |
 | `MACOS_SIGNING_IDENTITY` | Exact signing identity, for example `Developer ID Application: Name (TEAMID)`. |
-| `MACOS_KEYCHAIN_PASSWORD` | Temporary CI keychain password. Optional but recommended. |
+| `MACOS_KEYCHAIN_PASSWORD` | Repository secret used only to lock/unlock the temporary CI keychain. Required when macOS signing is enabled. |
 | `APPLE_ID` | Apple Developer account email used for notarization. |
 | `APPLE_TEAM_ID` | Apple Developer Team ID. |
 | `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password for notarization. |

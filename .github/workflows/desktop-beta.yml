@@ -156,12 +156,12 @@ jobs:
           MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
-          if [[ -z "${MACOS_CERTIFICATE_P12_BASE64:-}" ]]; then
+          if [[ -z "$MACOS_CERTIFICATE_P12_BASE64" ]]; then
             echo "Skipping macOS signing: MACOS_CERTIFICATE_P12_BASE64 is not configured."
             exit 0
           fi
-          if [[ -z "${MACOS_CERTIFICATE_PASSWORD:-}" || -z "${MACOS_SIGNING_IDENTITY:-}" ]]; then
-            echo "MACOS_CERTIFICATE_PASSWORD and MACOS_SIGNING_IDENTITY are required when macOS signing is enabled."
+          if [[ -z "$MACOS_CERTIFICATE_PASSWORD" || -z "$MACOS_KEYCHAIN_PASSWORD" || -z "$MACOS_SIGNING_IDENTITY" ]]; then
+            echo "MACOS_CERTIFICATE_PASSWORD, MACOS_KEYCHAIN_PASSWORD, and MACOS_SIGNING_IDENTITY are required when macOS signing is enabled."
             exit 1
           fi
 
@@ -171,17 +171,16 @@ jobs:
             exit 1
           fi
 
-          keychain_password="${MACOS_KEYCHAIN_PASSWORD:-iints-temporary-ci-keychain}"
           keychain_path="$RUNNER_TEMP/iints-signing.keychain-db"
           certificate_path="$RUNNER_TEMP/developer-id-application.p12"
           echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path"
 
-          security create-keychain -p "$keychain_password" "$keychain_path"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
-          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
           security import "$certificate_path" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
           security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/"//g')
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
 
           codesign --deep --force --options runtime --timestamp --sign "$MACOS_SIGNING_IDENTITY" "$app_path"
           codesign --verify --deep --strict --verbose=2 "$app_path"
@@ -207,7 +206,7 @@ jobs:
         run: |
           set -euo pipefail
           dmg_path="desktop-dist/${APP_NAME}-${{ matrix.platform_label }}.dmg"
-          if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]]; then
+          if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
             echo "Skipping notarization: APPLE_ID, APPLE_TEAM_ID, or APPLE_APP_SPECIFIC_PASSWORD is not configured."
             exit 0
           fi
@@ -215,7 +214,7 @@ jobs:
             echo "DMG not found: $dmg_path"
             exit 1
           fi
-          if [[ -n "${MACOS_SIGNING_IDENTITY:-}" ]]; then
+          if [[ -n "$MACOS_SIGNING_IDENTITY" ]]; then
             codesign --force --timestamp --sign "$MACOS_SIGNING_IDENTITY" "$dmg_path"
           fi
           xcrun notarytool submit "$dmg_path" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" --wait

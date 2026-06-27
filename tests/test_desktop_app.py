@@ -311,6 +311,8 @@ def test_desktop_beta_workflow_documents_optional_signing() -> None:
     assert "codesign --deep --force --options runtime" in workflow
     assert "xcrun notarytool submit" in workflow
     assert "xcrun stapler staple" in workflow
+    assert "iints-temporary-ci-keychain" not in workflow
+    assert "${MACOS_KEYCHAIN_PASSWORD:-" not in workflow
     assert "WINDOWS_SIGNING_PFX_BASE64" in signing_docs
     assert "MACOS_CERTIFICATE_P12_BASE64" in signing_docs
     assert "APPLE_APP_SPECIFIC_PASSWORD" in signing_docs
