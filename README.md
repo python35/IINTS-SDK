@@ -17,7 +17,7 @@ IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dos
 
 - Website: [iints.org](https://iints.org)
 - Documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
-- Desktop app downloads: [latest beta](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3)
+- Desktop app downloads: [latest beta](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-4)
 
 ## Desktop App
 
@@ -27,9 +27,9 @@ Current beta downloads:
 
 | Platform | Download |
 | --- | --- |
-| Windows | [`.exe`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-windows-x64.exe) |
-| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-macos.dmg) |
-| Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-linux-x64) |
+| Windows | [`.exe`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-4/IINTS-AF-Desktop-Beta-windows-x64.exe) |
+| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-4/IINTS-AF-Desktop-Beta-macos.dmg) |
+| Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-4/IINTS-AF-Desktop-Beta-linux-x64) |
 
 The app is still research-only and uses the same SDK engine as the command-line tools.
 
