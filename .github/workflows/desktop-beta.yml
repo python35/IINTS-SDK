@@ -106,7 +106,14 @@ jobs:
           "$exe" --smoke
 
       - name: Package release archive
-        run: python tools/desktop/package_desktop_bundle.py --dist-dir dist --app-name "${{ env.APP_NAME }}" --platform-label "${{ matrix.platform_label }}" --output-dir desktop-dist
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/desktop/package_desktop_bundle.py \
+            --dist-dir dist \
+            --app-name "${APP_NAME}" \
+            --platform-label "${{ matrix.platform_label }}" \
+            --output-dir desktop-dist
 
       - name: Write debug summary
         if: always()
@@ -183,7 +190,7 @@ jobs:
 
           ## Scope
 
-          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, and display bundled AlphaFold structures.
+          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, display bundled AlphaFold structures, and open interactive PAE heatmaps.
 
           ## Safety
 

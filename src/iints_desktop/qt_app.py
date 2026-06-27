@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from pathlib import Path
@@ -17,8 +18,8 @@ from iints_desktop.engine import (
     read_run_history,
     run_demo_preset,
 )
-from iints_desktop.local_ai import ask_local_ai, check_local_ai
-from iints_desktop.molecules import MoleculeAsset, list_molecule_assets
+from iints_desktop.local_ai import ask_local_ai, check_local_ai, start_local_ai_stack
+from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_html_path
 from iints_desktop.results import ResultPreview, load_results_preview
 
 try:  # pragma: no cover - optional GUI dependency
@@ -53,8 +54,13 @@ try:  # pragma: no cover - optional GUI dependency
     )
 except ModuleNotFoundError as exc:  # pragma: no cover - optional GUI dependency
     _PYSIDE_IMPORT_ERROR: ModuleNotFoundError | None = exc
+    _QWEBENGINE_VIEW = None
 else:  # pragma: no cover - optional GUI dependency
     _PYSIDE_IMPORT_ERROR = None
+    try:
+        from PySide6.QtWebEngineWidgets import QWebEngineView as _QWEBENGINE_VIEW  # type: ignore[import-not-found,no-redef]
+    except ModuleNotFoundError:
+        _QWEBENGINE_VIEW = None
 
 
 if _PYSIDE_IMPORT_ERROR is None:
@@ -114,6 +120,47 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
+    class LocalAIStartWorker(QObject):
+        """Background worker that starts Ollama and prepares the local model."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, *, model: str, host: str) -> None:
+            super().__init__()
+            self.model = model
+            self.host = host
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                result = start_local_ai_stack(model=self.model, host=self.host or None)
+                self.finished.emit(result)
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
+    class PAEWorker(QObject):
+        """Background worker that renders an interactive AlphaFold PAE heatmap."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, *, target: str) -> None:
+            super().__init__()
+            self.target = target
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                from iints.research.structure import render_pae
+
+                results = render_pae(self.target)
+                self.finished.emit(results[0] if results else None)
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
     class IINTSQtDesktopApp(QMainWindow):
         """PySide/Qt desktop shell for a more polished native app experience."""
 
@@ -137,6 +184,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.current_worker: RunWorker | None = None
             self.ai_thread: QThread | None = None
             self.ai_worker: AIWorker | None = None
+            self.ai_start_thread: QThread | None = None
+            self.ai_start_worker: LocalAIStartWorker | None = None
+            self.pae_thread: QThread | None = None
+            self.pae_worker: PAEWorker | None = None
             self.tabs: QTabWidget | None = None
             self.workspace_status: QLabel | None = None
             self.molecules = list_molecule_assets()
@@ -178,6 +229,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_explanation = QLabel()
             self.molecule_reference_render = QLabel()
             self.molecule_structure_status = QLabel()
+            self.molecule_pae_status = QLabel()
+            self.pae_web_view: QWidget | None = None
 
             self.run_button = QPushButton("Run Selected Workflow")
             self.open_folder_button = QPushButton("Open Output Folder")
@@ -194,6 +247,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.load_last_result_button = QPushButton("Load Last Run CSV")
             self.open_loaded_csv_button = QPushButton("Open Loaded CSV")
             self.open_graph_button = QPushButton("Open Graph PNG")
+            self.start_ai_button = QPushButton("Start Local AI")
             self.check_ai_button = QPushButton("Check Ollama")
             self.ask_ai_button = QPushButton("Ask Local AI")
             self.copy_ai_answer_button = QPushButton("Copy AI Answer")
@@ -203,6 +257,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.reset_molecule_view_button = QPushButton("Reset 3D View")
             self.open_molecule_image_button = QPushButton("Open Reference PNG")
             self.open_molecule_structure_button = QPushButton("Open mmCIF")
+            self.generate_pae_button = QPushButton("Generate PAE Heatmap")
+            self.open_pae_button = QPushButton("Open PAE HTML")
+            self.open_pae_folder_button = QPushButton("Open PAE Folder")
 
             self._build_ui()
             self._apply_style()
@@ -528,7 +585,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             layout = self._scroll_tab_layout(parent)
 
             disclaimer = QLabel(
-                "Local AI review uses the loaded result summary. It may explain or critique a run, but it has no authority over dosing, diagnosis, or treatment."
+                "Local AI review uses the loaded result summary. Click Start Local AI to start Ollama and prepare the model when Ollama is installed locally. The AI can critique a run, but it has no authority over dosing, diagnosis, or treatment."
             )
             disclaimer.setObjectName("infoStrip")
             disclaimer.setWordWrap(True)
@@ -540,8 +597,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             config_layout.addWidget(self.ai_model, 0, 1)
             config_layout.addWidget(QLabel("Host:"), 1, 0)
             config_layout.addWidget(self.ai_host, 1, 1)
+            self.start_ai_button.clicked.connect(self._start_local_ai)
             self.check_ai_button.clicked.connect(self._check_ai_status)
-            config_layout.addWidget(self.check_ai_button, 0, 2, 2, 1)
+            config_layout.addWidget(self.start_ai_button, 0, 2)
+            config_layout.addWidget(self.check_ai_button, 1, 2)
             config_layout.addWidget(self.ai_status, 0, 3)
             config_layout.addWidget(self.ai_context_label, 1, 3)
             config_layout.setColumnStretch(1, 2)
@@ -715,6 +774,38 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_structure_status.setObjectName("moleculeStatus")
             self.molecule_structure_status.setWordWrap(True)
             context_layout.addWidget(self.molecule_structure_status)
+            pae_box = QGroupBox("Predicted aligned error (PAE)")
+            pae_layout = QVBoxLayout(pae_box)
+            pae_help = QLabel(
+                "Generate an interactive AlphaFold PAE heatmap. Dark green means lower predicted "
+                "relative-position error; white means higher uncertainty between residue positions."
+            )
+            pae_help.setWordWrap(True)
+            pae_layout.addWidget(pae_help)
+            self.molecule_pae_status.setObjectName("moleculePAEStatus")
+            self.molecule_pae_status.setWordWrap(True)
+            pae_layout.addWidget(self.molecule_pae_status)
+            self.generate_pae_button.clicked.connect(self._generate_pae_heatmap)
+            self.open_pae_button.clicked.connect(self._open_selected_pae_html)
+            self.open_pae_folder_button.clicked.connect(self._open_pae_folder)
+            pae_layout.addLayout(
+                self._button_grid(
+                    [self.generate_pae_button, self.open_pae_button, self.open_pae_folder_button],
+                    columns=3,
+                )
+            )
+            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+                self.pae_web_view = _QWEBENGINE_VIEW()
+                self.pae_web_view.setMinimumHeight(260)
+                pae_layout.addWidget(self.pae_web_view, stretch=1)
+            else:
+                embedded_note = QLabel(
+                    "Embedded interactive preview is unavailable in this environment; "
+                    "the HTML opens in the system browser instead."
+                )
+                embedded_note.setWordWrap(True)
+                pae_layout.addWidget(embedded_note)
+            context_layout.addWidget(pae_box)
             self.molecule_reference_render.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.molecule_reference_render.setMinimumHeight(200)
             context_layout.addWidget(self.molecule_reference_render, stretch=1)
@@ -844,6 +935,12 @@ if _PYSIDE_IMPORT_ERROR is None:
                     background: #eef5ee;
                     color: #285a32;
                     border: 1px solid #a9c5ad;
+                    padding: 6px 8px;
+                }
+                QLabel#moleculePAEStatus {
+                    background: #f4f7f4;
+                    color: #2f4830;
+                    border: 1px solid #bdcdbd;
                     padding: 6px 8px;
                 }
                 QGroupBox {
@@ -1127,6 +1224,54 @@ if _PYSIDE_IMPORT_ERROR is None:
                 QApplication.clipboard().setText(self.last_result.summary)
                 self.status.setText("Run summary copied")
 
+        def _set_ai_starting_state(self, is_starting: bool) -> None:
+            self.start_ai_button.setEnabled(not is_starting)
+            self.check_ai_button.setEnabled(not is_starting)
+            self.ask_ai_button.setEnabled(not is_starting)
+
+        def _start_local_ai(self) -> None:
+            self._set_ai_starting_state(True)
+            self.ai_status.setText("Starting local AI. First model download can take a while...")
+            self.status.setText("Starting local AI")
+            thread = QThread(self)
+            worker = LocalAIStartWorker(
+                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
+                host=self.ai_host.text().strip(),
+            )
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_ai_start_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_ai_start_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_ai_start_refs)
+            self.ai_start_thread = thread
+            self.ai_start_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_ai_start_success(self, result: object) -> None:
+            self._set_ai_starting_state(False)
+            available = bool(getattr(result, "available", False))
+            message = getattr(result, "message", str(result))
+            self.ai_status.setText(message)
+            self.status.setText("Local AI ready" if available else "Local AI not ready")
+
+        @Slot(str)
+        def _handle_ai_start_error(self, details: str) -> None:
+            self._set_ai_starting_state(False)
+            self.ai_status.setText("Local AI failed to start. See response panel for details.")
+            self.ai_answer.setPlainText(details)
+            self.status.setText("Local AI failed")
+
+        @Slot()
+        def _clear_ai_start_refs(self) -> None:
+            self.ai_start_thread = None
+            self.ai_start_worker = None
+
         def _check_ai_status(self) -> None:
             status = check_local_ai(
                 model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
@@ -1243,6 +1388,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.molecule_reference_render.setToolTip("Static PyMOL reference render")
             else:
                 self.molecule_reference_render.setText("Reference render is unavailable.")
+            self._update_pae_controls()
 
         def _reset_molecule_view(self) -> None:
             if self.molecule_viewer is not None:
@@ -1254,6 +1400,135 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _open_selected_molecule_structure(self) -> None:
             self._open_path(self._selected_molecule().structure_path)
+
+        def _selected_pae_target(self) -> str | None:
+            return self._selected_molecule().pae_target
+
+        def _selected_pae_html_path(self) -> Path | None:
+            target = self._selected_pae_target()
+            return pae_html_path(target) if target else None
+
+        def _update_pae_controls(self) -> None:
+            molecule = self._selected_molecule()
+            target = molecule.pae_target
+            is_busy = self.pae_thread is not None
+            if not target:
+                self.molecule_pae_status.setText("No PAE target is configured for this molecule.")
+                self.generate_pae_button.setEnabled(False)
+                self.open_pae_button.setEnabled(False)
+                self.open_pae_folder_button.setEnabled(False)
+                return
+
+            html_path = pae_html_path(target)
+            state = "available" if html_path.exists() else "not generated yet"
+            self.molecule_pae_status.setText(
+                f"Target: {target} / output: {html_path}\n"
+                f"Status: {state}. {molecule.pae_note}"
+            )
+            if html_path.exists() and self.pae_web_view is not None:
+                self._load_pae_html_in_app(html_path)
+            elif self.pae_web_view is not None:
+                self._set_empty_pae_preview(target)
+            self.generate_pae_button.setEnabled(not is_busy)
+            self.open_pae_button.setEnabled(html_path.exists() and not is_busy)
+            self.open_pae_folder_button.setEnabled(html_path.parent.exists() and not is_busy)
+
+        def _generate_pae_heatmap(self) -> None:
+            target = self._selected_pae_target()
+            if not target:
+                QMessageBox.information(self, "IINTS-AF Desktop", "No PAE target is configured.")
+                return
+            self.molecule_pae_status.setText(
+                f"Generating interactive AlphaFold PAE heatmap for {target}. "
+                "The first run needs internet access."
+            )
+            self.generate_pae_button.setEnabled(False)
+            self.open_pae_button.setEnabled(False)
+            self.open_pae_folder_button.setEnabled(False)
+            self.status.setText("Generating PAE heatmap")
+
+            thread = QThread(self)
+            worker = PAEWorker(target=target)
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_pae_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_pae_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_pae_refs)
+            self.pae_thread = thread
+            self.pae_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_pae_success(self, result: object) -> None:
+            html_path_value = getattr(result, "html_path", None)
+            html_path = Path(str(html_path_value)) if html_path_value else self._selected_pae_html_path()
+            if html_path is not None and html_path.exists():
+                self.molecule_pae_status.setText(f"PAE heatmap ready: {html_path}")
+                self.status.setText("PAE heatmap ready")
+                self._display_pae_html(html_path)
+            else:
+                self.molecule_pae_status.setText("PAE heatmap generation finished, but no HTML file was found.")
+                self.status.setText("PAE heatmap missing")
+            self._update_pae_controls()
+
+        @Slot(str)
+        def _handle_pae_error(self, details: str) -> None:
+            self.molecule_pae_status.setText(
+                "PAE heatmap failed. Check internet access and install Plotly with the research or desktop extras."
+            )
+            self._write_log(f"\nPAE ERROR:\n{details}\n")
+            self.status.setText("PAE heatmap failed")
+            self._update_pae_controls()
+
+        @Slot()
+        def _clear_pae_refs(self) -> None:
+            self.pae_thread = None
+            self.pae_worker = None
+            self._update_pae_controls()
+
+        def _open_selected_pae_html(self) -> None:
+            html_path = self._selected_pae_html_path()
+            if html_path and html_path.exists():
+                self._display_pae_html(html_path)
+            else:
+                QMessageBox.information(
+                    self,
+                    "IINTS-AF Desktop",
+                    "Generate the PAE heatmap first.",
+                )
+
+        def _open_pae_folder(self) -> None:
+            html_path = self._selected_pae_html_path()
+            folder = html_path.parent if html_path else Path("results") / "structural"
+            folder.mkdir(parents=True, exist_ok=True)
+            self._open_path(folder)
+
+        def _display_pae_html(self, html_path: Path) -> None:
+            if self.pae_web_view is not None:
+                self._load_pae_html_in_app(html_path)
+                self.status.setText(f"PAE loaded in app: {html_path.name}")
+            else:
+                self._open_path(html_path)
+
+        def _load_pae_html_in_app(self, html_path: Path) -> None:
+            if self.pae_web_view is not None:
+                self.pae_web_view.setUrl(QUrl.fromLocalFile(str(html_path.resolve())))
+
+        def _set_empty_pae_preview(self, target: str) -> None:
+            if self.pae_web_view is not None and hasattr(self.pae_web_view, "setHtml"):
+                self.pae_web_view.setHtml(
+                    "<html><body style='font-family: sans-serif; color: #2f3b44; "
+                    "background: #f8faf8; padding: 18px;'>"
+                    f"<h3>PAE heatmap: {target}</h3>"
+                    "<p>Click <b>Generate PAE Heatmap</b> to fetch the AlphaFold PAE JSON "
+                    "and load the interactive matrix here.</p>"
+                    "</body></html>"
+                )
 
         def _save_log(self) -> None:
             default_path = Path(self.output_dir.text()).expanduser() / "iints-desktop-log.txt"

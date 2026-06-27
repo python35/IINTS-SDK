@@ -48,6 +48,10 @@ def build_command(*, onefile: bool, windowed: bool, name: str) -> list[str]:
         "PySide6.QtSvg",
         "--hidden-import",
         "PySide6.QtXml",
+        "--hidden-import",
+        "PySide6.QtWebEngineCore",
+        "--hidden-import",
+        "PySide6.QtWebEngineWidgets",
     ]
     if onefile:
         command.append("--onefile")

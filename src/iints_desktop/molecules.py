@@ -17,6 +17,8 @@ class MoleculeAsset:
     structure_path: Path
     explanation: str
     sdk_link: str
+    pae_target: str | None
+    pae_note: str
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,12 @@ class MoleculeBackbone:
 
 class MoleculeStructureError(ValueError):
     """Raised when a bundled mmCIF structure cannot be rendered safely."""
+
+
+def pae_html_path(target: str, output_dir: Path = Path("results") / "structural") -> Path:
+    """Return the default interactive PAE HTML path for a structural target."""
+
+    return output_dir / f"{target}_pae.html"
 
 
 def load_molecule_backbone(path: Path) -> MoleculeBackbone:
@@ -169,6 +177,11 @@ def list_molecule_assets() -> list[MoleculeAsset]:
                 "diffusion, and receptor-level biology."
             ),
             sdk_link="Connects to: insulin-on-board, subcutaneous absorption, Hovorka/Bergman insulin action.",
+            pae_target="insulin-mutation",
+            pae_note=(
+                "PAE heatmap for UniProt P01308. Low PAE values indicate more confident relative "
+                "placement between residue positions in the AlphaFold structure."
+            ),
         ),
         MoleculeAsset(
             key="glucagon",
@@ -181,5 +194,10 @@ def list_molecule_assets() -> list[MoleculeAsset]:
                 "hypoglycemia defense, hepatic glucose production, and dual-hormone research demos."
             ),
             sdk_link="Connects to: hypo defense layer, HAAF experiments, glucagon rescue dynamics.",
+            pae_target="glucagon",
+            pae_note=(
+                "PAE heatmap for UniProt P01275. The matrix is structural prediction evidence only; "
+                "it is not a glucose, dosing, or treatment metric."
+            ),
         ),
     ]

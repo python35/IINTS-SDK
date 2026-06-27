@@ -14034,3 +14034,27 @@ def edge_benchmark_alias(
         api_port=api_port,
         seed=seed,
     )
+
+@app.command(name="render-molecules")
+def render_molecules(
+    target: Annotated[str, typer.Option("--target", help="The structural target to render (e.g. insulin-mutation, glucagon, glut4, insulin-receptor, or all)")] = "all",
+) -> None:
+    """Render 3D structural biology targets using AlphaFold & PyMOL."""
+    from iints.research.structure import render_target
+    render_target(target)
+
+@app.command(name="render-pathways")
+def render_pathways(
+    network: Annotated[str, typer.Option("--network", help="The physiological network to render (e.g. insulin-cascade, glucagon-rescue, or all)")] = "all",
+) -> None:
+    """Download and render high-resolution physiological pathways from the STRING Database."""
+    from iints.research.physiology import render_pathways as fetch_networks
+    fetch_networks(network)
+
+@app.command(name="render-pae")
+def render_pae(
+    target: Annotated[str, typer.Option("--target", help="The structural target to render the PAE matrix for (e.g. insulin-mutation, glucagon, glut4, insulin-receptor, or all)")] = "all",
+) -> None:
+    """Render interactive Predicted Aligned Error (PAE) matrices from AlphaFold."""
+    from iints.research.structure import render_pae as fetch_pae
+    fetch_pae(target)

@@ -14,8 +14,13 @@ from iints_desktop.engine import (
     list_desktop_presets,
     read_run_history,
 )
-from iints_desktop.local_ai import SYSTEM_PROMPT
-from iints_desktop.molecules import MoleculeStructureError, list_molecule_assets, load_molecule_backbone
+from iints_desktop.local_ai import SYSTEM_PROMPT, LocalAIStartResult, resolve_ollama_executable
+from iints_desktop.molecules import (
+    MoleculeStructureError,
+    list_molecule_assets,
+    load_molecule_backbone,
+    pae_html_path,
+)
 from iints_desktop.results import build_ai_result_context, load_results_preview
 
 
@@ -131,6 +136,29 @@ def test_local_ai_prompt_is_research_only() -> None:
     assert "Do not provide diagnosis" in SYSTEM_PROMPT
 
 
+
+def test_local_ai_can_resolve_ollama_from_extra_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_ollama = tmp_path / "ollama"
+    fake_ollama.write_text("#!/bin/sh\n", encoding="utf-8")
+
+    monkeypatch.setattr("iints_desktop.local_ai.shutil.which", lambda _name: None)
+
+    assert resolve_ollama_executable(extra_candidates=[fake_ollama]) == fake_ollama
+
+
+def test_local_ai_start_result_is_ui_friendly() -> None:
+    result = LocalAIStartResult(
+        available=True,
+        message="Local AI ready",
+        resolved_model="ministral-3:8b",
+        started_process=True,
+        pulled_model=False,
+    )
+
+    assert result.available is True
+    assert result.started_process is True
+    assert "ready" in result.message.lower()
+
 def test_molecule_assets_are_bundled_for_desktop_deep_dive() -> None:
     molecules = list_molecule_assets()
 
@@ -138,6 +166,8 @@ def test_molecule_assets_are_bundled_for_desktop_deep_dive() -> None:
     assert all(molecule.image_path.exists() for molecule in molecules)
     assert all(molecule.structure_path.exists() for molecule in molecules)
     assert all("Connects to:" in molecule.sdk_link for molecule in molecules)
+    assert {molecule.pae_target for molecule in molecules} == {"insulin-mutation", "glucagon"}
+    assert pae_html_path("glucagon").as_posix().endswith("results/structural/glucagon_pae.html")
 
 
 def test_molecule_assets_contain_renderable_backbone_coordinates() -> None:

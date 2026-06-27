@@ -64,7 +64,7 @@ It currently provides:
 - generated CSV/report/audit artifacts through the normal SDK engine
 - buttons to open the output folder, generated PDF report, and results CSV
 - an in-app Results tab that loads generated CSV files, summarizes glucose metrics, previews table rows, and renders a glucose graph
-- an in-app Local AI tab for asking a local Ollama/Mistral model research-only questions about the SDK or the loaded result summary
+- an in-app Local AI tab that can start a local Ollama server, prepare the selected Mistral/Ministral model, and answer research-only questions about the SDK or the loaded result summary
 - a Biology / AlphaFold deep-dive tab with bundled insulin and glucagon structures
 - an offline interactive 3D protein-chain viewer: drag to rotate, scroll to zoom, and double-click to reset
 - a run-history table in the Qt app for recent desktop outputs, including seed values
@@ -106,14 +106,16 @@ The graph is intentionally a review preview, not a clinical report. Publication-
 
 ## Local AI Mode
 
-The PySide6 app also includes a `Local AI` tab for local Ollama/Mistral questions.
+The PySide6 app includes a `Local AI` tab for local Ollama/Mistral questions. The app now has a `Start Local AI` button: when the Ollama binary is installed locally, the desktop app can start the Ollama server, wait for the local API, and prepare the selected model. If the model is missing, the app attempts to download it in the background.
 
 The intended use is:
 
-- start Ollama locally
-- run a compatible local model such as `ministral-3:8b`
+- click `Start Local AI` in the app
+- wait while Ollama starts and the selected model is checked or downloaded
 - load a result CSV in the Results tab
 - ask questions such as "explain this run", "find realism issues", or "write a doctor-facing research summary"
+
+The one thing the beta app does not silently install is Ollama itself. Users still need Ollama installed once on the machine; after that, the app manages starting it and preparing the model.
 
 The desktop AI mode sends only a compact result summary by default, not the full raw CSV. It is guarded by a research-only system prompt:
 
@@ -152,6 +154,23 @@ The main viewer renders the C-alpha protein backbone from the packaged mmCIF str
 - colours use the AlphaFold pLDDT confidence palette; these are structure-prediction confidence values, not physiological or clinical scores
 
 The compact C-alpha representation is a presentation and education view. It is deliberately separated from the deterministic simulation engine and never enters a dosing, safety, or treatment path.
+
+### Interactive PAE Heatmaps
+
+The Biology tab can also generate an interactive AlphaFold Predicted Aligned Error (PAE) heatmap for the selected molecule. The desktop app calls the SDK structural-biology helper and loads the generated Plotly HTML file inside the app when Qt WebEngine is available. In headless or minimal builds it falls back to opening the same file in the system browser:
+
+```text
+results/structural/<target>_pae.html
+```
+
+PAE is a structure-prediction confidence view: dark green cells indicate lower predicted relative-position error between residue positions, while pale/white cells indicate higher uncertainty. It is useful for explaining which parts of a predicted protein structure are relatively stable or flexible.
+
+This remains explanatory only:
+
+- PAE values do not enter the simulator, glucose model, safety supervisor, AI controller, or report scoring
+- the first generation needs internet access to fetch the AlphaFold PAE JSON
+- generated HTML files are local artifacts and can be reopened from the app
+- `plotly` is included in the Qt desktop extra so beta desktop builds can create the heatmaps
 
 ## Run History
 
@@ -250,7 +269,7 @@ Beta caveats:
 - Windows and macOS builds may show operating-system security warnings until the project has code-signing certificates.
 - The desktop app is research-only and not a medical device.
 - The app is a GUI wrapper around the SDK engine; reproducible CLI workflows remain the source of truth.
-- Local AI review requires a separately installed/running Ollama server.
+- Local AI review can start and prepare Ollama when Ollama is installed locally; first-time model download may take a while.
 
 ## Build A Desktop Binary
 
