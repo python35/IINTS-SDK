@@ -274,55 +274,51 @@ if _PYSIDE_IMPORT_ERROR is None:
             except Exception as exc:
                 self.failed.emit(str(exc))
 
-    class BiologyWorker(QObject):
-        """Background worker for optional public biomedical evidence helpers."""
+    class GenomicsWorker(QObject):
+        """Background worker for running multi-scale structural-metabolic coupling simulations."""
 
         finished = Signal(object)
         failed = Signal(str)
 
-        def __init__(self, *, action: str, value: str) -> None:
+        def __init__(self, *, gene: str, variant: str, out_dir: Path) -> None:
             super().__init__()
-            self.action = action
-            self.value = value
+            self.gene = gene
+            self.variant = variant
+            self.out_dir = out_dir
 
         @Slot()
         def run(self) -> None:
             try:
-                if self.action == "gtex-expression":
-                    from iints.research.anatomy import render_expression
+                from iints.research.genomics_engine import GenomicsEngine
+                html_path, data = GenomicsEngine.run_multi_scale_simulation(self.gene, self.variant, self.out_dir)
+                
+                msg = f"Simulated {self.gene} {self.variant}. " \
+                      f"Impact: {int(data['scalar']*100)}% affinity. " \
+                      f"Description: {data['desc']}. " \
+                      f"Plot saved to: {html_path}"
+                self.finished.emit((msg, data))
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
 
-                    result = render_expression(self.value)
-                    if result is None:
-                        self.finished.emit("No GTEx expression artifact was generated.")
-                    else:
-                        self.finished.emit(
-                            f"GTEx expression ready for {result.official_gene}: {result.html_path}"
-                        )
-                elif self.action == "insulin-pk":
-                    from iints.research.pharmacology import analyze_insulin
+    class TissueStressorWorker(QObject):
+        """Background worker for running comparative tissue-specific stress tests."""
 
-                    molecule, profile = analyze_insulin(self.value)
-                    molecule_name = molecule.preferred_name if molecule is not None else "no ChEMBL match"
-                    self.finished.emit(
-                        f"Insulin PK mapping ready for {self.value}: {profile.label}, "
-                        f"t_max,I={profile.tmax_minutes} min ({molecule_name})."
-                    )
-                elif self.action == "clinvar-mutation":
-                    from iints.research.genetics import simulate_mutation
+        finished = Signal(object)
+        failed = Signal(str)
 
-                    variants = simulate_mutation(self.value)
-                    self.finished.emit(
-                        f"ClinVar mutation stressor complete for {self.value}: "
-                        f"{len(variants)} public variant summaries shown."
-                    )
-                elif self.action == "string-pathways":
-                    from iints.research.physiology import render_pathways
+        def __init__(self, *, muscle_scalar: float, liver_scalar: float, out_dir: Path) -> None:
+            super().__init__()
+            self.muscle_scalar = muscle_scalar
+            self.liver_scalar = liver_scalar
+            self.out_dir = out_dir
 
-                    results = render_pathways(self.value)
-                    paths = ", ".join(str(result.png_path) for result in results)
-                    self.finished.emit(f"STRING pathway render complete: {paths}")
-                else:
-                    raise ValueError(f"Unknown biology evidence action: {self.action}")
+        @Slot()
+        def run(self) -> None:
+            try:
+                from iints.research.tissue_stressor import TissueStressor
+                html_path, data = TissueStressor.run_stress_test(self.muscle_scalar, self.liver_scalar, self.out_dir)
+                msg = f"Simulated tissue-specific stress (Muscle {int(data['muscle']*100)}%, Liver {int(data['liver']*100)}%). Plot saved to {html_path}."
+                self.finished.emit((msg, data))
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
 
@@ -435,11 +431,22 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.generate_pae_button = QPushButton("Generate PAE Heatmap")
             self.open_pae_button = QPushButton("Open PAE HTML")
             self.open_pae_folder_button = QPushButton("Open PAE Folder")
-            self.render_gtex_button = QPushButton("Render GTEx Expression")
-            self.analyze_insulin_button = QPushButton("Analyze Insulin PK")
-            self.simulate_mutation_button = QPushButton("Simulate ClinVar Mutation")
-            self.render_pathways_button = QPushButton("Render STRING Pathways")
-            self.open_structural_folder_button = QPushButton("Open Biology Output Folder")
+            self.genomics_variant_input = QLineEdit("V938M")
+            self.genomics_variant_input.setPlaceholderText("e.g. V938M, R1174W, A1135E")
+            self.run_genomics_sim_button = QPushButton("Run Multi-Scale Simulation")
+            self.highlight_mutation_button = QPushButton("Highlight Mutation in 3D")
+            self.open_structural_folder_button = QPushButton("Open Genomics Folder")
+            
+            # Tissue-specific resistance UI
+            self.tissue_muscle_input = QSpinBox()
+            self.tissue_muscle_input.setRange(0, 100)
+            self.tissue_muscle_input.setValue(100)
+            self.tissue_muscle_input.setSuffix("%")
+            self.tissue_liver_input = QSpinBox()
+            self.tissue_liver_input.setRange(0, 100)
+            self.tissue_liver_input.setValue(100)
+            self.tissue_liver_input.setSuffix("%")
+            self.run_tissue_stress_button = QPushButton("Stress-Test Pump Algorithm")
             self.open_app_downloads_button = QPushButton("Open App Downloads")
             self.open_update_docs_button = QPushButton("Open Update Docs")
             self.copy_update_command_button = QPushButton("Copy Update Command")
@@ -1024,33 +1031,67 @@ if _PYSIDE_IMPORT_ERROR is None:
                 pae_layout.addWidget(embedded_note)
             context_layout.addWidget(pae_box)
 
-            evidence_box = QGroupBox("Biology evidence actions")
+            evidence_box = QGroupBox("Advanced Research & Algorithm Stressors")
             evidence_layout = QVBoxLayout(evidence_box)
+            
+            # Genomics Panel
+            genomics_label = QLabel("<b>1. Genomics & Structural Impact</b>")
+            evidence_layout.addWidget(genomics_label)
+            
             evidence_help = QLabel(
-                "Run optional public-database helpers from the app. These actions fetch research context "
-                "from GTEx, ChEMBL, ClinVar, or STRING and write normal SDK artifacts under results/structural."
+                "Enter a genetic variant (e.g. INSR V938M) to predict its structural impact, "
+                "and directly run a patient-level simulation to see how the blood glucose curve "
+                "diverges from a healthy baseline."
             )
             evidence_help.setWordWrap(True)
             evidence_layout.addWidget(evidence_help)
-            self.biology_action_status.setObjectName("biologyActionStatus")
-            evidence_layout.addWidget(self.biology_action_status)
-            self.render_gtex_button.clicked.connect(lambda: self._run_biology_action("gtex-expression", "GLUT4"))
-            self.analyze_insulin_button.clicked.connect(lambda: self._run_biology_action("insulin-pk", "lispro"))
-            self.simulate_mutation_button.clicked.connect(lambda: self._run_biology_action("clinvar-mutation", "INSR"))
-            self.render_pathways_button.clicked.connect(lambda: self._run_biology_action("string-pathways", "all"))
+            
+            input_layout = QHBoxLayout()
+            input_label = QLabel("Variant:")
+            input_layout.addWidget(input_label)
+            input_layout.addWidget(self.genomics_variant_input)
+            evidence_layout.addLayout(input_layout)
+            
+            self.run_genomics_sim_button.clicked.connect(self._run_genomics_simulation)
+            self.highlight_mutation_button.clicked.connect(self._highlight_mutation)
             self.open_structural_folder_button.clicked.connect(self._open_structural_folder)
+            
             evidence_layout.addLayout(
                 self._button_grid(
                     [
-                        self.render_gtex_button,
-                        self.analyze_insulin_button,
-                        self.simulate_mutation_button,
-                        self.render_pathways_button,
+                        self.run_genomics_sim_button,
+                        self.highlight_mutation_button,
                         self.open_structural_folder_button,
                     ],
-                    columns=2,
+                    columns=3,
                 )
             )
+            
+            # Tissue Panel
+            tissue_label = QLabel("<b>2. Tissue-Specific Resistance Test (GTEx)</b>")
+            tissue_label.setStyleSheet("margin-top: 10px;")
+            evidence_layout.addWidget(tissue_label)
+            
+            tissue_help = QLabel(
+                "Stress-test pump algorithms by isolating insulin resistance to specific organs "
+                "(e.g., Hepatic vs Peripheral resistance), informed by GTEx expression profiles."
+            )
+            tissue_help.setWordWrap(True)
+            evidence_layout.addWidget(tissue_help)
+            
+            tissue_input_layout = QHBoxLayout()
+            tissue_input_layout.addWidget(QLabel("Muscle (Peripheral) Sensitivity:"))
+            tissue_input_layout.addWidget(self.tissue_muscle_input)
+            tissue_input_layout.addWidget(QLabel("Liver (Hepatic) Sensitivity:"))
+            tissue_input_layout.addWidget(self.tissue_liver_input)
+            evidence_layout.addLayout(tissue_input_layout)
+            
+            self.run_tissue_stress_button.clicked.connect(self._run_tissue_stress_simulation)
+            evidence_layout.addWidget(self.run_tissue_stress_button)
+            
+            # Shared Status box
+            self.biology_action_status.setObjectName("biologyActionStatus")
+            evidence_layout.addWidget(self.biology_action_status)
             self.biology_action_output.setMinimumHeight(95)
             evidence_layout.addWidget(self.biology_action_output)
             context_layout.addWidget(evidence_box)
@@ -1933,22 +1974,56 @@ if _PYSIDE_IMPORT_ERROR is None:
                     "</body></html>"
                 )
 
-        def _run_biology_action(self, action: str, value: str) -> None:
+        def _run_genomics_simulation(self) -> None:
             if self.biology_thread is not None:
-                QMessageBox.information(self, "IINTS-AF Desktop", "A biology evidence action is already running.")
+                QMessageBox.information(self, "IINTS-AF Desktop", "A simulation is already running.")
                 return
-            self._set_biology_action_state(True)
-            self.biology_action_status.setText(
-                f"Running {action} ({value}). The first run may need internet access."
-            )
-            self.biology_action_output.setPlainText("Working...\n")
-            self.status.setText("Running biology evidence action")
+            variant = self.genomics_variant_input.text().strip()
+            if not variant:
+                QMessageBox.information(self, "IINTS-AF Desktop", "Please enter a variant (e.g. V938M).")
+                return
 
+            self._set_biology_action_state(True)
+            self.biology_action_status.setText(f"Running Multi-Scale Simulation for INSR {variant}...")
+            self.biology_action_output.setPlainText("Working...\n")
+            self.status.setText("Running genomics simulation")
+
+            out_dir = Path("results") / "structural"
             thread = QThread(self)
-            worker = BiologyWorker(action=action, value=value)
+            worker = GenomicsWorker(gene="INSR", variant=variant, out_dir=out_dir)
             worker.moveToThread(thread)
             thread.started.connect(worker.run)
-            worker.finished.connect(self._handle_biology_action_success)
+            worker.finished.connect(self._handle_genomics_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_biology_action_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_biology_refs)
+            self.biology_thread = thread
+            self.biology_worker = worker
+            thread.start()
+
+        def _run_tissue_stress_simulation(self) -> None:
+            if self.biology_thread is not None:
+                QMessageBox.information(self, "IINTS-AF Desktop", "A simulation is already running.")
+                return
+
+            muscle_val = self.tissue_muscle_input.value() / 100.0
+            liver_val = self.tissue_liver_input.value() / 100.0
+
+            self._set_biology_action_state(True)
+            self.biology_action_status.setText(f"Running Tissue Stress Simulation (Muscle {muscle_val}, Liver {liver_val})...")
+            self.biology_action_output.setPlainText("Working...\n")
+            self.status.setText("Running tissue stress simulation")
+
+            out_dir = Path("results") / "structural"
+            thread = QThread(self)
+            worker = TissueStressorWorker(muscle_scalar=muscle_val, liver_scalar=liver_val, out_dir=out_dir)
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_tissue_success)
             worker.finished.connect(thread.quit)
             worker.finished.connect(worker.deleteLater)
             worker.failed.connect(self._handle_biology_action_error)
@@ -1961,12 +2036,46 @@ if _PYSIDE_IMPORT_ERROR is None:
             thread.start()
 
         @Slot(object)
-        def _handle_biology_action_success(self, result: object) -> None:
-            text = str(result)
-            self.biology_action_status.setText(text)
-            self.biology_action_output.setPlainText(text)
-            self.status.setText("Biology evidence action complete")
+        def _handle_tissue_success(self, result: object) -> None:
+            msg, data = result
+            self.biology_action_status.setText(msg)
+            self.biology_action_output.setPlainText(f"Tissue Impact Data:\n{data}")
+            self.status.setText("Tissue simulation complete")
             self._set_biology_action_state(False)
+            
+            # Automatically open the generated plot in the browser
+            plot_path = Path(data["html_path"])
+            if plot_path.exists():
+                self._open_path(plot_path)
+
+        @Slot()
+        def _highlight_mutation(self) -> None:
+            variant = self.genomics_variant_input.text().strip()
+            if not variant:
+                return
+            
+            # Very simple regex match to find the number in the variant
+            import re
+            match = re.search(r'\d+', variant)
+            if match and self.molecule_web_view is not None:
+                residue = int(match.group())
+                # Generate Javascript to highlight the specific residue in red
+                js = f"if(typeof glviewer !== 'undefined') {{ glviewer.setStyle({{resi: {residue}}}, {{sphere: {{color: 'red'}}}}); glviewer.render(); }}"
+                self.molecule_web_view.page().runJavaScript(js)
+                self.biology_action_status.setText(f"Highlighted residue {residue} in 3D viewer.")
+
+        @Slot(object)
+        def _handle_genomics_success(self, result: object) -> None:
+            msg, data = result
+            self.biology_action_status.setText(msg)
+            self.biology_action_output.setPlainText(f"Mutation Impact Data:\n{data}")
+            self.status.setText("Genomics simulation complete")
+            self._set_biology_action_state(False)
+            
+            # Automatically open the generated plot in the browser
+            plot_path = Path("results") / "structural" / f"multiscale_INSR_{self.genomics_variant_input.text().strip()}.html"
+            if plot_path.exists():
+                self._open_path(plot_path)
 
         @Slot(str)
         def _handle_biology_action_error(self, details: str) -> None:
@@ -1984,13 +2093,15 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _set_biology_action_state(self, is_running: bool) -> None:
             for button in (
-                self.render_gtex_button,
-                self.analyze_insulin_button,
-                self.simulate_mutation_button,
-                self.render_pathways_button,
+                self.run_genomics_sim_button,
+                self.highlight_mutation_button,
                 self.open_structural_folder_button,
+                self.run_tissue_stress_button,
             ):
                 button.setEnabled(not is_running)
+            self.genomics_variant_input.setEnabled(not is_running)
+            self.tissue_muscle_input.setEnabled(not is_running)
+            self.tissue_liver_input.setEnabled(not is_running)
 
         def _open_structural_folder(self) -> None:
             folder = Path("results") / "structural"

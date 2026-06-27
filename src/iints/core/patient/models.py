@@ -24,7 +24,8 @@ class CustomPatientModel:
                  dawn_start_hour: float = 4.0,
                  dawn_end_hour: float = 8.0,
                  carb_absorption_duration_minutes: float = 240.0,
-                 max_glucose_rate_mgdl_per_min: float = 3.0):
+                 max_glucose_rate_mgdl_per_min: float = 3.0,
+                 molecular_affinity_scalar: float = 1.0):
         """
         Initializes the patient model with simplified parameters.
 
@@ -39,9 +40,11 @@ class CustomPatientModel:
             insulin_peak_time (float): Time to peak insulin activity in minutes.
             meal_mismatch_epsilon (float): The multiplier for carb intake to simulate meal size errors. 
                                          `true_carbs = announced_carbs * meal_mismatch_epsilon`. Defaults to 1.0.
+            molecular_affinity_scalar (float): Multiplier representing molecular binding affinity (1.0 = normal, 0.2 = 80% loss of function).
         """
         self.basal_insulin_rate = basal_insulin_rate
-        self.insulin_sensitivity = insulin_sensitivity
+        self.molecular_affinity_scalar = molecular_affinity_scalar
+        self.insulin_sensitivity = insulin_sensitivity * molecular_affinity_scalar
         self.carb_factor = carb_factor
         self.glucose_decay_rate = glucose_decay_rate
         self.glucose_absorption_rate = glucose_absorption_rate

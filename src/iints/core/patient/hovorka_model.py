@@ -98,12 +98,18 @@ class HovorkaPatientModel:
         dawn_phenomenon_strength: float = 0.0,
         dawn_start_hour: float = 4.0,
         dawn_end_hour: float = 8.0,
+        molecular_affinity_scalar: float = 1.0,
+        muscle_sensitivity_scalar: float = 1.0,
+        liver_sensitivity_scalar: float = 1.0,
         carb_absorption_duration_minutes: float = 240.0,
         max_glucose_rate_mgdl_per_min: float = 3.0,
         hovorka_params: Optional[HovorkaParameters] = None,
     ) -> None:
         self.basal_insulin_rate = basal_insulin_rate
-        self.insulin_sensitivity = insulin_sensitivity
+        self.molecular_affinity_scalar = molecular_affinity_scalar
+        self.muscle_sensitivity_scalar = muscle_sensitivity_scalar
+        self.liver_sensitivity_scalar = liver_sensitivity_scalar
+        self.insulin_sensitivity = insulin_sensitivity * molecular_affinity_scalar
         self.carb_factor = carb_factor
         self.initial_glucose = initial_glucose
         self.basal_glucose_target = basal_glucose_target
@@ -152,8 +158,8 @@ class HovorkaPatientModel:
 
         I_basal = 10.0  # mU/L approximation.
         x1_init = p.S_IT * I_basal
-        x2_init = p.S_ID * I_basal
-        x3_init = p.S_IE * I_basal
+        x2_init = p.S_ID * self.muscle_sensitivity_scalar * I_basal
+        x3_init = p.S_IE * self.liver_sensitivity_scalar * I_basal
 
         # State vector: [Q1, Q2, S1, S2, I, x1, x2, x3, D1, D2, D3, H_stress, H_exercise, Y1, Y2, Gamma, x_gluc, HAAF, GLUT4_active]
         return np.array(
@@ -491,8 +497,8 @@ class HovorkaPatientModel:
         overall_sens = stress_sens_multiplier * ex_sens_multiplier
 
         k_b1 = p.S_IT * p.k_a1 * overall_sens
-        k_b2 = p.S_ID * p.k_a2 * overall_sens
-        k_b3 = p.S_IE * p.k_a3 * overall_sens
+        k_b2 = p.S_ID * p.k_a2 * overall_sens * self.muscle_sensitivity_scalar
+        k_b3 = p.S_IE * p.k_a3 * overall_sens * self.liver_sensitivity_scalar
 
         # Insulin action
         dx1_dt = -p.k_a1 * x1 + k_b1 * I
