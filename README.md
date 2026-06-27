@@ -1,160 +1,131 @@
-# IINTS-AF SDK
+# IINTS-AF Desktop App Branch
 
-[![EUCYS 2026](https://img.shields.io/badge/EUCYS-2026%20Selected-gold?style=flat)](https://www.uni-kiel.de/en/eucys2026)
-[![PyPI version](https://badge.fury.io/py/iints-sdk-python35.svg)](https://badge.fury.io/py/iints-sdk-python35)
-[![CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
-[![Docs](https://img.shields.io/badge/docs-IINTS--AF-0a66c2?style=flat)](https://python35.github.io/IINTS-SDK/)
+This branch is the app-focused entry point for IINTS-AF.
 
-IINTS-AF is an open-source research SDK for diabetes technology experiments.
+Use this branch if you mainly want the native desktop workbench instead of starting with the full command-line SDK documentation.
 
-It lets you create a virtual diabetes scenario, run an insulin-algorithm simulation, inspect the glucose result, and generate evidence files such as CSV outputs, reports, AGP-style figures, and audit records.
-
-The goal is simple: make it easier to test and discuss diabetes algorithm behavior safely before anything is connected to a real person.
+The desktop app uses the same IINTS-AF SDK engine underneath. It does not duplicate formulas, safety logic, reports, or simulation code.
 
 IINTS-AF is research and education software. It is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
 
-## What The SDK Does
+## What The App Is
 
-- Simulates virtual diabetes scenarios, meals, insulin delivery, sensors, and safety events.
-- Runs example insulin algorithms against those scenarios.
-- Generates results as CSV files, PDF reports, AGP-style reports, posters, and audit artifacts.
-- Helps compare software logic, safety checks, physiology assumptions, and AI/glucose-prediction experiments.
-- Provides command-line tools, a native desktop app, and hardware/demo helpers for Raspberry Pi, Jetson, FPGA, and Arduino-style experiments.
+The IINTS-AF Desktop App is a native research workbench for diabetes-technology simulation.
 
-## Who It Is For
+It helps you:
 
-- Students and researchers learning about diabetes technology.
-- Developers testing insulin-algorithm ideas in simulation.
-- Teachers or demo builders who need understandable digital-patient examples.
-- Reviewers who want reproducible outputs instead of screenshots without data.
+- run curated digital-patient demo workflows
+- open generated SDK results folders
+- load `results.csv` files
+- preview glucose graphs and metrics
+- open generated PDF/AGP/report artifacts
+- ask local Ollama/Mistral questions about a loaded run
+- inspect bundled structural-biology context such as insulin/glucagon AlphaFold assets
 
-## What It Is Not
-
-- It is not a clinical simulator validated for patient care.
-- It is not an insulin pump controller.
-- It is not a replacement for clinical trials, medical review, or regulatory approval.
-- It does not give medical advice.
-
-## Install
-
-```bash
-pip install "iints-sdk-python35[full,mdmp]"
-iints doctor --smoke-run
-```
-
-For the native desktop app:
-
-```bash
-pip install "iints-sdk-python35[full,desktop-qt,mdmp]"
-iints-desktop
-```
-
-## Quick Start
-
-Create a small project and run a baseline simulation:
-
-```bash
-iints quickstart --project-name my_study
-cd my_study
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
-```
-
-Run a clear demo workflow:
-
-```bash
-iints demo eucys --output-dir results/live_demo
-```
-
-Other useful demo modes:
-
-```bash
-iints demo doctor --output-dir results/doctor_demo
-iints demo booth --output-dir results/booth_demo
-```
-
-## Common Outputs
-
-A normal run can create files such as:
-
-```text
-results/
-├── results.csv
-├── clinical_report.pdf
-├── agp_report.png
-├── audit.json
-└── summary.md
-```
-
-These outputs are meant to make a run reviewable and reproducible.
-
-## Main Commands
-
-```bash
-iints doctor
-```
-
-Check the installation.
-
-```bash
-iints presets list
-```
-
-Show available simulation presets.
-
-```bash
-iints presets run --name baseline_t1d --algo algorithms/example_algorithm.py
-```
-
-Run a preset with an algorithm.
-
-```bash
-iints report --results results/results.csv
-```
-
-Generate a report from results.
-
-```bash
-iints-desktop
-```
-
-Open the native desktop workbench.
-
-## Repository Map
-
-| Path | Purpose |
-| --- | --- |
-| `src/iints/` | SDK source code |
-| `src/iints_desktop/` | native desktop app wrapper |
-| `docs/` | public documentation |
-| `tests/` | automated tests |
-| `examples/` | runnable examples |
-| `algorithms/` | example algorithm entry points |
-| `tools/` | build, release, and maintenance helpers |
-| `data_packs/` | small bundled/demo data packs |
-
-## Documentation
-
-Full documentation is available at:
-
-[python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
-
-Useful pages:
-
-- [Quickstart](https://python35.github.io/IINTS-SDK/QUICKSTART/)
-- [Desktop App](https://python35.github.io/IINTS-SDK/DESKTOP_APP/)
-- [Command Cheatsheet](https://python35.github.io/IINTS-SDK/CLI_CHEATSHEET/)
-- [Updating The SDK](https://python35.github.io/IINTS-SDK/UPDATING/)
-
-## Desktop App Branch
-
-The main branch contains the full SDK. A separate `desktop-app` branch is maintained as an app-focused branch for users who mainly want the native desktop experience and app installation instructions.
+## Install From This Branch
 
 ```bash
 git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
 python -m pip install -U -e ".[full,desktop-qt,mdmp]"
 iints-desktop
 ```
+
+On Windows PowerShell:
+
+```powershell
+git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
+cd IINTS-SDK
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+## Install From PyPI
+
+If you do not need the branch source code, install the app directly:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+## App Commands
+
+```bash
+iints-desktop
+```
+
+Start the best available desktop app. It prefers the PySide6/Qt app and can fall back to the simpler Tkinter app.
+
+```bash
+iints-desktop-qt
+```
+
+Force the PySide6/Qt app.
+
+```bash
+iints-desktop-tk
+```
+
+Force the lightweight Tkinter app.
+
+## First Run
+
+1. Start the app:
+
+```bash
+iints-desktop
+```
+
+2. Choose an output folder.
+3. Pick a workflow such as `Doctor safety discussion`, `EUCYS experiment run`, or `Booth / public demo`.
+4. Click `Run Selected Workflow`.
+5. Open the `Results` tab to inspect the glucose graph, metrics, and CSV preview.
+
+## Local AI Mode
+
+The app can use local Ollama/Mistral models for research-only explanation of loaded results.
+
+Install Ollama once, then in the app click `Start Local AI`.
+
+The app can start the local Ollama server and prepare the selected model when the Ollama binary is available.
+
+The AI mode is only a review assistant. It does not dose insulin, diagnose, or make treatment decisions.
+
+## What This Branch Contains
+
+This branch still includes the SDK source code because the app calls the SDK directly.
+
+Important paths:
+
+| Path | Purpose |
+| --- | --- |
+| `src/iints_desktop/` | native desktop app source |
+| `src/iints/` | SDK engine used by the app |
+| `docs/APP_INSTALL.md` | app-first installation guide |
+| `docs/DESKTOP_APP.md` | desktop app architecture and features |
+| `tools/desktop/` | app packaging helpers |
+| `.github/workflows/desktop-beta.yml` | beta desktop build workflow |
+
+## Full SDK Branch
+
+For full SDK development, CLI workflows, hardware docs, research tooling, and release maintenance, use `main`:
+
+```bash
+git clone https://github.com/python35/IINTS-SDK.git
+```
+
+## Documentation
+
+- [Desktop App Install](docs/APP_INSTALL.md)
+- [Desktop App Details](docs/DESKTOP_APP.md)
+- [Full Documentation Site](https://python35.github.io/IINTS-SDK/)
 
 ## License
 
