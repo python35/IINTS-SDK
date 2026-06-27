@@ -31,9 +31,15 @@ Current beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-macos.dmg) |
 | Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-linux-x64) |
 
-> **Note for macOS users:** You might see a warning stating *"Apple cannot check it for malicious software"*. Because this is an open-source beta, the app is currently unsigned. To bypass this, **Right-click (or Control-click)** the `.dmg` or the App icon and select **Open**, or run `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` in your terminal to clear the quarantine flag.
+### 🛡️ Waarom zie ik een beveiligingswaarschuwing? (Security Warnings)
+Omdat de IINTS-AF Desktop App gratis en open-source academische software is, is deze niet cryptografisch ondertekend met dure commerciële ontwikkelaarscertificaten van Apple of Microsoft. Hierdoor geven besturingssystemen uit voorzorg een standaard waarschuwing (Gatekeeper op Mac, SmartScreen op Windows). **Dit is volkomen normaal voor open-source tools.**
 
-The app is still research-only and uses the same SDK engine as the command-line tools.
+* **macOS ("Apple cannot check it for malicious software")**:
+  Klik met je rechtermuisknop (of `Control`-klik) op de `.dmg` of de App en kies **Open**. Dit hoef je slechts één keer te doen.
+* **Windows ("Windows protected your PC")**:
+  Klik op **More info** (Meer informatie) en vervolgens op **Run anyway** (Toch uitvoeren).
+
+The app is strictly research-only and runs entirely locally using the same SDK engine as the command-line tools. No data is sent externally.
 
 ## License
 
