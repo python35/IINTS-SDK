@@ -13,15 +13,17 @@ It is still research software. It is not a medical device and must not be used f
 
 The current desktop beta release is available on GitHub:
 
-[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2)
+[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3)
 
 | Platform | Download | Start |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-windows-x64.zip) | extract the zip, then open `IINTS-AF-Desktop-Beta.exe` |
-| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-macos.zip) | extract the zip, then open the `.app` bundle |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-linux-x64.zip) | extract the zip, then run `./IINTS-AF-Desktop-Beta` |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-windows-x64.exe) | download and open the `.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-macos.dmg) | open the `.dmg`, then open the app |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-linux-x64) | mark executable if needed, then run it |
 
 These beta builds are unsigned. Windows or macOS may show a security warning until the project has code-signing certificates.
+
+The app also includes an update panel that links back to the latest app release and can copy/update the Python SDK package command for Python-based installs.
 
 ## Install From PyPI
 
@@ -69,29 +71,6 @@ python -m pip install -U pip
 python -m pip install -U -e ".[full,desktop-qt,mdmp]"
 iints-desktop
 ```
-
-## App-Focused Branch
-
-The `main` branch contains the complete SDK. The `desktop-app` branch exists for users who mainly want the native app and app installation notes.
-
-```bash
-git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
-cd IINTS-SDK
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
-iints-desktop
-```
-
-Use the app branch when:
-
-- you mainly want the native desktop workbench
-- you are testing beta app packaging
-- you want app-first documentation in the repository root
-
-Use `main` when:
-
-- you are developing the SDK itself
-- you need all research, CLI, hardware, and CI docs together
-- you want the default development branch
 
 ## What The App Can Do
 

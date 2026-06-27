@@ -74,7 +74,7 @@ jobs:
 
       - name: Build PySide desktop bundle
         run: |
-          python tools/desktop/build_qt_desktop_app.py --onedir --name "${{ env.APP_NAME }}"
+          python tools/desktop/build_qt_desktop_app.py --name "${{ env.APP_NAME }}"
 
       - name: Smoke test bundled app on Linux
         if: runner.os == 'Linux'
@@ -83,7 +83,7 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
-          exe="dist/${APP_NAME}/${APP_NAME}"
+          exe="dist/${APP_NAME}"
           echo "Smoke testing: $exe"
           "$exe" --smoke
 
@@ -96,16 +96,16 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            exe="dist/${APP_NAME}/${APP_NAME}.exe"
+            exe="dist/${APP_NAME}.exe"
           elif [[ -x "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}" ]]; then
             exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
           else
-            exe="dist/${APP_NAME}/${APP_NAME}"
+            exe="dist/${APP_NAME}"
           fi
           echo "Best-effort smoke testing: $exe"
           "$exe" --smoke
 
-      - name: Package release archive
+      - name: Package release asset
         shell: bash
         run: |
           set -euo pipefail
@@ -184,13 +184,13 @@ jobs:
 
           ## Downloads
 
-          - `IINTS-AF-Desktop-Beta-windows-x64.zip` contains the Windows `.exe` bundle.
-          - `IINTS-AF-Desktop-Beta-macos.zip` contains the macOS app bundle.
-          - `IINTS-AF-Desktop-Beta-linux-x64.zip` contains the Linux executable bundle.
+          - `IINTS-AF-Desktop-Beta-windows-x64.exe` is the Windows executable.
+          - `IINTS-AF-Desktop-Beta-macos.dmg` is the macOS disk image containing the app.
+          - `IINTS-AF-Desktop-Beta-linux-x64` is the Linux executable.
 
           ## Scope
 
-          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, display bundled AlphaFold structures, and open interactive PAE heatmaps.
+          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, display bundled AlphaFold structures, open interactive PAE heatmaps, and link users to the latest app update.
 
           ## Safety
 

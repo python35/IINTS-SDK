@@ -23,16 +23,7 @@ python -m pip install -U -e ".[full,desktop-qt,mdmp]"
 iints-desktop
 ```
 
-A dedicated `desktop-app` branch is also available for app-focused beta testing:
-
-```bash
-git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
-cd IINTS-SDK
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
-iints-desktop
-```
-
-See [Desktop App Install](APP_INSTALL.md) for the app-first install guide.
+See [Desktop App Install](APP_INSTALL.md) for the app install and download guide.
 
 ## Design Goal
 
@@ -217,6 +208,12 @@ The Biology tab also exposes app buttons for the newer public-database helpers:
 
 These actions may need internet access on first run. They are evidence/context actions only; they do not change a running simulation or produce treatment advice.
 
+### In-App Updates
+
+The desktop app includes an update panel in the Methods tab. It can open the latest app download page, open the update documentation, copy the Python SDK update command, and run the Python package update command for Python-based installs.
+
+Packaged `.exe`/`.dmg` app updates still require downloading the newest app build, because fully silent self-updating needs code signing and platform-specific installer infrastructure.
+
 ## Run History
 
 The Qt app stores lightweight run history in the selected output folder:
@@ -261,17 +258,17 @@ sudo apt install python3-tk
 
 The repository includes a `Desktop Beta Builds` GitHub Actions workflow that builds downloadable native app bundles for the three main desktop platforms. It is intended for beta distribution, demos, and feedback sessions before a fully signed/stable desktop release.
 
-Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2)
+Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3)
 
 Generated release assets:
 
 | Platform | Download asset | What it contains |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-windows-x64.zip) | a folder bundle with `IINTS-AF-Desktop-Beta.exe` |
-| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-macos.zip) | a macOS `.app` bundle when PyInstaller creates one |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-linux-x64.zip) | a folder bundle with the Linux executable |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-windows-x64.exe) | a direct Windows executable |
+| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-macos.dmg) | a macOS disk image containing the app |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-linux-x64) | a direct Linux executable |
 
-Each zip is published with a matching `.sha256` checksum file.
+Each download is published with a matching `.sha256` checksum file.
 
 ### Create A Desktop Beta Release
 
@@ -290,25 +287,24 @@ The workflow can also publish automatically when a tag matching `desktop-beta*` 
 Windows:
 
 ```text
-Download IINTS-AF-Desktop-Beta-windows-x64.zip
-Extract the zip
-Open IINTS-AF-Desktop-Beta.exe
+Download IINTS-AF-Desktop-Beta-windows-x64.exe
+Open the downloaded executable
 ```
 
 macOS:
 
 ```text
-Download IINTS-AF-Desktop-Beta-macos.zip
-Extract the zip
-Open the IINTS-AF-Desktop-Beta app bundle
+Download IINTS-AF-Desktop-Beta-macos.dmg
+Open the disk image
+Open the IINTS-AF Desktop app
 ```
 
 Linux:
 
 ```bash
-Download IINTS-AF-Desktop-Beta-linux-x64.zip
-unzip IINTS-AF-Desktop-Beta-linux-x64.zip
-./IINTS-AF-Desktop-Beta/IINTS-AF-Desktop-Beta
+Download IINTS-AF-Desktop-Beta-linux-x64
+chmod +x IINTS-AF-Desktop-Beta-linux-x64
+./IINTS-AF-Desktop-Beta-linux-x64
 ```
 
 Beta caveats:
@@ -323,19 +319,12 @@ Beta caveats:
 Install the desktop build extra:
 
 ```bash
-python -m pip install -U -e ".[full,desktop,mdmp]"
-```
-
-Then build:
-
-```bash
-python tools/desktop/build_desktop_app.py
-```
-
-For the preferred PySide6/Qt version:
-
-```bash
 python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+```
+
+Then build the preferred PySide6/Qt app:
+
+```bash
 python tools/desktop/build_qt_desktop_app.py
 ```
 
@@ -347,18 +336,18 @@ Platform expectations:
 | --- | --- |
 | Windows | `.exe` |
 | macOS | `.app`-style bundle or executable depending on PyInstaller mode |
-| Linux | executable/onedir bundle; AppImage can be added later |
+| Linux | executable; AppImage can be added later |
 
 For debugging, keep the console visible:
 
 ```bash
-python tools/desktop/build_desktop_app.py --console
+python tools/desktop/build_qt_desktop_app.py --console
 ```
 
 For a folder bundle instead of a single-file executable:
 
 ```bash
-python tools/desktop/build_desktop_app.py --onedir
+python tools/desktop/build_qt_desktop_app.py --onedir
 ```
 
 ## Smoke Test
@@ -377,10 +366,10 @@ The Qt entry point also supports a direct smoke mode:
 QT_QPA_PLATFORM=offscreen iints-desktop-qt --smoke
 ```
 
-After building an onedir bundle, the generated executable can be checked the same way:
+After building the default single-file Linux bundle, the generated executable can be checked the same way:
 
 ```bash
-QT_QPA_PLATFORM=offscreen dist/IINTS-AF-Desktop-Qt/IINTS-AF-Desktop-Qt --smoke
+QT_QPA_PLATFORM=offscreen dist/IINTS-AF-Desktop-Qt --smoke
 ```
 
 ## Why Not Rewrite The SDK In Another Language?

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import sys
-import zipfile
+import shutil
+import subprocess
 from pathlib import Path
 
 
@@ -27,17 +27,6 @@ def find_bundle(dist_dir: Path, app_name: str) -> Path:
     )
 
 
-def add_to_zip(zip_file: zipfile.ZipFile, source: Path, archive_root: str) -> None:
-    if source.is_file():
-        zip_file.write(source, archive_root)
-        return
-
-    for path in sorted(source.rglob("*")):
-        if path.is_file():
-            relative = path.relative_to(source)
-            zip_file.write(path, str(Path(archive_root) / relative))
-
-
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -46,8 +35,76 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _copy_executable(source: Path, target: Path) -> None:
+    if not source.is_file():
+        raise SystemExit(f"Expected executable file, got: {source}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, target)
+    mode = target.stat().st_mode
+    target.chmod(mode | 0o111)
+
+
+def _bundle_executable(bundle: Path, app_name: str, suffix: str = "") -> Path:
+    if bundle.is_file():
+        return bundle
+    candidate = bundle / f"{app_name}{suffix}"
+    if candidate.exists():
+        return candidate
+    found = "\n".join(str(path) for path in sorted(bundle.glob("*"))) or "<empty>"
+    raise SystemExit(f"Could not find executable for {app_name!r} in {bundle}.\nFound:\n{found}")
+
+
+def _create_dmg(bundle: Path, output_path: Path, app_name: str) -> None:
+    if bundle.suffix != ".app":
+        raise SystemExit(
+            f"macOS packaging expects a .app bundle so users can download a .dmg. Got: {bundle}"
+        )
+    if shutil.which("hdiutil") is None:
+        raise SystemExit("hdiutil is required to package the macOS desktop app as a .dmg.")
+    if output_path.exists():
+        output_path.unlink()
+    subprocess.run(
+        [
+            "hdiutil",
+            "create",
+            "-volname",
+            app_name,
+            "-srcfolder",
+            str(bundle),
+            "-ov",
+            "-format",
+            "UDZO",
+            str(output_path),
+        ],
+        check=True,
+    )
+
+
+def package_release_asset(bundle: Path, app_name: str, platform_label: str, output_dir: Path) -> Path:
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if platform_label.startswith("windows"):
+        source = _bundle_executable(bundle, app_name, ".exe")
+        target = output_dir / f"{app_name}-{platform_label}.exe"
+        _copy_executable(source, target)
+        return target
+
+    if platform_label == "macos":
+        target = output_dir / f"{app_name}-{platform_label}.dmg"
+        _create_dmg(bundle, target, app_name)
+        return target
+
+    if platform_label.startswith("linux"):
+        source = _bundle_executable(bundle, app_name)
+        target = output_dir / f"{app_name}-{platform_label}"
+        _copy_executable(source, target)
+        return target
+
+    raise SystemExit(f"Unsupported platform label for direct desktop asset packaging: {platform_label}")
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Package a PyInstaller desktop bundle as a release zip.")
+    parser = argparse.ArgumentParser(description="Package a PyInstaller desktop bundle as a direct release asset.")
     parser.add_argument("--dist-dir", default="dist", help="PyInstaller dist directory.")
     parser.add_argument("--app-name", default="IINTS-AF-Desktop-Beta", help="PyInstaller app/executable name.")
     parser.add_argument("--platform-label", required=True, help="Release platform label, e.g. windows-x64.")
@@ -56,22 +113,14 @@ def main() -> int:
 
     dist_dir = Path(args.dist_dir).resolve()
     output_dir = Path(args.output_dir).resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     bundle = find_bundle(dist_dir, args.app_name)
-    archive_name = f"{args.app_name}-{args.platform_label}.zip"
-    archive_path = output_dir / archive_name
-    archive_root = bundle.name
+    asset_path = package_release_asset(bundle, args.app_name, args.platform_label, output_dir)
 
-    compression = zipfile.ZIP_DEFLATED
-    with zipfile.ZipFile(archive_path, "w", compression=compression, compresslevel=9) as zip_file:
-        add_to_zip(zip_file, bundle, archive_root)
+    checksum = sha256_file(asset_path)
+    checksum_path = asset_path.with_name(asset_path.name + ".sha256")
+    checksum_path.write_text(f"{checksum}  {asset_path.name}\n", encoding="utf-8")
 
-    checksum = sha256_file(archive_path)
-    checksum_path = archive_path.with_suffix(archive_path.suffix + ".sha256")
-    checksum_path.write_text(f"{checksum}  {archive_name}\n", encoding="utf-8")
-
-    print(f"Packaged {bundle} -> {archive_path}")
+    print(f"Packaged {bundle} -> {asset_path}")
     print(f"SHA256 {checksum}")
     return 0
 

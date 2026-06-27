@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import traceback
 from pathlib import Path
@@ -21,6 +22,10 @@ from iints_desktop.engine import (
 from iints_desktop.local_ai import ask_local_ai, check_local_ai, start_local_ai_stack
 from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_html_path
 from iints_desktop.results import ResultPreview, load_results_preview
+
+DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3"
+UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
+PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"'
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
@@ -140,6 +145,44 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
+    class UpdateWorker(QObject):
+        """Background worker for Python-package SDK updates from source installs."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                if getattr(sys, "frozen", False):
+                    self.finished.emit(
+                        "Packaged app builds cannot self-update safely yet. "
+                        "Open the app downloads page and install the newest .exe/.dmg build."
+                    )
+                    return
+                command = [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    "-U",
+                    "iints-sdk-python35[full,desktop-qt,mdmp]",
+                ]
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                output = completed.stdout or ""
+                if completed.returncode != 0:
+                    raise RuntimeError(output or f"pip exited with code {completed.returncode}")
+                self.finished.emit(output or "SDK package update completed.")
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
     class PAEWorker(QObject):
         """Background worker that renders an interactive AlphaFold PAE heatmap."""
 
@@ -239,6 +282,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.ai_worker: AIWorker | None = None
             self.ai_start_thread: QThread | None = None
             self.ai_start_worker: LocalAIStartWorker | None = None
+            self.update_thread: QThread | None = None
+            self.update_worker: UpdateWorker | None = None
             self.pae_thread: QThread | None = None
             self.pae_worker: PAEWorker | None = None
             self.biology_thread: QThread | None = None
@@ -324,6 +369,14 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.simulate_mutation_button = QPushButton("Simulate ClinVar Mutation")
             self.render_pathways_button = QPushButton("Render STRING Pathways")
             self.open_structural_folder_button = QPushButton("Open Biology Output Folder")
+            self.open_app_downloads_button = QPushButton("Open App Downloads")
+            self.open_update_docs_button = QPushButton("Open Update Docs")
+            self.copy_update_command_button = QPushButton("Copy Update Command")
+            self.run_package_update_button = QPushButton("Update Python SDK Package")
+            self.update_status = QLabel("No update action has run yet.")
+            self.update_status.setWordWrap(True)
+            self.update_log = QTextEdit()
+            self.update_log.setReadOnly(True)
 
             self._build_ui()
             self._apply_style()
@@ -925,6 +978,40 @@ if _PYSIDE_IMPORT_ERROR is None:
             intro.setWordWrap(True)
             layout.addWidget(intro)
 
+            update_box = QGroupBox("Updates")
+            update_layout = QVBoxLayout(update_box)
+            update_help = QLabel(
+                "Use this panel to get the newest desktop app build or update a Python-based SDK install. "
+                "Packaged .exe/.dmg builds open the download page; Python installs can run the pip update command."
+            )
+            update_help.setWordWrap(True)
+            update_layout.addWidget(update_help)
+            self.update_status.setObjectName("updateStatus")
+            update_layout.addWidget(self.update_status)
+            self.open_app_downloads_button.clicked.connect(self._open_app_downloads)
+            self.open_update_docs_button.clicked.connect(self._open_update_docs)
+            self.copy_update_command_button.clicked.connect(self._copy_update_command)
+            self.run_package_update_button.clicked.connect(self._run_package_update)
+            if getattr(sys, "frozen", False):
+                self.run_package_update_button.setEnabled(False)
+                self.update_status.setText(
+                    "Packaged app mode: download the newest .exe/.dmg/Linux build to update the app."
+                )
+            update_layout.addLayout(
+                self._button_grid(
+                    [
+                        self.open_app_downloads_button,
+                        self.open_update_docs_button,
+                        self.copy_update_command_button,
+                        self.run_package_update_button,
+                    ],
+                    columns=2,
+                )
+            )
+            self.update_log.setMinimumHeight(110)
+            update_layout.addWidget(self.update_log)
+            layout.addWidget(update_box)
+
             for preset in self.presets:
                 label = QLabel(f"<b>{preset.title}</b><br>{preset.description}")
                 label.setWordWrap(True)
@@ -1050,7 +1137,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                     border: 1px solid #a9c5ad;
                     padding: 6px 8px;
                 }
-                QLabel#moleculePAEStatus, QLabel#biologyActionStatus {
+                QLabel#moleculePAEStatus, QLabel#biologyActionStatus, QLabel#updateStatus {
                     background: #f4f7f4;
                     color: #2f4830;
                     border: 1px solid #bdcdbd;
@@ -1721,6 +1808,78 @@ if _PYSIDE_IMPORT_ERROR is None:
             folder = Path("results") / "structural"
             folder.mkdir(parents=True, exist_ok=True)
             self._open_path(folder)
+
+        def _open_app_downloads(self) -> None:
+            QDesktopServices.openUrl(QUrl(DESKTOP_RELEASE_URL))
+            self.status.setText("Opened app downloads")
+
+        def _open_update_docs(self) -> None:
+            QDesktopServices.openUrl(QUrl(UPDATE_DOCS_URL))
+            self.status.setText("Opened update docs")
+
+        def _copy_update_command(self) -> None:
+            QApplication.clipboard().setText(PYTHON_SDK_UPDATE_COMMAND)
+            self.update_status.setText(f"Copied: {PYTHON_SDK_UPDATE_COMMAND}")
+            self.status.setText("Update command copied")
+
+        def _run_package_update(self) -> None:
+            if self.update_thread is not None:
+                QMessageBox.information(self, "IINTS-AF Desktop", "An update action is already running.")
+                return
+            if getattr(sys, "frozen", False):
+                QMessageBox.information(
+                    self,
+                    "IINTS-AF Desktop",
+                    "Packaged app builds update by downloading the newest app build. "
+                    "Use 'Open App Downloads'.",
+                )
+                return
+            if QMessageBox.question(
+                self,
+                "Update Python SDK package",
+                "Run pip to update iints-sdk-python35 in this Python environment?",
+            ) != QMessageBox.StandardButton.Yes:
+                return
+            self.run_package_update_button.setEnabled(False)
+            self.update_status.setText("Updating Python SDK package...")
+            self.update_log.setPlainText(PYTHON_SDK_UPDATE_COMMAND + "\n\nWorking...")
+            self.status.setText("Updating SDK package")
+
+            thread = QThread(self)
+            worker = UpdateWorker()
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_update_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_update_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_update_refs)
+            self.update_thread = thread
+            self.update_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_update_success(self, result: object) -> None:
+            text = str(result)
+            self.update_status.setText("SDK package update finished. Restart the app to use updated code.")
+            self.update_log.setPlainText(text)
+            self.run_package_update_button.setEnabled(True)
+            self.status.setText("SDK update finished")
+
+        @Slot(str)
+        def _handle_update_error(self, details: str) -> None:
+            self.update_status.setText("SDK package update failed. See details below.")
+            self.update_log.setPlainText(details)
+            self.run_package_update_button.setEnabled(True)
+            self.status.setText("SDK update failed")
+
+        @Slot()
+        def _clear_update_refs(self) -> None:
+            self.update_thread = None
+            self.update_worker = None
 
         def _save_log(self) -> None:
             default_path = Path(self.output_dir.text()).expanduser() / "iints-desktop-log.txt"

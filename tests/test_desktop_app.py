@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -218,3 +219,57 @@ def test_qt_app_exposes_biology_evidence_actions() -> None:
     assert "Render STRING Pathways" in source
     assert "gtex-expression" in source
     assert "clinvar-mutation" in source
+
+
+def test_qt_app_exposes_desktop_update_panel() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "DESKTOP_RELEASE_URL" in source
+    assert "desktop-beta-2026-06-27-3" in source
+    assert "class UpdateWorker" in source
+    assert "Open App Downloads" in source
+    assert "Open Update Docs" in source
+    assert "Copy Update Command" in source
+    assert "Update Python SDK Package" in source
+    assert "iints-sdk-python35[full,desktop-qt,mdmp]" in source
+
+
+def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    app_install = Path("docs/APP_INSTALL.md").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
+
+    combined = "\n".join([readme, app_install])
+    assert "desktop-app" not in combined
+    assert "IINTS-AF-Desktop-Beta-windows-x64.exe" in combined
+    assert "IINTS-AF-Desktop-Beta-macos.dmg" in combined
+    assert "IINTS-AF-Desktop-Beta-linux-x64" in combined
+    assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
+    assert "IINTS-AF-Desktop-Beta-macos.zip" not in workflow
+
+
+def test_desktop_packager_creates_direct_windows_and_linux_assets(tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "package_desktop_bundle",
+        Path("tools/desktop/package_desktop_bundle.py"),
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    app_name = "IINTS-AF-Desktop-Beta"
+    windows_bundle = tmp_path / f"{app_name}.exe"
+    windows_bundle.write_bytes(b"fake-windows-exe")
+    linux_bundle = tmp_path / app_name
+    linux_bundle.write_bytes(b"fake-linux-exe")
+    output_dir = tmp_path / "desktop-dist"
+
+    windows_asset = module.package_release_asset(windows_bundle, app_name, "windows-x64", output_dir)
+    linux_asset = module.package_release_asset(linux_bundle, app_name, "linux-x64", output_dir)
+
+    assert windows_asset.name == "IINTS-AF-Desktop-Beta-windows-x64.exe"
+    assert windows_asset.read_bytes() == b"fake-windows-exe"
+    assert linux_asset.name == "IINTS-AF-Desktop-Beta-linux-x64"
+    assert linux_asset.read_bytes() == b"fake-linux-exe"
+    assert linux_asset.stat().st_mode & 0o111
