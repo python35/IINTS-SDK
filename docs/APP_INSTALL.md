@@ -13,13 +13,13 @@ It is still research software. It is not a medical device and must not be used f
 
 The current desktop beta release is available on GitHub:
 
-[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1)
+[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2)
 
 | Platform | Download | Start |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-windows-x64.zip) | extract the zip, then open `IINTS-AF-Desktop-Beta.exe` |
-| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-macos.zip) | extract the zip, then open the `.app` bundle |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-linux-x64.zip) | extract the zip, then run `./IINTS-AF-Desktop-Beta` |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-windows-x64.zip) | extract the zip, then open `IINTS-AF-Desktop-Beta.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-macos.zip) | extract the zip, then open the `.app` bundle |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-linux-x64.zip) | extract the zip, then run `./IINTS-AF-Desktop-Beta` |
 
 These beta builds are unsigned. Windows or macOS may show a security warning until the project has code-signing certificates.
 

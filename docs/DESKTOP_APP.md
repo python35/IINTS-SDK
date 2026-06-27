@@ -261,15 +261,15 @@ sudo apt install python3-tk
 
 The repository includes a `Desktop Beta Builds` GitHub Actions workflow that builds downloadable native app bundles for the three main desktop platforms. It is intended for beta distribution, demos, and feedback sessions before a fully signed/stable desktop release.
 
-Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1)
+Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-2)
 
 Generated release assets:
 
 | Platform | Download asset | What it contains |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-windows-x64.zip) | a folder bundle with `IINTS-AF-Desktop-Beta.exe` |
-| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-macos.zip) | a macOS `.app` bundle when PyInstaller creates one |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-linux-x64.zip) | a folder bundle with the Linux executable |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-windows-x64.zip) | a folder bundle with `IINTS-AF-Desktop-Beta.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-macos.zip) | a macOS `.app` bundle when PyInstaller creates one |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-2/IINTS-AF-Desktop-Beta-linux-x64.zip) | a folder bundle with the Linux executable |
 
 Each zip is published with a matching `.sha256` checksum file.
 
