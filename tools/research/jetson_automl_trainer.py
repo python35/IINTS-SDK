@@ -117,7 +117,7 @@ def preflight(dataset: Path, trials_dir: Path, champion_dir: Path) -> None:
     if glucose_model_config_payload is None:
         raise SystemExit(
             "Could not import the installed IINTS SDK. Activate your venv and run from the SDK repo: "
-            "source .venv/bin/activate && python scratch/jetson_automl_trainer.py"
+            "source .venv/bin/activate && python tools/research/jetson_automl_trainer.py"
         )
     if shutil.which("iints") is None:
         raise SystemExit("The 'iints' CLI is not on PATH. Activate the SDK venv or run: pip install -e .")

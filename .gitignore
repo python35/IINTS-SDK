@@ -58,6 +58,8 @@ coverage.xml
 *.tmp
 *.log
 local/
+scratch/
+.agents/
 .DS_Store
 .mplt_demo/
 .mplt_test/
@@ -97,6 +99,7 @@ docssphinx/_build/
 site/
 
 # Obsidian working vaults
+docs/obsidian/
 obsidian/IINTS OS - Smart Vault v2/
 obsidian/IINTS_OS_Smart_Vault_v2.zip
 obsidian/public/*.zip

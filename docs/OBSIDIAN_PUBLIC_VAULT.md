@@ -26,11 +26,12 @@ After downloading:
 4. Select `IINTS SDK Public Vault`.
 5. Start at `00 START HERE.md`.
 
-## Browse On GitHub
+## Repository Hygiene
 
-After this repository is pushed, the vault can also be browsed directly on GitHub:
-
-[Browse the public vault folder](https://github.com/python35/IINTS-SDK/tree/main/docs/obsidian/public/IINTS%20SDK%20Public%20Vault)
+The repository keeps the public vault as a downloadable ZIP only. The expanded
+Obsidian working folder is intentionally not tracked in Git because it duplicates
+large parts of the documentation tree and includes editor-specific workspace
+state.
 
 ## Obsidian Publish
 
@@ -38,7 +39,8 @@ This public vault is prepared as an Obsidian Publish package. Publishing still r
 
 If you publish it:
 
-- publish the folder `docs/obsidian/public/IINTS SDK Public Vault`
+- unzip `docs/assets/vaults/IINTS_SDK_Public_Obsidian_Vault.zip`
+- publish the extracted folder `IINTS SDK Public Vault`
 - do not publish the private/internal vault
 - keep private notes, credentials, local results, and personal meeting notes out of the public vault
 

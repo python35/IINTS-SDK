@@ -135,6 +135,6 @@ The command sets conservative thread limits for subprocesses and compares every
 candidate before promotion. On a Nano, start with `--batch-size 64`; increase
 only after you have verified stable thermals and memory.
 
-The older `scratch/jetson_automl_trainer.py` script is still useful for local
+The `tools/research/jetson_automl_trainer.py` script remains available for local
 experiments, but the HF-first command is the preferred path when your model
 already lives on Hugging Face.
