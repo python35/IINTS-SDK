@@ -353,7 +353,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.pae_thread: QThread | None = None
             self.pae_worker: PAEWorker | None = None
             self.biology_thread: QThread | None = None
-            self.biology_worker: BiologyWorker | None = None
+            self.biology_worker: QObject | None = None
             self.tabs: QTabWidget | None = None
             self.workspace_status: QLabel | None = None
             self.molecules = list_molecule_assets()
