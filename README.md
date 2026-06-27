@@ -27,9 +27,9 @@ Current beta downloads:
 
 | Platform | Download |
 | --- | --- |
-| Windows | [`.exe`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-windows-x64.exe) |
-| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-macos.dmg) |
-| Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-linux-x64) |
+| Windows | [`.exe`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-6/IINTS-AF-Desktop-Beta-windows-x64.exe) |
+| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-6/IINTS-AF-Desktop-Beta-macos.dmg) |
+| Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-6/IINTS-AF-Desktop-Beta-linux-x64) |
 
 
 
