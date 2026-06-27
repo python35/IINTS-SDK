@@ -31,6 +31,8 @@ Current beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-4/IINTS-AF-Desktop-Beta-macos.dmg) |
 | Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-4/IINTS-AF-Desktop-Beta-linux-x64) |
 
+> **Note for macOS users:** You might see a warning stating *"Apple cannot check it for malicious software"*. Because this is an open-source beta, the app is currently unsigned. To bypass this, **Right-click (or Control-click)** the `.dmg` or the App icon and select **Open**, or run `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` in your terminal to clear the quarantine flag.
+
 The app is still research-only and uses the same SDK engine as the command-line tools.
 
 ## License
