@@ -42,6 +42,12 @@ def build_command(*, onefile: bool, windowed: bool, name: str) -> list[str]:
         "iints",
         "--collect-data",
         "iints_desktop",
+        "--collect-submodules",
+        "iints_desktop",
+        "--collect-all",
+        "PySide6",
+        "--collect-all",
+        "shiboken6",
         "--hidden-import",
         "iints.core.algorithms.clinical_baseline",
         "--hidden-import",
@@ -62,6 +68,8 @@ def build_command(*, onefile: bool, windowed: bool, name: str) -> list[str]:
         command.append("--onefile")
     if windowed:
         command.append("--windowed")
+    if sys.platform == "darwin":
+        command.extend(["--osx-bundle-identifier", "org.iints.desktop"])
     command.append(str(ENTRYPOINT))
     return command
 

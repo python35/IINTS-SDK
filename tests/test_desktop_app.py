@@ -242,12 +242,19 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
 
     assert 'sys.platform != "darwin"' in source
+    assert "QT_MAC_WANTS_LAYER" in source
     assert "ENABLE_EMBEDDED_WEBENGINE" in source
     assert "Library\" / \"Logs\" / \"IINTS-AF Desktop\" / \"desktop.log\"" in source
     assert "_install_crash_logging()" in source
     assert "faulthandler.enable" in source
     assert 'if sys.platform != "darwin"' in build_source
+    assert "--collect-all" in build_source
+    assert "PySide6" in build_source
+    assert "shiboken6" in build_source
+    assert "--osx-bundle-identifier" in build_source
     assert "--onedir --name" in workflow
+    assert "Smoke test bundled app on macOS" in workflow
+    assert "continue-on-error: true\n        shell: bash\n        env:" not in workflow.split("Smoke test bundled app on macOS", 1)[1].split("Best-effort bundled smoke on Windows", 1)[0]
 
 
 def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:

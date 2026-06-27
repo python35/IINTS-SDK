@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox"
+if sys.platform == "darwin":
+    os.environ.setdefault("QT_MAC_WANTS_LAYER", "1")
 
 import traceback
 import faulthandler

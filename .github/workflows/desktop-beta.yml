@@ -92,22 +92,27 @@ jobs:
           echo "Smoke testing: $exe"
           "$exe" --smoke
 
-      - name: Best-effort bundled smoke on Windows/macOS
-        if: runner.os != 'Linux'
+      - name: Smoke test bundled app on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
+          echo "Smoke testing macOS app: $exe"
+          "$exe" --smoke
+
+      - name: Best-effort bundled smoke on Windows
+        if: runner.os == 'Windows'
         continue-on-error: true
         shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            exe="dist/${APP_NAME}.exe"
-          elif [[ -x "dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}" ]]; then
-            exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
-          else
-            exe="dist/${APP_NAME}"
-          fi
-          echo "Best-effort smoke testing: $exe"
+          exe="dist/${APP_NAME}.exe"
+          echo "Best-effort smoke testing Windows app: $exe"
           "$exe" --smoke
 
       - name: Sign Windows executable when certificate secrets exist
