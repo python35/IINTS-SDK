@@ -3,11 +3,12 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import os
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox"
 
 import traceback
+import faulthandler
 from pathlib import Path
+from typing import Any, cast
 
 from iints.ai.backends.ollama import DEFAULT_MINISTRAL_MODEL
 
@@ -28,9 +29,48 @@ from iints_desktop.results import ResultPreview, load_results_preview
 from iints_desktop.fetcher import fetch_alphafold_structure
 from iints_desktop.render_3dmol import generate_3dmol_html
 
-DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-8"
+DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-9"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
 PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"'
+ENABLE_EMBEDDED_WEBENGINE = (
+    sys.platform != "darwin" and os.environ.get("QT_QPA_PLATFORM") != "offscreen"
+)
+_CRASH_LOG_HANDLE: Any | None = None
+
+
+def _desktop_log_path() -> Path:
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Logs" / "IINTS-AF Desktop" / "desktop.log"
+    if sys.platform.startswith("win"):
+        return Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "IINTS-AF Desktop" / "desktop.log"
+    return Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))) / "iints-af-desktop" / "desktop.log"
+
+
+def _write_startup_log(message: str) -> None:
+    try:
+        log_path = _desktop_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(message.rstrip() + "\n")
+    except Exception:
+        pass
+
+
+def _install_crash_logging() -> None:
+    global _CRASH_LOG_HANDLE
+    try:
+        log_path = _desktop_log_path()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        _CRASH_LOG_HANDLE = log_path.open("a", encoding="utf-8")
+        _CRASH_LOG_HANDLE.write("\n--- IINTS-AF Desktop startup ---\n")
+        _CRASH_LOG_HANDLE.write(f"platform={sys.platform} executable={sys.executable}\n")
+        _CRASH_LOG_HANDLE.flush()
+        faulthandler.enable(file=_CRASH_LOG_HANDLE)
+    except Exception:
+        pass
+
+
+_install_crash_logging()
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
@@ -67,9 +107,12 @@ except ModuleNotFoundError as exc:  # pragma: no cover - optional GUI dependency
     _QWEBENGINE_VIEW = None
 else:  # pragma: no cover - optional GUI dependency
     _PYSIDE_IMPORT_ERROR = None
-    try:
-        from PySide6.QtWebEngineWidgets import QWebEngineView as _QWEBENGINE_VIEW  # type: ignore[import-not-found,no-redef]
-    except ModuleNotFoundError:
+    if ENABLE_EMBEDDED_WEBENGINE:
+        try:
+            from PySide6.QtWebEngineWidgets import QWebEngineView as _QWEBENGINE_VIEW  # type: ignore[import-not-found,no-redef]
+        except ModuleNotFoundError:
+            _QWEBENGINE_VIEW = None
+    else:
         _QWEBENGINE_VIEW = None
 
 
@@ -359,7 +402,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_status.setWordWrap(True)
             self.biology_action_output = QTextEdit()
             self.biology_action_output.setReadOnly(True)
-            self.pae_web_view: QWidget | None = None
+            self.molecule_web_view: Any | None = None
+            self.pae_web_view: Any | None = None
 
             self.run_button = QPushButton("Run Selected Workflow")
             self.open_folder_button = QPushButton("Open Output Folder")
@@ -1635,7 +1679,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         @Slot(object)
         def _handle_fetch_success(self, result: object) -> None:
             self.fetch_uniprot_button.setEnabled(True)
-            cif_path, html_path, uniprot_id = result
+            cif_path, _html_path, uniprot_id = cast(tuple[Path, Path, str], result)
             
             # Create a dynamic MoleculeAsset
             from iints_desktop.molecules import MoleculeAsset
@@ -1671,6 +1715,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _on_molecule_changed(self) -> None:
             if not self.molecules or self.molecule_viewer is None:
                 return
+            viewer = self.molecule_viewer
             molecule = self._selected_molecule()
             self.molecule_title.setText(
                 f"<b>{molecule.title}</b><br>UniProt {molecule.uniprot_id} / AlphaFold structure"
@@ -1679,19 +1724,19 @@ if _PYSIDE_IMPORT_ERROR is None:
                 f"{molecule.explanation}<br><br>"
                 f"<b>{molecule.sdk_link}</b>"
             )
-            self.molecule_viewer.set_structure(
+            viewer.set_structure(
                 molecule.structure_path,
                 display_name=f"{molecule.title} / UniProt {molecule.uniprot_id}",
             )
-            if self.molecule_viewer.error:
+            if viewer.error:
                 self.molecule_structure_status.setText(
-                    f"3D structure could not be loaded: {self.molecule_viewer.error}"
+                    f"3D structure could not be loaded: {viewer.error}"
                 )
                 self.molecule_structure_status.setStyleSheet(
                     "background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;"
                 )
             else:
-                structure = self.molecule_viewer.structure
+                structure = viewer.structure
                 residue_count = len(structure.atoms) if structure else 0
                 chain_count = structure.chain_count if structure else 0
                 self.molecule_structure_status.setText(
@@ -1701,18 +1746,19 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.molecule_structure_status.setStyleSheet("")
 
             # 3Dmol.js rendering path
-            if getattr(self, "molecule_web_view", None) is not None:
+            web_view = self.molecule_web_view
+            if web_view is not None:
                 from iints_desktop.render_3dmol import generate_3dmol_html
                 try:
                     out_dir = Path("results") / "structural"
                     html_path = generate_3dmol_html(molecule.structure_path, out_dir)
-                    self.molecule_web_view.setUrl(QUrl.fromLocalFile(str(html_path.absolute())))
-                    self.molecule_viewer.hide()
-                    self.molecule_web_view.show()
+                    web_view.setUrl(QUrl.fromLocalFile(str(html_path.absolute())))
+                    viewer.hide()
+                    web_view.show()
                 except Exception as e:
                     print(f"3Dmol.js render failed: {e}")
-                    self.molecule_web_view.hide()
-                    self.molecule_viewer.show()
+                    web_view.hide()
+                    viewer.show()
             
 
             if molecule.image_path.exists():
@@ -2135,31 +2181,38 @@ def _apply_application_palette(app: QApplication) -> None:
 
 def main() -> int:
     if _PYSIDE_IMPORT_ERROR is not None:
-        raise RuntimeError(
+        message = (
             "PySide6 is not installed. Install it with: "
             'python -m pip install -U -e ".[full,desktop-qt,mdmp]"'
-        ) from _PYSIDE_IMPORT_ERROR
-
-    app = QApplication(sys.argv)
-    _apply_application_palette(app)
-    window = IINTSQtDesktopApp()
-    if "--smoke" in sys.argv:
-        window.resize(760, 520)
-        app.processEvents()
-        window.resize(1240, 820)
-        app.processEvents()
-        print(
-            "Qt desktop smoke OK:",
-            window.windowTitle(),
-            f"workflows={window.workflow_combo.count()}",
-            f"history_rows={window.history_table.rowCount()}",
-            f"min={window.minimumWidth()}x{window.minimumHeight()}",
         )
-        window.close()
-        app.quit()
-        return 0
-    window.show()
-    return app.exec()
+        _write_startup_log(message)
+        raise RuntimeError(message) from _PYSIDE_IMPORT_ERROR
+
+    try:
+        app = QApplication(sys.argv)
+        _apply_application_palette(app)
+        window = IINTSQtDesktopApp()
+        if "--smoke" in sys.argv:
+            window.resize(760, 520)
+            app.processEvents()
+            window.resize(1240, 820)
+            app.processEvents()
+            print(
+                "Qt desktop smoke OK:",
+                window.windowTitle(),
+                f"workflows={window.workflow_combo.count()}",
+                f"history_rows={window.history_table.rowCount()}",
+                f"min={window.minimumWidth()}x{window.minimumHeight()}",
+            )
+            window.close()
+            app.quit()
+            return 0
+        window.show()
+        return app.exec()
+    except Exception:
+        details = traceback.format_exc()
+        _write_startup_log(details)
+        raise
 
 
 if __name__ == "__main__":

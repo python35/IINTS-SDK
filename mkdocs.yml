@@ -63,6 +63,7 @@ nav:
       - 5-Minute Quickstart: QUICKSTART.md
       - Desktop App: DESKTOP_APP.md
       - Desktop App Install: APP_INSTALL.md
+      - Desktop App Signing: DESKTOP_SIGNING.md
       - Command Cheatsheet: CLI_CHEATSHEET.md
       - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 from pathlib import Path
 
 import pytest
@@ -226,7 +227,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
 
     assert "DESKTOP_RELEASE_URL" in source
-    assert "desktop-beta-2026-06-27-8" in source
+    assert "desktop-beta-2026-06-27-9" in source
     assert "class UpdateWorker" in source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
@@ -235,16 +236,38 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     assert "iints-sdk-python35[full,desktop-qt,mdmp]" in source
 
 
-def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
-    readme = Path("README.md").read_text(encoding="utf-8")
-    app_install = Path("docs/APP_INSTALL.md").read_text(encoding="utf-8")
+def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    build_source = Path("tools/desktop/build_qt_desktop_app.py").read_text(encoding="utf-8")
     workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
 
-    combined = "\n".join([readme, app_install])
+    assert 'sys.platform != "darwin"' in source
+    assert "ENABLE_EMBEDDED_WEBENGINE" in source
+    assert "Library\" / \"Logs\" / \"IINTS-AF Desktop\" / \"desktop.log\"" in source
+    assert "_install_crash_logging()" in source
+    assert "faulthandler.enable" in source
+    assert 'if sys.platform != "darwin"' in build_source
+    assert "--onedir --name" in workflow
+
+
+def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+    app_install = Path("docs/APP_INSTALL.md").read_text(encoding="utf-8")
+    desktop_docs = Path("docs/DESKTOP_APP.md").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
+    release_tag_match = re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", source)
+    assert release_tag_match is not None
+    release_tag = release_tag_match.group(0)
+
+    combined = "\n".join([readme, app_install, desktop_docs])
     assert "desktop-app" not in combined
     assert "IINTS-AF-Desktop-Beta-windows-x64.exe" in combined
     assert "IINTS-AF-Desktop-Beta-macos.dmg" in combined
     assert "IINTS-AF-Desktop-Beta-linux-x64" in combined
+    assert release_tag in readme
+    assert release_tag in app_install
+    assert release_tag in desktop_docs
     assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
     assert "IINTS-AF-Desktop-Beta-macos.zip" not in workflow
 
@@ -275,3 +298,18 @@ def test_desktop_packager_creates_direct_windows_and_linux_assets(tmp_path: Path
     assert linux_asset.read_bytes() == b"fake-linux-exe"
     if os.name != "nt":
         assert linux_asset.stat().st_mode & 0o111
+
+
+def test_desktop_beta_workflow_documents_optional_signing() -> None:
+    workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
+    signing_docs = Path("docs/DESKTOP_SIGNING.md").read_text(encoding="utf-8")
+
+    assert "WINDOWS_SIGNING_PFX_BASE64" in workflow
+    assert "signtool" in workflow
+    assert "MACOS_CERTIFICATE_P12_BASE64" in workflow
+    assert "codesign --deep --force --options runtime" in workflow
+    assert "xcrun notarytool submit" in workflow
+    assert "xcrun stapler staple" in workflow
+    assert "WINDOWS_SIGNING_PFX_BASE64" in signing_docs
+    assert "MACOS_CERTIFICATE_P12_BASE64" in signing_docs
+    assert "APPLE_APP_SPECIFIC_PASSWORD" in signing_docs

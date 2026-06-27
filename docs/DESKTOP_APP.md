@@ -258,15 +258,15 @@ sudo apt install python3-tk
 
 The repository includes a `Desktop Beta Builds` GitHub Actions workflow that builds downloadable native app bundles for the three main desktop platforms. It is intended for beta distribution, demos, and feedback sessions before a fully signed/stable desktop release.
 
-Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3)
+Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-9](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-9)
 
 Generated release assets:
 
 | Platform | Download asset | What it contains |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-windows-x64.exe) | a direct Windows executable |
-| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-macos.dmg) | a macOS disk image containing the app |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-3/IINTS-AF-Desktop-Beta-linux-x64) | a direct Linux executable |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-9/IINTS-AF-Desktop-Beta-windows-x64.exe) | a direct Windows executable |
+| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-9/IINTS-AF-Desktop-Beta-macos.dmg) | a macOS disk image containing the app |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-9/IINTS-AF-Desktop-Beta-linux-x64) | a direct Linux executable |
 
 Each download is published with a matching `.sha256` checksum file.
 
@@ -309,7 +309,7 @@ chmod +x IINTS-AF-Desktop-Beta-linux-x64
 
 Beta caveats:
 
-- Windows and macOS builds may show operating-system security warnings until the project has code-signing certificates.
+- Windows and macOS builds may show operating-system security warnings until release signing and notarization secrets are configured. See [Desktop App Signing](DESKTOP_SIGNING.md).
 - The desktop app is research-only and not a medical device.
 - The app is a GUI wrapper around the SDK engine; reproducible CLI workflows remain the source of truth.
 - Local AI review can start and prepare Ollama when Ollama is installed locally; first-time model download may take a while.
