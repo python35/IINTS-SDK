@@ -1,28 +1,48 @@
-# IINTS-AF Desktop App Branch
+# IINTS-AF Desktop App
 
 This branch is the app-focused entry point for IINTS-AF.
 
-Use this branch if you mainly want the native desktop workbench instead of starting with the full command-line SDK documentation.
+IINTS-AF Desktop is a native research workbench for diabetes-technology simulation. It lets you run SDK demo workflows, load generated results, preview glucose graphs, open reports, ask local AI questions, and inspect biology evidence artifacts without needing to remember every CLI command.
 
-The desktop app uses the same IINTS-AF SDK engine underneath. It does not duplicate formulas, safety logic, reports, or simulation code.
+The app uses the same IINTS-AF SDK engine underneath. It does not duplicate formulas, safety logic, reports, or simulation code.
 
-IINTS-AF is research and education software. It is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
+IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
 
-## What The App Is
+## Download The Beta App
 
-The IINTS-AF Desktop App is a native research workbench for diabetes-technology simulation.
+Current beta release:
 
-It helps you:
+[Desktop Beta Release: desktop-beta-2026-06-27-1](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1)
 
-- run curated digital-patient demo workflows
-- open generated SDK results folders
-- load `results.csv` files
-- preview glucose graphs and metrics
-- open generated PDF/AGP/report artifacts
-- ask local Ollama/Mistral questions about a loaded run
-- inspect bundled structural-biology context such as insulin/glucagon AlphaFold assets
+| Platform | Download | How to start |
+| --- | --- | --- |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-windows-x64.zip) | extract the zip, then open `IINTS-AF-Desktop-Beta.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-macos.zip) | extract the zip, then open the `.app` bundle |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-linux-x64.zip) | extract the zip, then run `./IINTS-AF-Desktop-Beta` |
 
-## Install From This Branch
+These beta builds are unsigned. Windows or macOS may show a security warning until the project has code-signing certificates.
+
+## What The App Can Do
+
+- Run curated digital-patient demo workflows.
+- Load `results.csv` files.
+- Preview glucose graphs and summary metrics.
+- Open generated PDF, AGP, CSV, and output folders.
+- Ask local Ollama/Mistral questions about a loaded run.
+- View bundled AlphaFold insulin/glucagon structures.
+- Generate PAE heatmaps.
+- Run biology evidence actions for GTEx, ChEMBL, ClinVar, and STRING.
+
+## Install From Python Instead
+
+If you prefer installing from PyPI:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+If you want the app branch source code:
 
 ```bash
 git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
@@ -43,15 +63,6 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
 python -m pip install -U -e ".[full,desktop-qt,mdmp]"
-iints-desktop
-```
-
-## Install From PyPI
-
-If you do not need the branch source code, install the app directly:
-
-```bash
-python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
 iints-desktop
 ```
 
@@ -77,12 +88,7 @@ Force the lightweight Tkinter app.
 
 ## First Run
 
-1. Start the app:
-
-```bash
-iints-desktop
-```
-
+1. Start the app with `iints-desktop`.
 2. Choose an output folder.
 3. Pick a workflow such as `Doctor safety discussion`, `EUCYS experiment run`, or `Booth / public demo`.
 4. Click `Run Selected Workflow`.
@@ -92,43 +98,22 @@ iints-desktop
 
 The app can use local Ollama/Mistral models for research-only explanation of loaded results.
 
-Install Ollama once, then in the app click `Start Local AI`.
-
-The app can start the local Ollama server and prepare the selected model when the Ollama binary is available.
+Install Ollama once, then click `Start Local AI` in the app. The app can start the local Ollama server and prepare the selected model when the Ollama binary is available.
 
 The AI mode is only a review assistant. It does not dose insulin, diagnose, or make treatment decisions.
 
-## What This Branch Contains
+## Branches
 
-This branch still includes the SDK source code because the app calls the SDK directly.
-
-Important paths:
-
-| Path | Purpose |
-| --- | --- |
-| `src/iints_desktop/` | native desktop app source |
-| `src/iints/` | SDK engine used by the app |
-| `docs/APP_INSTALL.md` | app-first installation guide |
-| `docs/DESKTOP_APP.md` | desktop app architecture and features |
-| `tools/desktop/` | app packaging helpers |
-| `.github/workflows/desktop-beta.yml` | beta desktop build workflow |
-
-## Full SDK Branch
-
-For full SDK development, CLI workflows, hardware docs, research tooling, and release maintenance, use `main`:
-
-```bash
-git clone https://github.com/python35/IINTS-SDK.git
-```
+- `main`: full SDK, docs, CLI, hardware, research, and app source.
+- `desktop-app`: app-focused landing branch with desktop download/install instructions.
 
 ## Documentation
 
-- [Desktop App Install](docs/APP_INSTALL.md)
-- [Desktop App Details](docs/DESKTOP_APP.md)
-- [Full Documentation Site](https://python35.github.io/IINTS-SDK/)
+- Website: [iints.org](https://iints.org)
+- Full docs: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
+- Desktop App Install: [docs/APP_INSTALL.md](docs/APP_INSTALL.md)
+- Desktop App Details: [docs/DESKTOP_APP.md](docs/DESKTOP_APP.md)
 
 ## License
 
 Apache-2.0 licensed, with legacy MIT notices where applicable.
-
-Built as research software by Rune Bobbaers.
