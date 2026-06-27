@@ -99,7 +99,22 @@ jobs:
           set -euo pipefail
           exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
           echo "Smoke testing macOS app: $exe"
-          "$exe" --smoke
+          set +e
+          "$exe" --smoke 2>&1 | tee macos-smoke.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$status" -ne 0 ]]; then
+            echo "::error::macOS desktop smoke failed with exit code $status"
+            echo "---- macOS smoke output ----"
+            cat macos-smoke.log || true
+            echo "---- app bundle files ----"
+            find "dist/${APP_NAME}.app" -maxdepth 4 -type f | sort | sed -n '1,240p' || true
+            echo "---- executable dependencies ----"
+            otool -L "$exe" || true
+            echo "---- IINTS desktop startup log ----"
+            cat "$HOME/Library/Logs/IINTS-AF Desktop/desktop.log" || true
+            exit "$status"
+          fi
 
       - name: Best-effort bundled smoke on Windows
         if: runner.os == 'Windows'
@@ -244,6 +259,9 @@ jobs:
             echo
             echo "desktop-dist files:"
             find desktop-dist -maxdepth 2 -type f -print 2>/dev/null | sort || true
+            echo
+            echo "macos smoke log:"
+            cat macos-smoke.log 2>/dev/null || true
           } > "desktop-debug/desktop-build-debug-${{ matrix.platform_label }}.txt"
 
       - name: Upload desktop artifact
