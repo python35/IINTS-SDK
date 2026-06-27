@@ -903,7 +903,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_viewer.setMinimumHeight(260)
             viewer_layout.addWidget(self.molecule_viewer, stretch=1)
 
-            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen" and sys.platform != "darwin":
                 self.molecule_web_view = _QWEBENGINE_VIEW()
                 self.molecule_web_view.setMinimumHeight(260)
                 viewer_layout.addWidget(self.molecule_web_view, stretch=1)
@@ -914,8 +914,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.reset_molecule_view_button.clicked.connect(self._reset_molecule_view)
             self.open_molecule_image_button.clicked.connect(self._open_selected_molecule_image)
             self.open_molecule_structure_button.clicked.connect(self._open_selected_molecule_structure)
+
+            self.open_3dmol_browser_button = QPushButton("Open 3D Viewer in Browser")
+            self.open_3dmol_browser_button.clicked.connect(self._open_3dmol_in_browser)
+            if sys.platform != "darwin":
+                self.open_3dmol_browser_button.hide() # hide if embedded web view works
+
+            
+            viewer_layout.addWidget(self.open_3dmol_browser_button)
             viewer_layout.addLayout(
                 self._button_grid(
+
                     [
                         self.reset_molecule_view_button,
                         self.open_molecule_image_button,
@@ -956,7 +965,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                     columns=3,
                 )
             )
-            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen" and sys.platform != "darwin":
                 self.pae_web_view = _QWEBENGINE_VIEW()
                 self.pae_web_view.setMinimumHeight(260)
                 pae_layout.addWidget(self.pae_web_view, stretch=1)
@@ -1729,7 +1738,22 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _open_selected_molecule_image(self) -> None:
             self._open_path(self._selected_molecule().image_path)
 
+
+        def _open_3dmol_in_browser(self) -> None:
+            molecule = self._selected_molecule()
+            if not molecule: return
+            from iints_desktop.render_3dmol import generate_3dmol_html
+            try:
+                from pathlib import Path
+                out_dir = Path("results") / "structural"
+                html_path = generate_3dmol_html(molecule.structure_path, out_dir)
+                import webbrowser
+                webbrowser.open(html_path.absolute().as_uri())
+            except Exception as e:
+                print(f"3Dmol.js render failed: {e}")
+
         def _open_selected_molecule_structure(self) -> None:
+
             self._open_path(self._selected_molecule().structure_path)
 
         def _selected_pae_target(self) -> str | None:

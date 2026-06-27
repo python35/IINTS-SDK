@@ -31,18 +31,7 @@ Current beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-macos.dmg) |
 | Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-5/IINTS-AF-Desktop-Beta-linux-x64) |
 
-### 🛡️ Why am I seeing a security warning? (Gatekeeper / SmartScreen)
-Because the IINTS-AF Desktop App is free, open-source academic software, it is not cryptografically signed with expensive commercial developer certificates from Apple or Microsoft. As a result, operating systems flag it with a default precaution warning. **This is completely normal for indie open-source tools.**
 
-* **macOS ("Apple cannot check it for malicious software")**:
-  Since recent macOS updates, Apple often blocks the traditional "Right-click -> Open" bypass. You have two easy workarounds:
-  1. **Easiest**: Open your Mac's **System Settings** -> **Privacy & Security**. Scroll down, and you will see a message that IINTS-AF was blocked. Click the **"Open Anyway"** button.
-  2. **Via Terminal**: Open the "Terminal" app and run the following command to clear the quarantine flag: 
-     `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` (adjust the path if the app is located elsewhere).
-* **Windows ("Windows protected your PC")**:
-  Click on **More info**, and then click on **Run anyway**.
-
-The app is strictly research-only and runs entirely locally using the same SDK engine as the command-line tools. No data is sent externally.
 
 ## License
 
