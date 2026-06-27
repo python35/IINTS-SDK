@@ -6,7 +6,7 @@ on:
       release_tag:
         description: "GitHub prerelease tag to create/update"
         required: true
-        default: "desktop-beta"
+        default: "desktop-beta-latest"
       draft:
         description: "Create the GitHub release as a draft"
         type: boolean
@@ -315,6 +315,7 @@ jobs:
           name: IINTS-AF Desktop Beta (${{ steps.release.outputs.tag }})
           body_path: desktop-beta-release-notes.md
           files: release-assets/*
+          overwrite_files: true
           draft: ${{ steps.release.outputs.draft }}
           prerelease: true
           make_latest: false

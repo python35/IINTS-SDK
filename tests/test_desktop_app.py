@@ -227,7 +227,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
 
     assert "DESKTOP_RELEASE_URL" in source
-    assert "desktop-beta-2026-06-27-9" in source
+    assert "desktop-beta-latest" in source
     assert "class UpdateWorker" in source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
@@ -256,9 +256,7 @@ def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
     app_install = Path("docs/APP_INSTALL.md").read_text(encoding="utf-8")
     desktop_docs = Path("docs/DESKTOP_APP.md").read_text(encoding="utf-8")
     workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
-    release_tag_match = re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", source)
-    assert release_tag_match is not None
-    release_tag = release_tag_match.group(0)
+    release_tag = "desktop-beta-latest"
 
     combined = "\n".join([readme, app_install, desktop_docs])
     assert "desktop-app" not in combined
@@ -268,6 +266,9 @@ def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
     assert release_tag in readme
     assert release_tag in app_install
     assert release_tag in desktop_docs
+    assert release_tag in source
+    assert release_tag in workflow
+    assert not re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", combined)
     assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
     assert "IINTS-AF-Desktop-Beta-macos.zip" not in workflow
 
