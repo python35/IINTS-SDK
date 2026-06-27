@@ -95,8 +95,6 @@ jobs:
       - name: Smoke test bundled app on macOS
         if: runner.os == 'macOS'
         shell: bash
-        env:
-          QT_QPA_PLATFORM: offscreen
         run: |
           set -euo pipefail
           exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
