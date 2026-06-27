@@ -7,9 +7,9 @@ from typing import Any
 
 from rich.console import Console
 
-from iints.core.patient.hovorka_model import HovorkaModel
-from iints.core.simulation.simulator import Simulator
-from iints.core.simulation.controllers import FixedBasalBolus
+from iints.core.patient.hovorka_model import HovorkaPatientModel
+from iints.core.simulator import Simulator, StressEvent
+from iints.core.algorithms.fixed_basal_bolus import FixedBasalBolus
 
 console = Console()
 
@@ -45,63 +45,48 @@ class TissueStressor:
         basal_rate = 0.8
         
         # 1. Baseline
-        baseline_patient = HovorkaModel(
+        baseline_patient = HovorkaPatientModel(
             basal_insulin_rate=basal_rate,
             muscle_sensitivity_scalar=1.0,
             liver_sensitivity_scalar=1.0
         )
-        baseline_controller = FixedBasalBolus(
-            basal_rate_u_hr=basal_rate,
-            carb_ratio=10.0,
-            correction_factor=50.0,
-            target_glucose=120.0
-        )
-        baseline_sim = Simulator(patient=baseline_patient, controller=baseline_controller)
-        baseline_sim.add_meal(time_minutes=8 * 60, carbs_g=60.0)
-        baseline_sim.add_meal(time_minutes=13 * 60, carbs_g=80.0)
-        baseline_sim.add_meal(time_minutes=19 * 60, carbs_g=70.0)
-        baseline_results = baseline_sim.run(duration_minutes=duration_minutes)
+        baseline_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
+        baseline_sim = Simulator(patient_model=baseline_patient, algorithm=baseline_controller)  # type: ignore[arg-type]
+        baseline_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
+        baseline_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
+        baseline_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
+        baseline_results, _ = baseline_sim.run(duration_minutes=duration_minutes)
         
         # 2. Hepatic Resistance (Liver only)
-        hepatic_patient = HovorkaModel(
+        hepatic_patient = HovorkaPatientModel(
             basal_insulin_rate=basal_rate,
             muscle_sensitivity_scalar=1.0,
             liver_sensitivity_scalar=liver_scalar
         )
-        hepatic_controller = FixedBasalBolus(
-            basal_rate_u_hr=basal_rate,
-            carb_ratio=10.0,
-            correction_factor=50.0,
-            target_glucose=120.0
-        )
-        hepatic_sim = Simulator(patient=hepatic_patient, controller=hepatic_controller)
-        hepatic_sim.add_meal(time_minutes=8 * 60, carbs_g=60.0)
-        hepatic_sim.add_meal(time_minutes=13 * 60, carbs_g=80.0)
-        hepatic_sim.add_meal(time_minutes=19 * 60, carbs_g=70.0)
-        hepatic_results = hepatic_sim.run(duration_minutes=duration_minutes)
+        hepatic_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
+        hepatic_sim = Simulator(patient_model=hepatic_patient, algorithm=hepatic_controller)  # type: ignore[arg-type]
+        hepatic_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
+        hepatic_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
+        hepatic_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
+        hepatic_results, _ = hepatic_sim.run(duration_minutes=duration_minutes)
 
         # 3. Peripheral Resistance (Muscle only)
-        peripheral_patient = HovorkaModel(
+        peripheral_patient = HovorkaPatientModel(
             basal_insulin_rate=basal_rate,
             muscle_sensitivity_scalar=muscle_scalar,
             liver_sensitivity_scalar=1.0
         )
-        peripheral_controller = FixedBasalBolus(
-            basal_rate_u_hr=basal_rate,
-            carb_ratio=10.0,
-            correction_factor=50.0,
-            target_glucose=120.0
-        )
-        peripheral_sim = Simulator(patient=peripheral_patient, controller=peripheral_controller)
-        peripheral_sim.add_meal(time_minutes=8 * 60, carbs_g=60.0)
-        peripheral_sim.add_meal(time_minutes=13 * 60, carbs_g=80.0)
-        peripheral_sim.add_meal(time_minutes=19 * 60, carbs_g=70.0)
-        peripheral_results = peripheral_sim.run(duration_minutes=duration_minutes)
+        peripheral_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
+        peripheral_sim = Simulator(patient_model=peripheral_patient, algorithm=peripheral_controller)  # type: ignore[arg-type]
+        peripheral_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
+        peripheral_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
+        peripheral_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
+        peripheral_results, _ = peripheral_sim.run(duration_minutes=duration_minutes)
 
         # Plotting
         fig = go.Figure()
 
-        time_axis = [t / 60.0 for t in baseline_results["time_minutes"]]
+        time_axis = [t / 60.0 for t in baseline_results["time"]]
 
         fig.add_trace(go.Scatter(
             x=time_axis, y=baseline_results["glucose"],

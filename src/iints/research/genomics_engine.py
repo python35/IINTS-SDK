@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from typing import Dict, Any, Tuple
 
 from iints.core.patient.hovorka_model import HovorkaPatientModel
-from iints.core.simulator import Simulator
+from iints.core.simulator import Simulator, StressEvent
 from iints.core.algorithms.fixed_basal_bolus import FixedBasalBolus
 
 # Mock database of known mutations for the hybrid approach
@@ -55,36 +55,34 @@ class GenomicsEngine:
         
         # 1. Setup Healthy Baseline
         healthy_patient = HovorkaPatientModel(
-            body_weight=70.0,
             initial_glucose=100.0,
             basal_insulin_rate=1.0,
             insulin_sensitivity=50.0,
             molecular_affinity_scalar=1.0
         )
-        healthy_algo = FixedBasalBolus(basal_rate=1.0)
-        healthy_sim = Simulator(healthy_patient, healthy_algo)
-        healthy_sim.add_meal(time_min=60, carbs_g=60.0) # Standard meal test
-        healthy_sim.run(duration_minutes=360)
+        healthy_algo = FixedBasalBolus({"fixed_basal_rate": 1.0, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
+        healthy_sim = Simulator(healthy_patient, healthy_algo)  # type: ignore[arg-type]
+        healthy_sim.add_stress_event(StressEvent(start_time=60, event_type="meal", value=60.0))
+        healthy_results, _ = healthy_sim.run(duration_minutes=360)
         
         # 2. Setup Mutated Patient
         mutated_patient = HovorkaPatientModel(
-            body_weight=70.0,
             initial_glucose=100.0,
             basal_insulin_rate=1.0,
             insulin_sensitivity=50.0,
             molecular_affinity_scalar=scalar
         )
-        mutated_algo = FixedBasalBolus(basal_rate=1.0)
-        mutated_sim = Simulator(mutated_patient, mutated_algo)
-        mutated_sim.add_meal(time_min=60, carbs_g=60.0)
-        mutated_sim.run(duration_minutes=360)
+        mutated_algo = FixedBasalBolus({"fixed_basal_rate": 1.0, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
+        mutated_sim = Simulator(mutated_patient, mutated_algo)  # type: ignore[arg-type]
+        mutated_sim.add_stress_event(StressEvent(start_time=60, event_type="meal", value=60.0))
+        mutated_results, _ = mutated_sim.run(duration_minutes=360)
         
         # 3. Extract Data
-        t_healthy = [r["time"] for r in healthy_sim.history]
-        g_healthy = [r["glucose"] for r in healthy_sim.history]
+        t_healthy = [r for r in healthy_results["time"]]
+        g_healthy = [r for r in healthy_results["glucose"]]
         
-        t_mutated = [r["time"] for r in mutated_sim.history]
-        g_mutated = [r["glucose"] for r in mutated_sim.history]
+        t_mutated = [r for r in mutated_results["time"]]
+        g_mutated = [r for r in mutated_results["glucose"]]
         
         # 4. Generate Plot
         fig = go.Figure()

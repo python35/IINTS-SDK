@@ -320,3 +320,12 @@ Key external anchors used by this page:
 - [Campbell et al., *Pathogenesis of the Dawn Phenomenon in Patients with Insulin-Dependent Diabetes Mellitus*](https://doi.org/10.1056/NEJM198506063122302).
 - [Richter and Hargreaves, *Exercise, GLUT4, and skeletal muscle glucose uptake*](https://doi.org/10.1152/physrev.00038.2012).
 - [Naslund et al., *GLP-1 slows solid gastric emptying and inhibits insulin, glucagon, and PYY release in humans*](https://doi.org/10.1152/ajpregu.1999.277.3.R910).
+
+### Mathematical Appendix: Tissue-Specific Resistance
+
+To isolate peripheral and hepatic resistance, the base sensitivity parameters ($S_{ID}$, $S_{IE}$) in the Hovorka ODEs are decoupled via GTEx-inspired scalars ($M_{scalar}$ for muscle, $L_{scalar}$ for liver). This ensures mathematical stability at $t=0$ while enabling dynamic stressor testing:
+
+$$k_{b2} = S_{ID} \cdot k_{a2} \cdot Sens_{overall} \cdot M_{scalar}$$
+$$k_{b3} = S_{IE} \cdot k_{a3} \cdot Sens_{overall} \cdot L_{scalar}$$
+
+This formulation allows the simulator to trigger fasting hyperglycemia (driven by a reduction in $L_{scalar}$) independently from post-prandial absorption failures (driven by a reduction in $M_{scalar}$), forcing candidate algorithms to handle distinct physiological phenotypes.
