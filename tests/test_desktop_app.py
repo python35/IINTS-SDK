@@ -226,7 +226,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
 
     assert "DESKTOP_RELEASE_URL" in source
-    assert "desktop-beta-2026-06-27-6" in source
+    assert "desktop-beta-2026-06-27-8" in source
     assert "class UpdateWorker" in source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
