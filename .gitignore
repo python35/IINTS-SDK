@@ -103,3 +103,15 @@ docs/obsidian/
 obsidian/IINTS OS - Smart Vault v2/
 obsidian/IINTS_OS_Smart_Vault_v2.zip
 obsidian/public/*.zip
+
+# Local output and scratch
+EUCYS_POSTER_ASSETS/
+logs/
+outputs/
+tmp/
+.mplt_formulas/
+.mplt_training/
+patch_app*.py
+finalize_training.py
+train_quick.py
+IINTS-SDK/
