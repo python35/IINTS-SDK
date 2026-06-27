@@ -251,10 +251,36 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert "--collect-all" in build_source
     assert "PySide6" in build_source
     assert "shiboken6" in build_source
+    assert "ENTRYPOINTS" in build_source
+    assert '"cocoa": REPO_ROOT / "src" / "iints_desktop" / "cocoa_app.py"' in build_source
+    assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source
+    assert 'if args.backend == "qt"' in build_source
+    assert 'if args.backend == "cocoa"' in build_source
     assert "--osx-bundle-identifier" in build_source
-    assert "--onedir --name" in workflow
+    assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
+    assert "desktop-macos" in workflow
     assert "Smoke test bundled app on macOS" in workflow
     assert "continue-on-error: true\n        shell: bash\n        env:" not in workflow.split("Smoke test bundled app on macOS", 1)[1].split("Best-effort bundled smoke on Windows", 1)[0]
+
+
+def test_tk_desktop_app_has_packaged_smoke_mode() -> None:
+    source = Path("src/iints_desktop/app.py").read_text(encoding="utf-8")
+
+    assert '"--smoke" in sys.argv' in source
+    assert "Tk desktop smoke OK" in source
+    assert "raise SystemExit(main())" in source
+
+
+def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
+    source = Path("src/iints_desktop/cocoa_app.py").read_text(encoding="utf-8")
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert "Cocoa desktop smoke OK" in source
+    assert "NSApplication.sharedApplication()" in source
+    assert "Not a medical device" in source
+    assert "run_demo_preset" in source
+    assert "pyobjc-framework-Cocoa" in pyproject
+    assert "iints-desktop-cocoa" in pyproject
 
 
 def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:

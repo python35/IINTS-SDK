@@ -23,6 +23,8 @@ The links below use the stable `desktop-beta-latest` release tag, so the README 
 | macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) | open the `.dmg`, then open the app |
 | Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) | mark executable if needed, then run it |
 
+The macOS DMG uses the small native Cocoa shell for now. That keeps the beta app opening reliably on unsigned/downloaded macOS builds while the richer Qt bundle is being hardened. The Qt app is still available through the Python install below.
+
 These beta builds are unsigned unless release signing secrets are configured. Windows or macOS may show a security warning until the project has code-signing certificates. See [Desktop App Signing](DESKTOP_SIGNING.md).
 
 The app also includes an update panel that links back to the latest app release and can copy/update the Python SDK package command for Python-based installs.

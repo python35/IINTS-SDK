@@ -267,10 +267,12 @@ Generated release assets:
 | Platform | Download asset | What it contains |
 | --- | --- | --- |
 | Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-windows-x64.exe) | a direct Windows executable |
-| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) | a macOS disk image containing the app |
+| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) | a macOS disk image containing the small native Cocoa app |
 | Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) | a direct Linux executable |
 
 Each download is published with a matching `.sha256` checksum file.
+
+The Windows and Linux beta assets currently use the richer PySide6/Qt shell. The macOS DMG uses a small native Cocoa shell for reliability while the macOS Qt bundle is being hardened.
 
 ### Create A Desktop Beta Release
 
@@ -279,7 +281,7 @@ In GitHub:
 1. Open `Actions`.
 2. Choose `Desktop Beta Builds`.
 3. Click `Run workflow`.
-4. Keep `release_tag` as `desktop-beta` for an overwriteable beta, or use a dated tag such as `desktop-beta-2026-06-26`.
+4. Keep `release_tag` as `desktop-beta-latest` for the stable README/docs download links, or use a dated tag such as `desktop-beta-2026-06-26` for a one-off beta.
 5. Keep `draft` enabled if you want to inspect artifacts before publishing.
 
 The workflow can also publish automatically when a tag matching `desktop-beta*` is pushed.
@@ -395,7 +397,7 @@ Rewriting those in another language would create two engines that can disagree. 
 
 ## Toolkit Options
 
-The current recommendation is to ship the first app with Python + Tkinter + PyInstaller, then move to a richer shell only after the workflows feel stable.
+The current recommendation is to ship the macOS beta with Python + PyObjC/Cocoa + PyInstaller for reliability, while continuing to improve the richer PySide6/Qt shell for Windows, Linux, and future signed/notarized macOS builds.
 
 | Option | Strength | Tradeoff | Recommendation |
 | --- | --- | --- | --- |

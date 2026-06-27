@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 import tkinter as tk
 import webbrowser
@@ -315,14 +316,26 @@ class IINTSDesktopApp:
         self.log.see(tk.END)
 
 
-def main() -> None:
+def _create_root() -> tk.Tk:
     try:
-        root = tk.Tk()
+        return tk.Tk()
     except Exception as exc:  # pragma: no cover - depends on host GUI support
         raise RuntimeError("IINTS-AF Desktop requires a graphical desktop session with Tk support.") from exc
+
+
+def main() -> int:
+    root = _create_root()
+    if "--smoke" in sys.argv:
+        root.withdraw()
+        app = IINTSDesktopApp(root)
+        root.update_idletasks()
+        root.destroy()
+        print(f"Tk desktop smoke OK: {len(app.presets)} workflows loaded")
+        return 0
     IINTSDesktopApp(root)
     root.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

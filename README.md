@@ -21,7 +21,7 @@ IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dos
 
 ## Desktop App
 
-IINTS-AF also has a native desktop app for running demos, opening results, asking local AI questions, and viewing biology evidence without using many terminal commands.
+IINTS-AF also has a native desktop app for running demos and opening generated results without using many terminal commands. Windows and Linux beta builds use the richer Qt interface; the current macOS DMG uses a small native Cocoa fallback so it opens more reliably while the Mac Qt bundle is being hardened.
 
 Current beta downloads:
 

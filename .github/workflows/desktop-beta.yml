@@ -63,20 +63,25 @@ jobs:
           sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0
 
       - name: Install desktop dependencies
+        shell: bash
         run: |
           python -m pip install --upgrade pip wheel setuptools
           python -m pip install pytest
-          python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            python -m pip install -U -e ".[full,desktop-macos,mdmp]"
+          else
+            python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+          fi
 
       - name: Run desktop unit tests
         run: |
           python -m pytest tests/test_desktop_app.py -q
 
-      - name: Build PySide desktop bundle
+      - name: Build desktop bundle
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python tools/desktop/build_qt_desktop_app.py --onedir --name "${APP_NAME}"
+            python tools/desktop/build_qt_desktop_app.py --backend cocoa --onedir --name "${APP_NAME}"
           else
             python tools/desktop/build_qt_desktop_app.py --name "${APP_NAME}"
           fi
@@ -321,7 +326,7 @@ jobs:
 
           ## Scope
 
-          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows, inspect CSV results, ask a local Ollama/Mistral model research-only questions, display bundled AlphaFold structures, open interactive PAE heatmaps, and link users to the latest app update.
+          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows and open generated evidence. Windows and Linux beta builds use the richer Qt shell. The macOS DMG currently uses a small native Cocoa shell because it is more reliable for unsigned beta distribution while the Qt app bundle is being hardened.
 
           ## Safety
 
