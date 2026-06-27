@@ -22,6 +22,8 @@ from iints_desktop.engine import (
 from iints_desktop.local_ai import ask_local_ai, check_local_ai, start_local_ai_stack
 from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_html_path
 from iints_desktop.results import ResultPreview, load_results_preview
+from iints_desktop.fetcher import fetch_alphafold_structure
+from iints_desktop.render_3dmol import generate_3dmol_html
 
 DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-3"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
@@ -203,6 +205,26 @@ if _PYSIDE_IMPORT_ERROR is None:
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
 
+
+    
+    class AlphaFoldFetchWorker(QObject):
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, uniprot_id: str):
+            super().__init__()
+            self.uniprot_id = uniprot_id
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                from pathlib import Path
+                out_dir = Path("results") / "structural"
+                cif_path = fetch_alphafold_structure(self.uniprot_id, out_dir)
+                html_path = generate_3dmol_html(cif_path, out_dir)
+                self.finished.emit((cif_path, html_path, self.uniprot_id))
+            except Exception as exc:
+                self.failed.emit(str(exc))
 
     class BiologyWorker(QObject):
         """Background worker for optional public biomedical evidence helpers."""
@@ -855,6 +877,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             viewer_label.setToolTip("Colours use AlphaFold pLDDT confidence values.")
             selector_layout.addWidget(viewer_label, 1, 1)
             selector_layout.setColumnStretch(1, 1)
+
+            self.custom_uniprot_input = QLineEdit()
+            self.custom_uniprot_input.setPlaceholderText("UniProt ID (e.g. Q13131)")
+            self.fetch_uniprot_button = QPushButton("Fetch Live")
+            self.fetch_uniprot_button.clicked.connect(self._fetch_custom_uniprot)
+            fetch_layout = QHBoxLayout()
+            fetch_layout.addWidget(self.custom_uniprot_input)
+            fetch_layout.addWidget(self.fetch_uniprot_button)
+            selector_layout.addWidget(QLabel("Fetch custom:"), 2, 0)
+            selector_layout.addLayout(fetch_layout, 2, 1)
+
             layout.addWidget(selector_box)
 
             viewer_row = QSplitter(Qt.Orientation.Horizontal)
@@ -866,6 +899,15 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_viewer = MolecularChainViewer()
             self.molecule_viewer.setMinimumHeight(260)
             viewer_layout.addWidget(self.molecule_viewer, stretch=1)
+
+            if _QWEBENGINE_VIEW is not None and os.environ.get("QT_QPA_PLATFORM") != "offscreen":
+                self.molecule_web_view = _QWEBENGINE_VIEW()
+                self.molecule_web_view.setMinimumHeight(260)
+                viewer_layout.addWidget(self.molecule_web_view, stretch=1)
+                self.molecule_viewer.hide() # fallback hidden
+            else:
+                self.molecule_web_view = None
+
             self.reset_molecule_view_button.clicked.connect(self._reset_molecule_view)
             self.open_molecule_image_button.clicked.connect(self._open_selected_molecule_image)
             self.open_molecule_structure_button.clicked.connect(self._open_selected_molecule_structure)
@@ -1551,6 +1593,62 @@ if _PYSIDE_IMPORT_ERROR is None:
             QApplication.clipboard().setText(self.ai_answer.toPlainText())
             self.status.setText("AI answer copied")
 
+        
+        def _fetch_custom_uniprot(self) -> None:
+            uniprot_id = self.custom_uniprot_input.text().strip().upper()
+            if not uniprot_id:
+                QMessageBox.information(self, "IINTS-AF Desktop", "Please enter a UniProt ID.")
+                return
+            
+            self.fetch_uniprot_button.setEnabled(False)
+            self.molecule_structure_status.setText(f"Fetching {uniprot_id} from AlphaFold...")
+            
+            thread = QThread(self)
+            worker = AlphaFoldFetchWorker(uniprot_id)
+            worker.moveToThread(thread)
+            
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_fetch_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_fetch_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            
+            self.af_fetch_thread = thread
+            self.af_fetch_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_fetch_success(self, result: object) -> None:
+            self.fetch_uniprot_button.setEnabled(True)
+            cif_path, html_path, uniprot_id = result
+            
+            # Create a dynamic MoleculeAsset
+            from iints_desktop.molecules import MoleculeAsset
+            new_mol = MoleculeAsset(
+                key=uniprot_id.lower(),
+                title=f"Custom: {uniprot_id}",
+                uniprot_id=uniprot_id,
+                image_path=Path("nonexistent.png"),
+                structure_path=cif_path,
+                explanation="Dynamically fetched AlphaFold structure.",
+                sdk_link="Custom research target.",
+                pae_target=uniprot_id.lower(),
+                pae_note="Dynamic PAE heatmap target."
+            )
+            self.molecules.append(new_mol)
+            self.molecule_selector.addItem(f"{new_mol.title} (UniProt {new_mol.uniprot_id})", new_mol.key)
+            self.molecule_selector.setCurrentIndex(self.molecule_selector.count() - 1)
+            self.molecule_structure_status.setText(f"Successfully loaded {uniprot_id}.")
+
+        @Slot(str)
+        def _handle_fetch_error(self, details: str) -> None:
+            self.fetch_uniprot_button.setEnabled(True)
+            self.molecule_structure_status.setText(f"Fetch failed: {details}")
+            self.molecule_structure_status.setStyleSheet("background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa;")
+
         def _selected_molecule(self) -> MoleculeAsset:
             key = str(self.molecule_selector.currentData())
             for molecule in self.molecules:
@@ -1589,6 +1687,21 @@ if _PYSIDE_IMPORT_ERROR is None:
                     "Colours show AlphaFold pLDDT confidence, not a clinical score."
                 )
                 self.molecule_structure_status.setStyleSheet("")
+
+            # 3Dmol.js rendering path
+            if getattr(self, "molecule_web_view", None) is not None:
+                from iints_desktop.render_3dmol import generate_3dmol_html
+                try:
+                    out_dir = Path("results") / "structural"
+                    html_path = generate_3dmol_html(molecule.structure_path, out_dir)
+                    self.molecule_web_view.setUrl(QUrl.fromLocalFile(str(html_path.absolute())))
+                    self.molecule_viewer.hide()
+                    self.molecule_web_view.show()
+                except Exception as e:
+                    print(f"3Dmol.js render failed: {e}")
+                    self.molecule_web_view.hide()
+                    self.molecule_viewer.show()
+            
 
             if molecule.image_path.exists():
                 pixmap = QPixmap(str(molecule.image_path))

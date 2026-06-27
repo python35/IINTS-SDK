@@ -200,4 +200,58 @@ def list_molecule_assets() -> list[MoleculeAsset]:
                 "it is not a glucose, dosing, or treatment metric."
             ),
         ),
+        MoleculeAsset(
+            key="insr",
+            title="Insulin Receptor (INSR)",
+            uniprot_id="P06213",
+            image_path=base / "insr_3D.png",
+            structure_path=base / "AF-P06213-F1-model_v6.cif",
+            explanation=(
+                "The Insulin Receptor (INSR) is the massive transmembrane complex that binds insulin. "
+                "In the SDK, genetic defects in this receptor are directly modeled by severely "
+                "reducing the insulin sensitivity parameter (S_I), simulating Donohue Syndrome."
+            ),
+            sdk_link="Connects to: S_I parameter, ClinVar mutation simulations, severe insulin resistance.",
+            pae_target="insulin-receptor",
+            pae_note=(
+                "PAE heatmap for UniProt P06213. Demonstrates the structural confidence "
+                "of the extracellular alpha-subunits where insulin docks."
+            ),
+        ),
+        MoleculeAsset(
+            key="glut4",
+            title="Glucose Transporter Type 4 (GLUT4)",
+            uniprot_id="P14672",
+            image_path=base / "glut4_3D.png",
+            structure_path=base / "AF-P14672-F1-model_v6.cif",
+            explanation=(
+                "GLUT4 (SLC2A4) is the insulin-regulated glucose transporter. When insulin binds INSR, "
+                "GLUT4 translocates to the cell membrane to absorb glucose from the blood. "
+                "This transporter is highly expressed in skeletal muscle, proving our compartment sizing."
+            ),
+            sdk_link="Connects to: GTEx tissue expression mapping, muscle compartment glucose uptake.",
+            pae_target="glut4",
+            pae_note=(
+                "PAE heatmap for UniProt P14672. Shows the structural confidence of the 12 "
+                "transmembrane helices that form the glucose channel."
+            ),
+        ),
+        MoleculeAsset(
+            key="gcgr",
+            title="Glucagon Receptor (GCGR)",
+            uniprot_id="P47871",
+            image_path=base / "gcgr_3D.png",
+            structure_path=base / "AF-P47871-F1-model_v6.cif",
+            explanation=(
+                "The Glucagon Receptor (GCGR) is a G-protein coupled receptor primarily located in "
+                "the liver. When activated, it stimulates Endogenous Glucose Production (EGP). "
+                "This provides the physiological basis for the SDK's rescue-carb mathematics."
+            ),
+            sdk_link="Connects to: EGP mathematics, hypoglycemia counter-regulation, GTEx liver mapping.",
+            pae_target="glucagon-receptor",
+            pae_note=(
+                "PAE heatmap for UniProt P47871. Illustrates AlphaFold's confidence in predicting "
+                "the 7-transmembrane bundle geometry."
+            ),
+        ),
     ]

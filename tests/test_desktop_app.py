@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 
 import pytest
@@ -163,11 +164,11 @@ def test_local_ai_start_result_is_ui_friendly() -> None:
 def test_molecule_assets_are_bundled_for_desktop_deep_dive() -> None:
     molecules = list_molecule_assets()
 
-    assert {molecule.uniprot_id for molecule in molecules} == {"P01308", "P01275"}
+    assert {molecule.uniprot_id for molecule in molecules} == {"P01308", "P01275", "P06213", "P14672", "P47871"}
     assert all(molecule.image_path.exists() for molecule in molecules)
     assert all(molecule.structure_path.exists() for molecule in molecules)
     assert all("Connects to:" in molecule.sdk_link for molecule in molecules)
-    assert {molecule.pae_target for molecule in molecules} == {"insulin-mutation", "glucagon"}
+    assert {molecule.pae_target for molecule in molecules} == {"insulin-mutation", "glucagon", "insulin-receptor", "glut4", "glucagon-receptor"}
     assert pae_html_path("glucagon").as_posix().endswith("results/structural/glucagon_pae.html")
 
 
@@ -272,4 +273,5 @@ def test_desktop_packager_creates_direct_windows_and_linux_assets(tmp_path: Path
     assert windows_asset.read_bytes() == b"fake-windows-exe"
     assert linux_asset.name == "IINTS-AF-Desktop-Beta-linux-x64"
     assert linux_asset.read_bytes() == b"fake-linux-exe"
-    assert linux_asset.stat().st_mode & 0o111
+    if os.name != "nt":
+        assert linux_asset.stat().st_mode & 0o111
