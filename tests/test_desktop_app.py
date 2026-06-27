@@ -205,3 +205,16 @@ def test_qt_app_biology_copy_is_neutral_workbench_text() -> None:
     assert "Structural biology assets for research context" in source
     assert "Scientific Deep Dive" not in source
     assert "Viewer guide:" not in source
+
+
+def test_qt_app_exposes_biology_evidence_actions() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "class BiologyWorker" in source
+    assert "Biology evidence actions" in source
+    assert "Render GTEx Expression" in source
+    assert "Analyze Insulin PK" in source
+    assert "Simulate ClinVar Mutation" in source
+    assert "Render STRING Pathways" in source
+    assert "gtex-expression" in source
+    assert "clinvar-mutation" in source

@@ -96,6 +96,7 @@ It currently provides:
 - an in-app Results tab that loads generated CSV files, summarizes glucose metrics, previews table rows, and renders a glucose graph
 - an in-app Local AI tab that can start a local Ollama server, prepare the selected Mistral/Ministral model, and answer research-only questions about the SDK or the loaded result summary
 - a Biology / AlphaFold deep-dive tab with bundled insulin and glucagon structures
+- one-click biology evidence actions for GTEx, ChEMBL, ClinVar, and STRING
 - an offline interactive 3D protein-chain viewer: drag to rotate, scroll to zoom, and double-click to reset
 - a run-history table in the Qt app for recent desktop outputs, including seed values
 - a one-click action to load a previous run's CSV from history into the Results tab
@@ -202,6 +203,20 @@ This remains explanatory only:
 - generated HTML files are local artifacts and can be reopened from the app
 - `plotly` is included in the Qt desktop extra so beta desktop builds can create the heatmaps
 
+
+### Biology Evidence Actions
+
+The Biology tab also exposes app buttons for the newer public-database helpers:
+
+| Button | SDK helper | Output/use |
+| --- | --- | --- |
+| `Render GTEx Expression` | `iints render-expression --gene GLUT4` | interactive tissue-expression HTML under `results/structural/` |
+| `Analyze Insulin PK` | `iints analyze-insulin --drug lispro` | deterministic SDK insulin absorption mapping with public ChEMBL context |
+| `Simulate ClinVar Mutation` | `iints simulate-mutation --gene INSR` | public ClinVar summaries plus curated simulator stress-test mapping |
+| `Render STRING Pathways` | `iints render-pathways --network all` | pathway PNG files under `results/structural/` |
+
+These actions may need internet access on first run. They are evidence/context actions only; they do not change a running simulation or produce treatment advice.
+
 ## Run History
 
 The Qt app stores lightweight run history in the selected output folder:
@@ -246,13 +261,15 @@ sudo apt install python3-tk
 
 The repository includes a `Desktop Beta Builds` GitHub Actions workflow that builds downloadable native app bundles for the three main desktop platforms. It is intended for beta distribution, demos, and feedback sessions before a fully signed/stable desktop release.
 
+Latest app beta release: [https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1)
+
 Generated release assets:
 
 | Platform | Download asset | What it contains |
 | --- | --- | --- |
-| Windows | `IINTS-AF-Desktop-Beta-windows-x64.zip` | a folder bundle with `IINTS-AF-Desktop-Beta.exe` |
-| macOS | `IINTS-AF-Desktop-Beta-macos.zip` | a macOS `.app` bundle when PyInstaller creates one |
-| Linux | `IINTS-AF-Desktop-Beta-linux-x64.zip` | a folder bundle with the Linux executable |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-windows-x64.zip) | a folder bundle with `IINTS-AF-Desktop-Beta.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-macos.zip) | a macOS `.app` bundle when PyInstaller creates one |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-linux-x64.zip) | a folder bundle with the Linux executable |
 
 Each zip is published with a matching `.sha256` checksum file.
 

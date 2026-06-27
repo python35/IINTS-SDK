@@ -9,6 +9,20 @@ The desktop app is meant for users who want to run demos, load results, view gra
 
 It is still research software. It is not a medical device and must not be used for treatment decisions.
 
+## Download Beta App
+
+The current desktop beta release is available on GitHub:
+
+[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-1)
+
+| Platform | Download | Start |
+| --- | --- | --- |
+| Windows | [IINTS-AF-Desktop-Beta-windows-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-windows-x64.zip) | extract the zip, then open `IINTS-AF-Desktop-Beta.exe` |
+| macOS | [IINTS-AF-Desktop-Beta-macos.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-macos.zip) | extract the zip, then open the `.app` bundle |
+| Linux | [IINTS-AF-Desktop-Beta-linux-x64.zip](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-2026-06-27-1/IINTS-AF-Desktop-Beta-linux-x64.zip) | extract the zip, then run `./IINTS-AF-Desktop-Beta` |
+
+These beta builds are unsigned. Windows or macOS may show a security warning until the project has code-signing certificates.
+
 ## Install From PyPI
 
 This is the easiest path for most users:
@@ -88,6 +102,7 @@ Use `main` when:
 - Ask local Ollama/Mistral questions about a loaded run.
 - View bundled AlphaFold insulin/glucagon structures.
 - Generate local PAE heatmap HTML files when Plotly and internet access are available.
+- Run biology evidence actions for GTEx expression, ChEMBL insulin context, ClinVar mutation stressors, and STRING pathway images.
 
 ## What The App Does Not Do
 

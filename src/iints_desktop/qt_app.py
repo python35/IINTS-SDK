@@ -161,6 +161,59 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
+    class BiologyWorker(QObject):
+        """Background worker for optional public biomedical evidence helpers."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, *, action: str, value: str) -> None:
+            super().__init__()
+            self.action = action
+            self.value = value
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                if self.action == "gtex-expression":
+                    from iints.research.anatomy import render_expression
+
+                    result = render_expression(self.value)
+                    if result is None:
+                        self.finished.emit("No GTEx expression artifact was generated.")
+                    else:
+                        self.finished.emit(
+                            f"GTEx expression ready for {result.official_gene}: {result.html_path}"
+                        )
+                elif self.action == "insulin-pk":
+                    from iints.research.pharmacology import analyze_insulin
+
+                    molecule, profile = analyze_insulin(self.value)
+                    molecule_name = molecule.preferred_name if molecule is not None else "no ChEMBL match"
+                    self.finished.emit(
+                        f"Insulin PK mapping ready for {self.value}: {profile.label}, "
+                        f"t_max,I={profile.tmax_minutes} min ({molecule_name})."
+                    )
+                elif self.action == "clinvar-mutation":
+                    from iints.research.genetics import simulate_mutation
+
+                    variants = simulate_mutation(self.value)
+                    self.finished.emit(
+                        f"ClinVar mutation stressor complete for {self.value}: "
+                        f"{len(variants)} public variant summaries shown."
+                    )
+                elif self.action == "string-pathways":
+                    from iints.research.physiology import render_pathways
+
+                    results = render_pathways(self.value)
+                    paths = ", ".join(str(result.png_path) for result in results)
+                    self.finished.emit(f"STRING pathway render complete: {paths}")
+                else:
+                    raise ValueError(f"Unknown biology evidence action: {self.action}")
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
     class IINTSQtDesktopApp(QMainWindow):
         """PySide/Qt desktop shell for a more polished native app experience."""
 
@@ -188,6 +241,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.ai_start_worker: LocalAIStartWorker | None = None
             self.pae_thread: QThread | None = None
             self.pae_worker: PAEWorker | None = None
+            self.biology_thread: QThread | None = None
+            self.biology_worker: BiologyWorker | None = None
             self.tabs: QTabWidget | None = None
             self.workspace_status: QLabel | None = None
             self.molecules = list_molecule_assets()
@@ -230,6 +285,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_reference_render = QLabel()
             self.molecule_structure_status = QLabel()
             self.molecule_pae_status = QLabel()
+            self.biology_action_status = QLabel("No biology evidence action has run yet.")
+            self.biology_action_status.setWordWrap(True)
+            self.biology_action_output = QTextEdit()
+            self.biology_action_output.setReadOnly(True)
             self.pae_web_view: QWidget | None = None
 
             self.run_button = QPushButton("Run Selected Workflow")
@@ -260,6 +319,11 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.generate_pae_button = QPushButton("Generate PAE Heatmap")
             self.open_pae_button = QPushButton("Open PAE HTML")
             self.open_pae_folder_button = QPushButton("Open PAE Folder")
+            self.render_gtex_button = QPushButton("Render GTEx Expression")
+            self.analyze_insulin_button = QPushButton("Analyze Insulin PK")
+            self.simulate_mutation_button = QPushButton("Simulate ClinVar Mutation")
+            self.render_pathways_button = QPushButton("Render STRING Pathways")
+            self.open_structural_folder_button = QPushButton("Open Biology Output Folder")
 
             self._build_ui()
             self._apply_style()
@@ -806,6 +870,38 @@ if _PYSIDE_IMPORT_ERROR is None:
                 embedded_note.setWordWrap(True)
                 pae_layout.addWidget(embedded_note)
             context_layout.addWidget(pae_box)
+
+            evidence_box = QGroupBox("Biology evidence actions")
+            evidence_layout = QVBoxLayout(evidence_box)
+            evidence_help = QLabel(
+                "Run optional public-database helpers from the app. These actions fetch research context "
+                "from GTEx, ChEMBL, ClinVar, or STRING and write normal SDK artifacts under results/structural."
+            )
+            evidence_help.setWordWrap(True)
+            evidence_layout.addWidget(evidence_help)
+            self.biology_action_status.setObjectName("biologyActionStatus")
+            evidence_layout.addWidget(self.biology_action_status)
+            self.render_gtex_button.clicked.connect(lambda: self._run_biology_action("gtex-expression", "GLUT4"))
+            self.analyze_insulin_button.clicked.connect(lambda: self._run_biology_action("insulin-pk", "lispro"))
+            self.simulate_mutation_button.clicked.connect(lambda: self._run_biology_action("clinvar-mutation", "INSR"))
+            self.render_pathways_button.clicked.connect(lambda: self._run_biology_action("string-pathways", "all"))
+            self.open_structural_folder_button.clicked.connect(self._open_structural_folder)
+            evidence_layout.addLayout(
+                self._button_grid(
+                    [
+                        self.render_gtex_button,
+                        self.analyze_insulin_button,
+                        self.simulate_mutation_button,
+                        self.render_pathways_button,
+                        self.open_structural_folder_button,
+                    ],
+                    columns=2,
+                )
+            )
+            self.biology_action_output.setMinimumHeight(95)
+            evidence_layout.addWidget(self.biology_action_output)
+            context_layout.addWidget(evidence_box)
+
             self.molecule_reference_render.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.molecule_reference_render.setMinimumHeight(200)
             context_layout.addWidget(self.molecule_reference_render, stretch=1)
@@ -954,7 +1050,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                     border: 1px solid #a9c5ad;
                     padding: 6px 8px;
                 }
-                QLabel#moleculePAEStatus {
+                QLabel#moleculePAEStatus, QLabel#biologyActionStatus {
                     background: #f4f7f4;
                     color: #2f4830;
                     border: 1px solid #bdcdbd;
@@ -1561,6 +1657,70 @@ if _PYSIDE_IMPORT_ERROR is None:
                     "and load the interactive matrix here.</p>"
                     "</body></html>"
                 )
+
+        def _run_biology_action(self, action: str, value: str) -> None:
+            if self.biology_thread is not None:
+                QMessageBox.information(self, "IINTS-AF Desktop", "A biology evidence action is already running.")
+                return
+            self._set_biology_action_state(True)
+            self.biology_action_status.setText(
+                f"Running {action} ({value}). The first run may need internet access."
+            )
+            self.biology_action_output.setPlainText("Working...\n")
+            self.status.setText("Running biology evidence action")
+
+            thread = QThread(self)
+            worker = BiologyWorker(action=action, value=value)
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_biology_action_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_biology_action_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_biology_refs)
+            self.biology_thread = thread
+            self.biology_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_biology_action_success(self, result: object) -> None:
+            text = str(result)
+            self.biology_action_status.setText(text)
+            self.biology_action_output.setPlainText(text)
+            self.status.setText("Biology evidence action complete")
+            self._set_biology_action_state(False)
+
+        @Slot(str)
+        def _handle_biology_action_error(self, details: str) -> None:
+            self.biology_action_status.setText("Biology evidence action failed. See details below.")
+            self.biology_action_output.setPlainText(details)
+            self._write_log(f"\nBIOLOGY ACTION ERROR:\n{details}\n")
+            self.status.setText("Biology evidence action failed")
+            self._set_biology_action_state(False)
+
+        @Slot()
+        def _clear_biology_refs(self) -> None:
+            self.biology_thread = None
+            self.biology_worker = None
+            self._set_biology_action_state(False)
+
+        def _set_biology_action_state(self, is_running: bool) -> None:
+            for button in (
+                self.render_gtex_button,
+                self.analyze_insulin_button,
+                self.simulate_mutation_button,
+                self.render_pathways_button,
+                self.open_structural_folder_button,
+            ):
+                button.setEnabled(not is_running)
+
+        def _open_structural_folder(self) -> None:
+            folder = Path("results") / "structural"
+            folder.mkdir(parents=True, exist_ok=True)
+            self._open_path(folder)
 
         def _save_log(self) -> None:
             default_path = Path(self.output_dir.text()).expanduser() / "iints-desktop-log.txt"
