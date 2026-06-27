@@ -28,7 +28,7 @@ from iints_desktop.results import ResultPreview, load_results_preview
 from iints_desktop.fetcher import fetch_alphafold_structure
 from iints_desktop.render_3dmol import generate_3dmol_html
 
-DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-4"
+DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-2026-06-27-5"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
 PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"'
 
