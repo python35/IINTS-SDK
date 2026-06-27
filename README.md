@@ -35,7 +35,10 @@ Current beta downloads:
 Omdat de IINTS-AF Desktop App gratis en open-source academische software is, is deze niet cryptografisch ondertekend met dure commerciële ontwikkelaarscertificaten van Apple of Microsoft. Hierdoor geven besturingssystemen uit voorzorg een standaard waarschuwing (Gatekeeper op Mac, SmartScreen op Windows). **Dit is volkomen normaal voor open-source tools.**
 
 * **macOS ("Apple cannot check it for malicious software")**:
-  Klik met je rechtermuisknop (of `Control`-klik) op de `.dmg` of de App en kies **Open**. Dit hoef je slechts één keer te doen.
+  Sinds recente macOS-updates blokkeert Apple soms de "Rechtermuisknop -> Open" optie. Je hebt twee simpele oplossingen:
+  1. **Makkelijkst**: Ga naar je Mac's *Systeeminstellingen* -> *Privacy en beveiliging* (Privacy & Security). Scroll naar beneden, en je ziet een melding over IINTS-AF met een knop **"Open Anyway"** (Toch openen).
+  2. **Via Terminal**: Open de "Terminal" app en wis de quarantaine-vlag met dit commando: 
+     `xattr -cr /Applications/IINTS-AF-Desktop-Beta.app` (pas het pad aan als hij ergens anders staat).
 * **Windows ("Windows protected your PC")**:
   Klik op **More info** (Meer informatie) en vervolgens op **Run anyway** (Toch uitvoeren).
 
