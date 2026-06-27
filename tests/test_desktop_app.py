@@ -188,3 +188,20 @@ def test_invalid_mmcif_is_rejected_before_the_viewer_uses_it(tmp_path: Path) -> 
 
     with pytest.raises(MoleculeStructureError, match="not a valid AlphaFold mmCIF"):
         load_molecule_backbone(invalid_structure)
+
+
+def test_qt_app_source_forces_readable_light_palette() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "def _apply_application_palette" in source
+    assert "QPalette.ColorRole.WindowText" in source
+    assert "QWidget, QWidget#root" in source
+    assert "QGroupBox QLabel" in source
+
+
+def test_qt_app_biology_copy_is_neutral_workbench_text() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "Structural biology assets for research context" in source
+    assert "Scientific Deep Dive" not in source
+    assert "Viewer guide:" not in source

@@ -24,7 +24,7 @@ from iints_desktop.results import ResultPreview, load_results_preview
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
-    from PySide6.QtGui import QAction, QDesktopServices, QFont, QPixmap  # type: ignore[import-not-found]
+    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QPalette, QPixmap  # type: ignore[import-not-found]
     from PySide6.QtWidgets import (  # type: ignore[import-not-found]
         QApplication,
         QComboBox,
@@ -717,15 +717,15 @@ if _PYSIDE_IMPORT_ERROR is None:
             layout.setSpacing(12)
 
             intro = QLabel(
-                "Scientific Deep Dive: explore the bundled AlphaFold protein backbone locally in 3D. "
-                "The viewer is explanatory only: it never supplies values to the simulator, safety supervisor, "
-                "or any treatment decision."
+                "Structural biology assets for research context. Explore bundled AlphaFold protein backbones, "
+                "generate PAE heatmaps, and open supporting files without leaving the app. These assets are "
+                "documentation/evidence only and never feed treatment or dosing logic."
             )
             intro.setObjectName("deepDiveIntro")
             intro.setWordWrap(True)
             layout.addWidget(intro)
 
-            selector_box = QGroupBox("Choose a molecular structure")
+            selector_box = QGroupBox("Structure")
             selector_layout = QGridLayout(selector_box)
             for molecule in self.molecules:
                 self.molecule_selector.addItem(f"{molecule.title} (UniProt {molecule.uniprot_id})", molecule.key)
@@ -744,7 +744,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self._register_responsive_splitter(viewer_row)
             layout.addWidget(viewer_row, stretch=1)
 
-            viewer_box = QGroupBox("Interactive 3D molecular chain")
+            viewer_box = QGroupBox("3D chain viewer")
             viewer_layout = QVBoxLayout(viewer_box)
             self.molecule_viewer = MolecularChainViewer()
             self.molecule_viewer.setMinimumHeight(260)
@@ -764,7 +764,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             )
             viewer_row.addWidget(viewer_box)
 
-            context_box = QGroupBox("Model relevance")
+            context_box = QGroupBox("Research context")
             context_layout = QVBoxLayout(context_box)
             self.molecule_title.setObjectName("moleculeTitle")
             self.molecule_title.setWordWrap(True)
@@ -809,11 +809,12 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_reference_render.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.molecule_reference_render.setMinimumHeight(200)
             context_layout.addWidget(self.molecule_reference_render, stretch=1)
-            context_layout.addWidget(
-                QLabel(
-                    "Viewer guide: drag to turn the chain, use the mouse wheel to zoom, and double-click to return to the starting view."
-                )
+            usage_hint = QLabel(
+                "Controls: drag to rotate, mouse wheel to zoom, double-click to reset."
             )
+            usage_hint.setObjectName("subtleHint")
+            usage_hint.setWordWrap(True)
+            context_layout.addWidget(usage_hint)
             viewer_row.addWidget(context_box)
             viewer_row.setSizes([760, 420])
 
@@ -821,9 +822,9 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _build_about_tab(self, parent: QWidget) -> None:
             layout = self._scroll_tab_layout(parent)
             intro = QLabel(
-                "This PySide/Qt version is an experiment toward a more professional app shell. "
-                "The scientific engine remains the Python SDK, so formulas, safety checks, "
-                "reports, and validation stay in one source of truth."
+                "IINTS-AF Desktop is a native research workbench for running SDK simulations, "
+                "reviewing generated results, asking local AI questions, and opening biology evidence artifacts. "
+                "The Python SDK remains the single source of truth for formulas, reports, and validation."
             )
             intro.setWordWrap(True)
             layout.addWidget(intro)
@@ -837,8 +838,13 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _apply_style(self) -> None:
             self.setStyleSheet(
                 """
-                QMainWindow, QWidget#root {
-                    background: #e9edf1;
+                * {
+                    color: #202a35;
+                    selection-background-color: #cfe2f0;
+                    selection-color: #102436;
+                }
+                QMainWindow, QWidget, QWidget#root {
+                    background-color: #e9edf1;
                     color: #202a35;
                     font-size: 13px;
                 }
@@ -846,8 +852,18 @@ if _PYSIDE_IMPORT_ERROR is None:
                     color: #202a35;
                     background: transparent;
                 }
+                QFrame, QSplitter, QAbstractScrollArea, QScrollArea {
+                    background-color: #f7f8fa;
+                    color: #202a35;
+                    border-color: #b9c3cc;
+                }
+                QScrollArea > QWidget > QWidget {
+                    background-color: #f7f8fa;
+                    color: #202a35;
+                }
                 QMenuBar, QToolBar, QStatusBar {
                     background: #f6f7f8;
+                    color: #202a35;
                     border-color: #b9c3cc;
                 }
                 QMenuBar {
@@ -871,6 +887,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 }
                 QToolButton {
                     background: #f6f7f8;
+                    color: #1f2d3a;
                     border: 1px solid transparent;
                     border-radius: 2px;
                     padding: 5px 8px;
@@ -945,11 +962,17 @@ if _PYSIDE_IMPORT_ERROR is None:
                 }
                 QGroupBox {
                     background: #ffffff;
+                    color: #202a35;
                     border: 1px solid #b9c3cc;
                     border-radius: 2px;
                     margin-top: 9px;
-                    padding: 8px;
+                    padding: 10px 8px 8px 8px;
                     font-weight: 650;
+                }
+                QGroupBox QLabel {
+                    color: #202a35;
+                    background: transparent;
+                    font-weight: 400;
                 }
                 QGroupBox::title {
                     subcontrol-origin: margin;
@@ -980,12 +1003,15 @@ if _PYSIDE_IMPORT_ERROR is None:
                     color: #7d8993;
                     border-color: #c6cdd3;
                 }
-                QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit, QTableWidget {
+                QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit, QTableWidget, QTableView {
                     background: #ffffff;
                     color: #202a35;
                     border: 1px solid #aebac5;
                     border-radius: 1px;
                     padding: 5px;
+                }
+                QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus, QTextEdit:focus, QTableWidget:focus {
+                    border: 1px solid #2b618d;
                 }
                 QComboBox QAbstractItemView {
                     background: #ffffff;
@@ -1010,6 +1036,12 @@ if _PYSIDE_IMPORT_ERROR is None:
                 }
                 QPlainTextEdit, QTextEdit {
                     font-family: Menlo, Consolas, monospace;
+                }
+                QLabel#subtleHint {
+                    color: #5c6b78;
+                    background: #f6f7f8;
+                    border: 1px solid #d5dde4;
+                    padding: 5px 7px;
                 }
                 QStatusBar {
                     color: #314251;
@@ -1622,6 +1654,26 @@ if _PYSIDE_IMPORT_ERROR is None:
                     self.tabs.setCurrentIndex(1)
 
 
+def _apply_application_palette(app: QApplication) -> None:
+    """Force a readable light palette even when the OS is in dark mode."""
+
+    app.setStyle("Fusion")
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor("#e9edf1"))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor("#202a35"))
+    palette.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#f1f4f6"))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor("#ffffff"))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor("#202a35"))
+    palette.setColor(QPalette.ColorRole.Text, QColor("#202a35"))
+    palette.setColor(QPalette.ColorRole.Button, QColor("#f2f4f6"))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#1f2d3a"))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor("#cfe2f0"))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#102436"))
+    palette.setColor(QPalette.ColorRole.PlaceholderText, QColor("#6c7a86"))
+    app.setPalette(palette)
+
+
 def main() -> int:
     if _PYSIDE_IMPORT_ERROR is not None:
         raise RuntimeError(
@@ -1630,6 +1682,7 @@ def main() -> int:
         ) from _PYSIDE_IMPORT_ERROR
 
     app = QApplication(sys.argv)
+    _apply_application_palette(app)
     window = IINTSQtDesktopApp()
     if "--smoke" in sys.argv:
         window.resize(760, 520)

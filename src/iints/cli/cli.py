@@ -14058,3 +14058,27 @@ def render_pae(
     """Render interactive Predicted Aligned Error (PAE) matrices from AlphaFold."""
     from iints.research.structure import render_pae as fetch_pae
     fetch_pae(target)
+
+@app.command(name="simulate-mutation")
+def simulate_mutation(
+    gene: Annotated[str, typer.Option("--gene", help="The gene to simulate a mutation for (e.g. INSR or INS)")] = "INSR",
+) -> None:
+    """Fetch pathogenic variants from ClinVar and simulate their physiological effects on the Digital Twin."""
+    from iints.research.genetics import simulate_mutation as run_sim
+    run_sim(gene)
+
+@app.command(name="analyze-insulin")
+def analyze_insulin(
+    drug: Annotated[str, typer.Option("--drug", help="The insulin analog to analyze (e.g. lispro, glargine, regular)")] = "lispro",
+) -> None:
+    """Fetch pharmacological properties from ChEMBL and map them to subcutaneous absorption times."""
+    from iints.research.pharmacology import analyze_insulin as run_analysis
+    run_analysis(drug)
+
+@app.command(name="render-expression")
+def render_expression(
+    gene: Annotated[str, typer.Option("--gene", help="The gene to map anatomically (e.g. GLUT4 or GCGR)")] = "GLUT4",
+) -> None:
+    """Fetch tissue expression data from GTEx and render an interactive anatomical bar chart."""
+    from iints.research.anatomy import render_expression as fetch_expression
+    fetch_expression(gene)
