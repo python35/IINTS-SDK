@@ -4,6 +4,36 @@ IINTS-AF started as a command-line SDK because researchers need reproducible com
 
 The desktop app does not replace the SDK. It calls the same simulation/reporting code that the CLI uses.
 
+
+## Installation
+
+For normal users, install the desktop app from PyPI with the Qt desktop extra:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+For the newest app code from GitHub:
+
+```bash
+git clone https://github.com/python35/IINTS-SDK.git
+cd IINTS-SDK
+python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+A dedicated `desktop-app` branch is also available for app-focused beta testing:
+
+```bash
+git clone --branch desktop-app https://github.com/python35/IINTS-SDK.git
+cd IINTS-SDK
+python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+iints-desktop
+```
+
+See [Desktop App Install](APP_INSTALL.md) for the app-first install guide.
+
 ## Design Goal
 
 ```mermaid

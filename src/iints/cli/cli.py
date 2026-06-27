@@ -14039,7 +14039,14 @@ def edge_benchmark_alias(
 def render_molecules(
     target: Annotated[str, typer.Option("--target", help="The structural target to render (e.g. insulin-mutation, glucagon, glut4, insulin-receptor, or all)")] = "all",
 ) -> None:
-    """Render 3D structural biology targets using AlphaFold & PyMOL."""
+    """
+    Render explanatory 3D structural-biology targets using AlphaFold and PyMOL.
+
+    The generated structures are research/education artifacts. They help connect
+    SDK model terms such as insulin, glucagon, GLUT4, and receptor biology to
+    public protein-structure data, but they are not simulator inputs or clinical
+    evidence.
+    """
     from iints.research.structure import render_target
     render_target(target)
 
@@ -14047,7 +14054,13 @@ def render_molecules(
 def render_pathways(
     network: Annotated[str, typer.Option("--network", help="The physiological network to render (e.g. insulin-cascade, glucagon-rescue, or all)")] = "all",
 ) -> None:
-    """Download and render high-resolution physiological pathways from the STRING Database."""
+    """
+    Download explanatory physiological pathway images from the STRING Database.
+
+    The rendered protein-interaction networks help users see how model concepts
+    such as insulin signalling, GLUT4 translocation, and glucagon rescue relate
+    to known biological pathways. They do not calibrate or replace the simulator.
+    """
     from iints.research.physiology import render_pathways as fetch_networks
     fetch_networks(network)
 
@@ -14055,7 +14068,13 @@ def render_pathways(
 def render_pae(
     target: Annotated[str, typer.Option("--target", help="The structural target to render the PAE matrix for (e.g. insulin-mutation, glucagon, glut4, insulin-receptor, or all)")] = "all",
 ) -> None:
-    """Render interactive Predicted Aligned Error (PAE) matrices from AlphaFold."""
+    """
+    Render interactive Predicted Aligned Error (PAE) matrices from AlphaFold.
+
+    The Plotly heatmaps show AlphaFold's predicted relative-position uncertainty
+    between residues. PAE is useful for structural context only; it is not a
+    glucose, dosing, safety-supervisor, or treatment metric.
+    """
     from iints.research.structure import render_pae as fetch_pae
     fetch_pae(target)
 
@@ -14063,7 +14082,13 @@ def render_pae(
 def simulate_mutation(
     gene: Annotated[str, typer.Option("--gene", help="The gene to simulate a mutation for (e.g. INSR or INS)")] = "INSR",
 ) -> None:
-    """Fetch pathogenic variants from ClinVar and simulate their physiological effects on the Digital Twin."""
+    """
+    Fetch ClinVar variant summaries and show deterministic stress-test mappings.
+
+    The SDK currently includes curated educational mappings for genes such as
+    INSR and INS. These mappings create virtual-patient edge cases for research;
+    they are not diagnostic genetics or patient-specific interpretation.
+    """
     from iints.research.genetics import simulate_mutation as run_sim
     run_sim(gene)
 
@@ -14071,7 +14096,13 @@ def simulate_mutation(
 def analyze_insulin(
     drug: Annotated[str, typer.Option("--drug", help="The insulin analog to analyze (e.g. lispro, glargine, regular)")] = "lispro",
 ) -> None:
-    """Fetch pharmacological properties from ChEMBL and map them to subcutaneous absorption times."""
+    """
+    Fetch ChEMBL molecule context and show deterministic insulin PK mappings.
+
+    ChEMBL provides public pharmacology context. The simulator absorption values
+    are fixed SDK defaults for common insulin classes, not patient-specific
+    dosing guidance and not AI-generated at runtime.
+    """
     from iints.research.pharmacology import analyze_insulin as run_analysis
     run_analysis(drug)
 
@@ -14079,6 +14110,12 @@ def analyze_insulin(
 def render_expression(
     gene: Annotated[str, typer.Option("--gene", help="The gene to map anatomically (e.g. GLUT4 or GCGR)")] = "GLUT4",
 ) -> None:
-    """Fetch tissue expression data from GTEx and render an interactive anatomical bar chart."""
+    """
+    Fetch GTEx tissue expression data and render an interactive anatomy chart.
+
+    The chart helps explain why genes such as SLC2A4/GLUT4 matter for muscle
+    glucose uptake and exercise modelling. It is supporting biology context, not
+    automatic patient calibration.
+    """
     from iints.research.anatomy import render_expression as fetch_expression
     fetch_expression(gene)
