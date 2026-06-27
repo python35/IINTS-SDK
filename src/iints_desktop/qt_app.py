@@ -3,6 +3,9 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import os
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox"
+
 import traceback
 from pathlib import Path
 
