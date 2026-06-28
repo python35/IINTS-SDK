@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import re
 from pathlib import Path
@@ -17,7 +18,14 @@ from iints_desktop.engine import (
     list_desktop_presets,
     read_run_history,
 )
-from iints_desktop.local_ai import SYSTEM_PROMPT, LocalAIStartResult, resolve_ollama_executable
+from iints_desktop.local_ai import (
+    RECOMMENDED_OLLAMA_MODELS,
+    SYSTEM_PROMPT,
+    LocalAIStartResult,
+    format_ai_answer,
+    resolve_ollama_executable,
+)
+from iints_desktop.mdmp import create_desktop_mdmp_certificate
 from iints_desktop.molecules import (
     MoleculeStructureError,
     list_molecule_assets,
@@ -123,6 +131,35 @@ def test_results_preview_builds_metrics_graph_and_bounded_rows(tmp_path: Path) -
     assert preview.graph_path.exists()
 
 
+def test_desktop_mdmp_certificate_signs_loaded_results(tmp_path: Path) -> None:
+    if importlib.util.find_spec("cryptography") is None:
+        pytest.skip("cryptography is not installed")
+
+    from mdmp_core.crypto import MDMPVerifier
+
+    csv_path = tmp_path / "results.csv"
+    csv_path.write_text(
+        "\n".join(
+            [
+                "time_minutes,glucose_actual_mgdl,carb_intake_grams,delivered_insulin_units",
+                "0,110,0,0.01",
+                "5,145,20,0.03",
+                "10,185,0,0.02",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = create_desktop_mdmp_certificate(csv_path, output_dir=tmp_path / "certs", quick=True, quick_rows=2)
+
+    assert result.certificate_path.exists()
+    assert result.report_path.exists()
+    verification = MDMPVerifier(public_key_path=result.public_key_path).verify(
+        json.loads(result.certificate_path.read_text(encoding="utf-8"))
+    )
+    assert verification["valid"] is True
+
+
 def test_ai_result_context_is_summary_only(tmp_path: Path) -> None:
     csv_path = tmp_path / "results.csv"
     csv_path.write_text("timestamp,glucose,carbs,insulin\n0,100,0,0\n5,130,12,0.1\n", encoding="utf-8")
@@ -137,7 +174,17 @@ def test_ai_result_context_is_summary_only(tmp_path: Path) -> None:
 def test_local_ai_prompt_is_research_only() -> None:
     assert "Not a medical device" in SYSTEM_PROMPT
     assert "Do not provide diagnosis" in SYSTEM_PROMPT
+    assert "Summary" in SYSTEM_PROMPT
+    assert RECOMMENDED_OLLAMA_MODELS
 
+
+def test_local_ai_answer_formatter_removes_markdown_noise() -> None:
+    formatted = format_ai_answer("## Summary\n- **Glucose** is stable\n---\n* Next check")
+
+    assert "##" not in formatted
+    assert "**" not in formatted
+    assert "---" not in formatted
+    assert "• Glucose is stable" in formatted
 
 
 def test_local_ai_can_resolve_ollama_from_extra_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -218,6 +265,15 @@ def test_qt_app_exposes_biology_evidence_actions() -> None:
     assert "Run Multi-Scale Simulation" in source
     assert "Highlight Mutation in 3D" in source
     assert "Open Genomics Folder" in source
+
+
+def test_qt_app_exposes_mdmp_and_model_selector_actions() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "RECOMMENDED_OLLAMA_MODELS" in source
+    assert "Refresh Models" in source
+    assert "Create MDMP Certificate" in source
+    assert "class MDMPCertifyWorker" in source
 
 
 def test_qt_app_exposes_desktop_update_panel() -> None:

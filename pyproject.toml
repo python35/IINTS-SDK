@@ -137,6 +137,7 @@ iints = [
   "templates/pico_pump/*.txt",
   "assets/*.png",
   "data/*.json",
+  "data/contracts/*.yaml",
   "data/virtual_patients/*.yaml",
   "data/demo/*.csv",
   "presets/*.json",

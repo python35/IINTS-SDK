@@ -20,6 +20,33 @@ BACKEND_MDMP = "mdmp_core"
 
 
 MDMP_GRADE_ORDER = ("raw", "draft", "research_grade", "clinical_grade", "ai_ready")
+MDMP_GRADE_DEFINITIONS: dict[str, dict[str, str]] = {
+    "raw": {
+        "meaning": "Unprocessed or unreviewed data.",
+        "minimum_conditions": "No reliable MDMP contract evidence yet.",
+        "allowed_use": "Storage and ingestion only; not for model training claims.",
+    },
+    "draft": {
+        "meaning": "Exploratory or incomplete dataset evidence.",
+        "minimum_conditions": "Compliance score below 75, or hard checks failed.",
+        "allowed_use": "Debugging, demos, and early exploration only.",
+    },
+    "research_grade": {
+        "meaning": "Usable for simulation, benchmarking, and AI research with documented limitations.",
+        "minimum_conditions": "Compliance score >= 75.",
+        "allowed_use": "Research workflows, model development, and reproducibility evidence.",
+    },
+    "clinical_grade": {
+        "meaning": "Passes all hard contract checks with compliance score >= 90.",
+        "minimum_conditions": "is_compliant=True and compliance_score >= 90.",
+        "allowed_use": "Stronger pre-clinical research evidence; not medical-device approval.",
+    },
+    "ai_ready": {
+        "meaning": "Signed, governed, AI-training-ready MDMP artifact.",
+        "minimum_conditions": "Clinical-grade quality plus explicit governance/signature policy.",
+        "allowed_use": "High-trust AI research pipelines; still not treatment authority.",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -61,6 +88,8 @@ class MDMPValidationResult:
             "dataset_fingerprint_sha256": self.dataset_fingerprint_sha256,
             "row_count": self.row_count,
             "checks": [check.to_dict() for check in self.checks],
+            "grade_definition": MDMP_GRADE_DEFINITIONS.get(self.mdmp_grade, MDMP_GRADE_DEFINITIONS["draft"]),
+            "grade_definitions": MDMP_GRADE_DEFINITIONS,
         }
 
 

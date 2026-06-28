@@ -25,7 +25,13 @@ from iints_desktop.engine import (
     read_run_history,
     run_demo_preset,
 )
-from iints_desktop.local_ai import ask_local_ai, check_local_ai, start_local_ai_stack
+from iints_desktop.local_ai import (
+    RECOMMENDED_OLLAMA_MODELS,
+    ask_local_ai,
+    check_local_ai,
+    list_local_ai_models,
+    start_local_ai_stack,
+)
 from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_html_path
 from iints_desktop.results import ResultPreview, load_results_preview
 from iints_desktop.fetcher import fetch_alphafold_structure
@@ -195,6 +201,27 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
+    class MDMPCertifyWorker(QObject):
+        """Background worker that signs a loaded result CSV with local MDMP evidence."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, *, csv_path: str) -> None:
+            super().__init__()
+            self.csv_path = csv_path
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                from iints_desktop.mdmp import create_desktop_mdmp_certificate
+
+                result = create_desktop_mdmp_certificate(self.csv_path)
+                self.finished.emit(result)
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
     class UpdateWorker(QObject):
         """Background worker for Python-package SDK updates from source installs."""
 
@@ -341,6 +368,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.default_preset = get_desktop_preset(DEFAULT_DESKTOP_PRESET_KEY)
             self.last_result: DesktopRunResult | None = None
             self.loaded_result: ResultPreview | None = None
+            self.last_mdmp_certificate_dir: Path | None = None
             self.history_entries: list[DesktopRunHistoryEntry] = []
             self.current_thread: QThread | None = None
             self.current_worker: RunWorker | None = None
@@ -348,6 +376,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.ai_worker: AIWorker | None = None
             self.ai_start_thread: QThread | None = None
             self.ai_start_worker: LocalAIStartWorker | None = None
+            self.mdmp_thread: QThread | None = None
+            self.mdmp_worker: MDMPCertifyWorker | None = None
             self.update_thread: QThread | None = None
             self.update_worker: UpdateWorker | None = None
             self.pae_thread: QThread | None = None
@@ -380,7 +410,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.result_graph = QLabel("Load a results CSV to view a glucose graph.")
             self.result_graph.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.history_table = QTableWidget(0, 7)
-            self.ai_model = QLineEdit(DEFAULT_MINISTRAL_MODEL)
+            self.ai_model = QComboBox()
+            self.ai_model.setEditable(True)
+            self.ai_model.addItems(list(RECOMMENDED_OLLAMA_MODELS))
+            self.ai_model.setCurrentText(DEFAULT_MINISTRAL_MODEL)
             self.ai_host = QLineEdit("http://127.0.0.1:11434")
             self.ai_model.setMinimumWidth(0)
             self.ai_host.setMinimumWidth(0)
@@ -418,8 +451,11 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.load_last_result_button = QPushButton("Load Last Run CSV")
             self.open_loaded_csv_button = QPushButton("Open Loaded CSV")
             self.open_graph_button = QPushButton("Open Graph PNG")
+            self.create_mdmp_cert_button = QPushButton("Create MDMP Certificate")
+            self.open_mdmp_cert_folder_button = QPushButton("Open Certificate Folder")
             self.start_ai_button = QPushButton("Start Local AI")
             self.check_ai_button = QPushButton("Check Ollama")
+            self.refresh_ai_models_button = QPushButton("Refresh Models")
             self.ask_ai_button = QPushButton("Ask Local AI")
             self.copy_ai_answer_button = QPushButton("Copy AI Answer")
             self.quick_explain_button = QPushButton("Explain Run")
@@ -738,6 +774,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.load_last_result_button.clicked.connect(self._load_last_result_csv)
             self.open_loaded_csv_button.clicked.connect(self._open_loaded_result_csv)
             self.open_graph_button.clicked.connect(self._open_loaded_graph)
+            self.create_mdmp_cert_button.clicked.connect(self._create_mdmp_certificate)
+            self.open_mdmp_cert_folder_button.clicked.connect(self._open_loaded_certificate_folder)
             csv_row.addWidget(self.result_csv_path, stretch=1)
             csv_row.addWidget(self.browse_result_button)
             csv_layout.addLayout(csv_row)
@@ -748,8 +786,10 @@ if _PYSIDE_IMPORT_ERROR is None:
                         self.load_last_result_button,
                         self.open_loaded_csv_button,
                         self.open_graph_button,
+                        self.create_mdmp_cert_button,
+                        self.open_mdmp_cert_folder_button,
                     ],
-                    columns=4,
+                    columns=3,
                 )
             )
             layout.addWidget(csv_box)
@@ -794,8 +834,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             config_layout.addWidget(self.ai_host, 1, 1)
             self.start_ai_button.clicked.connect(self._start_local_ai)
             self.check_ai_button.clicked.connect(self._check_ai_status)
+            self.refresh_ai_models_button.clicked.connect(self._refresh_ai_models)
             config_layout.addWidget(self.start_ai_button, 0, 2)
             config_layout.addWidget(self.check_ai_button, 1, 2)
+            config_layout.addWidget(self.refresh_ai_models_button, 2, 2)
             config_layout.addWidget(self.ai_status, 0, 3)
             config_layout.addWidget(self.ai_context_label, 1, 3)
             config_layout.setColumnStretch(1, 2)
@@ -1493,6 +1535,8 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _set_loaded_result_actions(self, enabled: bool) -> None:
             self.open_loaded_csv_button.setEnabled(enabled)
             self.open_graph_button.setEnabled(enabled and bool(self.loaded_result and self.loaded_result.graph_path))
+            self.create_mdmp_cert_button.setEnabled(enabled)
+            self.open_mdmp_cert_folder_button.setEnabled(enabled)
 
         def _open_output_folder(self) -> None:
             path = self.last_result.output_dir if self.last_result else Path(self.output_dir.text())
@@ -1537,6 +1581,74 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _open_loaded_graph(self) -> None:
             if self.loaded_result and self.loaded_result.graph_path:
                 self._open_path(self.loaded_result.graph_path)
+
+        def _open_loaded_certificate_folder(self) -> None:
+            if self.last_mdmp_certificate_dir and self.last_mdmp_certificate_dir.exists():
+                self._open_path(self.last_mdmp_certificate_dir)
+                return
+            if self.loaded_result:
+                self._open_path(self.loaded_result.csv_path.parent / "mdmp_certificates")
+
+        def _set_mdmp_certifying_state(self, is_running: bool) -> None:
+            self.create_mdmp_cert_button.setEnabled(not is_running and self.loaded_result is not None)
+            self.open_mdmp_cert_folder_button.setEnabled(not is_running and self.loaded_result is not None)
+
+        def _create_mdmp_certificate(self) -> None:
+            if not self.loaded_result:
+                QMessageBox.information(self, "IINTS-AF Desktop", "Load a results CSV first.")
+                return
+            self._set_mdmp_certifying_state(True)
+            self.status.setText("Creating signed MDMP certificate")
+            thread = QThread(self)
+            worker = MDMPCertifyWorker(csv_path=str(self.loaded_result.csv_path))
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_mdmp_certificate_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_mdmp_certificate_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_mdmp_certificate_refs)
+            self.mdmp_thread = thread
+            self.mdmp_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_mdmp_certificate_success(self, result: object) -> None:
+            self._set_mdmp_certifying_state(False)
+            cert_path = Path(str(getattr(result, "certificate_path", "")))
+            report_path = Path(str(getattr(result, "report_path", "")))
+            public_key_path = Path(str(getattr(result, "public_key_path", "")))
+            self.last_mdmp_certificate_dir = cert_path.parent if cert_path.name else None
+            grade = str(getattr(result, "grade", "unknown"))
+            score = float(getattr(result, "compliance_score", 0.0))
+            row_count = int(getattr(result, "row_count", 0))
+            message = (
+                f"Signed MDMP certificate created.\n\n"
+                f"Grade: {grade}\n"
+                f"Compliance: {score:.2f}%\n"
+                f"Rows scanned: {row_count}\n\n"
+                f"Certificate: {cert_path}\n"
+                f"Report: {report_path}\n"
+                f"Verifier public key: {public_key_path}\n\n"
+                "The certificate is Ed25519-signed locally. Share the public key if an external reviewer "
+                "needs to verify the certificate."
+            )
+            self.ai_answer.setPlainText(message)
+            self.status.setText("MDMP certificate ready")
+
+        @Slot(str)
+        def _handle_mdmp_certificate_error(self, details: str) -> None:
+            self._set_mdmp_certifying_state(False)
+            self.ai_answer.setPlainText(details)
+            self.status.setText("MDMP certification failed")
+
+        @Slot()
+        def _clear_mdmp_certificate_refs(self) -> None:
+            self.mdmp_thread = None
+            self.mdmp_worker = None
 
         def _load_result_csv(self, path: Path) -> None:
             try:
@@ -1583,7 +1695,11 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _set_ai_starting_state(self, is_starting: bool) -> None:
             self.start_ai_button.setEnabled(not is_starting)
             self.check_ai_button.setEnabled(not is_starting)
+            self.refresh_ai_models_button.setEnabled(not is_starting)
             self.ask_ai_button.setEnabled(not is_starting)
+
+        def _selected_ai_model(self) -> str:
+            return self.ai_model.currentText().strip() or DEFAULT_MINISTRAL_MODEL
 
         def _start_local_ai(self) -> None:
             self._set_ai_starting_state(True)
@@ -1591,7 +1707,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Starting local AI")
             thread = QThread(self)
             worker = LocalAIStartWorker(
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
+                model=self._selected_ai_model(),
                 host=self.ai_host.text().strip(),
             )
             worker.moveToThread(thread)
@@ -1630,11 +1746,19 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _check_ai_status(self) -> None:
             status = check_local_ai(
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
+                model=self._selected_ai_model(),
                 host=self.ai_host.text().strip() or None,
             )
             self.ai_status.setText(status.message)
             self.status.setText("Local AI ready" if status.available else "Local AI not ready")
+
+        def _refresh_ai_models(self) -> None:
+            selected = self._selected_ai_model()
+            models = list_local_ai_models(host=self.ai_host.text().strip() or None)
+            self.ai_model.clear()
+            self.ai_model.addItems(models)
+            self.ai_model.setCurrentText(selected if selected in models else models[0])
+            self.ai_status.setText(f"Model list refreshed ({len(models)} choices).")
 
         def _set_ai_question(self, text: str) -> None:
             self.ai_question.setPlainText(text)
@@ -1651,7 +1775,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             thread = QThread(self)
             worker = AIWorker(
                 question=question,
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
+                model=self._selected_ai_model(),
                 host=self.ai_host.text().strip(),
                 result_csv=result_csv,
             )
@@ -1673,7 +1797,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _handle_ai_success(self, answer: object) -> None:
             self.ask_ai_button.setEnabled(True)
             text = getattr(answer, "answer", str(answer))
-            model = getattr(answer, "model", self.ai_model.text())
+            model = getattr(answer, "model", self._selected_ai_model())
             self.ai_answer.setPlainText(f"Model: {model}\n\n{text}")
             self.status.setText("Local AI answer ready")
 

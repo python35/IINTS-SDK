@@ -1,0 +1,60 @@
+version: 1
+metadata:
+  contract_id: iints.diabetes.cgm.v1
+  title: IINTS Diabetes CGM + Insulin Research Contract
+  intended_use: research_and_education_only
+  description: >-
+    Standard IINTS-AF contract for diabetes research CSV files containing CGM,
+    carbohydrate, and insulin signals. This is not a medical-device approval
+    contract; it is a reproducibility and data-quality gate for research.
+streams:
+  - name: PatientHealth
+    source: sdk.iints_af.diabetes.v1
+    security: PII_MINIMIZED_OR_DEIDENTIFIED
+    metadata:
+      required_columns: [timestamp, glucose]
+      recommended_columns: [carbs, insulin, subject_id, source_dataset]
+      column_types:
+        glucose: float
+        carbs: float
+        insulin: float
+      ranges:
+        glucose:
+          min: 20
+          max: 600
+        carbs:
+          min: 0
+          max: 250
+        insulin:
+          min: 0
+          max: 50
+      expected_units:
+        glucose: mg/dL
+        carbs: grams
+        insulin: units
+      grade_policy:
+        draft: incomplete, exploratory, or failing hard checks
+        research_grade: usable for simulation/AI research with documented limitations
+        clinical_grade: compliant with all hard checks and >=90 score; still not a medical-device approval
+processes:
+  - name: DiabetesResearchData
+    input_stream: PatientHealth.glucose
+    features:
+      - name: cgm_rolling_avg_15m
+        operation: moving_average
+        source: PatientHealth.glucose
+        window: 15m
+      - name: glucose_rate_of_change
+        operation: finite_difference
+        source: PatientHealth.glucose
+        window: 10m
+    labels:
+      - name: hypo_event
+        expression: glucose < 70
+        classes: [hypoglycemia, not_hypoglycemia]
+      - name: hyper_event
+        expression: glucose > 180
+        classes: [hyperglycemia, not_hyperglycemia]
+    validations:
+      - expression: glucose is not null and glucose >= 20 and glucose <= 600
+        on_fail: DISCARD_AND_LOG

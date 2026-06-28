@@ -25,6 +25,23 @@ _RESERVED_TOKENS = {
 
 MDMP_PROTOCOL_VERSION = "1.0-draft"
 MDMP_GRADE_ORDER = ("draft", "research_grade", "clinical_grade")
+MDMP_GRADE_DEFINITIONS = {
+    "draft": {
+        "meaning": "Exploratory or incomplete dataset evidence.",
+        "minimum_conditions": "Compliance score below 75, or hard contract checks failed.",
+        "allowed_use": "Debugging, demos, and early exploration only.",
+    },
+    "research_grade": {
+        "meaning": "Usable for simulation, benchmarking, and AI research with documented limitations.",
+        "minimum_conditions": "Compliance score >= 75. Some non-hard issues may remain.",
+        "allowed_use": "Research workflows, model development, and reproducibility evidence.",
+    },
+    "clinical_grade": {
+        "meaning": "Passes all hard contract checks with a compliance score >= 90.",
+        "minimum_conditions": "is_compliant=True and compliance_score >= 90.",
+        "allowed_use": "Stronger pre-clinical research evidence; not medical-device approval.",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -68,6 +85,8 @@ class ValidationResult:
             "row_count": self.row_count,
             "output_columns": self.output_columns,
             "checks": [check.to_dict() for check in self.checks],
+            "grade_definition": MDMP_GRADE_DEFINITIONS.get(self.mdmp_grade, MDMP_GRADE_DEFINITIONS["draft"]),
+            "grade_definitions": MDMP_GRADE_DEFINITIONS,
         }
 
 
@@ -254,6 +273,21 @@ class ContractRunner:
 
     def _apply_builtin_transforms(self, df: pd.DataFrame) -> pd.DataFrame:
         transformed = df.copy()
+        # Normalize common IINTS simulator exports so the standard diabetes
+        # contract works for both raw research CSVs and SDK result files.
+        aliases = {
+            "timestamp": ("time_minutes", "time", "minute", "minutes"),
+            "glucose": ("glucose_actual_mgdl", "cgm_mgdl", "sensor_glucose_mgdl", "glucose_mgdl"),
+            "carbs": ("carb_intake_grams", "carbohydrates", "meal_carbs"),
+            "insulin": ("delivered_insulin_units", "insulin_units", "bolus_units"),
+        }
+        for canonical, candidates in aliases.items():
+            if canonical in transformed.columns:
+                continue
+            for candidate in candidates:
+                if candidate in transformed.columns:
+                    transformed[canonical] = transformed[candidate]
+                    break
         for stream in self.contract.streams:
             raw_conversions = stream.metadata.get("unit_conversions", {})
             if not isinstance(raw_conversions, dict):
