@@ -42,9 +42,7 @@ from iints_desktop.render_3dmol import generate_3dmol_html
 DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
 PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"'
-ENABLE_EMBEDDED_WEBENGINE = (
-    sys.platform != "darwin" and os.environ.get("QT_QPA_PLATFORM") != "offscreen"
-)
+ENABLE_EMBEDDED_WEBENGINE = os.environ.get("QT_QPA_PLATFORM") != "offscreen"
 _CRASH_LOG_HANDLE: Any | None = None
 
 
@@ -104,6 +102,7 @@ try:  # pragma: no cover - optional GUI dependency
         QStatusBar,
         QTableWidget,
         QTableWidgetItem,
+        QListWidget,
         QTextEdit,
         QPushButton,
         QSpinBox,
@@ -421,11 +420,22 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.result_summary = QLabel("No results loaded yet.")
             self.result_summary.setWordWrap(True)
             self.result_table = QTableWidget(0, 0)
-            self.result_graph = QLabel("Load a results CSV to view a glucose graph.")
-            self.result_graph.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            from PySide6.QtWidgets import QStackedWidget
+            self.result_graph_stack = QStackedWidget()
+            self.result_graph_label = QLabel("Load a results CSV to view a glucose graph.")
+            self.result_graph_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.result_graph_stack.addWidget(self.result_graph_label)
+            if _QWEBENGINE_VIEW:
+                self.result_graph_web = _QWEBENGINE_VIEW()
+                self.result_graph_stack.addWidget(self.result_graph_web)
+            else:
+                self.result_graph_web = None
             self.history_table = QTableWidget(0, 7)
             self.ai_model = QComboBox()
             self.ai_model.setEditable(True)
+            self.batch_queue = []
+            self.batch_running = False
+            self.batch_list_widget = QListWidget()
             self.ai_model.addItems(["llama3.2", "medllama2", "ministral-8b-instruct", "devanshamin/PubMedDiabetes-LLM-Predictions"])
             self.ai_model.setCurrentText(DEFAULT_MINISTRAL_MODEL)
             self.ai_host = QComboBox()
@@ -453,6 +463,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.pae_web_view: Any | None = None
 
             self.run_button = QPushButton("Run Selected Workflow")
+            self.run_button.setObjectName("primaryAction")
+            self.run_button.clicked.connect(self._run_selected_workflow)
+            self.queue_button = QPushButton("Add to Batch")
+            self.queue_button.clicked.connect(lambda: self._add_to_batch("preset"))
             self.open_folder_button = QPushButton("Open Output Folder")
             self.open_report_button = QPushButton("Open PDF Report")
             self.open_csv_button = QPushButton("Open Results CSV")
@@ -469,6 +483,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button = QPushButton("Open Graph PNG")
             self.create_mdmp_cert_button = QPushButton("Create MDMP Certificate")
             self.open_mdmp_cert_folder_button = QPushButton("Open Certificate Folder")
+            self.export_workspace_button = QPushButton("Export Workspace (.zip)")
             self.start_ai_button = QPushButton("Start Local AI")
             self.check_ai_button = QPushButton("Check Ollama")
             self.refresh_ai_models_button = QPushButton("Refresh Models")
@@ -576,6 +591,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             tabs.addTab(history_tab, "Run Archive")
             tabs.addTab(molecules_tab, "Biology")
             tabs.addTab(builder_tab, "Scenario Builder")
+            batch_tab = QWidget()
+            tabs.addTab(batch_tab, "Batch Queue")
             tabs.addTab(about_tab, "Methods")
             self._build_run_tab(run_tab)
             self._build_results_tab(results_tab)
@@ -583,6 +600,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self._build_history_tab(history_tab)
             self._build_molecules_tab(molecules_tab)
             self._build_builder_tab(builder_tab)
+            self._build_batch_tab(batch_tab)
             self._build_about_tab(about_tab)
 
             status_bar = QStatusBar(self)
@@ -768,6 +786,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self._button_grid(
                     [
                         self.run_button,
+                        self.queue_button,
                         self.open_folder_button,
                         self.open_report_button,
                         self.open_csv_button,
@@ -807,6 +826,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button.clicked.connect(self._open_loaded_graph)
             self.create_mdmp_cert_button.clicked.connect(self._create_mdmp_certificate)
             self.open_mdmp_cert_folder_button.clicked.connect(self._open_loaded_certificate_folder)
+            self.export_workspace_button.clicked.connect(self._export_workspace)
             csv_row.addWidget(self.result_csv_path, stretch=1)
             csv_row.addWidget(self.browse_result_button)
             csv_layout.addLayout(csv_row)
@@ -819,6 +839,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                         self.open_graph_button,
                         self.create_mdmp_cert_button,
                         self.open_mdmp_cert_folder_button,
+                        self.export_workspace_button,
                     ],
                     columns=3,
                 )
@@ -831,10 +852,10 @@ if _PYSIDE_IMPORT_ERROR is None:
 
             graph_box = QGroupBox("Glucose trajectory")
             graph_layout = QVBoxLayout(graph_box)
-            self.result_graph.setMinimumHeight(220)
+            self.result_graph_stack.setMinimumHeight(220)
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
-            scroll.setWidget(self.result_graph)
+            scroll.setWidget(self.result_graph_stack)
             graph_layout.addWidget(scroll)
             workspace.addWidget(graph_box)
 
@@ -1186,32 +1207,38 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.custom_duration = QSpinBox()
             self.custom_duration.setRange(60, 10080)
             self.custom_duration.setValue(1440)
+            self.custom_duration.setToolTip("Total simulation time in minutes (e.g., 1440 for 24 hours).\nLonger durations require more compute time.")
             config_layout.addRow("Duration (mins):", self.custom_duration)
             
             self.custom_timestep = QSpinBox()
             self.custom_timestep.setRange(1, 60)
             self.custom_timestep.setValue(5)
+            self.custom_timestep.setToolTip("Integration time step in minutes (dt).\nSmaller steps increase ODE numerical stability but slow down the simulation.")
             config_layout.addRow("Time Step (mins):", self.custom_timestep)
             
             self.custom_seed = QSpinBox()
             self.custom_seed.setRange(0, 99999)
             self.custom_seed.setValue(42)
+            self.custom_seed.setToolTip("Random seed for generating physiological noise (sensor error, basal variations).\nKeep this constant to ensure perfectly reproducible runs.")
             config_layout.addRow("Random Seed:", self.custom_seed)
 
             self.custom_basal = QDoubleSpinBox()
             self.custom_basal.setRange(0.0, 5.0)
             self.custom_basal.setSingleStep(0.1)
             self.custom_basal.setValue(0.8)
+            self.custom_basal.setToolTip("Basal Rate [U/h]:\nThe continuous background insulin infusion rate modeled via subcutaneous absorption kinetics.")
             config_layout.addRow("Basal Rate (U/h):", self.custom_basal)
             
             self.custom_isf = QDoubleSpinBox()
             self.custom_isf.setRange(10.0, 150.0)
             self.custom_isf.setValue(45.0)
+            self.custom_isf.setToolTip("Insulin Sensitivity Factor (ISF) [mg/dL/U]:\nDefines the physiological drop in blood glucose concentration per unit of fast-acting insulin.")
             config_layout.addRow("Insulin Sensitivity (ISF):", self.custom_isf)
 
             self.custom_cr = QDoubleSpinBox()
             self.custom_cr.setRange(1.0, 50.0)
             self.custom_cr.setValue(10.0)
+            self.custom_cr.setToolTip("Carbohydrate Ratio [g/U]:\nThe grams of carbohydrates that are covered by 1 Unit of insulin during a meal bolus calculation.")
             config_layout.addRow("Carb Ratio (g/U):", self.custom_cr)
             layout.addWidget(config_box)
             
@@ -1239,6 +1266,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             run_custom_btn.clicked.connect(self._run_custom_scenario)
             actions_layout.addWidget(run_custom_btn)
             
+            queue_custom_btn = QPushButton("Add Custom to Batch")
+            queue_custom_btn.clicked.connect(lambda: self._add_to_batch("custom"))
+            actions_layout.addWidget(queue_custom_btn)
+            
             save_custom_btn = QPushButton("Save JSON")
             save_custom_btn.clicked.connect(self._save_custom_json)
             actions_layout.addWidget(save_custom_btn)
@@ -1248,6 +1279,64 @@ if _PYSIDE_IMPORT_ERROR is None:
             actions_layout.addWidget(load_custom_btn)
             layout.addWidget(actions_box)
             layout.addStretch(1)
+
+        def _build_batch_tab(self, parent: QWidget) -> None:
+            layout = self._scroll_tab_layout(parent)
+            intro = QLabel("Queue multiple scenarios to run them sequentially. This is useful for large parameter sweeps or overnight runs.")
+            intro.setWordWrap(True)
+            layout.addWidget(intro)
+            
+            queue_box = QGroupBox("Queued Simulations")
+            queue_layout = QVBoxLayout(queue_box)
+            queue_layout.addWidget(self.batch_list_widget)
+            
+            btn_layout = QHBoxLayout()
+            self.run_batch_btn = QPushButton("Run Batch Queue")
+            self.run_batch_btn.setObjectName("primaryAction")
+            self.run_batch_btn.clicked.connect(self._run_next_in_batch)
+            btn_layout.addWidget(self.run_batch_btn)
+            
+            clear_batch_btn = QPushButton("Clear Queue")
+            clear_batch_btn.clicked.connect(self._clear_batch)
+            btn_layout.addWidget(clear_batch_btn)
+            
+            queue_layout.addLayout(btn_layout)
+            layout.addWidget(queue_box)
+            layout.addStretch(1)
+
+        def _add_to_batch(self, config_type: str) -> None:
+            if config_type == "preset":
+                preset = self._selected_preset()
+                config = {"type": "preset", "key": preset.key, "seed": int(self.seed.value())}
+                title = f"{preset.title} (Seed: {config['seed']})"
+            else:
+                config = {"type": "custom", "payload": self._get_custom_preset_dict(), "seed": int(self.custom_seed.value())}
+                title = f"Custom Scenario (Seed: {config['seed']})"
+            self.batch_queue.append(config)
+            self.batch_list_widget.addItem(title)
+            self.status.setText(f"Added to batch: {title}")
+
+        def _clear_batch(self) -> None:
+            self.batch_queue.clear()
+            self.batch_list_widget.clear()
+            self.batch_running = False
+
+        def _run_next_in_batch(self) -> None:
+            if not self.batch_queue:
+                self.batch_running = False
+                QMessageBox.information(self, "Batch Complete", "All queued simulations have finished.")
+                return
+            
+            self.batch_running = True
+            config = self.batch_queue.pop(0)
+            self.batch_list_widget.takeItem(0)
+            
+            if config["type"] == "preset":
+                self.workflow_combo.setCurrentIndex(self._workflow_index(config["key"]))
+                self.seed.setValue(config["seed"])
+                self._run_selected_workflow()
+            else:
+                self._run_custom_payload(config["payload"])
 
         def _add_custom_meal(self) -> None:
             row = self.meals_table.rowCount()
@@ -1430,86 +1519,86 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.setStyleSheet(
                 """
                 * {
-                    color: #202a35;
-                    selection-background-color: #cfe2f0;
-                    selection-color: #102436;
+                    color: #d4d4d4;
+                    selection-background-color: #264f78;
+                    selection-color: #ffffff;
                 }
                 QMainWindow, QWidget, QWidget#root {
-                    background-color: #e9edf1;
-                    color: #202a35;
+                    background-color: #1e1e1e;
+                    color: #d4d4d4;
                     font-size: 13px;
                 }
                 QLabel {
-                    color: #202a35;
+                    color: #d4d4d4;
                     background: transparent;
                 }
                 QFrame, QSplitter, QAbstractScrollArea, QScrollArea {
-                    background-color: #f7f8fa;
-                    color: #202a35;
-                    border-color: #b9c3cc;
+                    background-color: #252526;
+                    color: #d4d4d4;
+                    border-color: #3c3c3c;
                 }
                 QScrollArea > QWidget > QWidget {
-                    background-color: #f7f8fa;
-                    color: #202a35;
+                    background-color: #252526;
+                    color: #d4d4d4;
                 }
                 QMenuBar, QToolBar, QStatusBar {
-                    background: #f6f7f8;
-                    color: #202a35;
-                    border-color: #b9c3cc;
+                    background: #333333;
+                    color: #cccccc;
+                    border-color: #3c3c3c;
                 }
                 QMenuBar {
-                    border-bottom: 1px solid #b9c3cc;
+                    border-bottom: 1px solid #3c3c3c;
                 }
                 QMenuBar::item {
                     padding: 4px 9px;
                 }
                 QMenuBar::item:selected, QMenu::item:selected {
-                    background: #dbe7f1;
+                    background: #094771;
                 }
                 QMenu {
-                    background: #ffffff;
-                    color: #202a35;
-                    border: 1px solid #aebac5;
+                    background: #252526;
+                    color: #cccccc;
+                    border: 1px solid #454545;
                 }
                 QToolBar {
                     spacing: 4px;
                     padding: 3px 5px;
-                    border-bottom: 1px solid #b9c3cc;
+                    border-bottom: 1px solid #3c3c3c;
                 }
                 QToolButton {
-                    background: #f6f7f8;
-                    color: #1f2d3a;
+                    background: #333333;
+                    color: #cccccc;
                     border: 1px solid transparent;
                     border-radius: 2px;
                     padding: 5px 8px;
                 }
                 QToolButton:hover {
-                    background: #e1e9ef;
-                    border-color: #9dacb9;
+                    background: #444444;
+                    border-color: #555555;
                 }
                 QWidget#workbenchHeader {
-                    background: #ffffff;
-                    border: 1px solid #b9c3cc;
+                    background: #252526;
+                    border: 1px solid #3c3c3c;
                 }
                 QLabel#appTitle {
-                    color: #173b5c;
+                    color: #4facfe;
                 }
                 QLabel#researchBadge {
-                    background: #fff3cd;
-                    color: #714b00;
-                    border: 1px solid #d6b765;
+                    background: #4d4d00;
+                    color: #ffff80;
+                    border: 1px solid #666600;
                     padding: 3px 7px;
                     font-weight: 700;
                 }
                 QTabWidget::pane {
-                    border: 1px solid #aebac5;
-                    background: #f7f8fa;
+                    border: 1px solid #3c3c3c;
+                    background: #252526;
                     padding: 4px;
                 }
                 QTabBar::tab {
-                    background: #dfe5ea;
-                    color: #34414d;
-                    border: 1px solid #aebac5;
+                    background: #2d2d2d;
+                    color: #999999;
+                    border: 1px solid #3c3c3c;
                     border-bottom: none;
                     border-radius: 0;
                     padding: 7px 12px;
@@ -1517,51 +1606,51 @@ if _PYSIDE_IMPORT_ERROR is None:
                     font-weight: 600;
                 }
                 QTabBar::tab:selected {
-                    background: #f7f8fa;
-                    color: #173b5c;
-                    border-top: 3px solid #2b618d;
+                    background: #1e1e1e;
+                    color: #4facfe;
+                    border-top: 3px solid #007acc;
                     padding-top: 5px;
                 }
                 QLabel#infoStrip, QLabel#deepDiveIntro {
-                    background: #edf4f8;
-                    color: #1f4b6e;
-                    border: 1px solid #a9c1d4;
+                    background: #1e3a5f;
+                    color: #e0f2fe;
+                    border: 1px solid #2a5286;
                     padding: 6px 8px;
                 }
                 QLabel#metricSummary {
-                    background: #f1f4f6;
-                    border: 1px solid #c7d0d8;
-                    color: #273746;
+                    background: #252526;
+                    border: 1px solid #3c3c3c;
+                    color: #cccccc;
                     padding: 7px;
                 }
                 QLabel#moleculeTitle {
-                    color: #173b5c;
+                    color: #4facfe;
                     font-size: 16px;
                     font-weight: 700;
                 }
                 QLabel#moleculeStatus {
-                    background: #eef5ee;
-                    color: #285a32;
-                    border: 1px solid #a9c5ad;
+                    background: #1b4332;
+                    color: #95d5b2;
+                    border: 1px solid #2d6a4f;
                     padding: 6px 8px;
                 }
                 QLabel#moleculePAEStatus, QLabel#biologyActionStatus, QLabel#updateStatus {
-                    background: #f4f7f4;
-                    color: #2f4830;
-                    border: 1px solid #bdcdbd;
+                    background: #1f3a2c;
+                    color: #d8f3dc;
+                    border: 1px solid #40916c;
                     padding: 6px 8px;
                 }
                 QGroupBox {
-                    background: #ffffff;
-                    color: #202a35;
-                    border: 1px solid #b9c3cc;
+                    background: #252526;
+                    color: #d4d4d4;
+                    border: 1px solid #3c3c3c;
                     border-radius: 2px;
                     margin-top: 9px;
                     padding: 10px 8px 8px 8px;
                     font-weight: 650;
                 }
                 QGroupBox QLabel {
-                    color: #202a35;
+                    color: #d4d4d4;
                     background: transparent;
                     font-weight: 400;
                 }
@@ -1569,59 +1658,59 @@ if _PYSIDE_IMPORT_ERROR is None:
                     subcontrol-origin: margin;
                     left: 8px;
                     padding: 0 4px;
-                    color: #173b5c;
+                    color: #4facfe;
                 }
                 QPushButton {
-                    background: #f2f4f6;
-                    color: #1f2d3a;
-                    border: 1px solid #aebac5;
+                    background: #3c3c3c;
+                    color: #cccccc;
+                    border: 1px solid #555555;
                     border-radius: 2px;
                     padding: 5px 9px;
                     font-weight: 600;
                 }
                 QPushButton:hover {
-                    background: #dfe9f1;
-                    border-color: #7d94a7;
+                    background: #505050;
+                    border-color: #666666;
                 }
                 QPushButton#primaryAction {
-                    background: #245a82;
+                    background: #007acc;
                     color: #ffffff;
-                    border-color: #173b5c;
+                    border-color: #005c99;
                     font-weight: 700;
                 }
                 QPushButton:disabled {
-                    background: #e4e8eb;
-                    color: #7d8993;
-                    border-color: #c6cdd3;
+                    background: #2d2d2d;
+                    color: #666666;
+                    border-color: #444444;
                 }
-                QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit, QTableWidget, QTableView {
-                    background: #ffffff;
-                    color: #202a35;
-                    border: 1px solid #aebac5;
+                QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit, QTextEdit, QTableWidget, QTableView {
+                    background: #1e1e1e;
+                    color: #d4d4d4;
+                    border: 1px solid #3c3c3c;
                     border-radius: 1px;
                     padding: 5px;
                 }
-                QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus, QTextEdit:focus, QTableWidget:focus {
-                    border: 1px solid #2b618d;
+                QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus, QTextEdit:focus, QTableWidget:focus {
+                    border: 1px solid #007acc;
                 }
                 QComboBox QAbstractItemView {
-                    background: #ffffff;
-                    color: #202a35;
-                    selection-background-color: #d8e7f2;
-                    selection-color: #202a35;
+                    background: #1e1e1e;
+                    color: #d4d4d4;
+                    selection-background-color: #264f78;
+                    selection-color: #ffffff;
                 }
                 QPlainTextEdit:disabled, QTextEdit:disabled, QLineEdit:disabled {
-                    color: #52616f;
-                    background: #eef1f3;
+                    color: #888888;
+                    background: #2d2d2d;
                 }
                 QTableWidget::item:selected {
-                    background: #d8e7f2;
-                    color: #1f2d3a;
+                    background: #264f78;
+                    color: #ffffff;
                 }
                 QHeaderView::section {
-                    background: #dfe5ea;
-                    color: #243746;
-                    border: 1px solid #b9c3cc;
+                    background: #333333;
+                    color: #cccccc;
+                    border: 1px solid #444444;
                     padding: 4px;
                     font-weight: 650;
                 }
@@ -1629,17 +1718,17 @@ if _PYSIDE_IMPORT_ERROR is None:
                     font-family: Menlo, Consolas, monospace;
                 }
                 QLabel#subtleHint {
-                    color: #5c6b78;
-                    background: #f6f7f8;
-                    border: 1px solid #d5dde4;
+                    color: #999999;
+                    background: #2d2d2d;
+                    border: 1px solid #444444;
                     padding: 5px 7px;
                 }
                 QStatusBar {
-                    color: #314251;
-                    border-top: 1px solid #b9c3cc;
+                    color: #cccccc;
+                    border-top: 1px solid #3c3c3c;
                 }
                 QLabel#workspaceStatus {
-                    color: #667684;
+                    color: #999999;
                     padding-left: 10px;
                 }
                 """
@@ -1735,14 +1824,21 @@ if _PYSIDE_IMPORT_ERROR is None:
             if result.results_csv:
                 self.result_csv_path.setText(str(result.results_csv))
                 self._load_result_csv(result.results_csv)
-                if self.tabs is not None:
+                if self.tabs is not None and not self.batch_running:
                     self.tabs.setCurrentIndex(1)
+            
+            if self.batch_running:
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(500, self._run_next_in_batch)
 
         @Slot(str)
         def _handle_error(self, details: str) -> None:
             self.status.setText("Run failed")
             self.progress_bar.hide()
             self._set_running_state(False)
+            if self.batch_running:
+                self.batch_running = False
+                self.status.setText("Batch halted due to error")
             self._write_log(f"\nERROR:\n{details}\n")
             QMessageBox.critical(self, "IINTS-AF Desktop", details)
 
@@ -1767,6 +1863,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button.setEnabled(enabled and bool(self.loaded_result and self.loaded_result.graph_path))
             self.create_mdmp_cert_button.setEnabled(enabled)
             self.open_mdmp_cert_folder_button.setEnabled(enabled)
+            self.export_workspace_button.setEnabled(enabled)
 
         def _open_output_folder(self) -> None:
             path = self.last_result.output_dir if self.last_result else Path(self.output_dir.text())
@@ -1818,6 +1915,28 @@ if _PYSIDE_IMPORT_ERROR is None:
                 return
             if self.loaded_result:
                 self._open_path(self.loaded_result.csv_path.parent / "mdmp_certificates")
+
+        def _export_workspace(self) -> None:
+            if not self.loaded_result:
+                return
+            from PySide6.QtWidgets import QFileDialog
+            import shutil
+            
+            target_dir = self.loaded_result.csv_path.parent
+            save_path, _ = QFileDialog.getSaveFileName(
+                self, 
+                "Export Workspace as ZIP", 
+                f"{target_dir.name}_export.zip", 
+                "ZIP Archives (*.zip)"
+            )
+            if save_path:
+                if save_path.endswith(".zip"):
+                    save_path = save_path[:-4]  # make_archive appends .zip automatically
+                try:
+                    shutil.make_archive(save_path, 'zip', str(target_dir))
+                    QMessageBox.information(self, "Export Successful", f"Workspace exported to:\n{save_path}.zip")
+                except Exception as e:
+                    QMessageBox.critical(self, "Export Failed", f"Failed to export workspace:\n{e}")
 
         def _set_mdmp_certifying_state(self, is_running: bool) -> None:
             self.create_mdmp_cert_button.setEnabled(not is_running and self.loaded_result is not None)
@@ -1905,15 +2024,22 @@ if _PYSIDE_IMPORT_ERROR is None:
                 for column_index, value in enumerate(row):
                     self.result_table.setItem(row_index, column_index, QTableWidgetItem(value))
             self.result_table.resizeColumnsToContents()
-            if preview.graph_path and preview.graph_path.exists():
+            html_path = preview.csv_path.with_name(preview.csv_path.name.replace(".csv", ".html"))
+            if html_path.exists() and self.result_graph_web:
+                from PySide6.QtCore import QUrl
+                self.result_graph_web.load(QUrl.fromLocalFile(str(html_path.absolute())))
+                self.result_graph_stack.setCurrentWidget(self.result_graph_web)
+            elif preview.graph_path and preview.graph_path.exists():
                 pixmap = QPixmap(str(preview.graph_path))
-                self.result_graph.clear()
-                self.result_graph.setPixmap(
+                self.result_graph_label.clear()
+                self.result_graph_label.setPixmap(
                     pixmap.scaledToWidth(900, Qt.TransformationMode.SmoothTransformation)
                 )
+                self.result_graph_stack.setCurrentWidget(self.result_graph_label)
             else:
-                self.result_graph.clear()
-                self.result_graph.setText("No glucose column was found, so no graph could be generated.")
+                self.result_graph_label.clear()
+                self.result_graph_label.setText("No glucose column was found, so no graph could be generated.")
+                self.result_graph_stack.setCurrentWidget(self.result_graph_label)
             self.ai_context_label.setText(f"AI context: loaded summary from {preview.csv_path.name}")
             self._set_loaded_result_actions(True)
 
