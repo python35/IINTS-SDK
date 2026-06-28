@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from dataclasses import asdict
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, Callable
 
 import pandas as pd
 import yaml
@@ -296,6 +296,7 @@ def run_full(
     enable_profiling: bool = True,
     safety_config: Optional[SafetyConfig] = None,
     predictor: Optional[object] = None,
+    step_callback: Optional[Callable[[int, int, float], None]] = None,
 ) -> Dict[str, Any]:
     """
     One-line runner that always exports results + audit + PDF + baseline comparison.
@@ -341,7 +342,7 @@ def run_full(
     for event in build_stress_events(stress_event_payloads):
         simulator.add_stress_event(event)
 
-    results_df, safety_report = simulator.run_batch(duration_minutes)
+    results_df, safety_report = simulator.run_batch(duration_minutes, step_callback=step_callback)
 
     outputs: Dict[str, Any] = {
         "results": results_df,

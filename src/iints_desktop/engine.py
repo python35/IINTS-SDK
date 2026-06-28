@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -174,6 +174,7 @@ def run_demo_preset(
     desktop_preset_key: str = DEFAULT_DESKTOP_PRESET_KEY,
     preset_name: str | None = None,
     seed: int = 42,
+    step_callback: Callable[[int, int, float], None] | None = None,
 ) -> DesktopRunResult:
     """Run one deterministic demo preset through the normal SDK engine.
 
@@ -205,6 +206,7 @@ def run_demo_preset(
         time_step=int(preset["time_step_minutes"]),
         seed=seed,
         output_dir=target,
+        step_callback=step_callback,
     )
 
     results_csv = _optional_path(outputs.get("results_csv"))
@@ -248,6 +250,7 @@ def run_custom_preset(
     output_dir: str | Path,
     custom_preset: dict[str, Any],
     seed: int = 42,
+    step_callback: Callable[[int, int, float], None] | None = None,
 ) -> DesktopRunResult:
     """Run a dynamically constructed scenario from the UI."""
     base_output = Path(output_dir).expanduser().resolve()
@@ -269,6 +272,7 @@ def run_custom_preset(
         time_step=int(custom_preset.get("time_step_minutes", 5)),
         seed=seed,
         output_dir=target,
+        step_callback=step_callback,
     )
 
     results_csv = _optional_path(outputs.get("results_csv"))

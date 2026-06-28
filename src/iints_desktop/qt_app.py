@@ -137,6 +137,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         finished = Signal(object)
         failed = Signal(str)
         log = Signal(str)
+        telemetry = Signal(int, int, float)
 
         def __init__(self, *, output_dir: str, desktop_preset_key: str | None = None, seed: int, custom_preset: dict[str, Any] | None = None) -> None:
             super().__init__()
@@ -148,12 +149,16 @@ if _PYSIDE_IMPORT_ERROR is None:
         @Slot()
         def run(self) -> None:
             try:
+                def step_cb(step: int, total: int, glucose: float) -> None:
+                    self.telemetry.emit(step, total, glucose)
+
                 self.log.emit("Calling the IINTS-AF SDK engine...\n")
                 if self.custom_preset is not None:
                     result = run_custom_preset(
                         output_dir=self.output_dir,
                         custom_preset=self.custom_preset,
                         seed=self.seed,
+                        step_callback=step_cb,
                     )
                 else:
                     assert self.desktop_preset_key is not None
@@ -161,6 +166,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                         output_dir=self.output_dir,
                         desktop_preset_key=self.desktop_preset_key,
                         seed=self.seed,
+                        step_callback=step_cb,
                     )
                 self.finished.emit(result)
             except Exception:  # pragma: no cover - GUI error path
@@ -614,6 +620,11 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.progress_bar.hide()
             status_bar.addPermanentWidget(self.progress_bar)
             
+            self.live_telemetry_label = QLabel()
+            self.live_telemetry_label.setStyleSheet("color: #4facfe; font-weight: bold;")
+            self.live_telemetry_label.hide()
+            status_bar.addPermanentWidget(self.live_telemetry_label)
+            
             workspace_label = QLabel(f"Workspace: {Path(self.output_dir.text()).expanduser()}")
             workspace_label.setObjectName("workspaceStatus")
             status_bar.addPermanentWidget(workspace_label)
@@ -962,11 +973,19 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_selected_report_button.clicked.connect(self._open_selected_history_report)
             self.open_selected_csv_button.clicked.connect(self._open_selected_history_csv)
             self.load_selected_history_csv_button.clicked.connect(self._load_selected_history_csv)
+            self.history_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
+            self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+            
+            compare_button = QPushButton("Compare Selected Runs")
+            compare_button.setStyleSheet("background-color: #2b1154; color: #4facfe; font-weight: bold; border: 1px solid #4facfe;")
+            compare_button.clicked.connect(self._compare_selected_runs)
+            
             layout.addLayout(
                 self._button_grid(
                     [
                         refresh_button,
                         open_base_button,
+                        compare_button,
                         self.load_selected_history_csv_button,
                         self.open_selected_folder_button,
                         self.open_selected_report_button,
@@ -1403,6 +1422,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             worker.failed.connect(thread.quit)
             worker.finished.connect(worker.deleteLater)
             worker.failed.connect(worker.deleteLater)
+            worker.telemetry.connect(self._update_telemetry)
             thread.finished.connect(thread.deleteLater)
             thread.start()
             self._workers.append(thread)
@@ -1799,6 +1819,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             worker.failed.connect(self._handle_error)
             worker.failed.connect(thread.quit)
             worker.failed.connect(worker.deleteLater)
+            worker.telemetry.connect(self._update_telemetry)
             thread.finished.connect(thread.deleteLater)
             thread.finished.connect(self._clear_worker_refs)
             self.current_thread = thread
@@ -1814,7 +1835,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Run completed")
             self._set_running_state(False)
             self.run_button.setEnabled(True)
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setTextVisible(False)
             self.progress_bar.hide()
+            self.live_telemetry_label.hide()
             self.open_folder_button.setEnabled(True)
             self.open_report_button.setEnabled(bool(result.report_pdf and result.report_pdf.exists()))
             self.open_csv_button.setEnabled(bool(result.results_csv and result.results_csv.exists()))
@@ -1834,13 +1858,24 @@ if _PYSIDE_IMPORT_ERROR is None:
         @Slot(str)
         def _handle_error(self, details: str) -> None:
             self.status.setText("Run failed")
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setTextVisible(False)
             self.progress_bar.hide()
+            self.live_telemetry_label.hide()
             self._set_running_state(False)
             if self.batch_running:
                 self.batch_running = False
                 self.status.setText("Batch halted due to error")
             self._write_log(f"\nERROR:\n{details}\n")
             QMessageBox.critical(self, "IINTS-AF Desktop", details)
+
+        @Slot(int, int, float)
+        def _update_telemetry(self, step: int, total: int, glucose: float) -> None:
+            self.progress_bar.setRange(0, total)
+            self.progress_bar.setValue(step)
+            self.progress_bar.setTextVisible(True)
+            self.live_telemetry_label.setText(f" Live Glucose: {glucose:.1f} mg/dL ")
+            self.live_telemetry_label.show()
 
         @Slot()
         def _clear_worker_refs(self) -> None:
@@ -2742,6 +2777,69 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self._load_result_csv(Path(entry.results_csv))
                 if self.tabs is not None:
                     self.tabs.setCurrentIndex(1)
+
+        def _compare_selected_runs(self) -> None:
+            selected_ranges = self.history_table.selectedRanges()
+            if not selected_ranges:
+                self.status.setText("Select at least 2 runs to compare.")
+                return
+            
+            rows = set()
+            for r in selected_ranges:
+                for i in range(r.topRow(), r.bottomRow() + 1):
+                    rows.add(i)
+            
+            if len(rows) < 2:
+                self.status.setText("Select at least 2 runs to compare.")
+                return
+
+            import pandas as pd
+            import plotly.graph_objects as go
+            
+            fig = go.Figure()
+            valid_runs = 0
+
+            for row in rows:
+                if row >= len(self._history_entries):
+                    continue
+                entry = self._history_entries[row]
+                if not entry.results_csv or not Path(entry.results_csv).exists():
+                    continue
+                
+                try:
+                    df = pd.read_csv(entry.results_csv)
+                    if "time" in df.columns and "glucose" in df.columns:
+                        name = f"{entry.preset_name} (Seed: {entry.seed})"
+                        fig.add_trace(go.Scatter(x=df["time"], y=df["glucose"], mode="lines", name=name))
+                        valid_runs += 1
+                except Exception as e:
+                    self._write_log(f"Failed to load CSV for {entry.preset_name}: {e}\n")
+
+            if valid_runs < 2:
+                self.status.setText("Not enough valid results.csv files selected.")
+                return
+                
+            fig.update_layout(
+                title="Simulation Comparison (Glucose Over Time)",
+                xaxis_title="Time (minutes)",
+                yaxis_title="Glucose (mg/dL)",
+                template="plotly_dark",
+            )
+            
+            html_path = Path(self.output_dir.text()).expanduser() / ".cache" / "comparison_graph.html"
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            fig.write_html(str(html_path))
+            
+            if self.result_graph_web is not None:
+                from PySide6.QtCore import QUrl
+                self.result_graph_web.load(QUrl.fromLocalFile(str(html_path)))
+                self.result_csv_path.setText("Comparing multiple runs...")
+                if self.tabs is not None:
+                    self.tabs.setCurrentIndex(1)
+                self.status.setText("Comparison loaded.")
+            else:
+                self.status.setText("QWebEngineView not available. Graph generated but cannot be shown.")
+
 
 
 def _apply_application_palette(app: QApplication) -> None:

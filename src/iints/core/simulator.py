@@ -724,12 +724,13 @@ class Simulator:
         """Alias for run_batch to ensure backward compatibility."""
         return self.run_batch(duration_minutes)
 
-    def run_batch(self, duration_minutes: int) -> Tuple[pd.DataFrame, Dict[str, Any]]:
+    def run_batch(self, duration_minutes: int, step_callback: Optional[Callable[[int, int, float], None]] = None) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
         Runs the entire simulation and returns the results as a single DataFrame.
 
         Args:
             duration_minutes (int): Total simulation duration in minutes.
+            step_callback (Callable): Optional callback for live telemetry (time, duration, glucose).
 
         Returns:
             pd.DataFrame: A DataFrame containing the complete simulation results.
@@ -740,6 +741,8 @@ class Simulator:
         try:
             for record in self.run_live(duration_minutes):
                 all_records.append(record)
+                if step_callback:
+                    step_callback(record["time"], duration_minutes, record["glucose"])
         except SimulationLimitError as err:
             logger.error("Simulation terminated early: %s", err)
             self._termination_info = {
