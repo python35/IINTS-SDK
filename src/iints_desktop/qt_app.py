@@ -24,6 +24,7 @@ from iints_desktop.engine import (
     list_desktop_presets,
     read_run_history,
     run_demo_preset,
+    run_custom_preset,
 )
 from iints_desktop.local_ai import ask_local_ai, check_local_ai, start_local_ai_stack
 from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_html_path
@@ -76,11 +77,13 @@ _install_crash_logging()
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
-    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QPalette, QPixmap  # type: ignore[import-not-found]
+    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence, QPalette, QPixmap, QShortcut  # type: ignore[import-not-found]
     from PySide6.QtWidgets import (  # type: ignore[import-not-found]
         QApplication,
         QComboBox,
+        QDoubleSpinBox,
         QFileDialog,
+        QFormLayout,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -88,6 +91,7 @@ try:  # pragma: no cover - optional GUI dependency
         QMainWindow,
         QMessageBox,
         QPlainTextEdit,
+        QProgressBar,
         QScrollArea,
         QSplitter,
         QStatusBar,
@@ -128,21 +132,30 @@ if _PYSIDE_IMPORT_ERROR is None:
         failed = Signal(str)
         log = Signal(str)
 
-        def __init__(self, *, output_dir: str, desktop_preset_key: str, seed: int) -> None:
+        def __init__(self, *, output_dir: str, desktop_preset_key: str | None = None, seed: int, custom_preset: dict[str, Any] | None = None) -> None:
             super().__init__()
             self.output_dir = output_dir
             self.desktop_preset_key = desktop_preset_key
             self.seed = seed
+            self.custom_preset = custom_preset
 
         @Slot()
         def run(self) -> None:
             try:
                 self.log.emit("Calling the IINTS-AF SDK engine...\n")
-                result = run_demo_preset(
-                    output_dir=self.output_dir,
-                    desktop_preset_key=self.desktop_preset_key,
-                    seed=self.seed,
-                )
+                if self.custom_preset is not None:
+                    result = run_custom_preset(
+                        output_dir=self.output_dir,
+                        custom_preset=self.custom_preset,
+                        seed=self.seed,
+                    )
+                else:
+                    assert self.desktop_preset_key is not None
+                    result = run_demo_preset(
+                        output_dir=self.output_dir,
+                        desktop_preset_key=self.desktop_preset_key,
+                        seed=self.seed,
+                    )
                 self.finished.emit(result)
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
@@ -380,8 +393,14 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.result_graph = QLabel("Load a results CSV to view a glucose graph.")
             self.result_graph.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.history_table = QTableWidget(0, 7)
-            self.ai_model = QLineEdit(DEFAULT_MINISTRAL_MODEL)
-            self.ai_host = QLineEdit("http://127.0.0.1:11434")
+            self.ai_model = QComboBox()
+            self.ai_model.setEditable(True)
+            self.ai_model.addItems(["llama3.2", "medllama2", "ministral-8b-instruct", "devanshamin/PubMedDiabetes-LLM-Predictions"])
+            self.ai_model.setCurrentText(DEFAULT_MINISTRAL_MODEL)
+            self.ai_host = QComboBox()
+            self.ai_host.setEditable(True)
+            self.ai_host.addItems(["http://127.0.0.1:11434", "https://api.huggingface.co/v1"])
+            self.ai_host.setCurrentText("http://127.0.0.1:11434")
             self.ai_model.setMinimumWidth(0)
             self.ai_host.setMinimumWidth(0)
             self.ai_question = QTextEdit()
@@ -393,7 +412,6 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_selector = QComboBox()
             self.molecule_title = QLabel()
             self.molecule_explanation = QLabel()
-            self.molecule_reference_render = QLabel()
             self.molecule_structure_status = QLabel()
             self.molecule_pae_status = QLabel()
             self.biology_action_status = QLabel("No biology evidence action has run yet.")
@@ -448,6 +466,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.tissue_liver_input.setSuffix("%")
             self.run_tissue_stress_button = QPushButton("Stress-Test Pump Algorithm")
             self.open_app_downloads_button = QPushButton("Open App Downloads")
+            
+            # Setup keyboard shortcuts
+            self.run_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
+            self.run_shortcut.activated.connect(self._run_workflow)
             self.open_update_docs_button = QPushButton("Open Update Docs")
             self.copy_update_command_button = QPushButton("Copy Update Command")
             self.run_package_update_button = QPushButton("Update Python SDK Package")
@@ -512,23 +534,34 @@ if _PYSIDE_IMPORT_ERROR is None:
             ai_tab = QWidget()
             history_tab = QWidget()
             molecules_tab = QWidget()
+            builder_tab = QWidget()
             about_tab = QWidget()
             tabs.addTab(run_tab, "Simulation")
             tabs.addTab(results_tab, "Results")
             tabs.addTab(ai_tab, "AI Review")
             tabs.addTab(history_tab, "Run Archive")
             tabs.addTab(molecules_tab, "Biology")
+            tabs.addTab(builder_tab, "Scenario Builder")
             tabs.addTab(about_tab, "Methods")
             self._build_run_tab(run_tab)
             self._build_results_tab(results_tab)
             self._build_ai_tab(ai_tab)
             self._build_history_tab(history_tab)
             self._build_molecules_tab(molecules_tab)
+            self._build_builder_tab(builder_tab)
             self._build_about_tab(about_tab)
 
             status_bar = QStatusBar(self)
             status_bar.setSizeGripEnabled(False)
             status_bar.addWidget(self.status, 1)
+            
+            self.progress_bar = QProgressBar()
+            self.progress_bar.setRange(0, 0)
+            self.progress_bar.setTextVisible(False)
+            self.progress_bar.setFixedWidth(150)
+            self.progress_bar.hide()
+            status_bar.addPermanentWidget(self.progress_bar)
+            
             workspace_label = QLabel(f"Workspace: {Path(self.output_dir.text()).expanduser()}")
             workspace_label.setObjectName("workspaceStatus")
             status_bar.addPermanentWidget(workspace_label)
@@ -657,7 +690,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             workflow_layout.addLayout(workflow_row)
 
             for preset in self.presets:
-                self.workflow_combo.addItem(preset.title, preset.key)
+                self.workflow_combo.addItem(f"{preset.title} ({preset.preset_name})", preset.key)
             default_index = self._workflow_index(self.default_preset.key)
             self.workflow_combo.setCurrentIndex(default_index)
             self.workflow_combo.currentIndexChanged.connect(self._on_workflow_changed)
@@ -1096,9 +1129,6 @@ if _PYSIDE_IMPORT_ERROR is None:
             evidence_layout.addWidget(self.biology_action_output)
             context_layout.addWidget(evidence_box)
 
-            self.molecule_reference_render.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.molecule_reference_render.setMinimumHeight(200)
-            context_layout.addWidget(self.molecule_reference_render, stretch=1)
             usage_hint = QLabel(
                 "Controls: drag to rotate, mouse wheel to zoom, double-click to reset."
             )
@@ -1107,6 +1137,176 @@ if _PYSIDE_IMPORT_ERROR is None:
             context_layout.addWidget(usage_hint)
             viewer_row.addWidget(context_box)
             viewer_row.setSizes([760, 420])
+
+        def _build_builder_tab(self, parent: QWidget) -> None:
+            layout = self._scroll_tab_layout(parent)
+            
+            config_box = QGroupBox("Scenario Configuration")
+            config_layout = QFormLayout(config_box)
+            self.custom_duration = QSpinBox()
+            self.custom_duration.setRange(60, 10080)
+            self.custom_duration.setValue(1440)
+            config_layout.addRow("Duration (mins):", self.custom_duration)
+            
+            self.custom_timestep = QSpinBox()
+            self.custom_timestep.setRange(1, 60)
+            self.custom_timestep.setValue(5)
+            config_layout.addRow("Time Step (mins):", self.custom_timestep)
+            
+            self.custom_seed = QSpinBox()
+            self.custom_seed.setRange(0, 99999)
+            self.custom_seed.setValue(42)
+            config_layout.addRow("Random Seed:", self.custom_seed)
+
+            self.custom_basal = QDoubleSpinBox()
+            self.custom_basal.setRange(0.0, 5.0)
+            self.custom_basal.setSingleStep(0.1)
+            self.custom_basal.setValue(0.8)
+            config_layout.addRow("Basal Rate (U/h):", self.custom_basal)
+            
+            self.custom_isf = QDoubleSpinBox()
+            self.custom_isf.setRange(10.0, 150.0)
+            self.custom_isf.setValue(45.0)
+            config_layout.addRow("Insulin Sensitivity (ISF):", self.custom_isf)
+
+            self.custom_cr = QDoubleSpinBox()
+            self.custom_cr.setRange(1.0, 50.0)
+            self.custom_cr.setValue(10.0)
+            config_layout.addRow("Carb Ratio (g/U):", self.custom_cr)
+            layout.addWidget(config_box)
+            
+            meals_box = QGroupBox("Meal Events")
+            meals_layout = QVBoxLayout(meals_box)
+            self.meals_table = QTableWidget(0, 2)
+            self.meals_table.setHorizontalHeaderLabels(["Time (min)", "Carbs (g)"])
+            meals_layout.addWidget(self.meals_table)
+            
+            meals_buttons = QHBoxLayout()
+            add_meal_btn = QPushButton("Add Meal")
+            add_meal_btn.clicked.connect(self._add_custom_meal)
+            meals_buttons.addWidget(add_meal_btn)
+            
+            remove_meal_btn = QPushButton("Remove Selected")
+            remove_meal_btn.clicked.connect(self._remove_custom_meal)
+            meals_buttons.addWidget(remove_meal_btn)
+            meals_layout.addLayout(meals_buttons)
+            layout.addWidget(meals_box)
+            
+            actions_box = QGroupBox("Actions")
+            actions_layout = QHBoxLayout(actions_box)
+            run_custom_btn = QPushButton("Run Custom Scenario")
+            run_custom_btn.setObjectName("primaryAction")
+            run_custom_btn.clicked.connect(self._run_custom_scenario)
+            actions_layout.addWidget(run_custom_btn)
+            
+            save_custom_btn = QPushButton("Save JSON")
+            save_custom_btn.clicked.connect(self._save_custom_json)
+            actions_layout.addWidget(save_custom_btn)
+            
+            load_custom_btn = QPushButton("Load JSON")
+            load_custom_btn.clicked.connect(self._load_custom_json)
+            actions_layout.addWidget(load_custom_btn)
+            layout.addWidget(actions_box)
+            layout.addStretch(1)
+
+        def _add_custom_meal(self) -> None:
+            row = self.meals_table.rowCount()
+            self.meals_table.insertRow(row)
+            self.meals_table.setItem(row, 0, QTableWidgetItem("120"))
+            self.meals_table.setItem(row, 1, QTableWidgetItem("60"))
+
+        def _remove_custom_meal(self) -> None:
+            for item in self.meals_table.selectedItems():
+                self.meals_table.removeRow(item.row())
+
+        def _get_custom_preset_dict(self) -> dict[str, Any]:
+            meals = []
+            for row in range(self.meals_table.rowCount()):
+                try:
+                    time_item = self.meals_table.item(row, 0)
+                    carbs_item = self.meals_table.item(row, 1)
+                    if time_item and carbs_item:
+                        time_min = int(time_item.text())
+                        carbs_g = float(carbs_item.text())
+                        meals.append({"time_minutes": time_min, "carbohydrates_g": carbs_g})
+                except ValueError:
+                    pass
+            
+            return {
+                "name": "custom_ui",
+                "duration_minutes": self.custom_duration.value(),
+                "time_step_minutes": self.custom_timestep.value(),
+                "patient_config": {
+                    "base_basal_rate": self.custom_basal.value(),
+                    "insulin_sensitivity_factor": self.custom_isf.value(),
+                    "carb_ratio": self.custom_cr.value(),
+                },
+                "scenario": {
+                    "meals": meals,
+                }
+            }
+
+        def _run_custom_scenario(self) -> None:
+            output_dir = self.output_dir.text().strip()
+            if not output_dir:
+                self.status.setText("Output workspace not selected.")
+                return
+
+            self.status.setText("Running Custom Scenario...")
+            self.progress_bar.show()
+            self.run_button.setEnabled(False)
+            self._write_log("\nStarting custom workflow from Scenario Builder.\n")
+            if self.tabs is not None:
+                self.tabs.setCurrentIndex(0)
+
+            thread = QThread(self)
+            worker = RunWorker(
+                output_dir=output_dir,
+                seed=self.custom_seed.value(),
+                custom_preset=self._get_custom_preset_dict()
+            )
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_run_success)
+            worker.failed.connect(self._handle_run_error)
+            worker.log.connect(self._write_log)
+            worker.finished.connect(thread.quit)
+            worker.failed.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.start()
+            self._workers.append(thread)
+
+        def _save_custom_json(self) -> None:
+            path, _ = QFileDialog.getSaveFileName(self, "Save Custom Scenario", "", "JSON Files (*.json)")
+            if path:
+                with open(path, "w") as f:
+                    json.dump(self._get_custom_preset_dict(), f, indent=2)
+                self.status.setText(f"Saved custom scenario to {path}")
+
+        def _load_custom_json(self) -> None:
+            path, _ = QFileDialog.getOpenFileName(self, "Load Custom Scenario", "", "JSON Files (*.json)")
+            if path:
+                try:
+                    with open(path, "r") as f:
+                        data = json.load(f)
+                    self.custom_duration.setValue(data.get("duration_minutes", 1440))
+                    self.custom_timestep.setValue(data.get("time_step_minutes", 5))
+                    patient = data.get("patient_config", {})
+                    self.custom_basal.setValue(patient.get("base_basal_rate", 0.8))
+                    self.custom_isf.setValue(patient.get("insulin_sensitivity_factor", 45.0))
+                    self.custom_cr.setValue(patient.get("carb_ratio", 10.0))
+                    
+                    self.meals_table.setRowCount(0)
+                    for meal in data.get("scenario", {}).get("meals", []):
+                        self._add_custom_meal()
+                        row = self.meals_table.rowCount() - 1
+                        self.meals_table.item(row, 0).setText(str(meal.get("time_minutes", 0)))
+                        self.meals_table.item(row, 1).setText(str(meal.get("carbohydrates_g", 0)))
+                    self.status.setText(f"Loaded custom scenario from {path}")
+                except Exception as e:
+                    self.status.setText(f"Failed to load JSON: {e}")
 
 
         def _build_about_tab(self, parent: QWidget) -> None:
@@ -1118,6 +1318,32 @@ if _PYSIDE_IMPORT_ERROR is None:
             )
             intro.setWordWrap(True)
             layout.addWidget(intro)
+            
+            danger_box = QGroupBox("Danger Zone")
+            danger_layout = QVBoxLayout(danger_box)
+            purge_button = QPushButton("Purge SDK Data from System")
+            purge_button.setStyleSheet("QPushButton { color: red; }")
+            purge_button.clicked.connect(self._purge_sdk_data)
+            danger_layout.addWidget(purge_button)
+            layout.addWidget(danger_box)
+            layout.addStretch(1)
+
+        def _purge_sdk_data(self) -> None:
+            reply = QMessageBox.warning(
+                self, 
+                "Purge SDK Data", 
+                "This will permanently delete all IINTS SDK cache, run history, and configuration on your system. Are you completely sure?", 
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                import shutil
+                from pathlib import Path
+                self.settings.clear()
+                history_file = Path("~/.iints-desktop-history.jsonl").expanduser()
+                if history_file.exists():
+                    history_file.unlink()
+                QMessageBox.information(self, "Purged", "SDK data purged. The app will now close.")
+                QApplication.quit()
 
             update_box = QGroupBox("Updates")
             update_layout = QVBoxLayout(update_box)
@@ -1419,6 +1645,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.settings.setValue("seed", seed)
             self._set_running_state(True)
             self.status.setText(f"Running {preset.title}...")
+            self.progress_bar.show()
+            self.run_button.setEnabled(False)
             self._write_log(
                 f"\nStarting workflow: {preset.title}\n"
                 f"SDK preset: {preset.preset_name}\n"
@@ -1455,6 +1683,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.last_result = result
             self.status.setText("Run completed")
             self._set_running_state(False)
+            self.run_button.setEnabled(True)
+            self.progress_bar.hide()
             self.open_folder_button.setEnabled(True)
             self.open_report_button.setEnabled(bool(result.report_pdf and result.report_pdf.exists()))
             self.open_csv_button.setEnabled(bool(result.results_csv and result.results_csv.exists()))
@@ -1470,6 +1700,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         @Slot(str)
         def _handle_error(self, details: str) -> None:
             self.status.setText("Run failed")
+            self.progress_bar.hide()
             self._set_running_state(False)
             self._write_log(f"\nERROR:\n{details}\n")
             QMessageBox.critical(self, "IINTS-AF Desktop", details)
@@ -1591,8 +1822,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Starting local AI")
             thread = QThread(self)
             worker = LocalAIStartWorker(
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
-                host=self.ai_host.text().strip(),
+                model=self.ai_model.currentText().strip() or DEFAULT_MINISTRAL_MODEL,
+                host=self.ai_host.currentText().strip(),
             )
             worker.moveToThread(thread)
             thread.started.connect(worker.run)
@@ -1630,8 +1861,8 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _check_ai_status(self) -> None:
             status = check_local_ai(
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
-                host=self.ai_host.text().strip() or None,
+                model=self.ai_model.currentText().strip() or DEFAULT_MINISTRAL_MODEL,
+                host=self.ai_host.currentText().strip() or None,
             )
             self.ai_status.setText(status.message)
             self.status.setText("Local AI ready" if status.available else "Local AI not ready")
@@ -1651,8 +1882,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             thread = QThread(self)
             worker = AIWorker(
                 question=question,
-                model=self.ai_model.text().strip() or DEFAULT_MINISTRAL_MODEL,
-                host=self.ai_host.text().strip(),
+                model=self.ai_model.currentText().strip() or DEFAULT_MINISTRAL_MODEL,
+                host=self.ai_host.currentText().strip(),
                 result_csv=result_csv,
             )
             worker.moveToThread(thread)
@@ -1673,7 +1904,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _handle_ai_success(self, answer: object) -> None:
             self.ask_ai_button.setEnabled(True)
             text = getattr(answer, "answer", str(answer))
-            model = getattr(answer, "model", self.ai_model.text())
+            model = getattr(answer, "model", self.ai_model.currentText())
             self.ai_answer.setPlainText(f"Model: {model}\n\n{text}")
             self.status.setText("Local AI answer ready")
 
@@ -1804,19 +2035,6 @@ if _PYSIDE_IMPORT_ERROR is None:
                     viewer.show()
             
 
-            if molecule.image_path.exists():
-                pixmap = QPixmap(str(molecule.image_path))
-                self.molecule_reference_render.setPixmap(
-                    pixmap.scaled(
-                        330,
-                        270,
-                        Qt.AspectRatioMode.KeepAspectRatio,
-                        Qt.TransformationMode.SmoothTransformation,
-                    )
-                )
-                self.molecule_reference_render.setToolTip("Static PyMOL reference render")
-            else:
-                self.molecule_reference_render.setText("Reference render is unavailable.")
             self._update_pae_controls()
 
         def _reset_molecule_view(self) -> None:
@@ -1987,6 +2205,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_status.setText(f"Running Multi-Scale Simulation for INSR {variant}...")
             self.biology_action_output.setPlainText("Working...\n")
             self.status.setText("Running genomics simulation")
+            self.progress_bar.show()
 
             out_dir = Path("results") / "structural"
             thread = QThread(self)
@@ -2017,6 +2236,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_status.setText(f"Running Tissue Stress Simulation (Muscle {muscle_val}, Liver {liver_val})...")
             self.biology_action_output.setPlainText("Working...\n")
             self.status.setText("Running tissue stress simulation")
+            self.progress_bar.show()
 
             out_dir = Path("results") / "structural"
             thread = QThread(self)

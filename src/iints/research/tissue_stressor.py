@@ -86,22 +86,22 @@ class TissueStressor:
         # Plotting
         fig = go.Figure()
 
-        time_axis = [t / 60.0 for t in baseline_results["time"]]
+        time_axis = [t / 60.0 for t in baseline_results["time_minutes"]]
 
         fig.add_trace(go.Scatter(
-            x=time_axis, y=baseline_results["glucose"],
+            x=time_axis, y=baseline_results["glucose_actual_mgdl"],
             mode="lines", name="Baseline (100% / 100%)",
             line=dict(color="green", width=2)
         ))
         
         fig.add_trace(go.Scatter(
-            x=time_axis, y=hepatic_results["glucose"],
+            x=time_axis, y=hepatic_results["glucose_actual_mgdl"],
             mode="lines", name=f"Hepatic Resistance (Liver {int(liver_scalar*100)}%)",
             line=dict(color="orange", width=2, dash="dash")
         ))
         
         fig.add_trace(go.Scatter(
-            x=time_axis, y=peripheral_results["glucose"],
+            x=time_axis, y=peripheral_results["glucose_actual_mgdl"],
             mode="lines", name=f"Peripheral Resistance (Muscle {int(muscle_scalar*100)}%)",
             line=dict(color="red", width=2, dash="dot")
         ))

@@ -243,6 +243,69 @@ def run_demo_preset(
     return result
 
 
+def run_custom_preset(
+    *,
+    output_dir: str | Path,
+    custom_preset: dict[str, Any],
+    seed: int = 42,
+) -> DesktopRunResult:
+    """Run a dynamically constructed scenario from the UI."""
+    base_output = Path(output_dir).expanduser().resolve()
+    mpl_cache = base_output / ".cache" / "matplotlib"
+    mpl_cache.mkdir(parents=True, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", str(mpl_cache))
+
+    from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
+    from iints.highlevel import run_full
+
+    resolved_preset_name = custom_preset.get("name", "custom_scenario")
+    folder_name = _safe_slug(f"custom-{resolved_preset_name}-{seed}")
+    target = base_output / folder_name
+    outputs: dict[str, Any] = run_full(
+        algorithm=ClinicalBaselineAlgorithm(),
+        scenario=custom_preset.get("scenario", {}),
+        patient_config=custom_preset.get("patient_config", {}),
+        duration_minutes=int(custom_preset.get("duration_minutes", 1440)),
+        time_step=int(custom_preset.get("time_step_minutes", 5)),
+        seed=seed,
+        output_dir=target,
+    )
+
+    results_csv = _optional_path(outputs.get("results_csv"))
+    report_pdf = _optional_path(outputs.get("report_pdf"))
+    config_path = _optional_path(outputs.get("config_path"))
+    run_id = str(outputs.get("run_id", "unknown-run"))
+    summary = "\n".join(
+        line
+        for line in [
+            "Workflow: Custom Scenario Builder",
+            f"SDK preset: {resolved_preset_name}",
+            f"Seed: {seed}",
+            f"Run completed: {run_id}",
+            f"Output folder: {target}",
+            f"Results CSV: {results_csv}" if results_csv else "Results CSV: not generated",
+            f"Clinical report: {report_pdf}" if report_pdf else "Clinical report: not generated",
+            "Research only: not a medical device and not for treatment decisions.",
+        ]
+    )
+    result = DesktopRunResult(
+        run_id=run_id,
+        workflow_title="Custom Scenario",
+        preset_name=resolved_preset_name,
+        seed=seed,
+        output_dir=target,
+        results_csv=results_csv,
+        report_pdf=report_pdf,
+        config_path=config_path,
+        summary=summary,
+    )
+    try:
+        append_run_history(base_output, result)
+    except OSError:
+        pass
+    return result
+
+
 def _optional_path(value: object) -> Path | None:
     if value is None:
         return None
