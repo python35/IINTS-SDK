@@ -1148,19 +1148,19 @@ if _PYSIDE_IMPORT_ERROR is None:
             evidence_layout = QVBoxLayout(evidence_box)
             
             # Genomics Panel
-            genomics_label = QLabel("<b>1. Genomics & Structural Impact</b>")
+            genomics_label = QLabel("<b>1. AlphaFold Structural Genomics</b>")
             evidence_layout.addWidget(genomics_label)
             
             evidence_help = QLabel(
-                "Enter a genetic variant (e.g. INSR V938M) to predict its structural impact, "
-                "and directly run a patient-level simulation to see how the blood glucose curve "
-                "diverges from a healthy baseline."
+                "Enter a UniProt ID and variant (e.g. INSR V938M or P06213 V938M). The engine will "
+                "live-query the AlphaFold database, extract the pLDDT folding confidence at the exact "
+                "residue, and mathematically translate it into a metabolic stress factor for the simulation."
             )
             evidence_help.setWordWrap(True)
             evidence_layout.addWidget(evidence_help)
             
             input_layout = QHBoxLayout()
-            input_label = QLabel("Variant:")
+            input_label = QLabel("Gene & Variant:")
             input_layout.addWidget(input_label)
             input_layout.addWidget(self.genomics_variant_input)
             evidence_layout.addLayout(input_layout)
@@ -2480,20 +2480,26 @@ if _PYSIDE_IMPORT_ERROR is None:
             if self.biology_thread is not None:
                 QMessageBox.information(self, "IINTS-AF Desktop", "A simulation is already running.")
                 return
-            variant = self.genomics_variant_input.text().strip()
-            if not variant:
-                QMessageBox.information(self, "IINTS-AF Desktop", "Please enter a variant (e.g. V938M).")
+            full_input = self.genomics_variant_input.text().strip()
+            if not full_input:
+                QMessageBox.information(self, "IINTS-AF Desktop", "Please enter a variant (e.g. INSR V938M).")
                 return
 
+            parts = full_input.split(maxsplit=1)
+            if len(parts) == 2:
+                gene, variant = parts[0], parts[1]
+            else:
+                gene, variant = "INSR", full_input
+
             self._set_biology_action_state(True)
-            self.biology_action_status.setText(f"Running Multi-Scale Simulation for INSR {variant}...")
+            self.biology_action_status.setText(f"Running AlphaFold Simulation for {gene} {variant}...")
             self.biology_action_output.setPlainText("Working...\n")
             self.status.setText("Running genomics simulation")
             self.progress_bar.show()
 
             out_dir = Path("results") / "structural"
             thread = QThread(self)
-            worker = GenomicsWorker(gene="INSR", variant=variant, out_dir=out_dir)
+            worker = GenomicsWorker(gene=gene, variant=variant, out_dir=out_dir)
             worker.moveToThread(thread)
             thread.started.connect(worker.run)
             worker.finished.connect(self._handle_genomics_success)
@@ -2580,7 +2586,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             html_path_text = str(data.get("html_path", ""))
             plot_path = Path(html_path_text) if html_path_text else Path()
             if not html_path_text:
-                plot_path = Path("results") / "structural" / f"multiscale_INSR_{self.genomics_variant_input.text().strip().upper()}.html"
+                full_input = self.genomics_variant_input.text().strip().upper()
+                parts = full_input.split(maxsplit=1)
+                gene, variant = (parts[0], parts[1]) if len(parts) == 2 else ("INSR", full_input)
+                plot_path = Path("results") / "structural" / f"multiscale_{gene}_{variant}.html"
             if plot_path.exists():
                 self._open_path(plot_path)
 

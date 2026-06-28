@@ -57,14 +57,33 @@ class GenomicsEngine:
 
     @staticmethod
     def evaluate_mutation(gene: str, variant: str) -> dict[str, Any]:
-        """Translate a variant such as ``INSR V938M`` into a functional scalar."""
+        """Translate a variant such as ``INSR V938M`` into a functional scalar using AlphaFold."""
+        import re
+        from iints.research.alphafold_engine import AlphaFoldGenomicsEngine
 
         variant = variant.upper().strip()
-        if gene.upper() != "INSR":
-            return {"scalar": 1.0, "desc": f"Gene {gene} not supported yet.", "residue": None}
-        if variant in KNOWN_MUTATIONS:
+        
+        # Check known mutations first for fast/offline execution
+        if gene.upper() == "INSR" and variant in KNOWN_MUTATIONS:
             return dict(KNOWN_MUTATIONS[variant])
-        return {"scalar": 0.5, "desc": "Unknown mutation (assumed 50% loss of function)", "residue": None}
+            
+        # Determine UniProt ID (INSR -> P06213)
+        uniprot_id = "P06213" if gene.upper() == "INSR" else gene.strip()
+        
+        # Extract residue index from variant (e.g. V938M -> 938)
+        match = re.search(r'\d+', variant)
+        if not match:
+            return {"scalar": 0.5, "desc": "Unknown mutation format (assumed 50% loss of function)", "residue": None}
+            
+        residue_idx = int(match.group())
+        
+        # Query AlphaFold
+        af_result = AlphaFoldGenomicsEngine.evaluate_plddt_impact(uniprot_id, residue_idx)
+        if "error" in af_result:
+            return {"scalar": 0.5, "desc": f"AlphaFold fallback (50% loss): {af_result['error']}", "residue": residue_idx}
+            
+        desc = f"AlphaFold pLDDT: {af_result['plddt']}. {af_result['conclusion']}"
+        return {"scalar": af_result['scalar'], "desc": desc, "residue": residue_idx}
 
     @staticmethod
     def run_multi_scale_simulation(
