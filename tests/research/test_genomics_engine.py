@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from iints.research.genomics_engine import GenomicsEngine, _extract_glucose_trace
+from iints.research.genomics_engine import GenomicsEngine, _extract_glucose_trace, _plotly_graph_objects
 
 
 def test_extract_glucose_trace_accepts_current_simulator_columns() -> None:
@@ -40,3 +40,15 @@ def test_genomics_engine_known_mutation_metadata_is_deterministic() -> None:
     assert data["scalar"] == 0.1
     assert data["residue"] == 938
     assert "Donohue" in data["desc"]
+
+
+def test_plotly_dependency_error_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_import_module(name: str) -> object:
+        if name == "plotly.graph_objects":
+            raise ModuleNotFoundError(name)
+        raise AssertionError(name)
+
+    monkeypatch.setattr("iints.research.genomics_engine.importlib.import_module", fake_import_module)
+
+    with pytest.raises(RuntimeError, match="requires Plotly"):
+        _plotly_graph_objects()

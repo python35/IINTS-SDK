@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 from typing import Any, Tuple, cast
 
 import pandas as pd
-import plotly.graph_objects as go
 
 from iints.core.algorithms.fixed_basal_bolus import FixedBasalBolus
 from iints.core.patient.hovorka_model import HovorkaPatientModel
@@ -39,6 +39,19 @@ def _extract_glucose_trace(results: pd.DataFrame) -> tuple[list[float], list[flo
     )
 
 
+def _plotly_graph_objects() -> Any:
+    """Import Plotly only when the interactive graph feature is used."""
+
+    try:
+        return importlib.import_module("plotly.graph_objects")
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "The genomics multi-scale HTML plot requires Plotly. Install the "
+            "research or desktop extra, for example: "
+            'python -m pip install -U "iints-sdk-python35[research]"'
+        ) from exc
+
+
 class GenomicsEngine:
     """Bridge molecular mutation examples to patient-level glycemic simulations."""
 
@@ -63,6 +76,7 @@ class GenomicsEngine:
     ) -> Tuple[Path, dict[str, Any]]:
         """Run healthy-vs-mutated Hovorka simulations and write an HTML plot."""
 
+        go = _plotly_graph_objects()
         normalized_variant = variant.upper().strip()
         mutation_data = GenomicsEngine.evaluate_mutation(gene, normalized_variant)
         scalar = float(mutation_data["scalar"])
