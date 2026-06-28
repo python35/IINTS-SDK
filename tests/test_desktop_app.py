@@ -174,12 +174,12 @@ def test_ai_result_context_is_summary_only(tmp_path: Path) -> None:
 def test_local_ai_prompt_is_research_only() -> None:
     assert "Not a medical device" in SYSTEM_PROMPT
     assert "Do not provide diagnosis" in SYSTEM_PROMPT
-    assert "Summary" in SYSTEM_PROMPT
+    assert "Clinical Overview" in SYSTEM_PROMPT
     assert RECOMMENDED_OLLAMA_MODELS
 
 
 def test_local_ai_answer_formatter_removes_markdown_noise() -> None:
-    formatted = format_ai_answer("## Summary\n- **Glucose** is stable\n---\n* Next check")
+    formatted = format_ai_answer("## Clinical Overview\n- **Glucose** is stable\n---\n* Next check")
 
     assert "##" not in formatted
     assert "**" not in formatted

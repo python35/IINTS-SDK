@@ -442,7 +442,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.batch_queue = []
             self.batch_running = False
             self.batch_list_widget = QListWidget()
-            self.ai_model.addItems(["llama3.2", "medllama2", "ministral-8b-instruct", "devanshamin/PubMedDiabetes-LLM-Predictions"])
+            self.ai_model.addItems(list(RECOMMENDED_OLLAMA_MODELS))
             self.ai_model.setCurrentText(DEFAULT_MINISTRAL_MODEL)
             self.ai_host = QComboBox()
             self.ai_host.setEditable(True)
