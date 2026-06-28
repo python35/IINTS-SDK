@@ -22,7 +22,7 @@ STANDARD_DIABETES_CONTRACT = "diabetes_cgm_mdmp_contract.yaml"
 def standard_diabetes_contract_path() -> Path:
     """Return the packaged standard diabetes research contract path."""
 
-    resource = importlib.resources.files("iints").joinpath("data", "contracts", STANDARD_DIABETES_CONTRACT)
+    resource = importlib.resources.files("iints").joinpath("data").joinpath("contracts").joinpath(STANDARD_DIABETES_CONTRACT)
     return Path(str(resource))
 
 
