@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import json
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox"
 if sys.platform == "darwin":
     os.environ.setdefault("QT_MAC_WANTS_LAYER", "1")
@@ -1367,22 +1368,6 @@ if _PYSIDE_IMPORT_ERROR is None:
             layout.addWidget(danger_box)
             layout.addStretch(1)
 
-        def _purge_sdk_data(self) -> None:
-            reply = QMessageBox.warning(
-                self, 
-                "Purge SDK Data", 
-                "This will permanently delete all IINTS SDK cache, run history, and configuration on your system. Are you completely sure?", 
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                import shutil
-                from pathlib import Path
-                self.settings.clear()
-                history_file = Path("~/.iints-desktop-history.jsonl").expanduser()
-                if history_file.exists():
-                    history_file.unlink()
-                QMessageBox.information(self, "Purged", "SDK data purged. The app will now close.")
-                QApplication.quit()
 
             update_box = QGroupBox("Updates")
             update_layout = QVBoxLayout(update_box)
@@ -1423,6 +1408,23 @@ if _PYSIDE_IMPORT_ERROR is None:
                 label.setWordWrap(True)
                 layout.addWidget(label)
             layout.addStretch(1)
+
+        def _purge_sdk_data(self) -> None:
+            reply = QMessageBox.warning(
+                self, 
+                "Purge SDK Data", 
+                "This will permanently delete all IINTS SDK cache, run history, and configuration on your system. Are you completely sure?", 
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                import shutil
+                from pathlib import Path
+                self.settings.clear()
+                history_file = Path("~/.iints-desktop-history.jsonl").expanduser()
+                if history_file.exists():
+                    history_file.unlink()
+                QMessageBox.information(self, "Purged", "SDK data purged. The app will now close.")
+                QApplication.quit()
 
         def _apply_style(self) -> None:
             self.setStyleSheet(
