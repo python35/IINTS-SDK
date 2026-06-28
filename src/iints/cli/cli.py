@@ -109,6 +109,11 @@ from iints.data.realism_validator import (
     validate_realism_dataset,
     write_realism_report,
 )
+from iints.data.certify import (
+    certification_payload,
+    write_mdmp_certificate,
+    write_standard_diabetes_contract,
+)
 from iints.data.realism_governance import review_real_data_realism
 from iints.data.realism_dashboard import write_realism_dashboard
 from iints.demo_assets import export_live_stage_demo
@@ -4528,19 +4533,19 @@ def new_algo(
     # Replace placeholders
     # We expect the template class name to be {{ALGO_NAME}} and author {{AUTHOR_NAME}}
     # But wait, the file I wrote uses {{ALGO_NAME}} as a class name, which is valid syntax only if I replace it.
-    # The file on disk is valid python ONLY if those tokens are valid. 
+    # The file on disk is valid python ONLY if those tokens are valid.
     # Actually, in the previous step I wrote {{ALGO_NAME}} literally into the python file.
-    # That makes the template file itself invalid python syntax until replaced. 
-    # That's fine for a template file, but might confuse linters. 
+    # That makes the template file itself invalid python syntax until replaced.
+    # That's fine for a template file, but might confuse linters.
     # Ideally it's a .txt or .tmpl, but .py is fine if we accept it's a template.
-    
+
     final_content = template_content.replace("{{ALGO_NAME}}", f"{name}Algorithm")
     final_content = final_content.replace("{{AUTHOR_NAME}}", author)
 
     output_file = output_dir / f"{name.lower().replace(' ', '_')}_algorithm.py"
     with open(output_file, "w") as f:
         f.write(final_content)
-    
+
     typer.echo(f"Successfully created new algorithm template: {output_file}")
 
 
@@ -7909,9 +7914,26 @@ def data_contract_template(
 @data_app.command(name="certify-template")
 def data_certify_template(
     output_path: Annotated[Path, typer.Option(help="Where to write the starter certification contract YAML")] = Path("data_contract.yaml"),
+    profile: Annotated[
+        str,
+        typer.Option(help="Template profile: diabetes (default) or basic"),
+    ] = "diabetes",
 ):
     """Write a starter IINTS data-certification contract."""
-    data_contract_template(output_path=output_path)
+    console = Console()
+    normalized = profile.strip().lower()
+    if normalized in {"diabetes", "diabetes-cgm", "clinical-diabetes", "standard"}:
+        write_standard_diabetes_contract(output_path)
+        console.print(f"[green]Diabetes MDMP contract written:[/green] {output_path}")
+        console.print("[cyan]Profile:[/cyan] diabetes-cgm research contract")
+        return
+    if normalized not in {"basic", "legacy"}:
+        console.print("[bold red]Unknown profile. Use 'diabetes' or 'basic'.[/bold red]")
+        raise typer.Exit(code=1)
+    template = _build_mdmp_core_contract_template() if active_mdmp_backend() == "mdmp_core" else _build_data_contract_template()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(yaml.safe_dump(template, sort_keys=False), encoding="utf-8")
+    console.print(f"[green]Basic certification contract written:[/green] {output_path}")
 
 
 @data_app.command(name="contract-run", hidden=True, deprecated=True)
@@ -7921,6 +7943,16 @@ def data_contract_run(
     output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
     apply_builtin_transforms: Annotated[bool, typer.Option(help="Apply built-in unit conversion transforms from the contract")] = True,
     fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when compliance checks fail")] = False,
+    quick: Annotated[bool, typer.Option("--quick", help="Quick scan: only load the first --quick-rows rows for large datasets")] = False,
+    quick_rows: Annotated[int, typer.Option(help="Rows loaded when --quick is enabled")] = 5000,
+    certificate_output: Annotated[Optional[Path], typer.Option(help="Optional MDMP certificate JSON output path")] = None,
+    signing_key: Annotated[Optional[Path], typer.Option(help="Optional Ed25519 private key PEM for externally verifiable certificates")] = None,
+    signing_key_id: Annotated[str, typer.Option(help="Key id written into a signed certificate")] = "iints_local_mdmp_v1",
+    signed_by: Annotated[str, typer.Option(help="Signer label for generated MDMP certificates")] = "IINTS-AF Local MDMP",
+    signing_key_passphrase_env: Annotated[
+        Optional[str],
+        typer.Option(help="Environment variable containing the private-key passphrase, if encrypted"),
+    ] = None,
     min_mdmp_grade: Annotated[
         Optional[str],
         typer.Option(help="Optional MDMP grade gate (draft, research_grade, clinical_grade)"),
@@ -7937,7 +7969,7 @@ def data_contract_run(
 
     try:
         contract = load_mdmp_contract(contract_path)
-        df = pd.read_csv(input_csv)
+        df = pd.read_csv(input_csv, nrows=max(1, int(quick_rows)) if quick else None)
         report = run_mdmp_validation(
             contract,
             df,
@@ -7956,6 +7988,9 @@ def data_contract_run(
     summary.add_row("Backend", active_mdmp_backend())
     summary.add_row("MDMP grade", report.mdmp_grade)
     summary.add_row("MDMP protocol", report.mdmp_protocol_version)
+    summary.add_row("Scan mode", "quick" if quick else "full")
+    if quick:
+        summary.add_row("Quick rows limit", str(max(1, int(quick_rows))))
     summary.add_row(
         "Certified",
         "yes" if report.certified_for_medical_research else "no",
@@ -7977,11 +8012,33 @@ def data_contract_run(
             check.detail,
         )
     console.print(checks_table)
+    payload = certification_payload(
+        report,
+        quick=quick,
+        quick_rows=max(1, int(quick_rows)) if quick else None,
+        input_path=input_csv,
+    )
 
     if output_json is not None:
         output_json.parent.mkdir(parents=True, exist_ok=True)
-        output_json.write_text(json.dumps(report.to_dict(), indent=2))
+        output_json.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         console.print(f"[green]Contract report written:[/green] {output_json}")
+
+    if certificate_output is not None:
+        certificate_path = write_mdmp_certificate(
+            payload,
+            certificate_output,
+            issued_by=signed_by,
+            signing_key=signing_key,
+            key_id=signing_key_id,
+            passphrase_env=signing_key_passphrase_env,
+        )
+        console.print(f"[green]MDMP certificate written:[/green] {certificate_path}")
+        if signing_key is None:
+            console.print(
+                "[yellow]Certificate is unsigned SHA-256 evidence only. "
+                "Pass --signing-key for externally verifiable Ed25519 signing.[/yellow]"
+            )
 
     if min_mdmp_grade is not None:
         normalized = min_mdmp_grade.strip().lower()
@@ -8006,6 +8063,16 @@ def data_certify(
     output_json: Annotated[Optional[Path], typer.Option(help="Optional output report JSON path")] = None,
     apply_builtin_transforms: Annotated[bool, typer.Option(help="Apply built-in unit conversion transforms from the contract")] = True,
     fail_on_noncompliant: Annotated[bool, typer.Option(help="Exit code 1 when compliance checks fail")] = False,
+    quick: Annotated[bool, typer.Option("--quick", help="Quick scan: only load the first --quick-rows rows for large datasets")] = False,
+    quick_rows: Annotated[int, typer.Option(help="Rows loaded when --quick is enabled")] = 5000,
+    certificate_output: Annotated[Optional[Path], typer.Option(help="Optional MDMP certificate JSON output path")] = None,
+    signing_key: Annotated[Optional[Path], typer.Option(help="Optional Ed25519 private key PEM for externally verifiable certificates")] = None,
+    signing_key_id: Annotated[str, typer.Option(help="Key id written into a signed certificate")] = "iints_local_mdmp_v1",
+    signed_by: Annotated[str, typer.Option(help="Signer label for generated MDMP certificates")] = "IINTS-AF Local MDMP",
+    signing_key_passphrase_env: Annotated[
+        Optional[str],
+        typer.Option(help="Environment variable containing the private-key passphrase, if encrypted"),
+    ] = None,
     min_mdmp_grade: Annotated[
         Optional[str],
         typer.Option(help="Optional certification grade gate (draft, research_grade, clinical_grade, ai_ready)"),
@@ -8018,7 +8085,59 @@ def data_certify(
         output_json=output_json,
         apply_builtin_transforms=apply_builtin_transforms,
         fail_on_noncompliant=fail_on_noncompliant,
+        quick=quick,
+        quick_rows=quick_rows,
+        certificate_output=certificate_output,
+        signing_key=signing_key,
+        signing_key_id=signing_key_id,
+        signed_by=signed_by,
+        signing_key_passphrase_env=signing_key_passphrase_env,
         min_mdmp_grade=min_mdmp_grade,
+    )
+
+
+@data_app.command(name="mdmp-keygen")
+def data_mdmp_keygen(
+    output_dir: Annotated[Path, typer.Option(help="Directory for the MDMP Ed25519 keypair")] = Path("certs/mdmp"),
+    private_name: Annotated[str, typer.Option(help="Private key filename")] = "iints_mdmp_private.pem",
+    public_name: Annotated[str, typer.Option(help="Public key filename")] = "iints_mdmp_public.pem",
+    passphrase: Annotated[Optional[str], typer.Option(help="Optional private-key passphrase (prefer env/file)")] = None,
+    passphrase_env: Annotated[Optional[str], typer.Option(help="Environment variable containing private-key passphrase")] = None,
+    passphrase_file: Annotated[Optional[Path], typer.Option(help="File containing private-key passphrase")] = None,
+) -> None:
+    """Generate an Ed25519 keypair for signed MDMP certificates."""
+
+    console = Console()
+    secret = _resolve_secret_option(
+        console=console,
+        label="passphrase",
+        direct_value=passphrase,
+        env_name=passphrase_env,
+        file_path=passphrase_file,
+    )
+    try:
+        from mdmp_core.crypto import generate_keypair
+
+        result = generate_keypair(
+            output_dir=output_dir,
+            private_name=private_name,
+            public_name=public_name,
+            passphrase=secret,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]MDMP key generation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="MDMP Signing Keypair")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value")
+    table.add_row("Private key", str(result["private_key"]))
+    table.add_row("Public key", str(result["public_key"]))
+    table.add_row("Encrypted", "yes" if result.get("private_key_encrypted") else "no")
+    console.print(table)
+    console.print(
+        "[dim]Use the private key with `iints data certify --signing-key ... --certificate-output ...`. "
+        "Share the public key with reviewers who need to verify certificates.[/dim]"
     )
 
 
@@ -8365,6 +8484,35 @@ def data_synthetic_mirror(
             raise typer.Exit(code=1)
 
     if fail_on_noncompliant and not artifact.validation.is_compliant:
+        raise typer.Exit(code=1)
+
+@data_app.command(name="pull-hf")
+def data_pull_hf(
+    repo: Annotated[str, typer.Option("--repo", help="Hugging Face dataset repository (e.g. MaxPrestige/Synthetic-Diabetes-Dataset)")],
+    output: Annotated[Path, typer.Option("--output", help="Output directory for the pulled dataset")] = Path("data/raw/"),
+    split: Annotated[str, typer.Option("--split", help="Dataset split to download (default: train)")] = "train",
+):
+    """Pull a tabular or time-series dataset from Hugging Face and prepare it for MDMP."""
+    console = Console()
+    try:
+        from datasets import load_dataset
+    except ImportError:
+        console.print("[bold red]Please install 'datasets' package first: pip install datasets[/bold red]")
+        raise typer.Exit(code=1)
+
+    console.print(f"Downloading dataset {repo} ({split} split)...")
+    try:
+        dataset = load_dataset(repo, split=split)
+        df = dataset.to_pandas()
+        output.mkdir(parents=True, exist_ok=True)
+        repo_name = repo.split("/")[-1]
+        out_file = output / f"{repo_name}_{split}.csv"
+        df.to_csv(out_file, index=False)
+        console.print(f"[green]Successfully downloaded dataset to {out_file}[/green]")
+        console.print(f"Rows: {len(df)}, Columns: {len(df.columns)}")
+        console.print("[yellow]Next step:[/yellow] Use 'iints data certify' or 'iints data mdmp-visualizer' to map columns to the SDK's schema.")
+    except Exception as e:
+        console.print(f"[bold red]Failed to pull dataset:[/bold red] {e}")
         raise typer.Exit(code=1)
 
 
@@ -9365,6 +9513,63 @@ def manage_results(
     _print_results_index_bundle(bundle, console)
 
 
+@research_app.command(name="xai-report")
+def research_xai_report(
+    results_csv: Annotated[Path, typer.Argument(help="Path to the simulation results.csv")],
+    hf_model: Annotated[Optional[str], typer.Option("--hf-model", help="Hugging Face medical LLM to use for generation (e.g. devanshamin/PubMedDiabetes-LLM-Predictions)")] = None,
+    output_json: Annotated[Path, typer.Option("--output", help="Path to write the xai_events.json")] = Path("xai_events.json"),
+):
+    """Generate an XAI (Explainable AI) clinical report from a simulation run, optionally using a Hugging Face medical LLM."""
+    console = Console()
+    if not results_csv.is_file():
+        console.print(f"[bold red]Results file not found:[/bold red] {results_csv}")
+        raise typer.Exit(code=1)
+
+    try:
+        df = pd.read_csv(results_csv)
+        hypos = len(df[df.get("glucose_actual_mgdl", pd.Series([100])) < 70])
+        hypers = len(df[df.get("glucose_actual_mgdl", pd.Series([100])) > 180])
+        summary_text = f"Simulation complete. {hypos} hypoglycemic intervals and {hypers} hyperglycemic intervals detected."
+
+        if hf_model:
+            console.print(f"Loading medical LLM from Hugging Face: {hf_model}...")
+            try:
+                from transformers import pipeline
+                generator = pipeline("text-generation", model=hf_model, device="cpu")
+                prompt = f"Patient simulation summary: {summary_text}. Provide a clinical interpretation:"
+                output = generator(prompt, max_new_tokens=50, num_return_sequences=1)
+                clinical_interpretation = output[0]["generated_text"]
+            except ImportError:
+                console.print("[bold red]Please install transformers: pip install transformers torch[/bold red]")
+                raise typer.Exit(code=1)
+            except Exception as e:
+                console.print(f"[bold yellow]Failed to generate with {hf_model}, falling back to basic summary. Error: {e}[/bold yellow]")
+                clinical_interpretation = "Clinical interpretation requires a successful LLM generation."
+        else:
+            clinical_interpretation = "Provide a --hf-model to generate clinical insights."
+
+        xai_events = {
+            "source_file": str(results_csv),
+            "summary": summary_text,
+            "clinical_interpretation": clinical_interpretation,
+            "metrics": {
+                "hypoglycemia_minutes": hypos * 5,
+                "hyperglycemia_minutes": hypers * 5
+            }
+        }
+
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(json.dumps(xai_events, indent=2))
+        console.print(f"[green]XAI Report generated and saved to {output_json}[/green]")
+        console.print(f"Summary: {summary_text}")
+        if hf_model:
+            console.print(f"LLM Interpretation: {clinical_interpretation}")
+
+    except Exception as e:
+        console.print(f"[bold red]Failed to generate XAI report:[/bold red] {e}")
+        raise typer.Exit(code=1)
+
+
 @research_app.command(name="results-index")
 def research_results_index(
     root: Annotated[
@@ -10013,9 +10218,13 @@ def research_glucose_model_jetson_train_hf(
         Path,
         typer.Option(help="Normalized glucose training dataset CSV/Parquet built by glucose-model build-dataset."),
     ] = Path("models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv"),
-    repo_id: Annotated[
+    base_hf_repo: Annotated[
         Optional[str],
-        typer.Option("--repo-id", help="Hugging Face model repo id, e.g. username/iints-glucose-forecast-v0."),
+        typer.Option("--base-hf-repo", "--repo-id", help="External Hugging Face model to pull from (e.g. username/GlucoFM). If empty, pulls from target_hf_repo. --repo-id is kept as a compatibility alias."),
+    ] = None,
+    target_hf_repo: Annotated[
+        Optional[str],
+        typer.Option("--target-hf-repo", help="Your Hugging Face model repo id to push to, e.g. username/iints-glucose-forecast-v0."),
     ] = "IINTS/iints-glucose-forecast-v0",
     local_base_dir: Annotated[
         Optional[Path],
@@ -10076,7 +10285,8 @@ def research_glucose_model_jetson_train_hf(
         from iints.research.jetson_hf_trainer import run_jetson_hf_training
 
         result = run_jetson_hf_training(
-            repo_id=repo_id,
+            base_repo_id=base_hf_repo or target_hf_repo,
+            target_repo_id=target_hf_repo,
             dataset=dataset,
             work_dir=work_dir,
             local_base_dir=local_base_dir,
@@ -11459,11 +11669,11 @@ def docs_algo(
     except Exception as e:
         console.print(f"[bold red]Error loading algorithm module {algo_path}: {e}[/bold red]")
         raise typer.Exit(code=1)
-    
+
     if algorithm_instance is None:
         console.print(f"[bold red]Error: No subclass of InsulinAlgorithm found in {algo_path}[/bold red]")
         raise typer.Exit(code=1)
-    
+
     # Extract Metadata
     metadata = algorithm_instance.get_algorithm_metadata()
 
@@ -11531,7 +11741,7 @@ def benchmark(
     if not scenarios_dir.is_dir():
         console.print(f"[bold red]Error: Scenarios directory '{scenarios_dir}' not found.[/bold red]")
         raise typer.Exit(code=1)
-    
+
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -11595,7 +11805,7 @@ def benchmark(
         for scenario_file in scenario_files:
             scenario_name = scenario_file.stem
             console.print(f"  [bold]Scenario: {scenario_name}[/bold]")
-            
+
             # Load Scenario Data (validated)
             try:
                 scenario_model = load_scenario(scenario_file)
@@ -11622,7 +11832,7 @@ def benchmark(
             )
             for event in stress_events:
                 simulator_ai.add_stress_event(event)
-            
+
             try:
                 results_df_ai, safety_report_ai = simulator_ai.run_batch(duration)
                 metrics_ai = iints.generate_benchmark_metrics(results_df_ai)
@@ -11637,7 +11847,7 @@ def benchmark(
             console.print(f"    Running [yellow]Standard Pump[/yellow]...") # Use name directly
             # The standard pump also needs patient-specific parameters for ISF, ICR, basal rate, etc.
             # We'll pass the patient_params directly to the StandardPumpAlgorithm constructor.
-            standard_pump_algo_instance = iints.StandardPumpAlgorithm(settings=patient_params) 
+            standard_pump_algo_instance = iints.StandardPumpAlgorithm(settings=patient_params)
             patient_model_std = iints.PatientModel(**patient_params) # New instance for each run
             simulator_std = iints.Simulator(
                 patient_model=patient_model_std,
@@ -11647,7 +11857,7 @@ def benchmark(
             )
             for event in stress_events:
                 simulator_std.add_stress_event(event)
-            
+
             try:
                 results_df_std, safety_report_std = simulator_std.run_batch(duration)
                 metrics_std = iints.generate_benchmark_metrics(results_df_std)
@@ -11673,19 +11883,19 @@ def benchmark(
                 **{f"Std Safety Violations": safety_report_std.get('total_violations', float('nan'))},
             })
             run_index += 1
-    
+
     console.print("\n[bold green]Benchmark Suite Completed![/bold green]")
 
     # Print Comparison Table
     if benchmark_results:
         results_df = pd.DataFrame(benchmark_results)
-        
+
         table = Table(title="IINTS-AF Benchmark Results", show_header=True, header_style="bold magenta")
-        
+
         # Add columns dynamically
         table.add_column("Patient", style="cyan", no_wrap=True)
         table.add_column("Scenario", style="cyan", no_wrap=True)
-        
+
         # Assuming AI Algo and Standard Algo names are consistent across results
         ai_algo_name = benchmark_results[0]["AI Algo"]
         std_algo_name = benchmark_results[0]["Standard Algo"]
@@ -11697,7 +11907,7 @@ def benchmark(
         for metric_name_raw in sample_metrics_keys_raw:
             table.add_column(f"{ai_algo_name} {metric_name_raw}", style="green")
             table.add_column(f"{std_algo_name} {metric_name_raw}", style="yellow")
-        
+
         table.add_column(f"{ai_algo_name} Safety Violations", style="red")
         table.add_column(f"{std_algo_name} Safety Violations", style="red")
 
@@ -11706,13 +11916,13 @@ def benchmark(
             for metric_name_raw in sample_metrics_keys_raw:
                 ai_val = row[f'AI {metric_name_raw}']
                 std_val = row[f'Std {metric_name_raw}']
-                
+
                 ai_formatted = f"{ai_val:.2f}%" if "%" in metric_name_raw and not pd.isna(ai_val) else (f"{ai_val:.2f}" if not pd.isna(ai_val) else "N/A")
                 std_formatted = f"{std_val:.2f}%" if "%" in metric_name_raw and not pd.isna(std_val) else (f"{std_val:.2f}" if not pd.isna(std_val) else "N/A")
-                
+
                 row_data.append(ai_formatted)
                 row_data.append(std_formatted)
-            
+
             ai_safety_violations = row['AI Safety Violations']
             std_safety_violations = row['Std Safety Violations']
             row_data.append(f"{ai_safety_violations:.0f}" if not pd.isna(ai_safety_violations) else "N/A")

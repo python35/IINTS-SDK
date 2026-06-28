@@ -440,7 +440,8 @@ def _iter_weight_decay(values: Optional[Iterable[float]]) -> list[float]:
 
 def run_jetson_hf_training(
     *,
-    repo_id: Optional[str],
+    base_repo_id: Optional[str] = None,
+    target_repo_id: Optional[str] = None,
     dataset: Path,
     work_dir: Path,
     local_base_dir: Optional[Path] = None,
@@ -467,15 +468,15 @@ def run_jetson_hf_training(
     hf_home: Optional[Path] = None,
 ) -> JetsonHFTrainingResult:
     _apply_jetson_env_defaults()
-    if repo_id is None and local_base_dir is None:
-        raise ValueError("Provide --repo-id or --local-base-dir so the Jetson has a warm-start model.")
+    if base_repo_id is None and local_base_dir is None:
+        raise ValueError("Provide --base-hf-repo or --local-base-dir so the Jetson has a warm-start model.")
     if upload_mode not in {"none", "pr", "direct"}:
         raise ValueError("upload_mode must be one of: none, pr, direct")
     if not dataset.exists():
         raise FileNotFoundError(f"Dataset not found: {dataset}")
     if shutil.which("iints") is None:
         raise RuntimeError("The 'iints' CLI is not on PATH. Activate the SDK venv first.")
-    if repo_id and shutil.which("hf") is None:
+    if (base_repo_id or target_repo_id) and shutil.which("hf") is None:
         raise RuntimeError("The 'hf' CLI is not on PATH. Install/login with Hugging Face CLI first.")
 
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -486,9 +487,9 @@ def run_jetson_hf_training(
     leaderboard = work_dir / "jetson_hf_leaderboard.csv"
     trials_dir.mkdir(parents=True, exist_ok=True)
 
-    if repo_id and local_base_dir is None:
+    if base_repo_id and local_base_dir is None:
         _download_hf_model(
-            repo_id=repo_id,
+            repo_id=base_repo_id,
             revision=revision,
             output_dir=base_dir,
             hf_home=hf_home,
@@ -574,7 +575,8 @@ def run_jetson_hf_training(
                     best_score = candidate_score
                     decision = {
                         "promoted_utc": utc_now(),
-                        "repo_id": repo_id,
+                        "base_repo_id": base_repo_id,
+                        "target_repo_id": target_repo_id,
                         "trial_id": trial_id,
                         "score_metric": "mae + physiology/hypo penalties",
                         "candidate_score": candidate_score,
@@ -594,13 +596,13 @@ def run_jetson_hf_training(
                     hf_outputs = write_huggingface_export_bundle(
                         model_dir=champion_dir,
                         output_dir=champion_dir / "huggingface",
-                        repo_id=repo_id,
+                        repo_id=target_repo_id,
                         dataset_manifest=dataset_manifest,
                         comparison_dir=champion_dir / "comparison",
                     )
-                    if repo_id and upload_mode != "none":
+                    if target_repo_id and upload_mode != "none":
                         uploaded = _upload_hf_bundle(
-                            repo_id=repo_id,
+                            repo_id=target_repo_id,
                             bundle_dir=Path(hf_outputs["output_dir"]),
                             hf_home=hf_home,
                             upload_mode=upload_mode,
@@ -628,7 +630,7 @@ def run_jetson_hf_training(
                     "timestamp_utc": utc_now(),
                     "trial_id": trial_id,
                     "status": status,
-                    "repo_id": repo_id or "",
+                    "repo_id": target_repo_id or base_repo_id or "",
                     "warm_start_path": str(warm_start),
                     "candidate_path": str(trial_dir / "predictor.pt"),
                     "score_metric": "mae + physiology/hypo penalties",
@@ -662,7 +664,7 @@ def run_jetson_hf_training(
         pass
 
     return JetsonHFTrainingResult(
-        repo_id=repo_id,
+        repo_id=target_repo_id or base_repo_id,
         work_dir=work_dir,
         base_dir=base_dir,
         champion_dir=champion_dir,

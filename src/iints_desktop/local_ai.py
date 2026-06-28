@@ -13,6 +13,14 @@ from iints.ai.backends.ollama import DEFAULT_MINISTRAL_MODEL, OllamaBackend
 
 from iints_desktop.results import build_ai_result_context
 
+RECOMMENDED_OLLAMA_MODELS = (
+    DEFAULT_MINISTRAL_MODEL,
+    "mistral-small:latest",
+    "llama3.1:8b",
+    "qwen2.5:7b",
+    "gemma3:4b",
+)
+
 
 @dataclass(frozen=True)
 class LocalAIStatus:
@@ -47,6 +55,12 @@ Rules:
 - If the user asks for dosing/treatment decisions, refuse briefly and redirect to safe research interpretation.
 - Prefer clear, plain-language explanations over hype.
 - If result-summary context is provided, explain what it suggests without pretending it is clinically validated.
+- Use this exact readable structure:
+  Summary
+  Key observations
+  Limitations
+  Next checks
+- Use short paragraphs or numbered points. Do not use markdown tables, decorative separators, or long raw bullet lists.
 """
 
 
@@ -224,6 +238,54 @@ def check_local_ai(*, model: str = DEFAULT_MINISTRAL_MODEL, host: str | None = N
     return LocalAIStatus(available=True, message=f"Ready: {resolved}", resolved_model=resolved)
 
 
+def list_local_ai_models(*, host: str | None = None) -> list[str]:
+    """Return installed Ollama models, falling back to curated recommendations."""
+
+    backend = OllamaBackend(model_name=DEFAULT_MINISTRAL_MODEL, base_url=host, timeout_seconds=3.0, num_predict=128)
+    if not backend.available():
+        return list(RECOMMENDED_OLLAMA_MODELS)
+    discovered = backend.list_models()
+    merged: list[str] = []
+    for model in [*discovered, *RECOMMENDED_OLLAMA_MODELS]:
+        if model and model not in merged:
+            merged.append(model)
+    return merged
+
+
+def format_ai_answer(text: str) -> str:
+    """Make local LLM output easier to read in the desktop text panel."""
+
+    cleaned = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    replacements = {
+        "**": "",
+        "__": "",
+        "### ": "",
+        "## ": "",
+        "# ": "",
+    }
+    for old, new in replacements.items():
+        cleaned = cleaned.replace(old, new)
+
+    lines: list[str] = []
+    previous_blank = False
+    for raw_line in cleaned.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            if not previous_blank:
+                lines.append("")
+            previous_blank = True
+            continue
+        previous_blank = False
+        if line.startswith(("- ", "* ")):
+            line = "• " + line[2:].strip()
+        if line.startswith(("---", "___", "***")):
+            continue
+        if line.lower().rstrip(":") in {"summary", "key observations", "limitations", "next checks"}:
+            line = line.rstrip(":").title()
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
 def ask_local_ai(
     *,
     question: str,
@@ -247,8 +309,9 @@ def ask_local_ai(
     user_prompt = (
         f"Result context:\n{context}\n\n"
         f"User question:\n{question.strip()}\n\n"
-        "Answer as a critical SDK research assistant. Mention limitations and avoid treatment advice."
+        "Answer as a critical SDK research assistant. Mention limitations and avoid treatment advice. "
+        "Make the response readable in a desktop app text panel."
     )
     answer = backend.complete(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt)
     resolved = backend.resolved_model_name or model
-    return LocalAIAnswer(answer=answer, model=resolved, context_used=result_csv is not None)
+    return LocalAIAnswer(answer=format_ai_answer(answer), model=resolved, context_used=result_csv is not None)
