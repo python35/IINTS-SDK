@@ -2037,7 +2037,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         @Slot(object)
         def _handle_tissue_success(self, result: object) -> None:
-            msg, data = result
+            msg, data = cast(tuple[str, dict[str, Any]], result)
             self.biology_action_status.setText(msg)
             self.biology_action_output.setPlainText(f"Tissue Impact Data:\n{data}")
             self.status.setText("Tissue simulation complete")
@@ -2066,14 +2066,17 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         @Slot(object)
         def _handle_genomics_success(self, result: object) -> None:
-            msg, data = result
+            msg, data = cast(tuple[str, dict[str, Any]], result)
             self.biology_action_status.setText(msg)
             self.biology_action_output.setPlainText(f"Mutation Impact Data:\n{data}")
             self.status.setText("Genomics simulation complete")
             self._set_biology_action_state(False)
             
             # Automatically open the generated plot in the browser
-            plot_path = Path("results") / "structural" / f"multiscale_INSR_{self.genomics_variant_input.text().strip()}.html"
+            html_path_text = str(data.get("html_path", ""))
+            plot_path = Path(html_path_text) if html_path_text else Path()
+            if not html_path_text:
+                plot_path = Path("results") / "structural" / f"multiscale_INSR_{self.genomics_variant_input.text().strip().upper()}.html"
             if plot_path.exists():
                 self._open_path(plot_path)
 

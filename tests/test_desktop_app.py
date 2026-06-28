@@ -253,9 +253,13 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source
     assert 'if args.backend == "qt"' in build_source
     assert 'if args.backend == "cocoa"' in build_source
+    assert "require_pkg_resources_runtime_hook_compatibility" in build_source
+    assert "NullProvider" in build_source
+    assert "setuptools>=77,<81" in build_source
     assert "--osx-bundle-identifier" in build_source
     assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
     assert "desktop-macos" in workflow
+    assert '"setuptools>=77,<81" pytest' in workflow
     assert "Smoke test bundled app on macOS" in workflow
     assert "continue-on-error: true\n        shell: bash\n        env:" not in workflow.split("Smoke test bundled app on macOS", 1)[1].split("Best-effort bundled smoke on Windows", 1)[0]
 
@@ -278,6 +282,7 @@ def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
     assert "run_demo_preset" in source
     assert "pyobjc-framework-Cocoa" in pyproject
     assert "iints-desktop-cocoa" in pyproject
+    assert "setuptools>=77.0.0,<81.0.0" in pyproject
 
 
 def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
