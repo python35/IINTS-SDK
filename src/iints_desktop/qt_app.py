@@ -1470,7 +1470,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             
             danger_box = QGroupBox("Danger Zone")
             danger_layout = QVBoxLayout(danger_box)
-            purge_button = QPushButton("Purge SDK Data from System")
+            purge_button = QPushButton("Self-Destruct SDK")
             purge_button.setStyleSheet("QPushButton { color: red; }")
             purge_button.clicked.connect(self._purge_sdk_data)
             danger_layout.addWidget(purge_button)
@@ -1521,18 +1521,21 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _purge_sdk_data(self) -> None:
             reply = QMessageBox.warning(
                 self, 
-                "Purge SDK Data", 
-                "This will permanently delete all IINTS SDK cache, run history, and configuration on your system. Are you completely sure?", 
+                "Self-Destruct SDK", 
+                "WARNING: This will initiate a self-destruct sequence. All SDK code, generated data, configuration, and shortcuts across the OS will be permanently deleted! Are you completely sure?", 
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
-                import shutil
+                import sys
+                import subprocess
                 from pathlib import Path
-                self.settings.clear()
-                history_file = Path("~/.iints-desktop-history.jsonl").expanduser()
-                if history_file.exists():
-                    history_file.unlink()
-                QMessageBox.information(self, "Purged", "SDK data purged. The app will now close.")
+                
+                uninstall_script = Path(__file__).resolve().parent.parent.parent.parent / "uninstall_app.py"
+                if not uninstall_script.exists():
+                    QMessageBox.critical(self, "Error", f"Could not find uninstall script at {uninstall_script}")
+                    return
+
+                subprocess.Popen([sys.executable, str(uninstall_script), "--self-destruct"])
                 QApplication.quit()
 
         def _apply_style(self) -> None:
