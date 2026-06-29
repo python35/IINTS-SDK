@@ -98,7 +98,7 @@ desktop-qt = [
 desktop-macos = [
   "pyinstaller>=6.11.0,<7.0.0",
   "setuptools>=77.0.0,<81.0.0",
-  "pyobjc-framework-Cocoa>=10.0,<12.0",
+  "pyobjc-framework-Cocoa>=10.0,<13.0",
 ]
 
 [project.scripts]
