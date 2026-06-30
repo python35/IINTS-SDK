@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## v1.5.20
+
+Release date: 2026-06-30
+
+### Fixed
+
+- published the complete post-rebase desktop/app release from current `main`
+- ensures the terminal update UI, integrated app terminal, Cocoa startup fix, desktop import merge, AlphaFold/genomics desktop updates, and uninstall helper are released together
+
+### Why this release exists
+
+- `v1.5.19` was created before the final rebase landed on `main`; `v1.5.20` is the clean follow-up release from the final merged commit line
+
 ## v1.5.19
 
 Release date: 2026-06-30

@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.20](v1.5.20.md) - complete post-rebase desktop/update release
 - [v1.5.19](v1.5.19.md) - desktop startup fix and transparent update terminal
 - [v1.5.18](v1.5.18.md) - AI realism auditor offline report CI fix
 - [v1.5.17](v1.5.17.md) - reporting NumPy typing CI fix
