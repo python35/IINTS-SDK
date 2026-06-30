@@ -48,7 +48,7 @@ class StemCellOptimizer:
         from iints.validation import build_stress_events
         
         simulator = Simulator(
-            patient_model=patient,
+            patient_model=patient,  # type: ignore
             algorithm=controller,
             sensor_model=sensor,
             pump_model=pump,
