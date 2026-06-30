@@ -303,7 +303,7 @@ def ask_local_ai(
     backend = OllamaBackend(
         model_name=model,
         base_url=host,
-        timeout_seconds=180.0,
+        timeout_seconds=900.0,
         temperature=0.1,
         top_p=0.8,
         num_predict=1000,
