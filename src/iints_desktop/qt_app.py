@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import shlex
+import shutil
 import subprocess
 import sys
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox"
@@ -46,6 +48,57 @@ ENABLE_EMBEDDED_WEBENGINE = (
 _CRASH_LOG_HANDLE: Any | None = None
 
 
+def _python_update_command() -> list[str]:
+    """Return the safest Python SDK update command for the current launch mode."""
+
+    if getattr(sys, "frozen", False):
+        python_executable = "py" if sys.platform.startswith("win") else "python3"
+    else:
+        python_executable = sys.executable
+    return [python_executable, "-m", "pip", "install", "-U", "iints-sdk-python35[full,desktop-qt,mdmp]"]
+
+
+def _display_command(command: list[str]) -> str:
+    if sys.platform.startswith("win"):
+        return subprocess.list2cmdline(command)
+    return shlex.join(command)
+
+
+def _applescript_quote(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def open_command_in_system_terminal(command: list[str], *, title: str = "IINTS-AF Update") -> None:
+    """Open a real OS terminal and run a command so users can see progress live."""
+
+    command_text = _display_command(command)
+    if sys.platform == "darwin":
+        script = (
+            'tell application "Terminal"\n'
+            f"  do script {_applescript_quote(command_text)}\n"
+            "  activate\n"
+            "end tell"
+        )
+        subprocess.Popen(["osascript", "-e", script])
+        return
+    if sys.platform.startswith("win"):
+        subprocess.Popen(["cmd.exe", "/c", "start", title, "cmd.exe", "/k", command_text])
+        return
+
+    terminal_candidates = [
+        ("x-terminal-emulator", ["x-terminal-emulator", "-e", "bash", "-lc", command_text]),
+        ("gnome-terminal", ["gnome-terminal", "--", "bash", "-lc", command_text]),
+        ("konsole", ["konsole", "-e", "bash", "-lc", command_text]),
+        ("xfce4-terminal", ["xfce4-terminal", "-e", f"bash -lc {shlex.quote(command_text)}"]),
+        ("xterm", ["xterm", "-e", "bash", "-lc", command_text]),
+    ]
+    for executable, terminal_command in terminal_candidates:
+        if shutil.which(executable):
+            subprocess.Popen(terminal_command)
+            return
+    raise RuntimeError("No supported Linux terminal emulator found on PATH.")
+
+
 def _desktop_log_path() -> Path:
     if sys.platform == "darwin":
         return Path.home() / "Library" / "Logs" / "IINTS-AF Desktop" / "desktop.log"
@@ -82,7 +135,7 @@ _install_crash_logging()
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
-    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QPalette, QPixmap  # type: ignore[import-not-found]
+    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QPalette, QPixmap, QTextCursor  # type: ignore[import-not-found]
     from PySide6.QtWidgets import (  # type: ignore[import-not-found]
         QApplication,
         QComboBox,
@@ -231,20 +284,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         @Slot()
         def run(self) -> None:
             try:
-                if getattr(sys, "frozen", False):
-                    self.finished.emit(
-                        "Packaged app builds cannot self-update safely yet. "
-                        "Open the app downloads page and install the newest .exe/.dmg build."
-                    )
-                    return
-                command = [
-                    sys.executable,
-                    "-m",
-                    "pip",
-                    "install",
-                    "-U",
-                    "iints-sdk-python35[full,desktop-qt,mdmp]",
-                ]
+                command = _python_update_command()
                 completed = subprocess.run(
                     command,
                     check=False,
@@ -256,6 +296,38 @@ if _PYSIDE_IMPORT_ERROR is None:
                 if completed.returncode != 0:
                     raise RuntimeError(output or f"pip exited with code {completed.returncode}")
                 self.finished.emit(output or "SDK package update completed.")
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
+    class TerminalCommandWorker(QObject):
+        """Stream a command's stdout/stderr into the integrated app terminal."""
+
+        line = Signal(str)
+        finished = Signal(int)
+        failed = Signal(str)
+
+        def __init__(self, *, command: list[str], cwd: str | None = None) -> None:
+            super().__init__()
+            self.command = command
+            self.cwd = cwd
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                self.line.emit(f"$ {_display_command(self.command)}")
+                process = subprocess.Popen(
+                    self.command,
+                    cwd=self.cwd or None,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                )
+                assert process.stdout is not None
+                for output_line in process.stdout:
+                    self.line.emit(output_line.rstrip())
+                code = process.wait()
+                self.finished.emit(code)
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
 
@@ -380,6 +452,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.mdmp_worker: MDMPCertifyWorker | None = None
             self.update_thread: QThread | None = None
             self.update_worker: UpdateWorker | None = None
+            self.terminal_thread: QThread | None = None
+            self.terminal_worker: TerminalCommandWorker | None = None
             self.pae_thread: QThread | None = None
             self.pae_worker: PAEWorker | None = None
             self.biology_thread: QThread | None = None
@@ -486,11 +560,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_app_downloads_button = QPushButton("Open App Downloads")
             self.open_update_docs_button = QPushButton("Open Update Docs")
             self.copy_update_command_button = QPushButton("Copy Update Command")
+            self.open_update_terminal_button = QPushButton("Open Update Terminal")
             self.run_package_update_button = QPushButton("Update Python SDK Package")
+            self.run_app_terminal_update_button = QPushButton("Run Update In App Terminal")
+            self.run_version_terminal_button = QPushButton("Run Version Check")
+            self.clear_app_terminal_button = QPushButton("Clear Terminal")
             self.update_status = QLabel("No update action has run yet.")
             self.update_status.setWordWrap(True)
             self.update_log = QTextEdit()
             self.update_log.setReadOnly(True)
+            self.app_terminal_output = QPlainTextEdit()
+            self.app_terminal_output.setReadOnly(True)
 
             self._build_ui()
             self._apply_style()
@@ -1165,7 +1245,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             update_layout = QVBoxLayout(update_box)
             update_help = QLabel(
                 "Use this panel to get the newest desktop app build or update a Python-based SDK install. "
-                "Packaged .exe/.dmg builds open the download page; Python installs can run the pip update command."
+                "The terminal button opens a real OS terminal so the update progress stays visible on macOS, Windows, and Linux."
             )
             update_help.setWordWrap(True)
             update_layout.addWidget(update_help)
@@ -1174,26 +1254,50 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_app_downloads_button.clicked.connect(self._open_app_downloads)
             self.open_update_docs_button.clicked.connect(self._open_update_docs)
             self.copy_update_command_button.clicked.connect(self._copy_update_command)
+            self.open_update_terminal_button.clicked.connect(self._open_update_terminal)
             self.run_package_update_button.clicked.connect(self._run_package_update)
-            if getattr(sys, "frozen", False):
-                self.run_package_update_button.setEnabled(False)
-                self.update_status.setText(
-                    "Packaged app mode: download the newest .exe/.dmg/Linux build to update the app."
-                )
             update_layout.addLayout(
                 self._button_grid(
                     [
                         self.open_app_downloads_button,
                         self.open_update_docs_button,
                         self.copy_update_command_button,
+                        self.open_update_terminal_button,
                         self.run_package_update_button,
                     ],
-                    columns=2,
+                    columns=3,
                 )
             )
             self.update_log.setMinimumHeight(110)
             update_layout.addWidget(self.update_log)
             layout.addWidget(update_box)
+
+            developer_box = QGroupBox("Developer Settings / Integrated App Terminal")
+            developer_layout = QVBoxLayout(developer_box)
+            developer_help = QLabel(
+                "Run small SDK maintenance commands from inside the app and capture stdout/stderr here. "
+                "Use the system-terminal update when you want users to see the full install process in a separate terminal window."
+            )
+            developer_help.setWordWrap(True)
+            developer_layout.addWidget(developer_help)
+            self.run_app_terminal_update_button.clicked.connect(self._run_update_in_app_terminal)
+            self.run_version_terminal_button.clicked.connect(self._run_version_in_app_terminal)
+            self.clear_app_terminal_button.clicked.connect(self._clear_app_terminal)
+            developer_layout.addLayout(
+                self._button_grid(
+                    [
+                        self.run_app_terminal_update_button,
+                        self.run_version_terminal_button,
+                        self.clear_app_terminal_button,
+                    ],
+                    columns=3,
+                )
+            )
+            self.app_terminal_output.setObjectName("appTerminalOutput")
+            self.app_terminal_output.setMinimumHeight(160)
+            self.app_terminal_output.setPlainText("Integrated terminal ready.\n")
+            developer_layout.addWidget(self.app_terminal_output)
+            layout.addWidget(developer_box)
 
             for preset in self.presets:
                 label = QLabel(f"<b>{preset.title}</b><br>{preset.description}")
@@ -2244,21 +2348,70 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Opened update docs")
 
         def _copy_update_command(self) -> None:
-            QApplication.clipboard().setText(PYTHON_SDK_UPDATE_COMMAND)
-            self.update_status.setText(f"Copied: {PYTHON_SDK_UPDATE_COMMAND}")
+            command_text = _display_command(_python_update_command())
+            QApplication.clipboard().setText(command_text)
+            self.update_status.setText(f"Copied: {command_text}")
             self.status.setText("Update command copied")
+
+        def _open_update_terminal(self) -> None:
+            try:
+                command = _python_update_command()
+                open_command_in_system_terminal(command, title="IINTS-AF SDK Update")
+                command_text = _display_command(command)
+                self.update_status.setText(f"Opened system terminal: {command_text}")
+                self.update_log.setPlainText(
+                    "Opened a system terminal for the SDK update.\n\n"
+                    f"{command_text}\n\n"
+                    "The terminal window shows live installation output."
+                )
+                self.status.setText("Opened update terminal")
+            except Exception as exc:
+                self.update_status.setText("Could not open a system terminal.")
+                self.update_log.setPlainText(str(exc))
+                self.status.setText("Opening update terminal failed")
+                self._show_error(str(exc))
+
+        def _run_update_in_app_terminal(self) -> None:
+            self._run_app_terminal_command(_python_update_command(), label="SDK package update")
+
+        def _run_version_in_app_terminal(self) -> None:
+            command = [sys.executable, "-c", "import iints; print(iints.__version__)"]
+            if getattr(sys, "frozen", False):
+                command = ["iints", "--version"]
+            self._run_app_terminal_command(command, label="SDK version check")
+
+        def _clear_app_terminal(self) -> None:
+            self.app_terminal_output.setPlainText("Integrated terminal ready.\n")
+
+        def _run_app_terminal_command(self, command: list[str], *, label: str) -> None:
+            if self.terminal_thread is not None:
+                QMessageBox.information(self, "IINTS-AF Desktop", "A terminal command is already running.")
+                return
+            self.app_terminal_output.appendPlainText(f"\n--- {label} ---")
+            self.run_app_terminal_update_button.setEnabled(False)
+            self.run_version_terminal_button.setEnabled(False)
+            self.status.setText(f"Running {label}")
+
+            thread = QThread(self)
+            worker = TerminalCommandWorker(command=command, cwd=str(Path.cwd()))
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.line.connect(self._handle_terminal_line)
+            worker.finished.connect(self._handle_terminal_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_terminal_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_terminal_refs)
+            self.terminal_thread = thread
+            self.terminal_worker = worker
+            thread.start()
 
         def _run_package_update(self) -> None:
             if self.update_thread is not None:
                 QMessageBox.information(self, "IINTS-AF Desktop", "An update action is already running.")
-                return
-            if getattr(sys, "frozen", False):
-                QMessageBox.information(
-                    self,
-                    "IINTS-AF Desktop",
-                    "Packaged app builds update by downloading the newest app build. "
-                    "Use 'Open App Downloads'.",
-                )
                 return
             if QMessageBox.question(
                 self,
@@ -2268,7 +2421,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 return
             self.run_package_update_button.setEnabled(False)
             self.update_status.setText("Updating Python SDK package...")
-            self.update_log.setPlainText(PYTHON_SDK_UPDATE_COMMAND + "\n\nWorking...")
+            self.update_log.setPlainText(_display_command(_python_update_command()) + "\n\nWorking...")
             self.status.setText("Updating SDK package")
 
             thread = QThread(self)
@@ -2306,6 +2459,30 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _clear_update_refs(self) -> None:
             self.update_thread = None
             self.update_worker = None
+
+        @Slot(str)
+        def _handle_terminal_line(self, line: str) -> None:
+            self.app_terminal_output.appendPlainText(line)
+            self.app_terminal_output.moveCursor(QTextCursor.MoveOperation.End)
+
+        @Slot(int)
+        def _handle_terminal_success(self, exit_code: int) -> None:
+            self.app_terminal_output.appendPlainText(f"Process exited with code {exit_code}")
+            self.run_app_terminal_update_button.setEnabled(True)
+            self.run_version_terminal_button.setEnabled(True)
+            self.status.setText("Terminal command finished" if exit_code == 0 else "Terminal command failed")
+
+        @Slot(str)
+        def _handle_terminal_error(self, details: str) -> None:
+            self.app_terminal_output.appendPlainText(details)
+            self.run_app_terminal_update_button.setEnabled(True)
+            self.run_version_terminal_button.setEnabled(True)
+            self.status.setText("Terminal command failed")
+
+        @Slot()
+        def _clear_terminal_refs(self) -> None:
+            self.terminal_thread = None
+            self.terminal_worker = None
 
         def _save_log(self) -> None:
             default_path = Path(self.output_dir.text()).expanduser() / "iints-desktop-log.txt"

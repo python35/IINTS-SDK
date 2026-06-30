@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+## v1.5.19
+
+Release date: 2026-06-30
+
+### Added
+
+- added a cross-platform desktop update terminal flow for the PySide/Qt app
+- added a Methods-tab `Developer Settings / Integrated App Terminal` panel that streams command stdout/stderr inside the app
+- added a terminal walkthrough documenting macOS, Windows, and Linux update behavior
+
+### Fixed
+
+- fixed the macOS Cocoa desktop crash caused by PyObjC treating helper methods as Objective-C selectors
+- fixed the packaged standard diabetes MDMP contract path to satisfy mypy on modern `Traversable` resources
+
+### Verified
+
+- desktop tests: `28 passed`
+- Cocoa smoke check: `Cocoa desktop smoke OK`
+- targeted mypy checks: no issues found
+- full test suite: `651 passed, 2 skipped`
+- docs build: `mkdocs build --strict`
+
 ## v1.5.15
 
 Release date: 2026-06-13
