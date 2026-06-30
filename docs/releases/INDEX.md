@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.23](v1.5.23.md) - desktop extra installs PySide6 automatically
 - [v1.5.22](v1.5.22.md) - Linux Qt desktop shortcut startup crash fix
 - [v1.5.21](v1.5.21.md) - clinical report Matplotlib layout robustness fix
 - [v1.5.20](v1.5.20.md) - complete post-rebase desktop/update release

@@ -34,7 +34,7 @@ The app also includes an update panel that links back to the latest app release 
 This is the easiest path for most users:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
 iints-desktop
 ```
 
@@ -60,7 +60,7 @@ cd IINTS-SDK
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+python -m pip install -U -e ".[full,desktop,mdmp]"
 iints-desktop
 ```
 
@@ -72,7 +72,7 @@ cd IINTS-SDK
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+python -m pip install -U -e ".[full,desktop,mdmp]"
 iints-desktop
 ```
 
@@ -106,13 +106,13 @@ The app can start the local Ollama server and prepare the selected model when th
 If the app command is missing, reinstall with the desktop extra:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
 ```
 
-If the Qt app fails because PySide6 is missing:
+If the Qt app fails because PySide6 is missing, reinstall the SDK with the desktop extra. The desktop extra installs PySide6 automatically:
 
 ```bash
-python -m pip install -U PySide6
+python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
 ```
 
 If you want to verify the SDK first:

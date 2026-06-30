@@ -10,16 +10,18 @@ The desktop app does not replace the SDK. It calls the same simulation/reporting
 For normal users, install the desktop app from PyPI with the Qt desktop extra:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"
+python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
 iints-desktop
 ```
+
+The `desktop` extra installs the PySide6/Qt runtime automatically, so users do not need to install PySide6 by hand.
 
 For the newest app code from GitHub:
 
 ```bash
 git clone https://github.com/python35/IINTS-SDK.git
 cd IINTS-SDK
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+python -m pip install -U -e ".[full,desktop,mdmp]"
 iints-desktop
 ```
 
@@ -237,7 +239,7 @@ This file contains timestamps, workflow names, preset names, seeds, run IDs, and
 From a development checkout:
 
 ```bash
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+python -m pip install -U -e ".[full,desktop,mdmp]"
 iints-desktop
 ```
 
@@ -331,7 +333,7 @@ Beta caveats:
 Install the desktop build extra:
 
 ```bash
-python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+python -m pip install -U -e ".[full,desktop,mdmp]"
 ```
 
 Then build the preferred PySide6/Qt app:

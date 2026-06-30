@@ -70,7 +70,7 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             python -m pip install -U -e ".[full,desktop-macos,mdmp]"
           else
-            python -m pip install -U -e ".[full,desktop-qt,mdmp]"
+            python -m pip install -U -e ".[full,desktop,mdmp]"
           fi
 
       - name: Run desktop unit tests

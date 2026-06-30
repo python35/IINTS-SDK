@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v1.5.23
+
+Release date: 2026-06-30
+
+### Fixed
+
+- made the generic `desktop` extra install the PySide6/Qt runtime automatically
+- updated desktop app update/install commands to use `iints-sdk-python35[full,desktop,mdmp]`
+- updated the desktop beta CI install path to use the same batteries-included desktop extra on Windows and Linux
+- removed the docs path that told users to install PySide6 manually
+
+### Verified
+
+- desktop app tests: `30 passed`
+- Qt desktop smoke path: `Qt desktop smoke OK`
+
 ## v1.5.22
 
 Release date: 2026-06-30
