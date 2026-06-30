@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v1.5.21
+
+Release date: 2026-06-30
+
+### Fixed
+
+- fixed a Matplotlib/scienceplots mathtext failure that could abort desktop baseline report generation during `fig.tight_layout()`
+- disabled mathtext tick formatting in the shared IINTS plotting style to keep report labels plain and robust across macOS/Python/Matplotlib combinations
+- added a fallback layout path so the clinical validation PNG is still saved even if Matplotlib tight layout fails
+
+### Verified
+
+- PDF regression tests: `7 passed`
+- desktop baseline workflow smoke generated both `results.csv` and `clinical_report.pdf`
+- full test suite: `652 passed, 2 skipped`
+
 ## v1.5.20
 
 Release date: 2026-06-30

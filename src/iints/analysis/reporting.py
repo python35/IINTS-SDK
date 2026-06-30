@@ -854,9 +854,15 @@ class ClinicalReportGenerator:
         ax.set_ylabel("Sensor glucose (mg/dL)")
         ax.grid(True, alpha=0.22)
         ax.legend(loc="upper left", fontsize=7, frameon=True)
-        fig.tight_layout()
-        fig.savefig(output_path, dpi=260, bbox_inches="tight")
-        plt.close(fig)
+        try:
+            fig.tight_layout()
+            fig.savefig(output_path, dpi=260, bbox_inches="tight")
+        except ValueError as exc:
+            logger.warning("Clinical validation plot layout failed; saving fallback layout: %s", exc)
+            fig.subplots_adjust(left=0.08, right=0.98, top=0.9, bottom=0.12)
+            fig.savefig(output_path, dpi=260)
+        finally:
+            plt.close(fig)
 
     @staticmethod
     def _metric_delta(current: float, target: float, higher_is_better: bool = True) -> str:

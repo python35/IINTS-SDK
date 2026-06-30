@@ -54,6 +54,11 @@ def apply_plot_style(
             "ytick.labelsize": 10,
             "axes.spines.top": False,
             "axes.spines.right": False,
+            # Scientific styles can enable mathtext tick formatting. Some
+            # Matplotlib/macOS combinations then try to parse empty ticklabels
+            # during tight_layout(), which can abort report generation.
+            "axes.formatter.use_mathtext": False,
+            "text.usetex": False,
         }
     )
     return colors

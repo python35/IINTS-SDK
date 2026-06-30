@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
+from matplotlib.figure import Figure
 import pandas as pd
 from typer.testing import CliRunner
 
@@ -30,6 +31,31 @@ def test_demo_pdf_generation(tmp_path: Path) -> None:
     output_path = tmp_path / "demo_report.pdf"
     generator = ClinicalReportGenerator()
     generator.generate_pdf(sim_df, safety_report, str(output_path))
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 1000
+
+
+def test_clinical_validation_plot_survives_tight_layout_mathtext_failure(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    sim_df = pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10, 15, 20, 25],
+            "glucose_actual_mgdl": [110, 118, 140, 170, 155, 135],
+            "carb_intake_grams": [0, 15, 0, 0, 0, 0],
+            "delivered_insulin_units": [0.0, 0.0, 0.1, 0.0, 0.0, 0.0],
+        }
+    )
+
+    def broken_tight_layout(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
+        raise ValueError("simulated Matplotlib mathtext parse failure")
+
+    monkeypatch.setattr(Figure, "tight_layout", broken_tight_layout)
+
+    output_path = tmp_path / "clinical_validation_pattern.png"
+    ClinicalReportGenerator()._plot_clinical_validation_pattern(sim_df, output_path)
 
     assert output_path.exists()
     assert output_path.stat().st_size > 1000
