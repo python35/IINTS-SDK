@@ -137,13 +137,13 @@ def main() -> int:
     if not entrypoint.exists():
         raise SystemExit(f"Desktop entrypoint not found for backend {args.backend!r}: {entrypoint}")
 
-    install_extra = "desktop-qt" if args.backend == "qt" else "desktop"
+    install_extra = "desktop"
     if args.backend == "cocoa":
         install_extra = "desktop-macos"
     require_module("PyInstaller", f'python -m pip install -U -e ".[{install_extra}]"')
     require_pkg_resources_runtime_hook_compatibility()
     if args.backend == "qt":
-        require_module("PySide6", 'python -m pip install -U -e ".[desktop-qt]"')
+        require_module("PySide6", 'python -m pip install -U -e ".[desktop]"')
     if args.backend == "cocoa":
         require_module("Cocoa", 'python -m pip install -U -e ".[desktop-macos]"')
 

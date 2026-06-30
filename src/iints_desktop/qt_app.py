@@ -41,9 +41,10 @@ from iints_desktop.render_3dmol import generate_3dmol_html
 
 DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
-PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop-qt,mdmp]"'
+PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"'
 ENABLE_EMBEDDED_WEBENGINE = os.environ.get("QT_QPA_PLATFORM") != "offscreen"
 _CRASH_LOG_HANDLE: Any | None = None
+
 
 
 def _desktop_log_path() -> Path:
@@ -2883,7 +2884,8 @@ def main() -> int:
     if _PYSIDE_IMPORT_ERROR is not None:
         message = (
             "PySide6 is not installed. Install it with: "
-            'python -m pip install -U -e ".[full,desktop-qt,mdmp]"'
+            'python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]" '
+            'or, from a source checkout, python -m pip install -U -e ".[full,desktop,mdmp]"'
         )
         _write_startup_log(message)
         raise RuntimeError(message) from _PYSIDE_IMPORT_ERROR

@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -286,7 +287,21 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     assert "Copy Update Command" in source
     assert "Update Python SDK Package" in source
     assert "Developer Settings" in source
-    assert "iints-sdk-python35[full,desktop-qt,mdmp]" in source
+    assert "iints-sdk-python35[full,desktop,mdmp]" in source
+
+
+def test_desktop_extra_installs_pyside6_automatically() -> None:
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    extras = pyproject["project"]["optional-dependencies"]
+    desktop_deps = extras["desktop"]
+    desktop_qt_deps = extras["desktop-qt"]
+    build_source = Path("tools/desktop/build_qt_desktop_app.py").read_text(encoding="utf-8")
+
+    assert any(dep.startswith("PySide6") for dep in desktop_deps)
+    assert any(dep.startswith("plotly") for dep in desktop_deps)
+    assert any(dep.startswith("PySide6") for dep in desktop_qt_deps)
+    assert 'python -m pip install -U -e ".[desktop]"' in build_source
+    assert 'python -m pip install -U -e ".[desktop-qt]"' not in build_source
 
 
 def test_qt_app_keyboard_shortcut_uses_existing_workflow_handler() -> None:
@@ -336,6 +351,8 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
     assert "desktop-macos" in workflow
     assert '"setuptools>=77,<81" pytest' in workflow
+    assert 'python -m pip install -U -e ".[full,desktop,mdmp]"' in workflow
+    assert 'python -m pip install -U -e ".[full,desktop-qt,mdmp]"' not in workflow
     assert "Smoke test bundled app on macOS" in workflow
     assert "continue-on-error: true\n        shell: bash\n        env:" not in workflow.split("Smoke test bundled app on macOS", 1)[1].split("Best-effort bundled smoke on Windows", 1)[0]
 

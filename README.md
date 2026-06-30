@@ -31,7 +31,12 @@ Current beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) |
 | Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) |
 
+Python install, including the PySide6 desktop runtime:
 
+```bash
+python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
+iints-desktop
+```
 
 ## License
 

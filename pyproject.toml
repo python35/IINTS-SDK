@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.22"
+version = "1.5.23"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -88,6 +88,8 @@ mdmp = [
 desktop = [
   "pyinstaller>=6.11.0,<7.0.0",
   "setuptools>=77.0.0,<81.0.0",
+  "PySide6>=6.7.0,<7.0.0",
+  "plotly>=5.18.0,<7.0.0",
 ]
 desktop-qt = [
   "pyinstaller>=6.11.0,<7.0.0",
