@@ -500,7 +500,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             
             # Setup keyboard shortcuts
             self.run_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
-            self.run_shortcut.activated.connect(self._run_workflow)
+            self.run_shortcut.activated.connect(self._run_selected_workflow)
             self.open_update_docs_button = QPushButton("Open Update Docs")
             self.copy_update_command_button = QPushButton("Copy Update Command")
             self.run_package_update_button = QPushButton("Update Python SDK Package")
