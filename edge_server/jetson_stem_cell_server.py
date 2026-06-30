@@ -4,11 +4,12 @@ import random
 import threading
 import sys
 import subprocess
+import os
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Import from IINTS-SDK
-sys.path.insert(0, "/Users/runebobbaers/IINTS-SDK/src")
+# Ensure the 'src' directory is in the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from iints.research.stem_cell_optimizer import StemCellOptimizer
 from iints_desktop.local_ai import ask_local_ai
 
