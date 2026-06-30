@@ -294,6 +294,14 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     assert "iints-sdk-python35[full,desktop-qt,mdmp]" in source
 
 
+def test_qt_app_keyboard_shortcut_uses_existing_workflow_handler() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "def _run_selected_workflow" in source
+    assert "self.run_shortcut.activated.connect(self._run_selected_workflow)" in source
+    assert "self.run_shortcut.activated.connect(self._run_workflow)" not in source
+
+
 def test_qt_app_update_terminal_is_cross_platform() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
 

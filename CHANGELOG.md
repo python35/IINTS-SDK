@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v1.5.22
+
+Release date: 2026-06-30
+
+### Fixed
+
+- fixed the packaged PySide/Qt desktop app startup crash on Linux caused by the `Ctrl+R` shortcut pointing at the removed `_run_workflow` handler
+- wired the shortcut to the existing `_run_selected_workflow` handler used by the Run button and menu actions
+- added regression coverage so desktop startup wiring cannot point to the stale handler again
+
+### Verified
+
+- Qt desktop source compile check: passed
+- Qt desktop packaged-style smoke path: `Qt desktop smoke OK`
+- desktop app tests: `29 passed`
+
 ## v1.5.21
 
 Release date: 2026-06-30

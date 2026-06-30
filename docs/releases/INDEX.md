@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.22](v1.5.22.md) - Linux Qt desktop shortcut startup crash fix
 - [v1.5.21](v1.5.21.md) - clinical report Matplotlib layout robustness fix
 - [v1.5.20](v1.5.20.md) - complete post-rebase desktop/update release
 - [v1.5.19](v1.5.19.md) - desktop startup fix and transparent update terminal
