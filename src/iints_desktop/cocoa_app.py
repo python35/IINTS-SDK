@@ -80,6 +80,7 @@ def main() -> int:
         def applicationShouldTerminateAfterLastWindowClosed_(self, _sender: Any) -> bool:
             return True
 
+        @objc.python_method
         def _label(self, parent: Any, text: str, frame: tuple[float, float, float, float], *, size: float = 13.0, bold: bool = False) -> Any:
             field = NSTextField.alloc().initWithFrame_(NSMakeRect(*frame))
             field.setStringValue_(text)
@@ -98,6 +99,7 @@ def main() -> int:
             parent.addSubview_(field)
             return field
 
+        @objc.python_method
         def _button(self, parent: Any, text: str, frame: tuple[float, float, float, float], action: str) -> Any:
             button = NSButton.alloc().initWithFrame_(NSMakeRect(*frame))
             button.setTitle_(text)
@@ -107,6 +109,7 @@ def main() -> int:
             parent.addSubview_(button)
             return button
 
+        @objc.python_method
         def _build_window(self) -> None:
             style = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask
             self.window = NSWindow.alloc().initWithContentRect_styleMask_backing_defer_(
@@ -182,6 +185,7 @@ def main() -> int:
             scroll.setDocumentView_(self.log_view)
             content.addSubview_(scroll)
 
+        @objc.python_method
         def selectedPreset(self) -> DesktopPreset:
             index = int(self.workflow_popup.indexOfSelectedItem())
             if index < 0 or index >= len(self.presets):
@@ -223,6 +227,7 @@ def main() -> int:
             thread = threading.Thread(target=self._run_worker, args=(preset.key, seed), daemon=True)
             thread.start()
 
+        @objc.python_method
         def _run_worker(self, preset_key: str, seed: int) -> None:
             try:
                 result = run_demo_preset(
@@ -245,6 +250,7 @@ def main() -> int:
             except queue.Empty:
                 return
 
+        @objc.python_method
         def _handle_success(self, result: DesktopRunResult) -> None:
             self.last_result = result
             self._set_running(False)
@@ -254,12 +260,14 @@ def main() -> int:
             self.open_csv_button.setEnabled_(bool(result.results_csv and result.results_csv.exists()))
             self._write_log("\n" + result.summary + "\n")
 
+        @objc.python_method
         def _handle_error(self, exc: Exception) -> None:
             self._set_running(False)
             self.status_label.setStringValue_("Run failed")
             self._write_log(f"\nERROR: {exc}\n")
             self._show_error(str(exc))
 
+        @objc.python_method
         def _set_running(self, is_running: bool) -> None:
             self.run_button.setEnabled_(not is_running)
             if is_running:
@@ -279,16 +287,19 @@ def main() -> int:
             if self.last_result and self.last_result.results_csv:
                 self._open_path(self.last_result.results_csv)
 
+        @objc.python_method
         def _open_path(self, path: Path) -> None:
             url = NSURL.fileURLWithPath_(str(path.resolve()))
             NSWorkspace.sharedWorkspace().openURL_(url)
 
+        @objc.python_method
         def _show_error(self, message: str) -> None:
             alert = NSAlert.alloc().init()
             alert.setMessageText_("IINTS-AF Desktop")
             alert.setInformativeText_(message)
             alert.runModal()
 
+        @objc.python_method
         def _write_log(self, text: str) -> None:
             current = str(self.log_view.string())
             self.log_view.setString_(current + text)

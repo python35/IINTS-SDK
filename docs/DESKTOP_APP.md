@@ -210,9 +210,17 @@ These actions may need internet access on first run. They are evidence/context a
 
 ### In-App Updates
 
-The desktop app includes an update panel in the Methods tab. It can open the latest app download page, open the update documentation, copy the Python SDK update command, and run the Python package update command for Python-based installs.
+The desktop app includes an update panel in the Methods tab. It can open the latest app download page, open the update documentation, copy the Python SDK update command, run the Python package update command inside the app, or open the same update command in a real system terminal.
 
-Packaged `.exe`/`.dmg` app updates still require downloading the newest app build, because fully silent self-updating needs code signing and platform-specific installer infrastructure.
+The `Open Update Terminal` button is cross-platform:
+
+- macOS uses `osascript` to open Terminal and run the update command visibly
+- Windows uses `cmd.exe` so users can see the install output and any warnings
+- Linux searches common terminal emulators such as `x-terminal-emulator`, `gnome-terminal`, `konsole`, `xfce4-terminal`, and `xterm`
+
+The Methods tab also has a `Developer Settings / Integrated App Terminal` section. It can run a version check or SDK update command while streaming stdout/stderr directly into the app. This is intended for debugging, demos, and support sessions where seeing the exact system output matters.
+
+Packaged `.exe`/`.dmg` app builds still depend on the GitHub release assets for app-bundle replacement. The in-app terminal updater is for the Python SDK package environment and for transparent maintenance output.
 
 ## Run History
 
