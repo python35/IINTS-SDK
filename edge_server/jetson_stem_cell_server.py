@@ -24,8 +24,9 @@ state = {
     "score_history": [],
 }
 
-CONFIG_FILE = Path("/Users/runebobbaers/.gemini/antigravity/brain/b46587f9-7099-4c95-9909-3a2bf25ac5b1/scratch/jetson_config.json")
-HTML_FILE = Path("/Users/runebobbaers/.gemini/antigravity/brain/b46587f9-7099-4c95-9909-3a2bf25ac5b1/scratch/dashboard.html")
+BASE_DIR = Path(__file__).parent
+CONFIG_FILE = BASE_DIR / "jetson_config.json"
+HTML_FILE = BASE_DIR / "dashboard.html"
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
