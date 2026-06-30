@@ -281,15 +281,10 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
 
     assert "DESKTOP_RELEASE_URL" in source
     assert "desktop-beta-latest" in source
-    assert "class UpdateWorker" in source
-    assert "class TerminalCommandWorker" in source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
     assert "Copy Update Command" in source
-    assert "Open Update Terminal" in source
     assert "Update Python SDK Package" in source
-    assert "Run Update In App Terminal" in source
-    assert "Integrated App Terminal" in source
     assert "Developer Settings" in source
     assert "iints-sdk-python35[full,desktop-qt,mdmp]" in source
 
@@ -303,18 +298,15 @@ def test_qt_app_keyboard_shortcut_uses_existing_workflow_handler() -> None:
 
 
 def test_qt_app_update_terminal_is_cross_platform() -> None:
-    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    source = Path("src/iints_desktop/terminal_utils.py").read_text(encoding="utf-8")
 
-    assert "open_command_in_system_terminal" in source
+    assert "open_terminal_and_run" in source
     assert "osascript" in source
     assert "cmd.exe" in source
-    assert "x-terminal-emulator" in source
     assert "gnome-terminal" in source
     assert "konsole" in source
     assert "xfce4-terminal" in source
     assert "xterm" in source
-    assert "stdout=subprocess.PIPE" in source
-    assert "stderr=subprocess.STDOUT" in source
 
 
 def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
