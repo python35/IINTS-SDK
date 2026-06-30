@@ -63,6 +63,11 @@ class BergmanParameters:
     k_a_glucagon: float = 0.05    # 1/min
     S_glucagon: float = 0.02      # sensitivity
 
+    # --- Stem Cell Graft (Research) ---
+    stem_cell_engraftment_percent: float = 0.0 # 0 for T1D, 100 for cure
+    stem_cell_subq_fraction: float = 0.0       # 0.0 = PV (immediate), 1.0 = subQ (delayed via S1)
+    immune_rejection_rate: float = 0.0         # 1/min decay of graft mass
+
     # --- Gut absorption ---
     tau_meal: float = 40.0  # min    — gastric emptying time constant
     k_abs: float = 0.05     # 1/min  — intestinal absorption rate constant
@@ -96,6 +101,7 @@ class BergmanPatientModel:
         carb_absorption_duration_minutes: float = 240.0,
         max_glucose_rate_mgdl_per_min: float = 3.0,
         bergman_params: Optional[BergmanParameters] = None,
+        **kwargs
     ) -> None:
         # Store clinical knobs (for ratio queries and compatibility)
         self.basal_insulin_rate = basal_insulin_rate
@@ -121,6 +127,10 @@ class BergmanPatientModel:
             Gb=gb_default,
             tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
             k_abs=max(0.015, min(float(glucose_absorption_rate), 0.035)),
+            stem_cell_engraftment_percent=kwargs.get('stem_cell_engraftment_percent', 0.0),
+            stem_cell_subq_fraction=kwargs.get('stem_cell_subq_fraction', 0.0),
+            immune_rejection_rate=kwargs.get('immune_rejection_rate', 0.0),
+            gamma=0.005 if kwargs.get('stem_cell_engraftment_percent', 0.0) > 0 else 0.0
         )
 
         # Exercise book-keeping
@@ -159,6 +169,7 @@ class BergmanPatientModel:
             0.0,                   # 10: Gamma (pg/mL) - Plasma Glucagon
             0.0,                   # 11: x_gluc (1) - Glucagon action on EGP
             0.0,                   # 12: HAAF (1) - Memory
+            (self.params.stem_cell_engraftment_percent / 100.0),  # 13: M_graft (1) - Graft Mass
         ], dtype=np.float64)
 
         self.reset()
@@ -183,7 +194,7 @@ class BergmanPatientModel:
         """Reset to initial conditions."""
         self._state = np.array([
             self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0
+            0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)
         ], dtype=np.float64)
         self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
@@ -369,22 +380,27 @@ class BergmanPatientModel:
             # Handle legacy snapshot coercions to 13-state vector
             if ode_state.size == 4:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], 0.0, 0.0, ode_state[3], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], 0.0, 0.0, ode_state[3], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)],
                     dtype=np.float64,
                 )
             elif ode_state.size == 5:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)],
                     dtype=np.float64,
                 )
             elif ode_state.size == 7:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], ode_state[5], ode_state[6], 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], 0.0, ode_state[4], ode_state[5], ode_state[6], 0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)],
                     dtype=np.float64,
                 )
             elif ode_state.size == 8:
                 ode_state = np.array(
-                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], ode_state[4], ode_state[5], ode_state[6], ode_state[7], 0.0, 0.0, 0.0, 0.0, 0.0],
+                    [ode_state[0], ode_state[1], ode_state[2], ode_state[3], ode_state[4], ode_state[5], ode_state[6], ode_state[7], 0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)],
+                    dtype=np.float64,
+                )
+            elif ode_state.size == 13:
+                ode_state = np.array(
+                    list(ode_state) + [(self.params.stem_cell_engraftment_percent / 100.0)],
                     dtype=np.float64,
                 )
             self._state = ode_state
@@ -415,7 +431,7 @@ class BergmanPatientModel:
         u_glucagon_pg_per_min: float,
         current_time: float,
     ) -> np.ndarray:
-        G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF = y
+        G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, M_graft = y
         p = self.params
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
@@ -484,16 +500,28 @@ class BergmanPatientModel:
         # --- dX/dt ---
         dXdt = -p.p2 * X + p3_eff * max(I - p.Ib, 0.0)
 
+        # --- Stem Cell / Islet Secretion ---
+        # Gamma acts as base secretion rate for a 100% functional pancreas
+        # M_graft acts as the survival fraction multiplier.
+        total_secretion = p.gamma * M_graft * max(G - p.h, 0.0)
+        
+        secretion_subq = total_secretion * p.stem_cell_subq_fraction
+        secretion_plasma = total_secretion * (1.0 - p.stem_cell_subq_fraction)
+
         # --- dS1/dt, dS2/dt (Subcutaneous Insulin Absorption) ---
-        dS1dt = u_insulin_mu_per_min - p.k_a * S1
+        # Any SubQ implanted islet cells release into S1
+        dS1dt = u_insulin_mu_per_min + secretion_subq - p.k_a * S1
         dS2dt = p.k_a * S1 - p.k_a * S2
 
         # Rate of appearance of insulin into plasma (mU/min)
         Ra_I = p.k_a * S2
 
         # --- dI/dt ---
-        secretion = p.gamma * max(G - p.h, 0.0)
-        dIdt = -p.n * (I - p.Ib) + secretion + Ra_I / Vi_abs
+        # Any PV/Hepatic implanted islet cells release directly into plasma
+        dIdt = -p.n * (I - p.Ib) + secretion_plasma + Ra_I / Vi_abs
+        
+        # --- dM_graft/dt ---
+        dM_graft_dt = -p.immune_rejection_rate * M_graft
 
         # --- Dalla Man Multi-compartment Meal Kinetcs ---
         gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
@@ -502,4 +530,4 @@ class BergmanPatientModel:
         dQ_sto2_dt = solid_to_liquid_rate * Q_sto1 - gastric_emptying_rate * Q_sto2
         dQ_gut_dt = gastric_emptying_rate * Q_sto2 - p.k_abs * Q_gut
 
-        return np.array([dGdt, dXdt, dIdt, dQ_sto1_dt, dQ_sto2_dt, dQ_gut_dt, dS1dt, dS2dt, dY1_dt, dY2_dt, dGamma_dt, dx_gluc_dt, dHAAF_dt])
+        return np.array([dGdt, dXdt, dIdt, dQ_sto1_dt, dQ_sto2_dt, dQ_gut_dt, dS1dt, dS2dt, dY1_dt, dY2_dt, dGamma_dt, dx_gluc_dt, dHAAF_dt, dM_graft_dt])

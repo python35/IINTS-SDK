@@ -1,0 +1,7 @@
+{
+    "ai_model": "hf.co/devanshamin/PubMedDiabetes-LLM-Predictions",
+    "ai_checkin_interval_iterations": 20,
+    "target_metric": "tir_70_180",
+    "patient_preset": "eucys_deep_sim",
+    "optimization_strategy": "random_search"
+}

@@ -141,7 +141,7 @@ class TestBergmanPatientModel:
             }
         )
 
-        assert len(model.get_state()["ode_state"]) == 13
+        assert len(model.get_state()["ode_state"]) == 14
         assert model.update(5.0, 0.0, 0.0) >= 20.0
 
     def test_custom_bergman_params(self):

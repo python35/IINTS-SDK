@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IINTS-AF Edge Optimizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --panel-bg: rgba(20, 27, 45, 0.7);
+            --accent-glow: #4facfe;
+            --accent-glow-secondary: #00f2fe;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-color: rgba(79, 172, 254, 0.2);
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(79, 172, 254, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(0, 242, 254, 0.15), transparent 25%);
+            font-family: 'Inter', sans-serif;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism Header */
+        header {
+            background: rgba(11, 15, 25, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .pulse-indicator {
+            width: 12px;
+            height: 12px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--success), 0 0 20px var(--success);
+            animation: pulse 1.5s infinite;
+        }
+        .pulse-indicator.stopped {
+            background-color: var(--danger);
+            box-shadow: 0 0 10px var(--danger);
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        h1 {
+            margin: 0;
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, var(--accent-glow), var(--accent-glow-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+        }
+        
+        .btn:hover {
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        .btn.danger {
+            border-color: rgba(239, 68, 68, 0.5);
+            color: #fca5a5;
+        }
+        .btn.danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+        }
+
+        /* Main Grid */
+        main {
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            flex: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        /* Glass Panels */
+        .glass-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-panel::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        }
+
+        .panel-header {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent-glow);
+            margin-bottom: 1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Metrics Layout */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .metric-card {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .metric-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .metric-value.highlight {
+            color: var(--accent-glow-secondary);
+        }
+
+        /* Progress Chart */
+        .chart-container {
+            height: 120px;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            padding-top: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .chart-bar {
+            flex: 1;
+            background: linear-gradient(0deg, rgba(79, 172, 254, 0.2), var(--accent-glow));
+            border-radius: 4px 4px 0 0;
+            min-height: 2px;
+            transition: height 0.5s ease;
+            position: relative;
+        }
+        
+        .chart-bar:hover::after {
+            content: attr(data-val) "%";
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #fff;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        /* AI Analysis Box */
+        .ai-analysis {
+            grid-column: 1 / -1;
+            font-family: 'Courier New', Courier, monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-glow);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #d1d5db;
+            white-space: pre-wrap;
+            height: 100%;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(79, 172, 254, 0.2);
+            border-top-color: var(--accent-glow);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
+        .status-text {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <div class="pulse-indicator" id="pulse"></div>
+            <h1>IINTS-AF Edge Optimizer</h1>
+        </div>
+        <div class="header-actions">
+            <div class="status-text" id="statusText">
+                Connected | Iteration: <span id="iterationCount">0</span>
+            </div>
+            <button class="btn" onclick="sendCommand('update')" id="btnUpdate">Update SDK</button>
+            <button class="btn danger" onclick="sendCommand('stop')" id="btnStop">Stop Optimizer</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- Simulation Status -->
+        <div class="glass-panel">
+            <div class="panel-header">
+                <div class="spinner" id="engineSpinner"></div> Current Engine Status
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Target Metric</div>
+                    <div class="metric-value" id="targetMetric">Loading...</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Best Score (TIR)</div>
+                    <div class="metric-value highlight" id="bestScore">0.0%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">AI Model</div>
+                    <div class="metric-value" style="font-size: 1rem; margin-top: 0.5rem;" id="aiModel">Loading...</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Status</div>
+                    <div class="metric-value" style="font-size: 1.2rem; color: var(--success);" id="engineStatus">Running</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem;">
+                <div class="metric-label">Recent Score History (TIR)</div>
+                <div class="chart-container" id="scoreChart">
+                    <!-- Bars injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Best Parameters -->
+        <div class="glass-panel">
+            <div class="panel-header">Best Found Parameters (Stem Cell Graft)</div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Graft Mass (mg)</div>
+                    <div class="metric-value" id="graftMass">0.0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Immune Rejection Rate</div>
+                    <div class="metric-value" id="rejectionRate">0.0</div>
+                </div>
+                <div class="metric-card" style="grid-column: 1 / -1;">
+                    <div class="metric-label">Implant Location</div>
+                    <div class="metric-value" id="implantLocation">Unknown</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Medical Report -->
+        <div class="glass-panel">
+            <div class="panel-header">Latest AI Scientific Review</div>
+            <div class="ai-analysis" id="aiReport">
+                <div class="spinner" style="margin-right: 10px;"></div> Waiting for first AI synthesis...
+            </div>
+        </div>
+
+        <!-- AlphaFold Molecular Engineering Report -->
+        <div class="glass-panel">
+            <div class="panel-header">AlphaFold Bio-Engineering Target: PD-L1 (CD274)</div>
+            <div style="font-size: 0.9rem; line-height: 1.5; color: var(--text-muted);">
+                <p><strong style="color: var(--accent-glow);">UniProt ID:</strong> Q9NZQ7 | <strong style="color: var(--accent-glow);">Target:</strong> Immune Evasion (T-Cell Tolerance)</p>
+                <p>To achieve the optimal <strong>Immune Rejection Rate of 0.0002/day</strong> found in Iteration 261, the Edge AI proposes genetic overexpression of Programmed Cell Death 1 Ligand 1 (PD-L1) on the graft surface.</p>
+                <div style="background: rgba(16, 185, 129, 0.1); border-left: 3px solid var(--success); padding: 10px; margin-top: 10px; border-radius: 4px;">
+                    <strong style="color: var(--success); display: block; margin-bottom: 5px;">AlphaFold Structural Confidence (pLDDT)</strong>
+                    Overall Global pLDDT: <strong>88.25</strong> (High Confidence)<br>
+                    Fraction Confident/Very High: <strong>84.4%</strong><br>
+                    Conclusion: <em>Protein is confidently predicted and fully ordered/structured.</em>
+                </div>
+                <div style="background: rgba(79, 172, 254, 0.1); border-left: 3px solid var(--accent-glow); padding: 10px; margin-top: 10px; border-radius: 4px;">
+                    <strong style="color: var(--accent-glow); display: block; margin-bottom: 5px;">Domain Boundary Analysis (PAE)</strong>
+                    Detected Rigid Domains: <strong>1</strong><br>
+                    Functional Domain: <strong>Residues 17 - 228</strong> (Extracellular Domain)<br>
+                    Conclusion: <em>The protein consists of a single well-folded, rigid composite domain, ideal for stable surface expression and robust PD-1 receptor binding.</em>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        async function sendCommand(cmd) {
+            try {
+                const res = await fetch('/api/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: cmd })
+                });
+                const data = await res.json();
+                console.log(data);
+                
+                if (cmd === 'stop') {
+                    document.getElementById('engineStatus').innerText = "Stopped";
+                    document.getElementById('engineStatus').style.color = "var(--danger)";
+                    document.getElementById('pulse').classList.add('stopped');
+                    document.getElementById('engineSpinner').style.display = 'none';
+                    document.getElementById('btnStop').disabled = true;
+                    document.getElementById('btnStop').style.opacity = "0.5";
+                }
+                
+                if (cmd === 'update') {
+                    let btn = document.getElementById('btnUpdate');
+                    let oldText = btn.innerText;
+                    btn.innerText = "Updating...";
+                    btn.style.color = "var(--warning)";
+                    setTimeout(() => {
+                        btn.innerText = oldText;
+                        btn.style.color = "";
+                    }, 5000);
+                }
+            } catch(e) {
+                console.error("Action error:", e);
+                alert("Failed to send command to Jetson edge server.");
+            }
+        }
+
+        function drawChart(history) {
+            const container = document.getElementById('scoreChart');
+            container.innerHTML = '';
+            
+            if (!history || history.length === 0) return;
+            
+            // Normalize bars to 100% max height relative to TIR
+            history.forEach(score => {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                bar.style.height = `${score}%`;
+                bar.setAttribute('data-val', score.toFixed(1));
+                container.appendChild(bar);
+            });
+        }
+
+        async function fetchState() {
+            try {
+                const response = await fetch('/api/state');
+                const data = await response.json();
+                
+                // Update header
+                document.getElementById('iterationCount').innerText = data.iteration;
+                
+                // Update Engine running status if stopped remotely
+                if (!data.is_running) {
+                    document.getElementById('engineStatus').innerText = "Stopped";
+                    document.getElementById('engineStatus').style.color = "var(--danger)";
+                    document.getElementById('pulse').classList.add('stopped');
+                    document.getElementById('engineSpinner').style.display = 'none';
+                }
+                
+                // Update Status Panel
+                document.getElementById('targetMetric').innerText = data.config.target_metric || "TIR";
+                document.getElementById('aiModel').innerText = (data.config.ai_model || "").split("/").pop();
+                
+                // Update Best Params
+                if (data.best_score !== null) {
+                    document.getElementById('bestScore').innerText = data.best_score.toFixed(1) + "%";
+                }
+                
+                if (data.best_params) {
+                    document.getElementById('graftMass').innerText = data.best_params.M_graft ? data.best_params.M_graft.toFixed(1) : "0.0";
+                    document.getElementById('rejectionRate').innerText = data.best_params.immune_rejection_rate ? data.best_params.immune_rejection_rate.toFixed(4) : "0.0";
+                    document.getElementById('implantLocation').innerText = data.best_params.location || "Unknown";
+                }
+                
+                // Update AI Report
+                if (data.latest_ai_report) {
+                    document.getElementById('aiReport').innerText = data.latest_ai_report;
+                }
+                
+                // Update Chart
+                if (data.score_history) {
+                    drawChart(data.score_history);
+                }
+                
+            } catch (error) {
+                console.error("Error fetching state:", error);
+                document.getElementById('engineStatus').innerText = "Disconnected";
+                document.getElementById('engineStatus').style.color = "var(--danger)";
+                document.getElementById('pulse').classList.add('stopped');
+                document.getElementById('engineSpinner').style.display = 'none';
+            }
+        }
+
+        setInterval(fetchState, 2000);
+        fetchState();
+    </script>
+</body>
+</html>
