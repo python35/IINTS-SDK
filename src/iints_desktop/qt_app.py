@@ -374,7 +374,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.mdmp_thread: QThread | None = None
             self.mdmp_worker: MDMPCertifyWorker | None = None
             self.update_thread: QThread | None = None
-            self.update_worker: UpdateWorker | None = None
+            self.update_worker = None
             self.pae_thread: QThread | None = None
             self.pae_worker: PAEWorker | None = None
             self.biology_thread: QThread | None = None
