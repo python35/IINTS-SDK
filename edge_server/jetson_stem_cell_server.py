@@ -44,6 +44,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps(state).encode())
+        elif self.path == "/api/export":
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.send_header("Content-Disposition", 'attachment; filename="jetson_optimizer_data.json"')
+            self.end_headers()
+            self.wfile.write(json.dumps(state, indent=4).encode())
         else:
             self.send_response(404)
             self.end_headers()
