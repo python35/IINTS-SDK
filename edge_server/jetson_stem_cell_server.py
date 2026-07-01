@@ -27,6 +27,19 @@ state = {
 BASE_DIR = Path(__file__).parent
 CONFIG_FILE = BASE_DIR / "jetson_config.json"
 HTML_FILE = BASE_DIR / "dashboard.html"
+BACKUP_FILE = BASE_DIR / "jetson_state_backup.json"
+
+# Try to load previous state to resume after a power failure
+if BACKUP_FILE.exists():
+    try:
+        with open(BACKUP_FILE, "r") as f:
+            saved_state = json.load(f)
+            # Update global state with saved values
+            state.update(saved_state)
+            state["is_running"] = True # Ensure it starts running again
+            print(f"Resumed from backup! Iteration: {state['iteration']}")
+    except Exception as e:
+        print(f"Failed to load backup state: {e}")
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -138,6 +151,13 @@ def run_optimizer():
                 state["latest_ai_report"] = ai_answer.answer
             except Exception as e:
                 state["latest_ai_report"] = f"AI Error: {e}"
+                
+        # Save state backup to recover from power failures
+        try:
+            with open(BACKUP_FILE, "w") as f:
+                json.dump(state, f)
+        except Exception as e:
+            pass # Ignore write errors to keep running
         
         # Short sleep to prevent 100% CPU lock if needed
         time.sleep(0.01)
