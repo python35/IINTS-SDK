@@ -4,10 +4,15 @@ import importlib.util
 import json
 import os
 import re
-import tomllib
 from pathlib import Path
+from typing import Any
 
 import pytest
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
+    tomllib = None  # type: ignore[assignment]
 
 from iints_desktop.engine import (
     DesktopRunResult,
@@ -34,6 +39,38 @@ from iints_desktop.molecules import (
     pae_html_path,
 )
 from iints_desktop.results import build_ai_result_context, load_results_preview
+
+
+def _load_pyproject() -> dict[str, Any]:
+    text = Path("pyproject.toml").read_text(encoding="utf-8")
+    if tomllib is not None:
+        return tomllib.loads(text)
+
+    optional_dependencies: dict[str, list[str]] = {}
+    current_extra: str | None = None
+    in_optional_deps = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line == "[project.optional-dependencies]":
+            in_optional_deps = True
+            continue
+        if in_optional_deps and line.startswith("[") and line.endswith("]"):
+            break
+        if not in_optional_deps or not line or line.startswith("#"):
+            continue
+        match = re.match(r"([A-Za-z0-9_-]+)\\s*=\\s*\\[", line)
+        if match:
+            current_extra = match.group(1)
+            optional_dependencies[current_extra] = []
+            continue
+        if current_extra is not None:
+            dep_match = re.match(r'"([^"]+)"\\s*,?', line)
+            if dep_match:
+                optional_dependencies[current_extra].append(dep_match.group(1))
+            elif line == "]":
+                current_extra = None
+
+    return {"project": {"optional-dependencies": optional_dependencies}}
 
 
 def test_desktop_run_result_is_ui_friendly(tmp_path: Path) -> None:
@@ -327,7 +364,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
 
 
 def test_desktop_extra_installs_pyside6_automatically() -> None:
-    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    pyproject = _load_pyproject()
     extras = pyproject["project"]["optional-dependencies"]
     desktop_deps = extras["desktop"]
     desktop_qt_deps = extras["desktop-qt"]

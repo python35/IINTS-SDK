@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## v1.5.25
+
+Release date: 2026-07-01
+
+### Fixed
+
+- fixed Python 3.10 test collection by avoiding a hard dependency on the Python 3.11+ standard-library `tomllib` module in desktop tests
+- added a small fallback parser for the desktop optional-dependency regression check when `tomllib` is unavailable
+
+### Verified
+
+- desktop app tests: `32 passed`
+- Qt desktop packaged-style smoke path: `Qt desktop smoke OK`
+
 ## v1.5.24
 
 Release date: 2026-07-01
