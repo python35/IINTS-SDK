@@ -147,7 +147,7 @@ def run_optimizer():
         if state["iteration"] % config.get("ai_checkin_interval_iterations", 10) == 1:
             prompt = f"We are running an edge-computing stem cell graft optimizer. Analyze this latest simulation result (Iteration {state['iteration']}): TIR={tir:.1f}%, Hypo={result['hypo_percent']:.1f}%, Hyper={result['hyper_percent']:.1f}%. Graft Mass={mass:.1f}mg, Immune Decay={decay:.4f}, SubQ Fraction={subq:.2f}."
             try:
-                ai_answer = ask_local_ai(question=prompt, model=config.get("ai_model", "hf.co/devanshamin/PubMedDiabetes-LLM-Predictions"))
+                ai_answer = ask_local_ai(question=prompt, model="llama3.2:3b")
                 state["latest_ai_report"] = ai_answer.answer
             except Exception as e:
                 state["latest_ai_report"] = f"AI Error: {e}"
