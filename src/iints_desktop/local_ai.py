@@ -307,7 +307,7 @@ def ask_local_ai(
         temperature=0.1,
         top_p=0.8,
         num_predict=1000,
-        num_ctx=8192,
+        num_ctx=2048,
     )
     context = build_ai_result_context(result_csv) if result_csv else "No result CSV is currently loaded."
     user_prompt = (
