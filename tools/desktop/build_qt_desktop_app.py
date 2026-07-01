@@ -16,6 +16,11 @@ ENTRYPOINTS = {
     "qt": REPO_ROOT / "src" / "iints_desktop" / "qt_app.py",
     "tk": REPO_ROOT / "src" / "iints_desktop" / "app.py",
 }
+ICON_ASSETS = {
+    "darwin": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.icns",
+    "win32": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.ico",
+    "default": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.png",
+}
 
 
 def require_module(module_name: str, install_hint: str) -> None:
@@ -59,6 +64,7 @@ def build_environment() -> dict[str, str]:
 
 def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> list[str]:
     entrypoint = ENTRYPOINTS[backend]
+    icon_path = ICON_ASSETS["darwin"] if sys.platform == "darwin" else ICON_ASSETS["win32"] if sys.platform.startswith("win") else ICON_ASSETS["default"]
     command = [
         sys.executable,
         "-m",
@@ -76,6 +82,8 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
         "--hidden-import",
         "iints.core.algorithms.clinical_baseline",
     ]
+    if icon_path.exists():
+        command.extend(["--icon", str(icon_path)])
     if backend == "qt":
         command.extend(
             [

@@ -250,6 +250,42 @@ def test_qt_app_source_forces_readable_light_palette() -> None:
     assert "QGroupBox QLabel" in source
 
 
+def test_desktop_app_bundles_and_applies_iints_logo_icon() -> None:
+    qt_source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    tk_source = Path("src/iints_desktop/app.py").read_text(encoding="utf-8")
+    cocoa_source = Path("src/iints_desktop/cocoa_app.py").read_text(encoding="utf-8")
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+    qt_build = Path("tools/desktop/build_qt_desktop_app.py").read_text(encoding="utf-8")
+    tk_build = Path("tools/desktop/build_desktop_app.py").read_text(encoding="utf-8")
+
+    assert Path("src/iints_desktop/assets/app_icon.png").is_file()
+    assert Path("src/iints_desktop/assets/app_icon.ico").is_file()
+    assert Path("src/iints_desktop/assets/app_icon.icns").is_file()
+    assert '"assets/*.png"' in pyproject
+    assert '"assets/*.ico"' in pyproject
+    assert '"assets/*.icns"' in pyproject
+    assert "QIcon" in qt_source
+    assert "desktop_icon_path" in qt_source
+    assert "setWindowIcon(icon)" in qt_source
+    assert "iconphoto(True" in tk_source
+    assert "setApplicationIconImage_" in cocoa_source
+    assert "--icon" in qt_build
+    assert "app_icon.icns" in qt_build
+    assert "app_icon.ico" in qt_build
+    assert "app_icon.png" in qt_build
+    assert "--icon" in tk_build
+
+
+def test_qt_app_terminal_state_exists_before_about_tab_builds() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "self.terminal_dock: QWidget | None = None" in source
+    assert source.index("self.terminal_dock: QWidget | None = None") < source.index("self._build_ui()")
+    assert "self.terminal_dock = QDockWidget" in source
+    assert source.index("self.terminal_dock = QDockWidget") < source.index("self._build_about_tab(about_tab)")
+    assert source.index("self.terminal_dock.setWidget(self.terminal_text)") < source.index("self._build_about_tab(about_tab)")
+
+
 def test_qt_app_biology_copy_is_neutral_workbench_text() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
 

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+## v1.5.24
+
+Release date: 2026-07-01
+
+### Fixed
+
+- hardened Qt desktop startup by initializing the integrated-terminal compatibility state before the About tab is built
+- added regression coverage for the packaged startup crash where UI code could reference `terminal_dock` before it existed
+
+### Added
+
+- added bundled IINTS desktop app icons in PNG, ICO, and ICNS formats
+- applied the IINTS icon to the Qt app window, Tk fallback window, and Cocoa/macOS app
+- wired PyInstaller desktop builds to use the bundled app icon for Windows, macOS, and Linux assets
+
+### Verified
+
+- desktop app tests: `32 passed`
+- Qt desktop packaged-style smoke path: `Qt desktop smoke OK`
+
 ## v1.5.23
 
 Release date: 2026-06-30

@@ -10,6 +10,7 @@ if sys.platform == "darwin":
 
 import traceback
 import faulthandler
+from importlib import resources
 from pathlib import Path
 from typing import Any, cast
 
@@ -83,7 +84,7 @@ _install_crash_logging()
 
 try:  # pragma: no cover - optional GUI dependency
     from PySide6.QtCore import Qt, QObject, QSettings, QThread, QUrl, Signal, Slot  # type: ignore[import-not-found]
-    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QKeySequence, QPalette, QPixmap, QShortcut, QTextCursor  # type: ignore[import-not-found]
+    from PySide6.QtGui import QAction, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPalette, QPixmap, QShortcut, QTextCursor  # type: ignore[import-not-found]
     from PySide6.QtWidgets import (  # type: ignore[import-not-found]
         QApplication,
         QCheckBox,
@@ -131,6 +132,18 @@ else:  # pragma: no cover - optional GUI dependency
         _QWEBENGINE_VIEW = None
 
 
+def desktop_icon_path() -> Path | None:
+    """Return the bundled desktop icon path when available."""
+
+    try:
+        icon = resources.files("iints_desktop").joinpath("assets", "app_icon.png")
+        if icon.is_file():
+            return Path(str(icon))
+    except Exception:
+        return None
+    return None
+
+
 if _PYSIDE_IMPORT_ERROR is None:
     from iints_desktop.molecule_viewer import MolecularChainViewer
 
@@ -139,7 +152,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def write(self, text: str) -> None:
             self.textWritten.emit(text)
-            
+
         def flush(self) -> None:
             pass
 
@@ -277,7 +290,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
-    
+
     class AlphaFoldFetchWorker(QObject):
         finished = Signal(object)
         failed = Signal(str)
@@ -314,7 +327,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             try:
                 from iints.research.genomics_engine import GenomicsEngine
                 html_path, data = GenomicsEngine.run_multi_scale_simulation(self.gene, self.variant, self.out_dir)
-                
+
                 msg = f"Simulated {self.gene} {self.variant}. " \
                       f"Impact: {int(data['scalar']*100)}% affinity. " \
                       f"Description: {data['desc']}. " \
@@ -352,6 +365,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         def __init__(self) -> None:
             super().__init__()
             self.setWindowTitle("IINTS-AF SDK | Research Workbench")
+            self._apply_app_icon()
             self.resize(1240, 820)
             self.setMinimumSize(760, 520)
 
@@ -380,6 +394,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.pae_worker: PAEWorker | None = None
             self.biology_thread: QThread | None = None
             self.biology_worker: QObject | None = None
+            # Compatibility guard for older UI paths that expected a docked
+            # terminal widget before the About tab was built.
+            self.terminal_dock: QWidget | None = None
             self.tabs: QTabWidget | None = None
             self.workspace_status: QLabel | None = None
             self.molecules = list_molecule_assets()
@@ -486,7 +503,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.run_genomics_sim_button = QPushButton("Run Multi-Scale Simulation")
             self.highlight_mutation_button = QPushButton("Highlight Mutation in 3D")
             self.open_structural_folder_button = QPushButton("Open Genomics Folder")
-            
+
             # Tissue-specific resistance UI
             self.tissue_muscle_input = QSpinBox()
             self.tissue_muscle_input.setRange(0, 100)
@@ -498,7 +515,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.tissue_liver_input.setSuffix("%")
             self.run_tissue_stress_button = QPushButton("Stress-Test Pump Algorithm")
             self.open_app_downloads_button = QPushButton("Open App Downloads")
-            
+
             # Setup keyboard shortcuts
             self.run_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
             self.run_shortcut.activated.connect(self._run_selected_workflow)
@@ -515,6 +532,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             self._set_loaded_result_actions(False)
             self._on_workflow_changed()
             self._on_molecule_changed()
+
+        def _apply_app_icon(self) -> None:
+            icon_path = desktop_icon_path()
+            if icon_path is None:
+                return
+            icon = QIcon(str(icon_path))
+            if not icon.isNull():
+                self.setWindowIcon(icon)
+                app = QApplication.instance()
+                if app is not None:
+                    app.setWindowIcon(icon)
 
         def _build_ui(self) -> None:
             self._build_menu_bar()
@@ -577,6 +605,27 @@ if _PYSIDE_IMPORT_ERROR is None:
             batch_tab = QWidget()
             tabs.addTab(batch_tab, "Batch Queue")
             tabs.addTab(about_tab, "Methods")
+            # Integrated Terminal Dock
+            self.terminal_dock = QDockWidget("Integrated Terminal Output", self)
+            self.terminal_dock.setObjectName("TerminalDockWidget")
+            self.terminal_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.TopDockWidgetArea)
+            self.terminal_text = QPlainTextEdit()
+            self.terminal_text.setReadOnly(True)
+            self.terminal_text.setFont(QFont("Courier", 10))
+            self.terminal_dock.setWidget(self.terminal_text)
+            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
+            self.terminal_dock.hide() # Hidden by default
+
+            # Redirect stdout/stderr
+            self.stream_redirector = EmittingStream()
+            self.stream_redirector.textWritten.connect(
+                lambda text: (
+                    self.terminal_text.moveCursor(QTextCursor.MoveOperation.End),
+                    self.terminal_text.insertPlainText(text)
+                )
+            )
+            sys.stdout = self.stream_redirector
+            sys.stderr = self.stream_redirector
             self._build_run_tab(run_tab)
             self._build_results_tab(results_tab)
             self._build_ai_tab(ai_tab)
@@ -589,46 +638,25 @@ if _PYSIDE_IMPORT_ERROR is None:
             status_bar = QStatusBar(self)
             status_bar.setSizeGripEnabled(False)
             status_bar.addWidget(self.status, 1)
-            
+
             self.progress_bar = QProgressBar()
             self.progress_bar.setRange(0, 0)
             self.progress_bar.setTextVisible(False)
             self.progress_bar.setFixedWidth(150)
             self.progress_bar.hide()
             status_bar.addPermanentWidget(self.progress_bar)
-            
+
             self.live_telemetry_label = QLabel()
             self.live_telemetry_label.setStyleSheet("color: #4facfe; font-weight: bold;")
             self.live_telemetry_label.hide()
             status_bar.addPermanentWidget(self.live_telemetry_label)
-            
+
             workspace_label = QLabel(f"Workspace: {Path(self.output_dir.text()).expanduser()}")
             workspace_label.setObjectName("workspaceStatus")
             status_bar.addPermanentWidget(workspace_label)
             self.workspace_status = workspace_label
             self.setStatusBar(status_bar)
-            
-            # Integrated Terminal Dock
-            self.terminal_dock = QDockWidget("Integrated Terminal Output", self)
-            self.terminal_dock.setObjectName("TerminalDockWidget")
-            self.terminal_dock.setAllowedAreas(Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.TopDockWidgetArea)
-            self.terminal_text = QPlainTextEdit()
-            self.terminal_text.setReadOnly(True)
-            self.terminal_text.setFont(QFont("Courier", 10))
-            self.terminal_dock.setWidget(self.terminal_text)
-            self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.terminal_dock)
-            self.terminal_dock.hide() # Hidden by default
-            
-            # Redirect stdout/stderr
-            self.stream_redirector = EmittingStream()
-            self.stream_redirector.textWritten.connect(
-                lambda text: (
-                    self.terminal_text.moveCursor(QTextCursor.MoveOperation.End),
-                    self.terminal_text.insertPlainText(text)
-                )
-            )
-            sys.stdout = self.stream_redirector
-            sys.stderr = self.stream_redirector
+
 
         def _build_menu_bar(self) -> None:
             file_menu = self.menuBar().addMenu("&File")
@@ -974,11 +1002,11 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.load_selected_history_csv_button.clicked.connect(self._load_selected_history_csv)
             self.history_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
             self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-            
+
             compare_button = QPushButton("Compare Selected Runs")
             compare_button.setStyleSheet("background-color: #2b1154; color: #4facfe; font-weight: bold; border: 1px solid #4facfe;")
             compare_button.clicked.connect(self._compare_selected_runs)
-            
+
             layout.addLayout(
                 self._button_grid(
                     [
@@ -1085,7 +1113,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             if sys.platform != "darwin":
                 self.open_3dmol_browser_button.hide() # hide if embedded web view works
 
-            
+
             viewer_layout.addWidget(self.open_3dmol_browser_button)
             viewer_layout.addLayout(
                 self._button_grid(
@@ -1145,11 +1173,11 @@ if _PYSIDE_IMPORT_ERROR is None:
 
             evidence_box = QGroupBox("Advanced Research & Algorithm Stressors")
             evidence_layout = QVBoxLayout(evidence_box)
-            
+
             # Genomics Panel
             genomics_label = QLabel("<b>1. AlphaFold Structural Genomics</b>")
             evidence_layout.addWidget(genomics_label)
-            
+
             evidence_help = QLabel(
                 "Enter a UniProt ID and variant (e.g. INSR V938M or P06213 V938M). The engine will "
                 "live-query the AlphaFold database, extract the pLDDT folding confidence at the exact "
@@ -1157,17 +1185,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             )
             evidence_help.setWordWrap(True)
             evidence_layout.addWidget(evidence_help)
-            
+
             input_layout = QHBoxLayout()
             input_label = QLabel("Gene & Variant:")
             input_layout.addWidget(input_label)
             input_layout.addWidget(self.genomics_variant_input)
             evidence_layout.addLayout(input_layout)
-            
+
             self.run_genomics_sim_button.clicked.connect(self._run_genomics_simulation)
             self.highlight_mutation_button.clicked.connect(self._highlight_mutation)
             self.open_structural_folder_button.clicked.connect(self._open_structural_folder)
-            
+
             evidence_layout.addLayout(
                 self._button_grid(
                     [
@@ -1178,29 +1206,29 @@ if _PYSIDE_IMPORT_ERROR is None:
                     columns=3,
                 )
             )
-            
+
             # Tissue Panel
             tissue_label = QLabel("<b>2. Tissue-Specific Resistance Test (GTEx)</b>")
             tissue_label.setStyleSheet("margin-top: 10px;")
             evidence_layout.addWidget(tissue_label)
-            
+
             tissue_help = QLabel(
                 "Stress-test pump algorithms by isolating insulin resistance to specific organs "
                 "(e.g., Hepatic vs Peripheral resistance), informed by GTEx expression profiles."
             )
             tissue_help.setWordWrap(True)
             evidence_layout.addWidget(tissue_help)
-            
+
             tissue_input_layout = QHBoxLayout()
             tissue_input_layout.addWidget(QLabel("Muscle (Peripheral) Sensitivity:"))
             tissue_input_layout.addWidget(self.tissue_muscle_input)
             tissue_input_layout.addWidget(QLabel("Liver (Hepatic) Sensitivity:"))
             tissue_input_layout.addWidget(self.tissue_liver_input)
             evidence_layout.addLayout(tissue_input_layout)
-            
+
             self.run_tissue_stress_button.clicked.connect(self._run_tissue_stress_simulation)
             evidence_layout.addWidget(self.run_tissue_stress_button)
-            
+
             # Shared Status box
             self.biology_action_status.setObjectName("biologyActionStatus")
             evidence_layout.addWidget(self.biology_action_status)
@@ -1219,7 +1247,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _build_builder_tab(self, parent: QWidget) -> None:
             layout = self._scroll_tab_layout(parent)
-            
+
             config_box = QGroupBox("Scenario Configuration")
             config_layout = QFormLayout(config_box)
             self.custom_duration = QSpinBox()
@@ -1227,13 +1255,13 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.custom_duration.setValue(1440)
             self.custom_duration.setToolTip("Total simulation time in minutes (e.g., 1440 for 24 hours).\nLonger durations require more compute time.")
             config_layout.addRow("Duration (mins):", self.custom_duration)
-            
+
             self.custom_timestep = QSpinBox()
             self.custom_timestep.setRange(1, 60)
             self.custom_timestep.setValue(5)
             self.custom_timestep.setToolTip("Integration time step in minutes (dt).\nSmaller steps increase ODE numerical stability but slow down the simulation.")
             config_layout.addRow("Time Step (mins):", self.custom_timestep)
-            
+
             self.custom_seed = QSpinBox()
             self.custom_seed.setRange(0, 99999)
             self.custom_seed.setValue(42)
@@ -1246,7 +1274,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.custom_basal.setValue(0.8)
             self.custom_basal.setToolTip("Basal Rate [U/h]:\nThe continuous background insulin infusion rate modeled via subcutaneous absorption kinetics.")
             config_layout.addRow("Basal Rate (U/h):", self.custom_basal)
-            
+
             self.custom_isf = QDoubleSpinBox()
             self.custom_isf.setRange(10.0, 150.0)
             self.custom_isf.setValue(45.0)
@@ -1258,24 +1286,24 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.custom_cr.setValue(10.0)
             self.custom_cr.setToolTip("Carbohydrate Ratio [g/U]:\nThe grams of carbohydrates that are covered by 1 Unit of insulin during a meal bolus calculation.")
             config_layout.addRow("Carb Ratio (g/U):", self.custom_cr)
-            
+
             # --- STEM CELL RESEARCH ---
             stem_label = QLabel("<b>Stem Cell Graft Research</b>")
             config_layout.addRow("", stem_label)
-            
+
             self.custom_engraftment = QDoubleSpinBox()
             self.custom_engraftment.setRange(0.0, 200.0)
             self.custom_engraftment.setValue(0.0)
             self.custom_engraftment.setToolTip("Stem Cell Engraftment (%):\n0% = Standard T1D, 100% = Healthy Beta Cell Mass.")
             config_layout.addRow("Engraftment (%):", self.custom_engraftment)
-            
+
             self.custom_subq_fraction = QDoubleSpinBox()
             self.custom_subq_fraction.setRange(0.0, 1.0)
             self.custom_subq_fraction.setSingleStep(0.1)
             self.custom_subq_fraction.setValue(0.0)
             self.custom_subq_fraction.setToolTip("Subcutaneous Fraction (0.0 - 1.0):\n0.0 = Portal Vein Injection (Fast Kinetics)\n1.0 = SubQ Encapsulation (Delayed Kinetics via S1 compartment).")
             config_layout.addRow("SubQ Fraction:", self.custom_subq_fraction)
-            
+
             self.custom_immune_decay = QDoubleSpinBox()
             self.custom_immune_decay.setRange(0.0, 0.1)
             self.custom_immune_decay.setDecimals(5)
@@ -1283,41 +1311,41 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.custom_immune_decay.setValue(0.0)
             self.custom_immune_decay.setToolTip("Auto-immune Rejection Rate (1/min):\nSimulates graft death over time. Set to 0 for perfect immunosuppression.")
             config_layout.addRow("Immune Rejection (1/min):", self.custom_immune_decay)
-            
+
             layout.addWidget(config_box)
-            
+
             meals_box = QGroupBox("Meal Events")
             meals_layout = QVBoxLayout(meals_box)
             self.meals_table = QTableWidget(0, 2)
             self.meals_table.setHorizontalHeaderLabels(["Time (min)", "Carbs (g)"])
             meals_layout.addWidget(self.meals_table)
-            
+
             meals_buttons = QHBoxLayout()
             add_meal_btn = QPushButton("Add Meal")
             add_meal_btn.clicked.connect(self._add_custom_meal)
             meals_buttons.addWidget(add_meal_btn)
-            
+
             remove_meal_btn = QPushButton("Remove Selected")
             remove_meal_btn.clicked.connect(self._remove_custom_meal)
             meals_buttons.addWidget(remove_meal_btn)
             meals_layout.addLayout(meals_buttons)
             layout.addWidget(meals_box)
-            
+
             actions_box = QGroupBox("Actions")
             actions_layout = QHBoxLayout(actions_box)
             run_custom_btn = QPushButton("Run Custom Scenario")
             run_custom_btn.setObjectName("primaryAction")
             run_custom_btn.clicked.connect(self._run_custom_scenario)
             actions_layout.addWidget(run_custom_btn)
-            
+
             queue_custom_btn = QPushButton("Add Custom to Batch")
             queue_custom_btn.clicked.connect(lambda: self._add_to_batch("custom"))
             actions_layout.addWidget(queue_custom_btn)
-            
+
             save_custom_btn = QPushButton("Save JSON")
             save_custom_btn.clicked.connect(self._save_custom_json)
             actions_layout.addWidget(save_custom_btn)
-            
+
             load_custom_btn = QPushButton("Load JSON")
             load_custom_btn.clicked.connect(self._load_custom_json)
             actions_layout.addWidget(load_custom_btn)
@@ -1329,21 +1357,21 @@ if _PYSIDE_IMPORT_ERROR is None:
             intro = QLabel("Queue multiple scenarios to run them sequentially. This is useful for large parameter sweeps or overnight runs.")
             intro.setWordWrap(True)
             layout.addWidget(intro)
-            
+
             queue_box = QGroupBox("Queued Simulations")
             queue_layout = QVBoxLayout(queue_box)
             queue_layout.addWidget(self.batch_list_widget)
-            
+
             btn_layout = QHBoxLayout()
             self.run_batch_btn = QPushButton("Run Batch Queue")
             self.run_batch_btn.setObjectName("primaryAction")
             self.run_batch_btn.clicked.connect(self._run_next_in_batch)
             btn_layout.addWidget(self.run_batch_btn)
-            
+
             clear_batch_btn = QPushButton("Clear Queue")
             clear_batch_btn.clicked.connect(self._clear_batch)
             btn_layout.addWidget(clear_batch_btn)
-            
+
             queue_layout.addLayout(btn_layout)
             layout.addWidget(queue_box)
             layout.addStretch(1)
@@ -1370,11 +1398,11 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.batch_running = False
                 QMessageBox.information(self, "Batch Complete", "All queued simulations have finished.")
                 return
-            
+
             self.batch_running = True
             config = self.batch_queue.pop(0)
             self.batch_list_widget.takeItem(0)
-            
+
             if config["type"] == "preset":
                 self.workflow_combo.setCurrentIndex(self._workflow_index(config["key"]))
                 self.seed.setValue(config["seed"])
@@ -1404,7 +1432,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                         meals.append({"time_minutes": time_min, "carbohydrates_g": carbs_g})
                 except ValueError:
                     pass
-            
+
             return {
                 "name": "custom_ui",
                 "duration_minutes": self.custom_duration.value(),
@@ -1474,7 +1502,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                     self.custom_basal.setValue(patient.get("base_basal_rate", 0.8))
                     self.custom_isf.setValue(patient.get("insulin_sensitivity_factor", 45.0))
                     self.custom_cr.setValue(patient.get("carb_ratio", 10.0))
-                    
+
                     self.meals_table.setRowCount(0)
                     for meal in data.get("scenario", {}).get("meals", []):
                         self._add_custom_meal()
@@ -1495,7 +1523,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             )
             intro.setWordWrap(True)
             layout.addWidget(intro)
-            
+
             danger_box = QGroupBox("Danger Zone")
             danger_layout = QVBoxLayout(danger_box)
             purge_button = QPushButton("Self-Destruct SDK")
@@ -1555,16 +1583,16 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _purge_sdk_data(self) -> None:
             reply = QMessageBox.warning(
-                self, 
-                "Self-Destruct SDK", 
-                "WARNING: This will initiate a self-destruct sequence. All SDK code, generated data, configuration, and shortcuts across the OS will be permanently deleted! Are you completely sure?", 
+                self,
+                "Self-Destruct SDK",
+                "WARNING: This will initiate a self-destruct sequence. All SDK code, generated data, configuration, and shortcuts across the OS will be permanently deleted! Are you completely sure?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             if reply == QMessageBox.StandardButton.Yes:
                 import sys
                 import subprocess
                 from pathlib import Path
-                
+
                 uninstall_script = Path(__file__).resolve().parent.parent.parent.parent / "uninstall_app.py"
                 if not uninstall_script.exists():
                     QMessageBox.critical(self, "Error", f"Could not find uninstall script at {uninstall_script}")
@@ -1888,7 +1916,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self._load_result_csv(result.results_csv)
                 if self.tabs is not None and not self.batch_running:
                     self.tabs.setCurrentIndex(1)
-            
+
             if self.batch_running:
                 from PySide6.QtCore import QTimer
                 QTimer.singleShot(500, self._run_next_in_batch)
@@ -1994,12 +2022,12 @@ if _PYSIDE_IMPORT_ERROR is None:
                 return
             from PySide6.QtWidgets import QFileDialog
             import shutil
-            
+
             target_dir = self.loaded_result.csv_path.parent
             save_path, _ = QFileDialog.getSaveFileName(
-                self, 
-                "Export Workspace as ZIP", 
-                f"{target_dir.name}_export.zip", 
+                self,
+                "Export Workspace as ZIP",
+                f"{target_dir.name}_export.zip",
                 "ZIP Archives (*.zip)"
             )
             if save_path:
@@ -2245,20 +2273,20 @@ if _PYSIDE_IMPORT_ERROR is None:
             QApplication.clipboard().setText(self.ai_answer.toPlainText())
             self.status.setText("AI answer copied")
 
-        
+
         def _fetch_custom_uniprot(self) -> None:
             uniprot_id = self.custom_uniprot_input.text().strip().upper()
             if not uniprot_id:
                 QMessageBox.information(self, "IINTS-AF Desktop", "Please enter a UniProt ID.")
                 return
-            
+
             self.fetch_uniprot_button.setEnabled(False)
             self.molecule_structure_status.setText(f"Fetching {uniprot_id} from AlphaFold...")
-            
+
             thread = QThread(self)
             worker = AlphaFoldFetchWorker(uniprot_id)
             worker.moveToThread(thread)
-            
+
             thread.started.connect(worker.run)
             worker.finished.connect(self._handle_fetch_success)
             worker.finished.connect(thread.quit)
@@ -2267,7 +2295,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             worker.failed.connect(thread.quit)
             worker.failed.connect(worker.deleteLater)
             thread.finished.connect(thread.deleteLater)
-            
+
             self.af_fetch_thread = thread
             self.af_fetch_worker = worker
             thread.start()
@@ -2276,7 +2304,7 @@ if _PYSIDE_IMPORT_ERROR is None:
         def _handle_fetch_success(self, result: object) -> None:
             self.fetch_uniprot_button.setEnabled(True)
             cif_path, _html_path, uniprot_id = cast(tuple[Path, Path, str], result)
-            
+
             # Create a dynamic MoleculeAsset
             from iints_desktop.molecules import MoleculeAsset
             new_mol = MoleculeAsset(
@@ -2355,7 +2383,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                     print(f"3Dmol.js render failed: {e}")
                     web_view.hide()
                     viewer.show()
-            
+
 
             self._update_pae_controls()
 
@@ -2590,7 +2618,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_output.setPlainText(f"Tissue Impact Data:\n{data}")
             self.status.setText("Tissue simulation complete")
             self._set_biology_action_state(False)
-            
+
             # Automatically open the generated plot in the browser
             plot_path = Path(data["html_path"])
             if plot_path.exists():
@@ -2601,7 +2629,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             variant = self.genomics_variant_input.text().strip()
             if not variant:
                 return
-            
+
             # Very simple regex match to find the number in the variant
             import re
             match = re.search(r'\d+', variant)
@@ -2619,7 +2647,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_output.setPlainText(f"Mutation Impact Data:\n{data}")
             self.status.setText("Genomics simulation complete")
             self._set_biology_action_state(False)
-            
+
             # Automatically open the generated plot in the browser
             html_path_text = str(data.get("html_path", ""))
             plot_path = Path(html_path_text) if html_path_text else Path()
@@ -2690,9 +2718,9 @@ if _PYSIDE_IMPORT_ERROR is None:
                 "This will open a terminal and run the pip update command. Continue?",
             ) != QMessageBox.StandardButton.Yes:
                 return
-                
+
             from iints_desktop.terminal_utils import open_terminal_and_run
-            
+
             success = open_terminal_and_run(PYTHON_SDK_UPDATE_COMMAND)
             if success:
                 self.update_status.setText("Update command launched in external terminal.")
@@ -2801,19 +2829,19 @@ if _PYSIDE_IMPORT_ERROR is None:
             if not selected_ranges:
                 self.status.setText("Select at least 2 runs to compare.")
                 return
-            
+
             rows = set()
             for r in selected_ranges:
                 for i in range(r.topRow(), r.bottomRow() + 1):
                     rows.add(i)
-            
+
             if len(rows) < 2:
                 self.status.setText("Select at least 2 runs to compare.")
                 return
 
             import pandas as pd
             import plotly.graph_objects as go
-            
+
             fig = go.Figure()
             valid_runs = 0
 
@@ -2823,7 +2851,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 entry = self._history_entries[row]
                 if not entry.results_csv or not Path(entry.results_csv).exists():
                     continue
-                
+
                 try:
                     df = pd.read_csv(entry.results_csv)
                     if "time" in df.columns and "glucose" in df.columns:
@@ -2836,18 +2864,18 @@ if _PYSIDE_IMPORT_ERROR is None:
             if valid_runs < 2:
                 self.status.setText("Not enough valid results.csv files selected.")
                 return
-                
+
             fig.update_layout(
                 title="Simulation Comparison (Glucose Over Time)",
                 xaxis_title="Time (minutes)",
                 yaxis_title="Glucose (mg/dL)",
                 template="plotly_dark",
             )
-            
+
             html_path = Path(self.output_dir.text()).expanduser() / ".cache" / "comparison_graph.html"
             html_path.parent.mkdir(parents=True, exist_ok=True)
             fig.write_html(str(html_path))
-            
+
             if self.result_graph_web is not None:
                 from PySide6.QtCore import QUrl
                 self.result_graph_web.load(QUrl.fromLocalFile(str(html_path)))

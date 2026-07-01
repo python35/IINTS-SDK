@@ -11,6 +11,11 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ENTRYPOINT = REPO_ROOT / "src" / "iints_desktop" / "app.py"
+ICON_ASSETS = {
+    "darwin": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.icns",
+    "win32": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.ico",
+    "default": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.png",
+}
 
 
 def require_module(module_name: str, install_hint: str) -> None:
@@ -30,6 +35,7 @@ def build_environment() -> dict[str, str]:
 
 
 def build_command(*, onefile: bool, windowed: bool, name: str) -> list[str]:
+    icon_path = ICON_ASSETS["darwin"] if sys.platform == "darwin" else ICON_ASSETS["win32"] if sys.platform.startswith("win") else ICON_ASSETS["default"]
     command = [
         sys.executable,
         "-m",
@@ -45,6 +51,8 @@ def build_command(*, onefile: bool, windowed: bool, name: str) -> list[str]:
         "--hidden-import",
         "iints.core.algorithms.clinical_baseline",
     ]
+    if icon_path.exists():
+        command.extend(["--icon", str(icon_path)])
     if onefile:
         command.append("--onefile")
     if windowed:

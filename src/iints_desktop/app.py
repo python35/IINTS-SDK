@@ -5,6 +5,7 @@ import sys
 import threading
 import tkinter as tk
 import webbrowser
+from importlib import resources
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
@@ -26,6 +27,7 @@ class IINTSDesktopApp:
         self.root.title("IINTS-AF Desktop")
         self.root.geometry("980x720")
         self.root.minsize(860, 620)
+        self._apply_app_icon()
 
         self.presets = list_desktop_presets()
         self.preset_by_title = {preset.title: preset for preset in self.presets}
@@ -41,6 +43,15 @@ class IINTSDesktopApp:
 
         self._build_ui()
         self.root.after(200, self._poll_messages)
+
+    def _apply_app_icon(self) -> None:
+        try:
+            icon_ref = resources.files("iints_desktop").joinpath("assets", "app_icon.png")
+            if icon_ref.is_file():
+                self._window_icon = tk.PhotoImage(file=str(icon_ref))
+                self.root.iconphoto(True, self._window_icon)
+        except Exception:
+            pass
 
     def _build_ui(self) -> None:
         self._configure_style()
