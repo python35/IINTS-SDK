@@ -234,15 +234,14 @@ class OllamaBackend:
                 resolved = installed_lookup.get(alias.lower())
                 if resolved is not None:
                     return resolved
-
-        for installed_name in installed:
-            lowered = installed_name.lower()
-            if "ministral-3" in lowered and "8b" in lowered:
-                return installed_name
-        for installed_name in installed:
-            lowered = installed_name.lower()
-            if "ministral" in lowered and "8b" in lowered:
-                return installed_name
+            for installed_name in installed:
+                lowered = installed_name.lower()
+                if "ministral-3" in lowered and "8b" in lowered:
+                    return installed_name
+            for installed_name in installed:
+                lowered = installed_name.lower()
+                if "ministral" in lowered and "8b" in lowered:
+                    return installed_name
 
         return None
 
