@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## v1.5.26
+
+Release date: 2026-07-01
+
+### Fixed
+
+- fixed the Python 3.10 desktop-test TOML fallback parser by replacing the fragile regex with simple line parsing
+- verified the fallback path explicitly with `tomllib` disabled
+
+### Verified
+
+- desktop app tests: `32 passed`
+- Python 3.10-style fallback parser smoke: passed
+- Qt desktop packaged-style smoke path: `Qt desktop smoke OK`
+
 ## v1.5.25
 
 Release date: 2026-07-01

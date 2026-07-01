@@ -58,15 +58,13 @@ def _load_pyproject() -> dict[str, Any]:
             break
         if not in_optional_deps or not line or line.startswith("#"):
             continue
-        match = re.match(r"([A-Za-z0-9_-]+)\\s*=\\s*\\[", line)
-        if match:
-            current_extra = match.group(1)
+        if line.endswith("[") and "=" in line:
+            current_extra = line.split("=", 1)[0].strip()
             optional_dependencies[current_extra] = []
             continue
         if current_extra is not None:
-            dep_match = re.match(r'"([^"]+)"\\s*,?', line)
-            if dep_match:
-                optional_dependencies[current_extra].append(dep_match.group(1))
+            if line.startswith('"'):
+                optional_dependencies[current_extra].append(line.split('"', 2)[1])
             elif line == "]":
                 current_extra = None
 
