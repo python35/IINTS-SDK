@@ -5,6 +5,9 @@ from iints.core.safety.config import SafetyConfig
 from dataclasses import dataclass
 from enum import Enum
 
+_TREND_COMPARISON_TOLERANCE = 1e-9
+
+
 class SafetyLevel(Enum):
     SAFE = "safe"
     WARNING = "warning"
@@ -158,7 +161,7 @@ class IndependentSupervisor:
             self.emergency_mode = True
             
         elif current_glucose <= self.hypoglycemia_threshold:
-            safety_status = SafetyLevel.CRITICAL
+            safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
             proposed_insulin = min(proposed_insulin, 0.1)  # Minimal insulin only
             actions_taken.append("CRITICAL: Hypoglycemia - insulin limited")
             
@@ -181,7 +184,8 @@ class IndependentSupervisor:
         if self.contract_enabled:
             if (
                 current_glucose < self.contract_glucose_threshold
-                and glucose_rate <= self.contract_trend_threshold_mgdl_min
+                and glucose_rate
+                <= self.contract_trend_threshold_mgdl_min + _TREND_COMPARISON_TOLERANCE
             ):
                 proposed_insulin = 0
                 actions_taken.append(
