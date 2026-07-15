@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.29](v1.5.29.md) - OhioT1DM physiology calibration profile retune
 - [v1.5.28](v1.5.28.md) - Hovorka molecular-affinity coupling fix
 - [v1.5.27](v1.5.27.md) - safety contract boundary and hypo cutoff severity fix
 - [v1.5.26](v1.5.26.md) - Python 3.10 desktop TOML fallback parser fix

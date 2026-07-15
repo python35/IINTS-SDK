@@ -10,6 +10,6 @@ meal_mismatch_epsilon: 0.83
 dawn_phenomenon_strength: 0.0
 dawn_start_hour: 4.0
 dawn_end_hour: 8.0
-basal_glucose_target: 138.0
-carb_absorption_duration_minutes: 280.0
+basal_glucose_target: 147.0
+carb_absorption_duration_minutes: 270.0
 max_glucose_rate_mgdl_per_min: 4.0
