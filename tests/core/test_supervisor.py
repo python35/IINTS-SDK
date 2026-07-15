@@ -34,6 +34,25 @@ def test_supervisor_blocks_severe_hypoglycemia():
     assert result["emergency_mode"] is True
 
 
+def test_hypo_cutoff_emergency_level_is_not_downgraded():
+    supervisor = IndependentSupervisor(
+        hypo_cutoff=70.0,
+        hypoglycemia_threshold=70.0,
+        severe_hypoglycemia_threshold=54.0,
+    )
+
+    result = supervisor.evaluate_safety(
+        current_glucose=60.0,
+        proposed_insulin=2.0,
+        current_time=0.0,
+        current_iob=0.0,
+    )
+
+    assert result["approved_insulin"] == 0.0
+    assert result["safety_level"] == SafetyLevel.EMERGENCY
+    assert any("HYPO_CUTOFF" in action for action in result["actions_taken"])
+
+
 def test_supervisor_reduces_dose_on_high_iob():
     supervisor = IndependentSupervisor(max_insulin_per_bolus=5.0)
 

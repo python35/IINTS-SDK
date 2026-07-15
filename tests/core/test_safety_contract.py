@@ -57,3 +57,26 @@ def test_formal_safety_contract_can_be_disabled():
     supervisor = IndependentSupervisor(safety_config=config)
     result = _evaluate_with_trend(supervisor, current_glucose=80.0, trend_mgdl_min=-2.0)
     assert all("SAFETY_CONTRACT" not in action for action in result["actions_taken"])
+
+
+def test_formal_safety_contract_tolerates_boundary_float_rounding():
+    supervisor = IndependentSupervisor(
+        contract_enabled=True,
+        contract_glucose_threshold=90.0,
+        contract_trend_threshold_mgdl_min=-1.0,
+        max_60min=100.0,
+    )
+    glucose = 54.49846485152617
+    trend = -1.0
+    g0 = glucose - trend * 10.0
+    supervisor.glucose_history = [(0.0, g0), (5.0, g0 + trend * 5.0)]
+
+    result = supervisor.evaluate_safety(
+        current_glucose=glucose,
+        proposed_insulin=1.0,
+        current_time=10.0,
+        current_iob=0.0,
+    )
+
+    assert result["approved_insulin"] == 0.0
+    assert any("SAFETY_CONTRACT" in action for action in result["actions_taken"])

@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## v1.5.27
+
+Release date: 2026-07-15
+
+### Fixed
+
+- fixed a formal safety-contract boundary case where a calculated trend of exactly `-1.0 mg/dL/min` could be missed because floating-point arithmetic produced `-0.9999999999999993`
+- prevented the hard hypo cutoff emergency state from being downgraded by the later hypoglycemia classification branch
+
+### Verified
+
+- supervisor safety tests: `24 passed`
+- full test suite: `658 passed, 2 skipped`
+- mypy: `Success: no issues found in 201 source files`
+- Qt desktop smoke path: `Qt desktop smoke OK`
+
 ## v1.5.26
 
 Release date: 2026-07-01
