@@ -323,9 +323,10 @@ Key external anchors used by this page:
 
 ### Mathematical Appendix: Tissue-Specific Resistance
 
-To isolate peripheral and hepatic resistance, the base sensitivity parameters ($S_{ID}$, $S_{IE}$) in the Hovorka ODEs are decoupled via GTEx-inspired scalars ($M_{scalar}$ for muscle, $L_{scalar}$ for liver). This ensures mathematical stability at $t=0$ while enabling dynamic stressor testing:
+To isolate molecular receptor affinity, peripheral resistance, and hepatic resistance, the Hovorka-style insulin action gains are scaled deterministically before ODE integration. The molecular scalar ($A_{scalar}$) applies to the receptor/action channels globally, while the GTEx-inspired muscle and liver scalars ($M_{scalar}$ and $L_{scalar}$) separate peripheral glucose disposal from hepatic EGP suppression. This ensures mathematical stability at $t=0$ while enabling dynamic stressor testing:
 
-$$k_{b2} = S_{ID} \cdot k_{a2} \cdot Sens_{overall} \cdot M_{scalar}$$
-$$k_{b3} = S_{IE} \cdot k_{a3} \cdot Sens_{overall} \cdot L_{scalar}$$
+$$k_{b1} = S_{IT} \cdot k_{a1} \cdot Sens_{overall} \cdot A_{scalar}$$
+$$k_{b2} = S_{ID} \cdot k_{a2} \cdot Sens_{overall} \cdot A_{scalar} \cdot M_{scalar}$$
+$$k_{b3} = S_{IE} \cdot k_{a3} \cdot Sens_{overall} \cdot A_{scalar} \cdot L_{scalar}$$
 
-This formulation allows the simulator to trigger fasting hyperglycemia (driven by a reduction in $L_{scalar}$) independently from post-prandial absorption failures (driven by a reduction in $M_{scalar}$), forcing candidate algorithms to handle distinct physiological phenotypes.
+This formulation allows the simulator to trigger global INSR-style resistance (driven by $A_{scalar}$), fasting hyperglycemia (driven by a reduction in $L_{scalar}$), or post-prandial absorption failures (driven by a reduction in $M_{scalar}$), forcing candidate algorithms to handle distinct physiological phenotypes.

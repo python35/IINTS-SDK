@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.28](v1.5.28.md) - Hovorka molecular-affinity coupling fix
 - [v1.5.27](v1.5.27.md) - safety contract boundary and hypo cutoff severity fix
 - [v1.5.26](v1.5.26.md) - Python 3.10 desktop TOML fallback parser fix
 - [v1.5.25](v1.5.25.md) - Python 3.10 desktop test collection fix
