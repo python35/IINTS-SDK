@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## v1.5.28
+
+Release date: 2026-07-15
+
+### Fixed
+
+- fixed the Hovorka molecular-affinity bridge so `molecular_affinity_scalar` now scales insulin action channels inside the ODE instead of only changing metadata
+- restored scientific coupling for INSR/genomics multi-scale simulations: resistant variants now produce measurably different glucose trajectories
+- updated the static formula registry and physiology reference so the deterministic formula context includes molecular affinity scaling
+
+### Verified
+
+- Hovorka/genomics physiology tests: `19 passed`
+- full test suite: `659 passed, 2 skipped`
+- mypy: `Success: no issues found in 201 source files`
+- formula registry smoke: `formula_count 15`, `ai_numeric_authority False`
+
 ## v1.5.27
 
 Release date: 2026-07-15

@@ -150,11 +150,12 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         title="Hovorka-style insulin action channels",
         category="physiology",
         canonical_expression=(
-            "dx1/dt=-ka1*x1+kb1*I; dx2/dt=-ka2*x2+kb2*I; dx3/dt=-ka3*x3+kb3*I"
+            "dx1/dt=-ka1*x1+kb1*I; dx2/dt=-ka2*x2+kb2*I; dx3/dt=-ka3*x3+kb3*I; "
+            "kb_i includes molecular_affinity_scalar"
         ),
         solved_or_runtime_form="kb1/kb2/kb3 are deterministic sensitivity products before ODE integration.",
         state_variables=("x1", "x2", "x3", "I"),
-        parameters=("ka1", "ka2", "ka3", "S_IT", "S_ID", "S_IE", "S_overall"),
+        parameters=("ka1", "ka2", "ka3", "S_IT", "S_ID", "S_IE", "S_overall", "molecular_affinity_scalar"),
         units="x1/x2 in 1/min-like action states; x3 dimensionless research action",
         implementation_paths=("src/iints/core/patient/hovorka_model.py:_ode",),
         literature_basis=("https://doi.org/10.1088/0967-3334/25/4/010",),

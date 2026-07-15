@@ -157,9 +157,10 @@ class HovorkaPatientModel:
         Q2_init = Q1_init * 0.5  # Rough steady-state approximation.
 
         I_basal = 10.0  # mU/L approximation.
-        x1_init = p.S_IT * I_basal
-        x2_init = p.S_ID * self.muscle_sensitivity_scalar * I_basal
-        x3_init = p.S_IE * self.liver_sensitivity_scalar * I_basal
+        affinity = float(np.clip(self.molecular_affinity_scalar, 0.0, 2.0))
+        x1_init = p.S_IT * affinity * I_basal
+        x2_init = p.S_ID * affinity * self.muscle_sensitivity_scalar * I_basal
+        x3_init = p.S_IE * affinity * self.liver_sensitivity_scalar * I_basal
 
         # State vector: [Q1, Q2, S1, S2, I, x1, x2, x3, D1, D2, D3, H_stress, H_exercise, Y1, Y2, Gamma, x_gluc, HAAF, GLUT4_active]
         return np.array(
@@ -496,9 +497,10 @@ class HovorkaPatientModel:
 
         overall_sens = stress_sens_multiplier * ex_sens_multiplier
 
-        k_b1 = p.S_IT * p.k_a1 * overall_sens
-        k_b2 = p.S_ID * p.k_a2 * overall_sens * self.muscle_sensitivity_scalar
-        k_b3 = p.S_IE * p.k_a3 * overall_sens * self.liver_sensitivity_scalar
+        affinity = float(np.clip(self.molecular_affinity_scalar, 0.0, 2.0))
+        k_b1 = p.S_IT * p.k_a1 * overall_sens * affinity
+        k_b2 = p.S_ID * p.k_a2 * overall_sens * affinity * self.muscle_sensitivity_scalar
+        k_b3 = p.S_IE * p.k_a3 * overall_sens * affinity * self.liver_sensitivity_scalar
 
         # Insulin action
         dx1_dt = -p.k_a1 * x1 + k_b1 * I

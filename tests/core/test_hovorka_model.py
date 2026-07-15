@@ -117,3 +117,19 @@ def test_hovorka_circadian_egp_is_gated_by_dawn_strength() -> None:
 
     assert no_dawn_morning == pytest.approx(no_dawn_evening)
     assert dawn_morning > dawn_evening
+
+
+def test_hovorka_molecular_affinity_scalar_affects_insulin_action_curve() -> None:
+    normal = HovorkaPatientModel(initial_glucose=120.0, molecular_affinity_scalar=1.0)
+    resistant = HovorkaPatientModel(initial_glucose=120.0, molecular_affinity_scalar=0.2)
+    normal_trace: list[float] = []
+    resistant_trace: list[float] = []
+
+    for minute in range(0, 241, 5):
+        carbs = 60.0 if minute == 30 else 0.0
+        insulin = 6.0 if minute == 25 else 0.0
+        normal_trace.append(normal.update(5.0, insulin, carbs, current_time=float(minute)))
+        resistant_trace.append(resistant.update(5.0, insulin, carbs, current_time=float(minute)))
+
+    assert max(abs(a - b) for a, b in zip(normal_trace, resistant_trace)) > 5.0
+    assert resistant_trace[-1] > normal_trace[-1]
