@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## v1.5.29
+
+Release date: 2026-07-15
+
+### Changed
+
+- ran a local OhioT1DM physiology calibration audit on train, test, and all processed splits
+- retuned `reference_free_living_t1d` with a gate-compatible OhioT1DM calibration compromise: basal target `147.0 mg/dL` and carbohydrate absorption duration `270.0 min`
+- documented the aggregate OhioT1DM calibration summaries and why raw profile hints must pass realism gates before becoming defaults
+
+### Verified
+
+- physiology calibration tests: `2 passed`
+- preset realism and physiology tests: `30 passed`
+- full test suite: `659 passed, 2 skipped`
+- mypy: `Success: no issues found in 201 source files`
+
 ## v1.5.28
 
 Release date: 2026-07-15

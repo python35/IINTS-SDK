@@ -253,6 +253,16 @@ Interpretation rule:
 - validate the resulting simulator runs with realism checks and AGP/report outputs
 - do not present the hints as individualized clinical parameters
 
+Current OhioT1DM aggregate calibration run:
+
+| Split | Rows | Subjects | Mean glucose | TIR 70-180 | Median post-meal peak | Raw hint summary |
+|---|---:|---:|---:|---:|---:|---|
+| train | 153,055 | 12 | 159.174 mg/dL | 63.916% | 110.0 min | initial 151.2, basal target 147.0, carb duration 331.5 min |
+| test | 35,925 | 12 | 161.584 mg/dL | 63.468% | 97.5 min | initial 153.233, basal target 148.0, carb duration 272.0 min |
+| all | 188,980 | 12 | 159.632 mg/dL | 63.831% | 110.0 min | initial 151.733, basal target 148.2, carb duration 323.0 min |
+
+The public `reference_free_living_t1d` profile uses a gate-compatible calibration compromise: it adopts the Ohio train basal target (`147.0 mg/dL`) while keeping carbohydrate absorption at `270.0 min` because the raw train duration hint (`331.5 min`) made the current preset realism gate fail on baseline/free-living regression tests. This is intentional: real-data hints must pass simulator realism checks before becoming defaults.
+
 ## 13. Experimental Or Not Fully Calibrated Yet
 
 | Not fully represented | Current SDK handling |
