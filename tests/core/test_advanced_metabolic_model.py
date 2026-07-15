@@ -21,6 +21,8 @@ def test_advanced_metabolic_model_update_runs_with_18_states():
     state = patient.get_patient_state()
     assert state["fat_pool_g"] > 0.0
     assert state["protein_pool_g"] > 0.0
+    assert state["stem_cell_graft_mass_fraction"] == 0.0
+    assert state["plasma_ffa_mmol_L"] > 0.0
 
 
 def test_advanced_metabolic_model_backward_compatible_aliases():
@@ -51,6 +53,35 @@ def test_advanced_metabolic_model_state_roundtrip_includes_new_flags():
     assert restored.cycle_start_time_minutes == 123.0
     assert restored.pump_cannula_age_minutes == patient.pump_cannula_age_minutes
     assert len(restored._state) == 18
+
+
+def test_advanced_metabolic_model_loads_current_bergman_snapshot():
+    patient = AdvancedMetabolicModel(initial_glucose=120.0)
+    patient.set_state(
+        {
+            "ode_state": [
+                120.0,
+                0.0,
+                7.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.75,
+            ],
+            "current_glucose": 120.0,
+        }
+    )
+
+    assert len(patient._state) == 18
+    assert patient.get_patient_state()["stem_cell_graft_mass_fraction"] == 0.0
+    assert patient.update(5.0, delivered_insulin=0.0) >= 20.0
 
 
 def test_patient_factory_can_create_advanced_metabolic_model():

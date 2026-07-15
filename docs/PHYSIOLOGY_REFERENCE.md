@@ -39,6 +39,7 @@ Keeping those four ideas separate is important. A glucose target, a sensor plaus
 | Exercise | bounded event intensity from `0.0` to `1.0` | Adds glucose-lowering stress independent of insulin dosing |
 | Stress / illness physiology | stress events, stress hormones/pseudo-hormones in supported models | Lets glucose rise without a meal because of stress-mediated insulin resistance and increased endogenous glucose production |
 | Hypoglycemia defense systems | experimental counterregulation, HAAF, glucagon, and renal-clearance layer | Makes explicit which rescue mechanisms are implemented experimentally and which assumptions still need calibration |
+| Stem-cell / islet graft research | optional Bergman-mode graft mass state `M_graft` with glucose-responsive insulin secretion | Lets researchers explore simplified engraftment, placement-delay, and rejection hypotheses without claiming clinical transplant prediction |
 | Meal mismatch | `meal_mismatch_epsilon` | Distinguishes announced carbohydrate from true carbohydrate exposure |
 | Measurement imperfections | CGM lag, bias, random noise, drift, dropout, compression lows | Lets algorithms be tested against what a sensor would report, not only perfect latent glucose |
 | Empirical residual variation | optional additive residual profile | Adds real-data-like day-scale irregularity on top of the mechanistic trajectory |
@@ -90,6 +91,9 @@ These values are deliberately conservative software controls. They protect simul
 | `meal_mismatch_epsilon` | ratio | `true carbs / announced carbs` | `0.5-1.5` | Models under- or over-estimation of meals |
 | `dawn_phenomenon_strength` | mg/dL/hour | Extra early-morning rise or, in Hovorka-style mode, the scale of the dawn EGP oscillator | `0-50` | Adds explicit circadian disturbance |
 | `dawn_start_hour`, `dawn_end_hour` | hour of day | Dawn-effect window | `0-23`, `0-24` | Defines when dawn physiology is active |
+| `stem_cell_engraftment_percent` | percent | Experimental functional beta-cell/islet graft fraction in Bergman mode | `0+`, usually `0-100` for demos | Scales glucose-responsive endogenous insulin secretion through `M_graft` |
+| `stem_cell_subq_fraction` | ratio | Fraction of graft secretion routed through the subcutaneous insulin depot chain | `0-1` | Separates portal/direct appearance from delayed subcutaneous appearance |
+| `immune_rejection_rate` | 1/min | Exponential graft-mass decay coefficient | `>=0` | Simulates simplified loss of functional graft mass over time |
 
 One important reading tip:
 - `glucose_decay_rate` is a **model coefficient**, not a directly measured patient value.
@@ -117,7 +121,7 @@ These profiles are shipped with the SDK for studies, demos, and physiological co
 | `clinic_safe_hyper_challenge` | `150` | `0.55` | `45` | `9` | none | post-meal high-glucose challenge |
 | `clinic_safe_midnight` | `125` | `0.45` | `65` | `11` | none | exercise-after-evening-meal challenge |
 | `clinic_safe_pizza` | `135` | `0.50` | `50` | `10` | none | delayed-meal challenge |
-| `reference_free_living_t1d` | `151.7` | `0.50` | `50` | `10` | Ohio-informed basal target `138`, carb tail `280 min`, meal mismatch `0.83` | empirical free-living reference |
+| `reference_free_living_t1d` | `151.7` | `0.50` | `50` | `10` | Ohio-informed basal target `147`, carb tail `270 min`, meal mismatch `0.83` | empirical free-living reference |
 | `reference_azt1d_t1d` | `135` | `0.50` | `50` | `10` | dawn rise `4 mg/dL/h`, meal mismatch `0.95` | AZT1D-oriented reference |
 | `reference_hupa_ucm_t1d` | `130` | `0.50` | `50` | `10` | dawn rise `8 mg/dL/h`, meal mismatch `0.95` | HUPA-UCM-oriented reference |
 | `default_patient` | `120` | `0.80` | `50` | `10` | legacy simplified defaults | compatibility, not the best first demo choice |
@@ -128,6 +132,82 @@ Units:
 - basal in `U/hour`
 - ISF in `mg/dL/U`
 - ICR in `g/U`
+
+### Stem-Cell / Islet Graft Abstraction
+
+The SDK contains a small Bergman-mode research extension for stem-cell or islet-graft hypotheses. It is deliberately simple:
+
+\[
+M_{graft}(0)=\frac{\text{engraftment percent}}{100}
+\]
+
+\[
+\frac{dM_{graft}}{dt}=-k_{reject}M_{graft}
+\]
+
+\[
+S_{graft}=\gamma M_{graft}\max(G-h,0)
+\]
+
+The secretion term is split by placement:
+
+\[
+S_{plasma}=S_{graft}(1-f_{subq}), \quad S_{subq}=S_{graft}f_{subq}
+\]
+
+`S_plasma` enters plasma insulin directly, while `S_subq` first enters the two-depot subcutaneous insulin absorption chain. This lets the simulator distinguish an immediate portal/direct abstraction from a delayed subcutaneous graft abstraction.
+
+Important limitation:
+this is not a validated stem-cell therapy model. It does not simulate differentiation, vascularization, encapsulation, immune-cell populations, immunosuppressive drugs, or transplant eligibility. It is an educational algorithm-stress tool for asking "what if functional insulin secretion appeared, lagged, or decayed?"
+
+### Multi-Compartment Transplant Research Engine
+
+For deeper experiments, `iints.research.stem_cell_transplant` adds a separate deterministic transplant engine. Unlike the minimal `M_graft` abstraction above, this runner tracks several graft-level states:
+
+| State | Meaning |
+| --- | --- |
+| `immature_mass` | cells that are present but not yet fully glucose-responsive |
+| `functional_mass` | beta-like mass that can secrete insulin |
+| `vascularization` | local blood-supply support for the graft |
+| `oxygenation` | oxygen availability after vascularization, fibrosis, and graft demand |
+| `innate_inflammation` | early inflammatory stress after implantation |
+| `adaptive_immunity` | slower immune pressure against visible graft cells |
+| `fibrosis` | encapsulation/scarring barrier that reduces diffusion and function |
+| `insulin_delay_pool_units` | delayed insulin release pool for subcutaneous or encapsulated sites |
+
+The model uses placement presets:
+
+| Placement | Intended abstraction |
+| --- | --- |
+| `portal` | liver/portal-style graft with fast plasma insulin appearance but high early inflammatory exposure |
+| `subcutaneous` | slower, initially oxygen-limited site with delayed insulin appearance |
+| `encapsulated` | immune-shielded but diffusion/fibrosis-limited graft |
+
+The core update is still deliberately transparent:
+
+\[
+\frac{dV}{dt}=k_V(1-V)(1-0.75F)(1-0.35I_{innate})
+\]
+
+\[
+O_{target}=\mathrm{clip}(0.10+0.90V-0.35F-0.10\max(0,M_{total}-1),0,1)
+\]
+
+\[
+\frac{dA}{dt}=k_A\,visibility\,M_{total}(1-S_{immuno})-k_{decay}A(0.3+S_{immuno})
+\]
+
+\[
+M_{functional,t+1}=M_{functional}+M_{matured}-M_{death}-M_{dediff}
+\]
+
+Insulin secretion is glucose-responsive:
+
+\[
+u_I = u_{max}M_{functional}O(1-0.55F)\sigma((G-G_{threshold})/slope)
+\]
+
+The runner couples this graft output back into a Bergman virtual patient. Portal-style release is added to plasma insulin; delayed/subcutaneous release goes through the two-depot insulin absorption chain. This is much closer to a transplant stress simulator, but it remains pre-clinical research software, not a therapy predictor.
 
 ## 8. A Full Day That Actually Means Something
 

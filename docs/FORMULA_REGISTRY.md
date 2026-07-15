@@ -44,17 +44,17 @@ Literature basis: https://doi.org/10.1152/ajpendo.1979.236.6.E667, https://arxiv
 
 Validation note: Insulin action is deterministic and non-negative relative to basal insulin.
 
-## F03_PLASMA_INSULIN_BALANCE: Plasma insulin balance with optional secretion
+## F03_PLASMA_INSULIN_BALANCE: Plasma insulin balance with optional graft secretion
 
 Category: `physiology`
 
 Canonical expression:
 
 ```text
-dI/dt = -n(I - Ib) + gamma*max(G - h, 0) + Ra_I / V_I
+dI/dt = -n(I - Ib) + gamma*M_graft*max(G - h, 0)*(1-f_subq) + Ra_I / V_I
 ```
 
-Runtime/solved form: Integrated in Bergman mode; gamma defaults to 0 for T1D research profiles.
+Runtime/solved form: Integrated in Bergman mode; gamma defaults to 0 for T1D research profiles. If f_subq>0, graft secretion first enters the S1/S2 absorption chain.
 
 Units: I in mU/L, Ra_I in mU/min, V_I in L
 
@@ -62,7 +62,7 @@ Implementation: `src/iints/core/patient/bergman_model.py:_ode`
 
 Literature basis: https://doi.org/10.1152/ajpendo.1979.236.6.E667
 
-Validation note: This formula is not delegated to AI; secretion is disabled by default for T1D simulation.
+Validation note: Stem-cell/islet graft secretion is an experimental abstraction and is disabled by default for T1D simulation.
 
 ## F04_SUBCUT_INSULIN_TWO_DEPOT_PK: Two-depot subcutaneous insulin absorption
 
@@ -71,7 +71,7 @@ Category: `physiology`
 Canonical expression:
 
 ```text
-dS1/dt = u_I - k*S1; dS2/dt = k*S1 - k*S2; U_I = k*S2
+dS1/dt = u_I + gamma*M_graft*max(G-h,0)*f_subq - k*S1; dS2/dt = k*S1 - k*S2; U_I = k*S2
 ```
 
 Runtime/solved form: Bergman uses k_a; Hovorka uses 1/t_max_I. The state equations are integrated each step.
@@ -131,7 +131,7 @@ Category: `physiology`
 Canonical expression:
 
 ```text
-dx1/dt=-ka1*x1+kb1*I; dx2/dt=-ka2*x2+kb2*I; dx3/dt=-ka3*x3+kb3*I
+dx1/dt=-ka1*x1+kb1*I; dx2/dt=-ka2*x2+kb2*I; dx3/dt=-ka3*x3+kb3*I; kb_i includes molecular_affinity_scalar
 ```
 
 Runtime/solved form: kb1/kb2/kb3 are deterministic sensitivity products before ODE integration.

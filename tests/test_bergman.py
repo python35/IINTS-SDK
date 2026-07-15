@@ -161,6 +161,65 @@ class TestBergmanPatientModel:
         assert "active_insulin" in state
         assert "insulin_effect" in state
 
+    def test_stem_cell_engraftment_adds_glucose_responsive_secretion(self):
+        no_graft = BergmanPatientModel(initial_glucose=120.0)
+        graft = BergmanPatientModel(
+            initial_glucose=120.0,
+            stem_cell_engraftment_percent=100.0,
+            stem_cell_subq_fraction=0.0,
+        )
+
+        no_graft.update(5.0, 0.0, 60.0)
+        graft.update(5.0, 0.0, 60.0)
+        for step in range(47):
+            no_graft.update(5.0, 0.0, 0.0, current_time=float((step + 1) * 5))
+            graft.update(5.0, 0.0, 0.0, current_time=float((step + 1) * 5))
+
+        no_graft_state = no_graft.get_patient_state()
+        graft_state = graft.get_patient_state()
+        assert graft.current_glucose < no_graft.current_glucose
+        assert graft_state["plasma_insulin_mU_L"] > no_graft_state["plasma_insulin_mU_L"]
+        assert graft_state["stem_cell_graft_mass_fraction"] == pytest.approx(1.0)
+
+    def test_subcutaneous_stem_cell_graft_delays_insulin_appearance(self):
+        portal_graft = BergmanPatientModel(
+            initial_glucose=120.0,
+            stem_cell_engraftment_percent=100.0,
+            stem_cell_subq_fraction=0.0,
+        )
+        subq_graft = BergmanPatientModel(
+            initial_glucose=120.0,
+            stem_cell_engraftment_percent=100.0,
+            stem_cell_subq_fraction=1.0,
+        )
+
+        portal_graft.update(5.0, 0.0, 60.0)
+        subq_graft.update(5.0, 0.0, 60.0)
+        for step in range(47):
+            portal_graft.update(5.0, 0.0, 0.0, current_time=float((step + 1) * 5))
+            subq_graft.update(5.0, 0.0, 0.0, current_time=float((step + 1) * 5))
+
+        portal_state = portal_graft.get_patient_state()
+        subq_state = subq_graft.get_patient_state()
+        assert subq_graft.current_glucose > portal_graft.current_glucose
+        assert subq_state["plasma_insulin_mU_L"] < portal_state["plasma_insulin_mU_L"]
+        assert subq_state["subcut_insulin_1_mU"] > 0.0
+        assert subq_state["subcut_insulin_2_mU"] > 0.0
+
+    def test_stem_cell_graft_mass_decays_with_rejection_rate(self):
+        model = BergmanPatientModel(
+            initial_glucose=120.0,
+            stem_cell_engraftment_percent=80.0,
+            immune_rejection_rate=0.001,
+        )
+
+        initial_mass = model.get_patient_state()["stem_cell_graft_mass_fraction"]
+        for _ in range(12):
+            model.update(5.0, 0.0, 0.0)
+
+        assert initial_mass == pytest.approx(0.8)
+        assert model.get_patient_state()["stem_cell_graft_mass_fraction"] < initial_mass
+
     def test_simulation_12h_stable(self):
         """A 12h simulation without events should not crash or diverge."""
         model = BergmanPatientModel(initial_glucose=120.0)

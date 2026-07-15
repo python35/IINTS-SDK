@@ -8,7 +8,7 @@ This provides a more physiologically accurate glucose simulation than the
 default ``CustomPatientModel``, at the cost of higher computational load
 (uses ``scipy.integrate.solve_ivp``).
 
-The model tracks 13 state variables:
+The model tracks 14 state variables:
 
 * **G** — plasma glucose concentration (mg/dL)
 * **X** — remote insulin action (1/min)
@@ -18,6 +18,7 @@ The model tracks 13 state variables:
 * **S1/S2** — SubQ insulin pools
 * **Y1/Y2/Gamma/x_gluc** — Glucagon subQ & plasma kinetics
 * **HAAF** — Hypoglycemia-Associated Autonomic Failure memory
+* **M_graft** — optional stem-cell/islet graft survival fraction
 
 References
 ----------
@@ -154,7 +155,8 @@ class BergmanPatientModel:
         self.last_delivered_glucagon_mg = 0.0
         self.meal_effect_delay = 30  # kept for API compat
 
-        # ODE state vector: [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF]
+        # ODE state vector:
+        # [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, M_graft]
         self._state = np.array([
             initial_glucose,       # 0: G  (mg/dL)
             0.0,                   # 1: X  (1/min)
@@ -326,6 +328,10 @@ class BergmanPatientModel:
             "subcut_insulin_2_mU": float(self._state[7]),
             "plasma_glucagon_pg_ml": float(self._state[10]),
             "haaf_metric": float(self._state[12]),
+            "stem_cell_graft_mass_fraction": float(self._state[13]),
+            "stem_cell_engraftment_percent": float(self.params.stem_cell_engraftment_percent),
+            "stem_cell_subq_fraction": float(self.params.stem_cell_subq_fraction),
+            "immune_rejection_rate_per_min": float(self.params.immune_rejection_rate),
             "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
             "delivered_insulin": self.last_delivered_insulin_units,
             "last_delivered_insulin_units": self.last_delivered_insulin_units,

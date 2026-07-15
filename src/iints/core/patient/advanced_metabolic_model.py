@@ -8,7 +8,7 @@ from .physiology import renal_glucose_clearance_concentration
 class AdvancedMetabolicModel(BergmanPatientModel):
     """
     Advanced Metabolic Model for IINTS-AF.
-    Extends the 13-state Bergman model to an 18-state model including:
+    Extends the Bergman-compatible base state to an 18-state model including:
     - F: Free Fatty Acids (FFA) (mmol/L)
     - K: Ketone Bodies (mmol/L)
     - Beta: Residual Beta-cell mass fraction (0.0 to 1.0)
@@ -44,7 +44,9 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         
         super().__init__(**kwargs)
         
-        # Override the 13-state with 18-state
+        # Override the Bergman state with an advanced 18-state vector.
+        # Advanced mode uses Beta for residual endogenous secretion and does
+        # not include the experimental Bergman M_graft stem-cell state.
         # State vector: [G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta, Q_fat, Q_prot]
         self._state = np.array([
             self.initial_glucose,  # 0: G
@@ -78,6 +80,10 @@ class AdvancedMetabolicModel(BergmanPatientModel):
     def get_patient_state(self) -> Dict[str, float]:
         state_dict = super().get_patient_state()
         state_dict.update({
+            "stem_cell_graft_mass_fraction": 0.0,
+            "stem_cell_engraftment_percent": 0.0,
+            "stem_cell_subq_fraction": 0.0,
+            "immune_rejection_rate_per_min": 0.0,
             "plasma_ffa_mmol_L": float(self._state[13]),
             "plasma_ketones_mmol_L": float(self._state[14]),
             "residual_beta_cell_mass": float(self._state[15]),
@@ -92,6 +98,10 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             if ode_state.size == 13:
                 # Upgrade legacy 13-state to 18-state
                 ode_state = np.append(ode_state, [self.initial_ffa, self.initial_ketones, self.initial_beta_mass, 0.0, 0.0])
+            elif ode_state.size == 14:
+                # Upgrade current Bergman 14-state snapshots by dropping
+                # M_graft; advanced mode models residual beta-cell mass via Beta.
+                ode_state = np.append(ode_state[:13], [self.initial_ffa, self.initial_ketones, self.initial_beta_mass, 0.0, 0.0])
             elif ode_state.size == 16:
                 # Upgrade legacy 16-state to 18-state
                 ode_state = np.append(ode_state, [0.0, 0.0])

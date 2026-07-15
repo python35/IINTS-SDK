@@ -74,25 +74,33 @@ FORMULAS: tuple[FormulaSpec, ...] = (
     ),
     FormulaSpec(
         formula_id="F03_PLASMA_INSULIN_BALANCE",
-        title="Plasma insulin balance with optional secretion",
+        title="Plasma insulin balance with optional graft secretion",
         category="physiology",
-        canonical_expression="dI/dt = -n(I - Ib) + gamma*max(G - h, 0) + Ra_I / V_I",
-        solved_or_runtime_form="Integrated in Bergman mode; gamma defaults to 0 for T1D research profiles.",
-        state_variables=("I", "G", "S2"),
-        parameters=("n", "Ib", "gamma", "h", "Ra_I", "V_I"),
+        canonical_expression=(
+            "dI/dt = -n(I - Ib) + gamma*M_graft*max(G - h, 0)*(1-f_subq) + Ra_I / V_I"
+        ),
+        solved_or_runtime_form=(
+            "Integrated in Bergman mode; gamma defaults to 0 for T1D research profiles. "
+            "If f_subq>0, graft secretion first enters the S1/S2 absorption chain."
+        ),
+        state_variables=("I", "G", "S2", "M_graft"),
+        parameters=("n", "Ib", "gamma", "h", "Ra_I", "V_I", "f_subq"),
         units="I in mU/L, Ra_I in mU/min, V_I in L",
         implementation_paths=("src/iints/core/patient/bergman_model.py:_ode",),
         literature_basis=("https://doi.org/10.1152/ajpendo.1979.236.6.E667",),
-        validation_note="This formula is not delegated to AI; secretion is disabled by default for T1D simulation.",
+        validation_note="Stem-cell/islet graft secretion is an experimental abstraction and is disabled by default for T1D simulation.",
     ),
     FormulaSpec(
         formula_id="F04_SUBCUT_INSULIN_TWO_DEPOT_PK",
         title="Two-depot subcutaneous insulin absorption",
         category="physiology",
-        canonical_expression="dS1/dt = u_I - k*S1; dS2/dt = k*S1 - k*S2; U_I = k*S2",
+        canonical_expression=(
+            "dS1/dt = u_I + gamma*M_graft*max(G-h,0)*f_subq - k*S1; "
+            "dS2/dt = k*S1 - k*S2; U_I = k*S2"
+        ),
         solved_or_runtime_form="Bergman uses k_a; Hovorka uses 1/t_max_I. The state equations are integrated each step.",
-        state_variables=("S1", "S2"),
-        parameters=("u_I", "k_a", "t_max_I"),
+        state_variables=("S1", "S2", "G", "M_graft"),
+        parameters=("u_I", "k_a", "t_max_I", "gamma", "h", "f_subq"),
         units="S1/S2 in mU, u_I/U_I in mU/min",
         implementation_paths=(
             "src/iints/core/patient/bergman_model.py:_ode",
