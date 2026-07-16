@@ -38,6 +38,8 @@ python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
 iints-desktop
 ```
 
+Experimental next-generation shell: a Tauri + Rust desktop prototype lives in `apps/iints-tauri`. It keeps the Python SDK as the scientific engine while moving the native app boundary into Rust. See `docs/TAURI_DESKTOP.md`.
+
 ## License
 
 Apache-2.0 licensed, with legacy MIT notices where applicable.

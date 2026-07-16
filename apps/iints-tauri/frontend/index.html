@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IINTS-AF Research Workbench</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">IINTS-AF SDK</p>
+        <h1>Research Workbench</h1>
+        <p class="subtitle">
+          Native Tauri shell around the Python SDK engine. Research only. Not a medical device.
+        </p>
+      </div>
+      <div class="badge">Not for treatment decisions</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel protocol-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 1</p>
+          <h2>Choose protocol</h2>
+        </div>
+        <div id="workflow-list" class="workflow-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel run-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 2</p>
+          <h2>Run through Python SDK</h2>
+        </div>
+        <div class="field-grid">
+          <label>
+            Output folder
+            <input id="output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" />
+          </label>
+          <label>
+            Seed
+            <input id="seed" type="number" min="0" value="42" />
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="run-btn" class="primary">Run selected workflow</button>
+          <button id="refresh-btn">Refresh protocols</button>
+        </div>
+        <pre id="run-status" class="status-box">Workbench loading...</pre>
+      </section>
+
+      <section class="panel results-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 3</p>
+          <h2>Results preview</h2>
+        </div>
+        <div class="field-grid">
+          <label>
+            Results CSV
+            <input id="csv-path" placeholder="Run a workflow or paste a results.csv path" spellcheck="false" />
+          </label>
+          <button id="preview-btn">Preview CSV</button>
+        </div>
+        <div id="metrics" class="metrics"></div>
+        <svg id="glucose-chart" viewBox="0 0 700 260" role="img" aria-label="Glucose chart"></svg>
+        <div class="table-wrap">
+          <table id="preview-table"></table>
+        </div>
+      </section>
+
+      <section class="panel ai-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 4</p>
+          <h2>Local AI readiness</h2>
+        </div>
+        <div class="field-grid">
+          <label>
+            Ollama model
+            <input id="ai-model" value="ministral-3:8b" spellcheck="false" />
+          </label>
+          <label>
+            Host
+            <input id="ai-host" value="http://127.0.0.1:11434" spellcheck="false" />
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="ai-check-btn">Check local AI</button>
+          <button id="ai-models-btn">List installed models</button>
+        </div>
+        <pre id="ai-status" class="status-box">Local AI not checked yet.</pre>
+      </section>
+    </main>
+
+    <footer>
+      <span id="sdk-status">Python bridge not checked yet.</span>
+      <span>Deterministic SDK outputs remain the source of truth.</span>
+    </footer>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

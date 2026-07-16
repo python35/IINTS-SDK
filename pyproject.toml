@@ -109,6 +109,7 @@ iints-desktop = "iints_desktop.launcher:main"
 iints-desktop-tk = "iints_desktop.app:main"
 iints-desktop-qt = "iints_desktop.qt_app:main"
 iints-desktop-cocoa = "iints_desktop.cocoa_app:main"
+iints-tauri-bridge = "iints_desktop.tauri_bridge:main"
 iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 
 [project.entry-points."iints.algorithms"]

@@ -64,6 +64,7 @@ nav:
       - Desktop App: DESKTOP_APP.md
       - Desktop App Install: APP_INSTALL.md
       - Desktop App Signing: DESKTOP_SIGNING.md
+      - Tauri Desktop Shell: TAURI_DESKTOP.md
       - Command Cheatsheet: CLI_CHEATSHEET.md
       - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md

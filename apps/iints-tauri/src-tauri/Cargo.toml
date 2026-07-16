@@ -1,0 +1,17 @@
+[package]
+name = "iints-af-tauri"
+version = "0.1.0"
+description = "Secure Tauri shell for the IINTS-AF Python SDK"
+authors = ["Rune Bobbaers"]
+license = "Apache-2.0"
+repository = "https://github.com/python35/IINTS-SDK"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
