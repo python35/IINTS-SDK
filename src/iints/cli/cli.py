@@ -10955,9 +10955,12 @@ def medtronic_live_cmd(
             start=1,
         ):
             if not timeline.empty:
+                if merged.empty:
+                    merged = timeline.copy()
+                else:
+                    merged = pd.concat([merged, timeline], ignore_index=True)
                 merged = (
-                    pd.concat([merged, timeline], ignore_index=True)
-                    .sort_values("timestamp_dt")
+                    merged.sort_values("timestamp_dt")
                     .drop_duplicates("timestamp_dt", keep="last")
                     .reset_index(drop=True)
                 )

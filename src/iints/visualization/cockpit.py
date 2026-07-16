@@ -17,6 +17,7 @@ This is not a hobby app - it's a professional medical cockpit.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import warnings
 from matplotlib.gridspec import GridSpec
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -503,7 +504,13 @@ class ClinicalCockpit:
         fig.suptitle('IINTS-AF Clinical Control Center',
                     fontsize=16, fontweight='bold', y=0.98)
         
-        plt.tight_layout(rect=(0, 0, 1, 0.96))
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="This figure includes Axes that are not compatible with tight_layout",
+                category=UserWarning,
+            )
+            plt.tight_layout(rect=(0, 0, 1, 0.96))
         
         if save_path:
             plt.savefig(save_path, dpi=self.config.dpi, bbox_inches='tight')
