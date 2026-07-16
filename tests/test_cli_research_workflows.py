@@ -171,11 +171,15 @@ def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> Non
     assert Path(outputs["realism_report_json"]).is_file()
     assert Path(outputs["realism_dashboard_html"]).is_file()
     assert Path(outputs["run_quality_review_md"]).is_file()
+    assert Path(outputs["run_quality_summary_json"]).is_file()
     assert Path(outputs["safety_visualizer_html"]).is_file()
     assert Path(outputs["safety_visualizer_json"]).is_file()
     assert "verdict" in outputs["realism_review"]
+    assert outputs["realism_review"]["quality_grade"] in {"research_ready", "review_before_use", "do_not_use"}
+    assert "grade" in outputs["run_quality"]
     review_text = Path(outputs["run_quality_review_md"]).read_text()
     assert "IINTS Run Quality Review" in review_text
+    assert "Result quality grade" in review_text
     assert "Max glucose rate" in review_text
 
 
@@ -196,6 +200,32 @@ def test_run_quality_artifacts_do_not_force_daily_reference_on_short_demos(tmp_p
     assert outputs["realism_review"]["reference_selection"] == "auto"
     assert outputs["realism_review"]["reference"] is None
     assert outputs["realism_review"]["verdict"] == "likely_realistic"
+    assert outputs["run_quality"]["grade"] == "research_ready"
+
+
+def test_run_quality_artifacts_flag_unusable_runs(tmp_path) -> None:
+    df = pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 5, 10],
+            "glucose_actual_mgdl": [120.0, None, 520.0, 20.0],
+            "carb_intake_grams": [0.0, 0.0, 0.0, 0.0],
+            "delivered_insulin_units": [0.0, 0.0, 0.0, 0.0],
+            "safety_triggered": [False, True, True, True],
+            "safety_reason": ["", "sensor", "sensor", "sensor"],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(
+        df,
+        tmp_path,
+        run_label="bad-run",
+        safety_report={"terminated_early": True, "input_validator_fail_soft_count": 2},
+    )
+
+    assert outputs["run_quality"]["grade"] == "do_not_use"
+    assert outputs["run_quality"]["terminated_early"] is True
+    assert outputs["run_quality"]["duplicate_timestamp_rows"] == 1
+    assert outputs["run_quality"]["nan_glucose_rows"] == 1
 
 
 def test_top_level_pump_compile_and_bench_test(tmp_path) -> None:

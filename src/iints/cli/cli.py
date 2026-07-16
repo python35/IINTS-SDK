@@ -488,6 +488,21 @@ def _maybe_prepare_ai_artifacts(output_dir: Path, console: Console) -> None:
         console.print(f"[yellow]AI-ready payload export skipped:[/yellow] {exc}")
 
 
+def _print_run_quality_review(console: Console, quality_outputs: Dict[str, Any]) -> None:
+    realism_review = quality_outputs.get("realism_review")
+    if not realism_review:
+        return
+    verdict = realism_review.get("verdict")
+    realism_score = float(realism_review.get("realism_score", 0.0))
+    quality_grade = realism_review.get("quality_grade", "unknown")
+    quality_score = float(realism_review.get("quality_score", 0.0))
+    console.print(
+        "[green]Run quality:[/green] "
+        f"{quality_grade} ({quality_score:.1f}/100); "
+        f"realism {verdict} ({realism_score:.2f})"
+    )
+
+
 def _get_preset(name: str) -> Dict[str, Any]:
     presets = _load_presets()
     for preset in presets:
@@ -4786,12 +4801,7 @@ def presets_run(
         run_label=run_id,
         safety_report=safety_report,
     )
-    if quality_outputs.get("realism_review"):
-        realism_review = quality_outputs["realism_review"]
-        console.print(
-            "[green]Realism review:[/green] "
-            f"{realism_review.get('verdict')} (score {float(realism_review.get('realism_score', 0.0)):.2f})"
-        )
+    _print_run_quality_review(console, quality_outputs)
     console.print(f"Safety visualizer: {quality_outputs.get('safety_visualizer_html')}")
 
     manifest_files = {
@@ -5548,12 +5558,7 @@ def run(
     console.print(f"Using compute device: [blue]{device}[/blue]")
     if baseline_paths is not None:
         console.print(f"Baseline comparison saved to: {baseline_paths}")
-    if quality_outputs.get("realism_review"):
-        realism_review = quality_outputs["realism_review"]
-        console.print(
-            "[green]Realism review:[/green] "
-            f"{realism_review.get('verdict')} (score {float(realism_review.get('realism_score', 0.0)):.2f})"
-        )
+    _print_run_quality_review(console, quality_outputs)
     if quality_outputs.get("safety_visualizer_html"):
         console.print(f"Safety visualizer: {quality_outputs.get('safety_visualizer_html')}")
     console.print(f"Run metadata: {run_metadata_path}")
