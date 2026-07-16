@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from iints.analysis.run_quality import write_run_quality_artifacts
@@ -11,6 +12,11 @@ from iints.cli.cli import app
 
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _disable_local_ai_review_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("IINTS_LOCAL_AI_REVIEW", "off")
 
 
 def _write_algorithm(path: Path) -> None:
@@ -181,6 +187,91 @@ def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> Non
     assert "IINTS Run Quality Review" in review_text
     assert "Result quality grade" in review_text
     assert "Max glucose rate" in review_text
+
+
+def test_run_quality_artifacts_can_write_local_ai_verification(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeOllamaBackend:
+        backend_name = "ollama"
+
+        def __init__(self, *, model_name: str, **_: object) -> None:
+            self.model_name = model_name
+            self.base_url = "http://127.0.0.1:11434"
+
+        def available(self) -> bool:
+            return True
+
+        def ensure_model_ready(self) -> str:
+            return self.model_name
+
+        def complete(self, *, system_prompt: str, user_prompt: str) -> str:
+            assert "not a medical device" in system_prompt.lower()
+            assert "deterministic_quality_gate" in user_prompt
+            return "## Verdict\nResearch-ready with review notes.\n"
+
+    monkeypatch.setattr("iints.analysis.run_quality.OllamaBackend", FakeOllamaBackend)
+    df = pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 240, 5)),
+            "glucose_actual_mgdl": [125.0 + (idx % 12) * 1.4 for idx in range(48)],
+            "carb_intake_grams": [35.0 if idx == 12 else 0.0 for idx in range(48)],
+            "delivered_insulin_units": [1.2 if idx == 12 else 0.0 for idx in range(48)],
+            "safety_triggered": [False for _ in range(48)],
+            "safety_reason": ["" for _ in range(48)],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(
+        df,
+        tmp_path,
+        run_label="ai-reviewed-run",
+        safety_report={},
+        local_ai_review="required",
+        local_ai_model="fake-local-model",
+    )
+
+    assert outputs["local_ai_review_status"] == "completed"
+    assert Path(outputs["local_ai_review_md"]).is_file()
+    assert Path(outputs["local_ai_review_json"]).is_file()
+    assert "Research-ready" in Path(outputs["local_ai_review_md"]).read_text()
+    summary = json.loads(Path(outputs["run_quality_summary_json"]).read_text())
+    assert summary["local_ai_review_status"] == "completed"
+
+
+def test_run_quality_artifacts_skip_local_ai_when_ollama_unavailable(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class OfflineOllamaBackend:
+        def __init__(self, **_: object) -> None:
+            self.base_url = "http://127.0.0.1:11434"
+
+        def available(self) -> bool:
+            return False
+
+    monkeypatch.setattr("iints.analysis.run_quality.OllamaBackend", OfflineOllamaBackend)
+    df = pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 120, 5)),
+            "glucose_actual_mgdl": [118.0 + idx * 0.4 for idx in range(24)],
+            "carb_intake_grams": [0.0 for _ in range(24)],
+            "delivered_insulin_units": [0.0 for _ in range(24)],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(
+        df,
+        tmp_path,
+        run_label="offline-ai-run",
+        safety_report={},
+        local_ai_review="auto",
+    )
+
+    assert outputs["local_ai_review_status"] == "skipped"
+    metadata = json.loads(Path(outputs["local_ai_review_json"]).read_text())
+    assert "not reachable" in metadata["reason"]
 
 
 def test_run_quality_artifacts_do_not_force_daily_reference_on_short_demos(tmp_path) -> None:

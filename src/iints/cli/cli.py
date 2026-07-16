@@ -501,6 +501,12 @@ def _print_run_quality_review(console: Console, quality_outputs: Dict[str, Any])
         f"{quality_grade} ({quality_score:.1f}/100); "
         f"realism {verdict} ({realism_score:.2f})"
     )
+    ai_status = quality_outputs.get("local_ai_review_status")
+    if ai_status == "completed":
+        console.print(f"[green]Local AI verifier:[/green] {quality_outputs.get('local_ai_review_md')}")
+    elif ai_status in {"failed", "skipped"}:
+        ai_json = quality_outputs.get("local_ai_review_json")
+        console.print(f"[yellow]Local AI verifier:[/yellow] {ai_status} ({ai_json})")
 
 
 def _get_preset(name: str) -> Dict[str, Any]:
@@ -4821,6 +4827,8 @@ def presets_run(
         "realism_dashboard": "realism_dashboard_html",
         "safety_visualizer": "safety_visualizer_html",
         "safety_visualizer_json": "safety_visualizer_json",
+        "local_ai_review": "local_ai_review_md",
+        "local_ai_review_json": "local_ai_review_json",
     }.items():
         output_value = quality_outputs.get(output_key)
         if output_value:
@@ -5546,6 +5554,8 @@ def run(
             "realism_dashboard": "realism_dashboard_html",
             "safety_visualizer": "safety_visualizer_html",
             "safety_visualizer_json": "safety_visualizer_json",
+            "local_ai_review": "local_ai_review_md",
+            "local_ai_review_json": "local_ai_review_json",
         }.items():
             output_value = quality_outputs.get(output_key)
             if output_value:
