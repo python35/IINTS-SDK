@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from iints.analysis.run_quality import write_run_quality_artifacts
+from iints.analysis.run_quality import build_result_quality_summary, write_run_quality_artifacts
 from iints.cli.cli import app
 
 
@@ -317,6 +317,59 @@ def test_run_quality_artifacts_flag_unusable_runs(tmp_path) -> None:
     assert outputs["run_quality"]["terminated_early"] is True
     assert outputs["run_quality"]["duplicate_timestamp_rows"] == 1
     assert outputs["run_quality"]["nan_glucose_rows"] == 1
+
+
+def test_run_quality_treats_pd_stacking_as_routine_dose_shaping(tmp_path) -> None:
+    class FakeRealismReport:
+        verdict = "likely_realistic"
+        realism_score = 0.92
+
+    df = pd.DataFrame(
+        {
+            "time_minutes": list(range(0, 240, 5)),
+            "glucose_actual_mgdl": [125.0 + (idx % 12) * 1.2 for idx in range(48)],
+            "carb_intake_grams": [35.0 if idx == 12 else 0.0 for idx in range(48)],
+            "delivered_insulin_units": [0.1 for _ in range(48)],
+            "safety_triggered": [True for _ in range(48)],
+            "safety_reason": [
+                "PD_STACKING_PREVENTION: Dose reduced by 35.0% due to unabsorbed IOB (0.80U)"
+                for _ in range(48)
+            ],
+        }
+    )
+
+    quality = build_result_quality_summary(df, realism_report=FakeRealismReport(), safety_report={})
+
+    assert quality["safety_intervention_count"] == 48
+    assert quality["routine_dose_shaping_count"] == 48
+    assert quality["material_safety_intervention_count"] == 0
+    assert quality["grade"] == "research_ready"
+
+
+def test_run_quality_treats_pd_clearance_limit_as_routine_dose_shaping() -> None:
+    class FakeRealismReport:
+        verdict = "likely_realistic"
+        realism_score = 0.92
+
+    df = pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10],
+            "glucose_actual_mgdl": [150.0, 148.0, 146.0],
+            "delivered_insulin_units": [0.2, 0.15, 0.12],
+            "safety_triggered": [True, True, False],
+            "safety_reason": [
+                "PD_CLEARANCE_LIMIT / High IOB: Active IOB 1.00U restricts max safe bolus to 3.00U",
+                "PD_CLEARANCE_LIMIT / High IOB: Active IOB 1.20U restricts max safe bolus to 2.80U; PD_STACKING_PREVENTION: Dose reduced by 35.0% due to unabsorbed IOB (1.20U)",
+                "APPROVED",
+            ],
+        }
+    )
+
+    quality = build_result_quality_summary(df, realism_report=FakeRealismReport(), safety_report={})
+
+    assert quality["routine_dose_shaping_count"] == 2
+    assert quality["material_safety_intervention_count"] == 0
+    assert quality["grade"] == "research_ready"
 
 
 def test_top_level_pump_compile_and_bench_test(tmp_path) -> None:

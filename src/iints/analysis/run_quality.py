@@ -147,6 +147,34 @@ def _count_safety_interventions(results_df: pd.DataFrame, safety_report: Optiona
     return int(results_df["safety_triggered"].fillna(False).astype(bool).sum())
 
 
+def _routine_safety_adjustment_mask(results_df: pd.DataFrame) -> pd.Series:
+    """Identify routine deterministic dose shaping, not hard safety failures."""
+
+    if "safety_reason" not in results_df.columns:
+        return pd.Series([False] * len(results_df), index=results_df.index)
+    reasons = results_df["safety_reason"].fillna("").astype(str)
+    return (
+        reasons.str.startswith("PD_STACKING_PREVENTION")
+        | reasons.str.startswith("PD_CLEARANCE_LIMIT")
+        | reasons.str.startswith("WARNING: Hyperglycemia detected")
+    )
+
+
+def _count_routine_safety_adjustments(results_df: pd.DataFrame) -> int:
+    if "safety_triggered" not in results_df.columns:
+        return 0
+    triggered = results_df["safety_triggered"].fillna(False).astype(bool)
+    return int((triggered & _routine_safety_adjustment_mask(results_df)).sum())
+
+
+def _count_material_safety_interventions(results_df: pd.DataFrame) -> int:
+    if "safety_triggered" not in results_df.columns:
+        return 0
+    triggered = results_df["safety_triggered"].fillna(False).astype(bool)
+    routine = _routine_safety_adjustment_mask(results_df)
+    return int((triggered & ~routine).sum())
+
+
 def build_result_quality_summary(
     results_df: pd.DataFrame,
     *,
@@ -180,9 +208,16 @@ def build_result_quality_summary(
         score -= 35.0
 
     intervention_count = _count_safety_interventions(results_df, safety_report)
-    if intervention_count:
-        review_reasons.append(f"{intervention_count} safety intervention(s) occurred.")
-        score -= min(20.0, intervention_count * 0.5)
+    routine_adjustment_count = _count_routine_safety_adjustments(results_df)
+    material_intervention_count = _count_material_safety_interventions(results_df)
+    if material_intervention_count:
+        review_reasons.append(f"{material_intervention_count} material safety intervention(s) occurred.")
+        score -= min(20.0, material_intervention_count * 0.75)
+    if routine_adjustment_count:
+        review_reasons.append(
+            f"{routine_adjustment_count} routine pharmacodynamic dose-shaping adjustment(s) occurred."
+        )
+        score -= min(4.0, routine_adjustment_count * 0.02)
 
     fail_soft_count = int((safety_report or {}).get("input_validator_fail_soft_count", 0) or 0)
     if fail_soft_count:
@@ -213,6 +248,8 @@ def build_result_quality_summary(
         "nan_glucose_rows": nan_glucose_rows,
         "duplicate_timestamp_rows": duplicate_timestamp_rows,
         "safety_intervention_count": intervention_count,
+        "material_safety_intervention_count": material_intervention_count,
+        "routine_dose_shaping_count": routine_adjustment_count,
         "input_validator_fail_soft_count": fail_soft_count,
         "terminated_early": terminated_early,
         "realism_verdict": realism_report.verdict,
