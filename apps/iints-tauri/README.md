@@ -39,10 +39,12 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 ## Current Scope
 
 - Load SDK version/status.
+- Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.
 - Preview generated `results.csv` files.
 - Show persisted run history for the chosen output folder.
+- Open generated folders/reports/certificates through an allowlisted native opener.
 - Create local MDMP certificates for CSV outputs.
 - Start/check local Ollama and list installed models.
 - Ask a local Ollama model to interpret the loaded result CSV.
@@ -52,6 +54,7 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
+- Native file opening is limited to existing folders and safe evidence/report file types.
 - No remote web content.
 - CSP is configured in `src-tauri/tauri.conf.json`.
 - The Rust command layer only exposes a small audited allowlist.

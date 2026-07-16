@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+import os
+import shutil
 import sys
 import traceback
 from dataclasses import asdict, is_dataclass
@@ -77,6 +80,50 @@ def _workflows(_args: argparse.Namespace) -> int:
         for preset in list_desktop_presets()
     ]
     return _ok({"workflows": workflows})
+
+
+def _module_available(name: str) -> bool:
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, AttributeError, ValueError):
+        return False
+
+
+def _diagnostics(_args: argparse.Namespace) -> int:
+    env = get_desktop_environment(qt_available=_module_available("PySide6"))
+    optional_modules = {
+        "pandas": _module_available("pandas"),
+        "matplotlib": _module_available("matplotlib"),
+        "plotly": _module_available("plotly"),
+        "mdmp_core.crypto": _module_available("mdmp_core.crypto"),
+        "PySide6": _module_available("PySide6"),
+    }
+    recommended_checks = []
+    if not optional_modules["pandas"]:
+        recommended_checks.append("Install the SDK with desktop/full extras so CSV previews can load.")
+    if not optional_modules["matplotlib"]:
+        recommended_checks.append("Install matplotlib for generated preview graphs.")
+    if not optional_modules["mdmp_core.crypto"]:
+        recommended_checks.append("Install the mdmp extra before creating signed MDMP certificates.")
+    ollama_path = shutil.which("ollama")
+    if ollama_path is None:
+        recommended_checks.append("Install Ollama if you want local AI analysis.")
+
+    return _ok(
+        {
+            "sdk_version": env.sdk_version,
+            "python_executable": sys.executable,
+            "python_version": sys.version.split()[0],
+            "cwd": Path.cwd(),
+            "iints_python_env": os.getenv("IINTS_PYTHON"),
+            "research_only": True,
+            "medical_device": False,
+            "optional_modules": optional_modules,
+            "ollama_on_path": ollama_path is not None,
+            "ollama_path": ollama_path,
+            "recommended_checks": recommended_checks,
+        }
+    )
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -210,6 +257,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     workflows = subcommands.add_parser("workflows")
     workflows.set_defaults(func=_workflows)
+
+    diagnostics = subcommands.add_parser("diagnostics")
+    diagnostics.set_defaults(func=_diagnostics)
 
     run = subcommands.add_parser("run")
     run.add_argument("--workflow-key", required=True)

@@ -105,6 +105,10 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.diagnostics-panel {
+  grid-column: 1 / -1;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;
@@ -261,6 +265,63 @@ button.primary {
   gap: 10px;
   max-height: 360px;
   overflow: auto;
+}
+
+.diagnostics-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.status-pill {
+  border: 1px solid #d6e2ea;
+  border-radius: 999px;
+  background: #f8fbfd;
+  color: var(--blue-dark);
+  padding: 7px 11px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.status-pill.good {
+  border-color: rgba(24, 112, 94, 0.28);
+  background: #edf8f4;
+  color: var(--green);
+}
+
+.status-pill.warn,
+.status-pill.loading {
+  border-color: rgba(163, 101, 0, 0.28);
+  background: #fff8e8;
+  color: var(--amber);
+}
+
+.status-pill.bad {
+  border-color: rgba(163, 58, 53, 0.32);
+  background: #fff3f1;
+  color: var(--red);
+}
+
+.diagnostic-note {
+  flex-basis: 100%;
+  border: 1px solid #dce6ee;
+  border-radius: 12px;
+  background: #f8fbfd;
+  color: var(--muted);
+  padding: 10px 12px;
+  font-size: 0.86rem;
+}
+
+.diagnostic-note strong {
+  display: block;
+  color: var(--blue-dark);
+  margin-bottom: 4px;
+}
+
+.diagnostic-note ul {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .history-item {

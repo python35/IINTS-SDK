@@ -516,3 +516,23 @@ def test_desktop_beta_workflow_documents_optional_signing() -> None:
     assert "WINDOWS_SIGNING_PFX_BASE64" in signing_docs
     assert "MACOS_CERTIFICATE_P12_BASE64" in signing_docs
     assert "APPLE_APP_SPECIFIC_PASSWORD" in signing_docs
+
+
+def test_tauri_app_exposes_diagnostics_and_safe_open_actions() -> None:
+    rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
+    frontend = Path("apps/iints-tauri/frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = Path("apps/iints-tauri/frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = Path("apps/iints-tauri/frontend/styles.css").read_text(encoding="utf-8")
+    readme = Path("apps/iints-tauri/README.md").read_text(encoding="utf-8")
+
+    assert "async fn desktop_diagnostics" in rust_source
+    assert "async fn open_path" in rust_source
+    assert "SAFE_EXTENSIONS" in rust_source
+    assert "Refusing to open unsupported file type" in rust_source
+    assert "diagnostics-btn" in frontend
+    assert "open-run-folder-btn" in frontend
+    assert "open-certificate-btn" in frontend
+    assert "desktop_diagnostics" in frontend_js
+    assert "open_path" in frontend_js
+    assert "diagnostics-grid" in frontend_css
+    assert "allowlisted native opener" in readme

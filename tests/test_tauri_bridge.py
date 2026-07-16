@@ -40,6 +40,18 @@ def test_tauri_bridge_lists_curated_workflows() -> None:
     assert any(workflow["key"] == "doctor-safety" for workflow in workflows)
 
 
+def test_tauri_bridge_reports_desktop_diagnostics() -> None:
+    payload = _bridge("diagnostics")
+
+    assert payload["ok"] is True
+    data = payload["data"]
+    assert data["medical_device"] is False  # type: ignore[index]
+    assert "python_version" in data  # type: ignore[operator]
+    assert "optional_modules" in data  # type: ignore[operator]
+    assert "pandas" in data["optional_modules"]  # type: ignore[index]
+    assert isinstance(data["recommended_checks"], list)  # type: ignore[index]
+
+
 def test_tauri_bridge_previews_results_csv(tmp_path: Path) -> None:
     csv_path = tmp_path / "results.csv"
     csv_path.write_text(

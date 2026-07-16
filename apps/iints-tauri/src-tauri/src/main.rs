@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
 use std::env;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Debug, Clone)]
@@ -105,6 +106,11 @@ async fn desktop_status() -> Result<Value, String> {
 #[tauri::command]
 async fn list_workflows() -> Result<Value, String> {
     run_python_bridge_async(vec!["workflows".to_string()]).await
+}
+
+#[tauri::command]
+async fn desktop_diagnostics() -> Result<Value, String> {
+    run_python_bridge_async(vec!["diagnostics".to_string()]).await
 }
 
 #[tauri::command]
@@ -277,11 +283,100 @@ async fn ask_local_ai(
     run_python_bridge_async(args).await
 }
 
+#[tauri::command]
+async fn open_path(path: String) -> Result<(), String> {
+    open_path_allowlisted(path).await
+}
+
+async fn open_path_allowlisted(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let resolved = resolve_user_path(&path)?;
+        validate_open_target(&resolved)?;
+        open_with_platform(&resolved)
+    })
+    .await
+    .map_err(|error| format!("Open-path task failed: {error}"))?
+}
+
+fn resolve_user_path(raw: &str) -> Result<PathBuf, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("Path is required.".to_string());
+    }
+    let expanded = if trimmed == "~" || trimmed.starts_with("~/") || trimmed.starts_with("~\\") {
+        let home = home_dir().ok_or_else(|| "Could not resolve the home directory.".to_string())?;
+        if trimmed.len() == 1 {
+            home
+        } else {
+            home.join(&trimmed[2..])
+        }
+    } else {
+        PathBuf::from(trimmed)
+    };
+    expanded
+        .canonicalize()
+        .map_err(|error| format!("Cannot open path because it does not exist: {} ({error})", expanded.display()))
+}
+
+fn home_dir() -> Option<PathBuf> {
+    if cfg!(windows) {
+        env::var_os("USERPROFILE").map(PathBuf::from)
+    } else {
+        env::var_os("HOME").map(PathBuf::from)
+    }
+}
+
+fn validate_open_target(path: &Path) -> Result<(), String> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    if !path.is_file() {
+        return Err(format!("Open target is not a regular file or folder: {}", path.display()));
+    }
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    const SAFE_EXTENSIONS: &[&str] = &[
+        "csv", "json", "md", "pdf", "png", "jpg", "jpeg", "svg", "html", "htm", "txt", "log",
+    ];
+    if SAFE_EXTENSIONS.contains(&extension.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Refusing to open unsupported file type '.{}'. Open the containing folder instead.",
+            extension
+        ))
+    }
+}
+
+fn open_with_platform(path: &Path) -> Result<(), String> {
+    let mut command = if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.arg(path);
+        command
+    } else if cfg!(target_os = "windows") {
+        let mut command = Command::new("explorer");
+        command.arg(path);
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(path);
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Could not open {}: {error}", path.display()))
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             desktop_status,
             list_workflows,
+            desktop_diagnostics,
             run_workflow,
             preview_results,
             run_history,
@@ -289,7 +384,8 @@ fn main() {
             check_local_ai,
             list_local_ai_models,
             start_local_ai,
-            ask_local_ai
+            ask_local_ai,
+            open_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");

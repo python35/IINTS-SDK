@@ -19,6 +19,18 @@
     </header>
 
     <main class="layout">
+      <section class="panel diagnostics-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">System</p>
+          <h2>Workbench readiness</h2>
+        </div>
+        <div class="button-row">
+          <button id="diagnostics-btn">Run diagnostics</button>
+          <button id="open-output-btn">Open output folder</button>
+        </div>
+        <div id="diagnostics-grid" class="diagnostics-grid" aria-live="polite"></div>
+      </section>
+
       <section class="panel protocol-panel">
         <div class="panel-heading">
           <p class="eyebrow">Step 1</p>
@@ -46,6 +58,8 @@
           <button id="run-btn" class="primary">Run selected workflow</button>
           <button id="refresh-btn">Refresh protocols</button>
           <button id="history-btn">Load run history</button>
+          <button id="open-run-folder-btn">Open latest run folder</button>
+          <button id="open-report-btn">Open latest report</button>
         </div>
         <pre id="run-status" class="status-box">Workbench loading...</pre>
       </section>
@@ -72,6 +86,8 @@
         </div>
         <div class="button-row">
           <button id="mdmp-btn">Create MDMP certificate</button>
+          <button id="open-csv-btn">Open CSV</button>
+          <button id="open-certificate-btn">Open certificate</button>
         </div>
         <pre id="mdmp-status" class="status-box compact">No MDMP certificate generated yet.</pre>
         <div id="metrics" class="metrics"></div>

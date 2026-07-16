@@ -4,6 +4,8 @@ const invoke = tauriCore?.invoke;
 let selectedWorkflow = null;
 let workflows = [];
 let lastPreview = null;
+let lastRun = null;
+let lastMdmp = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,6 +15,10 @@ function setText(id, value) {
 
 function pretty(value) {
   return JSON.stringify(value, null, 2);
+}
+
+function errorMessage(error) {
+  return String(error).replace(/^Error:\s*/i, "").trim();
 }
 
 async function call(command, args = {}) {
@@ -73,8 +79,47 @@ async function loadStatus() {
     setText("run-status", "Python SDK bridge ready.\nSelect a workflow and run it.");
   } catch (error) {
     $("sdk-status").textContent = "Python bridge unavailable";
-    setText("run-status", String(error));
+    setText("run-status", errorMessage(error));
   }
+}
+
+async function runDiagnostics() {
+  const grid = $("diagnostics-grid");
+  grid.replaceChildren(statusPill("loading", "Running diagnostics..."));
+  try {
+    const payload = await call("desktop_diagnostics");
+    renderDiagnostics(payload);
+  } catch (error) {
+    grid.replaceChildren(statusPill("bad", errorMessage(error)));
+  }
+}
+
+function renderDiagnostics(payload) {
+  const grid = $("diagnostics-grid");
+  grid.replaceChildren();
+  grid.appendChild(statusPill("good", `SDK ${payload.sdk_version}`));
+  grid.appendChild(statusPill("good", `Python ${payload.python_version}`));
+  grid.appendChild(statusPill(payload.ollama_on_path ? "good" : "warn", payload.ollama_on_path ? "Ollama found" : "Ollama not on PATH"));
+  const modules = payload.optional_modules || {};
+  for (const [name, available] of Object.entries(modules)) {
+    grid.appendChild(statusPill(available ? "good" : "warn", `${name}: ${available ? "ready" : "missing"}`));
+  }
+  if ((payload.recommended_checks || []).length) {
+    const note = document.createElement("div");
+    note.className = "diagnostic-note";
+    note.innerHTML = `
+      <strong>Recommended checks</strong>
+      <ul>${payload.recommended_checks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    `;
+    grid.appendChild(note);
+  }
+}
+
+function statusPill(kind, text) {
+  const pill = document.createElement("div");
+  pill.className = `status-pill ${kind}`;
+  pill.textContent = text;
+  return pill;
 }
 
 async function loadWorkflows() {
@@ -85,7 +130,7 @@ async function loadWorkflows() {
     renderWorkflows();
     setText("run-status", `Loaded ${workflows.length} workflows.`);
   } catch (error) {
-    setText("run-status", String(error));
+    setText("run-status", errorMessage(error));
   }
 }
 
@@ -104,6 +149,7 @@ async function runSelectedWorkflow() {
       outputDir,
       seed
     });
+    lastRun = result;
     setText("run-status", result.summary || pretty(result));
     if (result.results_csv) {
       $("csv-path").value = result.results_csv;
@@ -111,7 +157,7 @@ async function runSelectedWorkflow() {
     }
     await loadHistory();
   } catch (error) {
-    setText("run-status", String(error));
+    setText("run-status", errorMessage(error));
   } finally {
     setBusy(false);
   }
@@ -131,7 +177,7 @@ async function previewCsv() {
     drawGlucoseChart(preview);
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
   } catch (error) {
-    setText("run-status", String(error));
+    setText("run-status", errorMessage(error));
   }
 }
 
@@ -175,6 +221,11 @@ function renderHistory(entries) {
       button.textContent = "Preview";
       button.addEventListener("click", async () => {
         $("csv-path").value = entry.results_csv;
+        lastRun = {
+          output_dir: entry.output_dir,
+          results_csv: entry.results_csv,
+          report_pdf: entry.report_pdf || null
+        };
         await previewCsv();
       });
       item.appendChild(button);
@@ -192,6 +243,7 @@ async function certifyMdmp() {
   setText("mdmp-status", "Creating MDMP certificate using the standard diabetes contract...");
   try {
     const payload = await call("certify_mdmp", { csv, quickRows: 5000, full: false });
+    lastMdmp = payload;
     setText(
       "mdmp-status",
       [
@@ -204,7 +256,7 @@ async function certifyMdmp() {
       ].join("\n")
     );
   } catch (error) {
-    setText("mdmp-status", String(error));
+    setText("mdmp-status", errorMessage(error));
   }
 }
 
@@ -309,7 +361,7 @@ async function checkAi() {
     });
     setText("ai-status", pretty(payload));
   } catch (error) {
-    setText("ai-status", String(error));
+    setText("ai-status", errorMessage(error));
   }
 }
 
@@ -323,7 +375,7 @@ async function startAi() {
     });
     setText("ai-status", pretty(payload));
   } catch (error) {
-    setText("ai-status", String(error));
+    setText("ai-status", errorMessage(error));
   }
 }
 
@@ -333,7 +385,7 @@ async function listAiModels() {
     const payload = await call("list_local_ai_models", { host: $("ai-host").value.trim() });
     setText("ai-status", pretty(payload));
   } catch (error) {
-    setText("ai-status", String(error));
+    setText("ai-status", errorMessage(error));
   }
 }
 
@@ -365,8 +417,40 @@ async function askAi() {
       ].join("\n")
     );
   } catch (error) {
-    setText("ai-answer", String(error));
+    setText("ai-answer", errorMessage(error));
   }
+}
+
+async function openPath(path, statusId = "run-status") {
+  if (!path) {
+    setText(statusId, "Nothing to open yet.");
+    return;
+  }
+  try {
+    await call("open_path", { path });
+  } catch (error) {
+    setText(statusId, errorMessage(error));
+  }
+}
+
+async function openOutputFolder() {
+  await openPath($("output-dir").value.trim(), "run-status");
+}
+
+async function openLatestRunFolder() {
+  await openPath(lastRun?.output_dir, "run-status");
+}
+
+async function openLatestReport() {
+  await openPath(lastRun?.report_pdf, "run-status");
+}
+
+async function openLoadedCsv() {
+  await openPath($("csv-path").value.trim(), "run-status");
+}
+
+async function openLatestCertificate() {
+  await openPath(lastMdmp?.certificate_path, "mdmp-status");
 }
 
 function setBusy(isBusy) {
@@ -375,6 +459,8 @@ function setBusy(isBusy) {
   $("preview-btn").disabled = isBusy;
   $("history-btn").disabled = isBusy;
   $("mdmp-btn").disabled = isBusy;
+  $("open-run-folder-btn").disabled = isBusy;
+  $("open-report-btn").disabled = isBusy;
 }
 
 function firstIndex(columns, candidates) {
@@ -431,13 +517,20 @@ function svgRect(x, y, width, height, fill, opacity) {
 $("run-btn").addEventListener("click", runSelectedWorkflow);
 $("refresh-btn").addEventListener("click", loadWorkflows);
 $("history-btn").addEventListener("click", loadHistory);
+$("diagnostics-btn").addEventListener("click", runDiagnostics);
+$("open-output-btn").addEventListener("click", openOutputFolder);
+$("open-run-folder-btn").addEventListener("click", openLatestRunFolder);
+$("open-report-btn").addEventListener("click", openLatestReport);
 $("preview-btn").addEventListener("click", previewCsv);
 $("mdmp-btn").addEventListener("click", certifyMdmp);
+$("open-csv-btn").addEventListener("click", openLoadedCsv);
+$("open-certificate-btn").addEventListener("click", openLatestCertificate);
 $("ai-start-btn").addEventListener("click", startAi);
 $("ai-check-btn").addEventListener("click", checkAi);
 $("ai-models-btn").addEventListener("click", listAiModels);
 $("ai-ask-btn").addEventListener("click", askAi);
 
 await loadStatus();
+await runDiagnostics();
 await loadWorkflows();
 await loadHistory();
