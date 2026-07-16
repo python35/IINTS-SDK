@@ -126,6 +126,7 @@ nav:
       - MDMP Specification: MDMP.md
       - Governance:
           - API Stability: governance/API_STABILITY.md
+          - EU Research Software Compliance: governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md
           - Privacy Policy: governance/PRIVACY_POLICY.md
           - Terms of Use: governance/TERMS_OF_USE.md
       - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md

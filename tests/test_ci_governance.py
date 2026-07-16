@@ -45,3 +45,15 @@ def test_architecture_boundaries_have_no_current_violations() -> None:
     module = _load_architecture_module()
 
     assert module.find_violations() == []
+
+
+def test_eu_research_software_dossier_is_present() -> None:
+    module = _load_governance_module()
+
+    assert module._check_eu_research_software_dossier() == []
+
+
+def test_tauri_security_boundary_has_no_current_violations() -> None:
+    module = _load_governance_module()
+
+    assert module._check_tauri_security_boundary() == []
