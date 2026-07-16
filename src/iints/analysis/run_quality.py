@@ -11,6 +11,7 @@ from iints.ai.backends.ollama import DEFAULT_MINISTRAL_MODEL, OllamaBackend
 from iints.analysis.safety_visualizer import write_safety_visualizer
 from iints.data.realism_dashboard import write_realism_dashboard
 from iints.data.realism_validator import validate_realism_dataset, write_realism_report
+from iints.governance import RESEARCH_ONLY_NOTICE, guard_ai_output
 
 
 CORE_RESULT_COLUMNS = (
@@ -348,6 +349,7 @@ def _write_local_ai_metadata(
     model: str,
     reason: str | None = None,
     markdown_path: Path | None = None,
+    policy_violations: tuple[str, ...] = (),
 ) -> Dict[str, Any]:
     metadata = {
         "status": status,
@@ -356,6 +358,7 @@ def _write_local_ai_metadata(
         "markdown": str(markdown_path) if markdown_path else None,
         "research_only": True,
         "medical_device": False,
+        "policy_violations": list(policy_violations),
     }
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
@@ -448,7 +451,8 @@ def _write_local_ai_run_verification(
             "research and education only. You are not a medical device and must not give "
             "insulin, glucagon, diagnosis, or treatment advice. Treat the deterministic "
             "quality gate as authoritative; your role is to explain what looks trustworthy, "
-            "what needs review, and what next checks would improve the research result."
+            "what needs review, and what next checks would improve the research result. "
+            f"Boundary: {RESEARCH_ONLY_NOTICE}"
         )
         user_prompt = (
             "Review this bounded IINTS run summary and return concise Markdown with exactly "
@@ -460,13 +464,15 @@ def _write_local_ai_run_verification(
         response_text = backend.complete(system_prompt=system_prompt, user_prompt=user_prompt).strip()
         if not response_text:
             raise RuntimeError("local AI verifier returned an empty response")
+        guarded = guard_ai_output(response_text, source="run_quality_local_ai")
         ai_dir.mkdir(parents=True, exist_ok=True)
-        markdown_path.write_text(response_text + "\n", encoding="utf-8")
+        markdown_path.write_text(guarded.text + "\n", encoding="utf-8")
         metadata = _write_local_ai_metadata(
             metadata_path,
-            status="completed",
+            status="completed" if guarded.allowed else "blocked_policy",
             model=resolved_model,
             markdown_path=markdown_path,
+            policy_violations=guarded.violations,
         )
         return {
             "local_ai_review_status": metadata["status"],

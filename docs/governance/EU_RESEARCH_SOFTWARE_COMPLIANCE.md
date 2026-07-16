@@ -117,6 +117,18 @@ The deeper governance pack is split into:
 
 The JSON control matrix is intentionally machine-readable so CI can verify that each named control still has evidence in the repository.
 
+## Runtime Code Guardrails
+
+The SDK also enforces the research boundary in code:
+
+- `src/iints/governance/research_policy.py` defines the central research-only notice and post-generation policy scanner.
+- `src/iints/analysis/run_quality.py` passes local AI run-verifier output through `guard_ai_output()` before writing reports.
+- `src/iints_desktop/local_ai.py` passes desktop Ollama answers through the same guard before showing them to users.
+- `src/iints_desktop/tauri_bridge.py` returns policy-violation labels to the Tauri UI.
+- `tools/ci/check_governance.py` fails CI if those runtime hooks are removed.
+
+This means a local AI model can still explain research artifacts, but if it tries to provide patient-specific dosing, treatment, diagnosis, or regulatory-approval claims, the SDK replaces the answer with a blocked policy notice.
+
 ## Official Sources
 
 - European Commission, AI Act overview: https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai

@@ -357,6 +357,8 @@ async function askAi() {
       [
         `Model: ${payload.model}`,
         `CSV context used: ${payload.context_used ? "yes" : "no"}`,
+        `Policy guard: ${(payload.policy_violations || []).length ? "blocked" : "clear"}`,
+        ...(payload.policy_violations || []).map((violation) => `- ${violation}`),
         "",
         payload.answer
       ].join("\n")

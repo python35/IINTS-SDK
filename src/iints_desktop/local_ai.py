@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from iints.ai.backends.ollama import DEFAULT_MINISTRAL_MODEL, OllamaBackend
+from iints.governance import RESEARCH_ONLY_NOTICE, guard_ai_output
 
 from iints_desktop.results import build_ai_result_context
 
@@ -35,6 +36,7 @@ class LocalAIAnswer:
     answer: str
     model: str
     context_used: bool
+    policy_violations: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -60,7 +62,10 @@ CRITICAL INSTRUCTIONS:
 5. Use highly specific scientific terminology (e.g., exogenous insulin kinetics, hepatic glucose production).
 6. Present findings in dense, hard-hitting bullet points. Do not write fluffy paragraphs.
 7. Acknowledge that the IINTS-AF simulator is for research and education only. It is Not a medical device. Do not provide diagnosis, insulin dosing, or treatment advice.
+8. Boundary: {research_only_notice}
 """
+
+SYSTEM_PROMPT = SYSTEM_PROMPT.format(research_only_notice=RESEARCH_ONLY_NOTICE)
 
 
 def _common_ollama_candidates() -> list[Path]:
@@ -317,5 +322,11 @@ def ask_local_ai(
         "Do not offer generic advice. Structure the response perfectly."
     )
     answer = backend.complete(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt)
+    guarded = guard_ai_output(answer, source="desktop_local_ai")
     resolved = backend.resolved_model_name or model
-    return LocalAIAnswer(answer=format_ai_answer(answer), model=resolved, context_used=result_csv is not None)
+    return LocalAIAnswer(
+        answer=format_ai_answer(guarded.text),
+        model=resolved,
+        context_used=result_csv is not None,
+        policy_violations=guarded.violations,
+    )

@@ -8,7 +8,11 @@
       "framework": "Intended use / MDR boundary",
       "theme": "Research-only scope",
       "control": "The project must clearly exclude diagnosis, treatment, dosing, and real-time patient care.",
-      "evidence_paths": ["README.md", "docs/governance/INTENDED_USE_AND_CLAIMS.md", "docs/governance/TERMS_OF_USE.md"],
+      "evidence_paths": [
+        "README.md",
+        "docs/governance/INTENDED_USE_AND_CLAIMS.md",
+        "docs/governance/TERMS_OF_USE.md"
+      ],
       "status": "implemented"
     },
     {
@@ -16,7 +20,11 @@
       "framework": "EU AI Act readiness",
       "theme": "Logging, documentation, human oversight",
       "control": "Runs must remain traceable and AI output must remain advisory rather than authoritative.",
-      "evidence_paths": ["docs/governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md", "docs/EU_AI_PACT_GOVERNANCE.md", "src/iints/analysis/run_quality.py"],
+      "evidence_paths": [
+        "docs/governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md",
+        "docs/EU_AI_PACT_GOVERNANCE.md",
+        "src/iints/analysis/run_quality.py"
+      ],
       "status": "implemented"
     },
     {
@@ -24,7 +32,11 @@
       "framework": "GDPR research data",
       "theme": "Data minimisation and local processing",
       "control": "Private health data should be processed locally by default and kept out of the repository.",
-      "evidence_paths": ["docs/governance/PRIVACY_POLICY.md", "docs/governance/DPIA_LITE.md", ".gitignore"],
+      "evidence_paths": [
+        "docs/governance/PRIVACY_POLICY.md",
+        "docs/governance/DPIA_LITE.md",
+        ".gitignore"
+      ],
       "status": "implemented"
     },
     {
@@ -32,7 +44,11 @@
       "framework": "Cyber Resilience Act readiness",
       "theme": "Vulnerability handling and SBOM",
       "control": "The project must maintain a security reporting policy, dependency scanning, and SBOM governance checks.",
-      "evidence_paths": ["SECURITY.md", "tools/ci/check_governance.py", ".github/dependabot.yml"],
+      "evidence_paths": [
+        "SECURITY.md",
+        "tools/ci/check_governance.py",
+        ".github/dependabot.yml"
+      ],
       "status": "implemented"
     },
     {
@@ -40,7 +56,11 @@
       "framework": "Desktop app security",
       "theme": "Tauri least privilege",
       "control": "The Tauri app must avoid shell, broad filesystem, broad HTTP, process, and updater permissions unless separately reviewed.",
-      "evidence_paths": ["docs/governance/TAURI_THREAT_MODEL.md", "apps/iints-tauri/src-tauri/capabilities/main.json", "tools/ci/check_governance.py"],
+      "evidence_paths": [
+        "docs/governance/TAURI_THREAT_MODEL.md",
+        "apps/iints-tauri/src-tauri/capabilities/main.json",
+        "tools/ci/check_governance.py"
+      ],
       "status": "implemented"
     },
     {
@@ -48,7 +68,23 @@
       "framework": "Research integrity",
       "theme": "Risk register",
       "control": "Known research, privacy, AI, scientific, and desktop risks must be tracked before release.",
-      "evidence_paths": ["docs/governance/RISK_REGISTER.md", "docs/governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md"],
+      "evidence_paths": [
+        "docs/governance/RISK_REGISTER.md",
+        "docs/governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md"
+      ],
+      "status": "implemented"
+    },
+    {
+      "id": "EU-RS-007",
+      "framework": "EU AI Act readiness / research boundary",
+      "theme": "Post-generation AI guardrails",
+      "control": "Local AI outputs must be scanned after generation and blocked when they cross into dosing, treatment, diagnosis, or regulatory approval claims.",
+      "evidence_paths": [
+        "src/iints/governance/research_policy.py",
+        "src/iints/analysis/run_quality.py",
+        "src/iints_desktop/local_ai.py",
+        "tests/test_research_policy.py"
+      ],
       "status": "implemented"
     }
   ]

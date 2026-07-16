@@ -191,6 +191,7 @@ def _ai_ask(args: argparse.Namespace) -> int:
             "answer": answer.answer,
             "model": answer.model,
             "context_used": answer.context_used,
+            "policy_violations": list(answer.policy_violations),
         }
     )
 

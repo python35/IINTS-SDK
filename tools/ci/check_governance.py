@@ -210,6 +210,126 @@ def _check_eu_control_matrix() -> List[str]:
     return issues
 
 
+def _check_runtime_policy_hooks() -> List[str]:
+    """Ensure generated AI text goes through the research-boundary policy guard."""
+
+    issues: List[str] = []
+    required_hooks = {
+        "src/iints/analysis/run_quality.py": [
+            "guard_ai_output",
+            "blocked_policy",
+            "policy_violations",
+        ],
+        "src/iints_desktop/local_ai.py": [
+            "guard_ai_output",
+            "policy_violations",
+            "RESEARCH_ONLY_NOTICE",
+        ],
+        "src/iints_desktop/tauri_bridge.py": [
+            "policy_violations",
+        ],
+        "src/iints/governance/research_policy.py": [
+            "RESEARCH_ONLY_NOTICE",
+            "scan_text_for_policy_violations",
+            "guard_ai_output",
+        ],
+    }
+    for relative_path, needles in required_hooks.items():
+        text = _read_text(relative_path)
+        if not text:
+            issues.append(f"Missing runtime policy hook file: {relative_path}.")
+            continue
+        for needle in needles:
+            if needle not in text:
+                issues.append(f"{relative_path}: missing runtime policy hook '{needle}'.")
+    return issues
+
+
+def _check_public_claims() -> List[str]:
+    """Block accidental positive clinical/regulatory claims in project files."""
+
+    issues: List[str] = []
+    excluded = {
+        "docs/governance/INTENDED_USE_AND_CLAIMS.md",
+        "tools/ci/check_governance.py",
+        "tests/test_research_policy.py",
+    }
+    forbidden_claims = [
+        "clinically validated insulin dosing",
+        "safe for patient use",
+        "approved medical ai",
+        "ce marked",
+        "mdr certified",
+        "approved for clinical use",
+        "use for treatment decisions",
+        "use for insulin dosing",
+    ]
+    ignored_parts = {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".uv-cache",
+        ".uv-python",
+        ".venv",
+        ".venv-ci310",
+        ".venv_audit_tmp",
+        ".venv_unoq",
+        "__pycache__",
+        "data_packs",
+        "dist",
+        "IINTS-SDK",
+        "local",
+        "models",
+        "obsidian",
+        "private_docs",
+        "results",
+        "scratch",
+        "site",
+    }
+    negative_markers = (
+        "not ",
+        "not a ",
+        "not an ",
+        "no ",
+        "never ",
+        "must not ",
+        "do not ",
+        "does not ",
+        "forbidden ",
+        "excluded ",
+        "without ",
+    )
+    suffixes = {".md", ".py", ".js", ".rs", ".toml", ".json", ".yml", ".yaml"}
+    for path in REPO_ROOT.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in suffixes:
+            continue
+        try:
+            relative = path.relative_to(REPO_ROOT).as_posix()
+        except ValueError:
+            continue
+        if relative in excluded:
+            continue
+        if any(part in ignored_parts or part.startswith(".venv") for part in path.parts):
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore").lower()
+        scan_text = text.replace("*", "").replace("_", "")
+        for claim in forbidden_claims:
+            start = 0
+            while True:
+                index = scan_text.find(claim, start)
+                if index < 0:
+                    break
+                context = scan_text[max(0, index - 48) : index]
+                if not any(marker in context for marker in negative_markers):
+                    issues.append(
+                        f"{relative}: contains forbidden positive clinical/regulatory claim '{claim}'."
+                    )
+                    break
+                start = index + len(claim)
+    return issues
+
+
 def _check_tauri_security_boundary() -> List[str]:
     """Ensure the experimental Rust shell stays a narrow command boundary."""
 
@@ -257,6 +377,8 @@ def main() -> int:
         _check_eu_research_software_dossier,
         _check_security_policy,
         _check_eu_control_matrix,
+        _check_runtime_policy_hooks,
+        _check_public_claims,
         _check_tauri_security_boundary,
     ]
     issues: List[str] = []
