@@ -7,7 +7,11 @@ import pandas as pd
 import pytest
 
 from iints.analysis.run_quality import write_run_quality_artifacts
-from iints.governance import guard_ai_output, scan_text_for_policy_violations
+from iints.governance import (
+    guard_ai_output,
+    scan_text_for_policy_violations,
+    scan_text_for_policy_warnings,
+)
 from iints_desktop.local_ai import ask_local_ai
 
 
@@ -32,10 +36,48 @@ def test_policy_guard_blocks_patient_specific_dose_instruction() -> None:
     assert "not a medical device" in result.text
 
 
+def test_policy_guard_allows_simulation_dose_documentation() -> None:
+    text = "The simulated controller delivered 2 units insulin during the meal scenario."
+
+    result = guard_ai_output(text, source="test")
+
+    assert result.allowed is True
+    assert result.action == "allow"
+    assert result.violations == ()
+    assert result.text == text
+
+
+def test_policy_guard_warns_instead_of_blocking_research_adjustment_language() -> None:
+    text = "For the next simulation experiment, increase the basal parameter and compare the trace."
+
+    result = guard_ai_output(text, source="test")
+
+    assert result.allowed is True
+    assert result.action == "warn"
+    assert result.violations == ()
+    assert "candidate_adjustment_language" in result.warnings
+    assert "Research-only boundary note" in result.text
+
+
+def test_policy_scanner_allows_negated_regulatory_claim() -> None:
+    text = "This simulator is not CE marked and is not safe for patient use."
+
+    result = guard_ai_output(text, source="test")
+
+    assert result.allowed is True
+    assert result.violations == ()
+
+
 def test_policy_scanner_detects_regulatory_overclaim() -> None:
     violations = scan_text_for_policy_violations("This is CE marked and safe for patient use.")
 
     assert "regulatory_overclaim" in violations
+
+
+def test_policy_warning_scanner_detects_sensitive_language_without_blocking() -> None:
+    warnings = scan_text_for_policy_warnings("Change the correction setting in a simulator experiment.")
+
+    assert "candidate_adjustment_language" in warnings
 
 
 def test_desktop_local_ai_blocks_dosing_output(monkeypatch: pytest.MonkeyPatch) -> None:

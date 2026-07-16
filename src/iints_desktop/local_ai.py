@@ -37,6 +37,8 @@ class LocalAIAnswer:
     model: str
     context_used: bool
     policy_violations: tuple[str, ...] = ()
+    policy_warnings: tuple[str, ...] = ()
+    policy_action: str = "allow"
 
 
 @dataclass(frozen=True)
@@ -329,4 +331,6 @@ def ask_local_ai(
         model=resolved,
         context_used=result_csv is not None,
         policy_violations=guarded.violations,
+        policy_warnings=guarded.warnings,
+        policy_action=guarded.action,
     )

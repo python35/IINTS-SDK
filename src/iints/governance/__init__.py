@@ -5,6 +5,7 @@ from .research_policy import (
     RESEARCH_ONLY_NOTICE,
     guard_ai_output,
     scan_text_for_policy_violations,
+    scan_text_for_policy_warnings,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "RESEARCH_ONLY_NOTICE",
     "guard_ai_output",
     "scan_text_for_policy_violations",
+    "scan_text_for_policy_warnings",
 ]

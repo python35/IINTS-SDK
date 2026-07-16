@@ -387,6 +387,8 @@ def _write_local_ai_metadata(
     reason: str | None = None,
     markdown_path: Path | None = None,
     policy_violations: tuple[str, ...] = (),
+    policy_warnings: tuple[str, ...] = (),
+    policy_action: str = "allow",
 ) -> Dict[str, Any]:
     metadata = {
         "status": status,
@@ -396,6 +398,8 @@ def _write_local_ai_metadata(
         "research_only": True,
         "medical_device": False,
         "policy_violations": list(policy_violations),
+        "policy_warnings": list(policy_warnings),
+        "policy_action": policy_action,
     }
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
@@ -510,6 +514,8 @@ def _write_local_ai_run_verification(
             model=resolved_model,
             markdown_path=markdown_path,
             policy_violations=guarded.violations,
+            policy_warnings=guarded.warnings,
+            policy_action=guarded.action,
         )
         return {
             "local_ai_review_status": metadata["status"],
