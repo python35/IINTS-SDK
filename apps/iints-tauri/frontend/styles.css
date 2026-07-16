@@ -167,7 +167,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   border: 1px solid #ccd9e3;
   border-radius: 10px;
@@ -177,9 +178,21 @@ input {
   font: inherit;
 }
 
-input:focus {
+textarea {
+  resize: vertical;
+  min-height: 92px;
+  line-height: 1.4;
+}
+
+input:focus,
+textarea:focus {
   outline: 2px solid rgba(31, 94, 140, 0.22);
   border-color: var(--blue);
+}
+
+.wide-field {
+  display: grid;
+  margin-top: 14px;
 }
 
 .button-row {
@@ -228,6 +241,63 @@ button.primary {
   font-size: 0.84rem;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.status-box.compact {
+  min-height: 84px;
+  max-height: 170px;
+}
+
+.ai-answer {
+  min-height: 220px;
+  max-height: 520px;
+  background: #f9fcff;
+  color: var(--ink);
+  border-color: #cbdce8;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.history-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #dce6ee;
+  border-radius: 12px;
+  background: #f8fbfd;
+  padding: 11px;
+}
+
+.history-item div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.history-item strong {
+  color: var(--blue-dark);
+}
+
+.history-item span,
+.history-item p,
+.muted {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.history-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.history-item button {
+  justify-self: start;
+  padding: 7px 10px;
 }
 
 .metrics {
@@ -315,7 +385,8 @@ footer {
   }
 
   .results-panel,
-  .ai-panel {
+  .ai-panel,
+  .history-panel {
     grid-column: auto;
   }
 

@@ -12,8 +12,8 @@ The current PySide app is useful, but it places a lot of UI, process, update, an
 
 | Layer | Responsibility |
 | --- | --- |
-| Frontend | Simple workbench UI, results preview, protocol selection |
-| Rust/Tauri | Native app boundary, command allowlist, packaging, signing/updating later |
+| Frontend | Workbench UI, protocol selection, run history, results preview, local AI panel |
+| Rust/Tauri | Native app boundary, async command allowlist, packaging, signing/updating later |
 | Python SDK | Diabetes simulation, reports, local AI review, MDMP, scientific logic |
 
 This keeps the medical/research math in Python where the SDK already lives, while moving desktop authority and packaging into Rust.
@@ -36,8 +36,12 @@ The bridge supports these fixed commands:
 - `workflows`
 - `run`
 - `preview`
+- `history`
+- `mdmp-certify`
 - `ai-check`
 - `ai-models`
+- `ai-start`
+- `ai-ask`
 
 The Rust shell does **not** expose arbitrary shell execution. It calls:
 
@@ -108,7 +112,7 @@ Future hardening checklist:
 ## Migration Plan
 
 1. Keep PySide as the rich beta app while Tauri matures.
-2. Use Tauri first for the core workflow: run preset, preview CSV, check local AI.
-3. Move MDMP certificate creation into the Tauri command allowlist.
+2. Use Tauri first for the core workflow: run preset, preview CSV, certify MDMP, ask local AI.
+3. Stream run progress through Tauri events so long simulations feel live.
 4. Move biology/AlphaFold viewers into Tauri only after file/plugin scopes are locked down.
 5. Make Tauri the default downloadable app once CI builds and signing are stable.

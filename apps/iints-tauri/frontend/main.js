@@ -109,6 +109,7 @@ async function runSelectedWorkflow() {
       $("csv-path").value = result.results_csv;
       await previewCsv();
     }
+    await loadHistory();
   } catch (error) {
     setText("run-status", String(error));
   } finally {
@@ -131,6 +132,79 @@ async function previewCsv() {
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
   } catch (error) {
     setText("run-status", String(error));
+  }
+}
+
+async function loadHistory() {
+  const outputDir = $("output-dir").value.trim();
+  if (!outputDir) {
+    setText("run-status", "Output folder is required before loading history.");
+    return;
+  }
+  try {
+    const payload = await call("run_history", { outputDir, limit: 25 });
+    renderHistory(payload.history || []);
+  } catch (error) {
+    setText("run-status", String(error));
+  }
+}
+
+function renderHistory(entries) {
+  const container = $("history-list");
+  container.replaceChildren();
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No previous runs found for this output folder.";
+    container.appendChild(empty);
+    return;
+  }
+  for (const entry of entries) {
+    const item = document.createElement("article");
+    item.className = "history-item";
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(entry.workflow_title || entry.preset_name || "IINTS run")}</strong>
+        <span>${escapeHtml(entry.timestamp_utc || "")}</span>
+      </div>
+      <p>${escapeHtml(entry.output_dir || "")}</p>
+    `;
+    if (entry.results_csv) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Preview";
+      button.addEventListener("click", async () => {
+        $("csv-path").value = entry.results_csv;
+        await previewCsv();
+      });
+      item.appendChild(button);
+    }
+    container.appendChild(item);
+  }
+}
+
+async function certifyMdmp() {
+  const csv = $("csv-path").value.trim();
+  if (!csv) {
+    setText("mdmp-status", "Load or run a results CSV first.");
+    return;
+  }
+  setText("mdmp-status", "Creating MDMP certificate using the standard diabetes contract...");
+  try {
+    const payload = await call("certify_mdmp", { csv, quickRows: 5000, full: false });
+    setText(
+      "mdmp-status",
+      [
+        `Grade: ${payload.grade}`,
+        `Compliance score: ${payload.compliance_score}`,
+        `Rows reviewed: ${payload.row_count}`,
+        `Certificate: ${payload.certificate_path}`,
+        `Report: ${payload.report_path}`,
+        `Public key: ${payload.public_key_path}`
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("mdmp-status", String(error));
   }
 }
 
@@ -239,6 +313,20 @@ async function checkAi() {
   }
 }
 
+async function startAi() {
+  setText("ai-status", "Starting Ollama and preparing the selected local model...");
+  try {
+    const payload = await call("start_local_ai", {
+      model: $("ai-model").value.trim(),
+      host: $("ai-host").value.trim(),
+      noPull: false
+    });
+    setText("ai-status", pretty(payload));
+  } catch (error) {
+    setText("ai-status", String(error));
+  }
+}
+
 async function listAiModels() {
   setText("ai-status", "Listing local Ollama models...");
   try {
@@ -249,10 +337,41 @@ async function listAiModels() {
   }
 }
 
+async function askAi() {
+  const question = $("ai-question").value.trim();
+  if (!question) {
+    setText("ai-answer", "Write a question first.");
+    return;
+  }
+  const csv = $("csv-path").value.trim();
+  setText("ai-answer", "Running local AI analysis. This can take a while on small machines...");
+  try {
+    const payload = await call("ask_local_ai", {
+      question,
+      model: $("ai-model").value.trim(),
+      host: $("ai-host").value.trim(),
+      csv: csv || null
+    });
+    setText(
+      "ai-answer",
+      [
+        `Model: ${payload.model}`,
+        `CSV context used: ${payload.context_used ? "yes" : "no"}`,
+        "",
+        payload.answer
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("ai-answer", String(error));
+  }
+}
+
 function setBusy(isBusy) {
   $("run-btn").disabled = isBusy;
   $("refresh-btn").disabled = isBusy;
   $("preview-btn").disabled = isBusy;
+  $("history-btn").disabled = isBusy;
+  $("mdmp-btn").disabled = isBusy;
 }
 
 function firstIndex(columns, candidates) {
@@ -308,9 +427,14 @@ function svgRect(x, y, width, height, fill, opacity) {
 
 $("run-btn").addEventListener("click", runSelectedWorkflow);
 $("refresh-btn").addEventListener("click", loadWorkflows);
+$("history-btn").addEventListener("click", loadHistory);
 $("preview-btn").addEventListener("click", previewCsv);
+$("mdmp-btn").addEventListener("click", certifyMdmp);
+$("ai-start-btn").addEventListener("click", startAi);
 $("ai-check-btn").addEventListener("click", checkAi);
 $("ai-models-btn").addEventListener("click", listAiModels);
+$("ai-ask-btn").addEventListener("click", askAi);
 
 await loadStatus();
 await loadWorkflows();
+await loadHistory();

@@ -91,25 +91,31 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
     ))
 }
 
-#[tauri::command]
-fn desktop_status() -> Result<Value, String> {
-    run_python_bridge(&["status".to_string()])
+async fn run_python_bridge_async(args: Vec<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || run_python_bridge(&args))
+        .await
+        .map_err(|error| format!("Python bridge task failed: {error}"))?
 }
 
 #[tauri::command]
-fn list_workflows() -> Result<Value, String> {
-    run_python_bridge(&["workflows".to_string()])
+async fn desktop_status() -> Result<Value, String> {
+    run_python_bridge_async(vec!["status".to_string()]).await
 }
 
 #[tauri::command]
-fn run_workflow(workflow_key: String, output_dir: String, seed: i64) -> Result<Value, String> {
+async fn list_workflows() -> Result<Value, String> {
+    run_python_bridge_async(vec!["workflows".to_string()]).await
+}
+
+#[tauri::command]
+async fn run_workflow(workflow_key: String, output_dir: String, seed: i64) -> Result<Value, String> {
     if workflow_key.trim().is_empty() {
         return Err("workflow_key is required".to_string());
     }
     if output_dir.trim().is_empty() {
         return Err("output_dir is required".to_string());
     }
-    run_python_bridge(&[
+    run_python_bridge_async(vec![
         "run".to_string(),
         "--workflow-key".to_string(),
         workflow_key,
@@ -118,25 +124,66 @@ fn run_workflow(workflow_key: String, output_dir: String, seed: i64) -> Result<V
         "--seed".to_string(),
         seed.to_string(),
     ])
+    .await
 }
 
 #[tauri::command]
-fn preview_results(csv: String, max_rows: Option<i64>) -> Result<Value, String> {
+async fn preview_results(csv: String, max_rows: Option<i64>) -> Result<Value, String> {
     if csv.trim().is_empty() {
         return Err("csv path is required".to_string());
     }
     let bounded_rows = max_rows.unwrap_or(80).clamp(1, 200);
-    run_python_bridge(&[
+    run_python_bridge_async(vec![
         "preview".to_string(),
         "--csv".to_string(),
         csv,
         "--max-rows".to_string(),
         bounded_rows.to_string(),
     ])
+    .await
 }
 
 #[tauri::command]
-fn check_local_ai(model: String, host: Option<String>) -> Result<Value, String> {
+async fn run_history(output_dir: String, limit: Option<i64>) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let bounded_limit = limit.unwrap_or(25).clamp(1, 200);
+    run_python_bridge_async(vec![
+        "history".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+        "--limit".to_string(),
+        bounded_limit.to_string(),
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn certify_mdmp(
+    csv: String,
+    quick_rows: Option<i64>,
+    full: Option<bool>,
+) -> Result<Value, String> {
+    if csv.trim().is_empty() {
+        return Err("csv path is required".to_string());
+    }
+    let bounded_rows = quick_rows.unwrap_or(5000).clamp(10, 250_000);
+    let mut args = vec![
+        "mdmp-certify".to_string(),
+        "--csv".to_string(),
+        csv,
+        "--quick-rows".to_string(),
+        bounded_rows.to_string(),
+    ];
+    if full.unwrap_or(false) {
+        args.push("--full".to_string());
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn check_local_ai(model: String, host: Option<String>) -> Result<Value, String> {
     let mut args = vec![
         "ai-check".to_string(),
         "--model".to_string(),
@@ -152,11 +199,11 @@ fn check_local_ai(model: String, host: Option<String>) -> Result<Value, String> 
             args.push(host_value);
         }
     }
-    run_python_bridge(&args)
+    run_python_bridge_async(args).await
 }
 
 #[tauri::command]
-fn list_local_ai_models(host: Option<String>) -> Result<Value, String> {
+async fn list_local_ai_models(host: Option<String>) -> Result<Value, String> {
     let mut args = vec!["ai-models".to_string()];
     if let Some(host_value) = host {
         if !host_value.trim().is_empty() {
@@ -164,7 +211,70 @@ fn list_local_ai_models(host: Option<String>) -> Result<Value, String> {
             args.push(host_value);
         }
     }
-    run_python_bridge(&args)
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn start_local_ai(
+    model: String,
+    host: Option<String>,
+    no_pull: Option<bool>,
+) -> Result<Value, String> {
+    let mut args = vec![
+        "ai-start".to_string(),
+        "--model".to_string(),
+        if model.trim().is_empty() {
+            "ministral-3:8b".to_string()
+        } else {
+            model
+        },
+    ];
+    if let Some(host_value) = host {
+        if !host_value.trim().is_empty() {
+            args.push("--host".to_string());
+            args.push(host_value);
+        }
+    }
+    if no_pull.unwrap_or(false) {
+        args.push("--no-pull".to_string());
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn ask_local_ai(
+    question: String,
+    model: String,
+    host: Option<String>,
+    csv: Option<String>,
+) -> Result<Value, String> {
+    if question.trim().is_empty() {
+        return Err("question is required".to_string());
+    }
+    let mut args = vec![
+        "ai-ask".to_string(),
+        "--question".to_string(),
+        question,
+        "--model".to_string(),
+        if model.trim().is_empty() {
+            "ministral-3:8b".to_string()
+        } else {
+            model
+        },
+    ];
+    if let Some(host_value) = host {
+        if !host_value.trim().is_empty() {
+            args.push("--host".to_string());
+            args.push(host_value);
+        }
+    }
+    if let Some(csv_value) = csv {
+        if !csv_value.trim().is_empty() {
+            args.push("--csv".to_string());
+            args.push(csv_value);
+        }
+    }
+    run_python_bridge_async(args).await
 }
 
 fn main() {
@@ -174,8 +284,12 @@ fn main() {
             list_workflows,
             run_workflow,
             preview_results,
+            run_history,
+            certify_mdmp,
             check_local_ai,
-            list_local_ai_models
+            list_local_ai_models,
+            start_local_ai,
+            ask_local_ai
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");

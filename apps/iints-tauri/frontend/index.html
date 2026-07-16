@@ -45,8 +45,17 @@
         <div class="button-row">
           <button id="run-btn" class="primary">Run selected workflow</button>
           <button id="refresh-btn">Refresh protocols</button>
+          <button id="history-btn">Load run history</button>
         </div>
         <pre id="run-status" class="status-box">Workbench loading...</pre>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Evidence</p>
+          <h2>Run history</h2>
+        </div>
+        <div id="history-list" class="history-list" aria-live="polite"></div>
       </section>
 
       <section class="panel results-panel">
@@ -61,6 +70,10 @@
           </label>
           <button id="preview-btn">Preview CSV</button>
         </div>
+        <div class="button-row">
+          <button id="mdmp-btn">Create MDMP certificate</button>
+        </div>
+        <pre id="mdmp-status" class="status-box compact">No MDMP certificate generated yet.</pre>
         <div id="metrics" class="metrics"></div>
         <svg id="glucose-chart" viewBox="0 0 700 260" role="img" aria-label="Glucose chart"></svg>
         <div class="table-wrap">
@@ -71,7 +84,7 @@
       <section class="panel ai-panel">
         <div class="panel-heading">
           <p class="eyebrow">Step 4</p>
-          <h2>Local AI readiness</h2>
+          <h2>Local AI analysis</h2>
         </div>
         <div class="field-grid">
           <label>
@@ -84,10 +97,19 @@
           </label>
         </div>
         <div class="button-row">
+          <button id="ai-start-btn" class="primary">Start Local AI</button>
           <button id="ai-check-btn">Check local AI</button>
           <button id="ai-models-btn">List installed models</button>
         </div>
         <pre id="ai-status" class="status-box">Local AI not checked yet.</pre>
+        <label class="wide-field">
+          Ask about the loaded result
+          <textarea id="ai-question" rows="4" spellcheck="true">Summarize the run quality, physiological realism, safety concerns, and what should be checked next.</textarea>
+        </label>
+        <div class="button-row">
+          <button id="ai-ask-btn">Analyze current CSV</button>
+        </div>
+        <pre id="ai-answer" class="status-box ai-answer">AI answer will appear here after analysis.</pre>
       </section>
     </main>
 

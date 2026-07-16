@@ -42,7 +42,10 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.
 - Preview generated `results.csv` files.
-- Check local Ollama model readiness.
+- Show persisted run history for the chosen output folder.
+- Create local MDMP certificates for CSV outputs.
+- Start/check local Ollama and list installed models.
+- Ask a local Ollama model to interpret the loaded result CSV.
 
 ## Security Notes
 
