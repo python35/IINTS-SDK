@@ -20,6 +20,7 @@ CORE_RESULT_COLUMNS = (
 )
 
 LOCAL_AI_REVIEW_ENV = "IINTS_LOCAL_AI_REVIEW"
+LOCAL_AI_REVIEW_MODEL_ENV = "IINTS_LOCAL_AI_MODEL"
 LOCAL_AI_REVIEW_TIMEOUT_ENV = "IINTS_LOCAL_AI_REVIEW_TIMEOUT_SECONDS"
 
 
@@ -496,7 +497,7 @@ def write_run_quality_artifacts(
     safety_report: Optional[Dict[str, Any]] = None,
     realism_reference: Optional[str] = "auto",
     local_ai_review: bool | str | None = None,
-    local_ai_model: str = DEFAULT_MINISTRAL_MODEL,
+    local_ai_model: str | None = None,
     local_ai_timeout_seconds: float = 90.0,
     ollama_host: str | None = None,
 ) -> Dict[str, Any]:
@@ -573,7 +574,9 @@ def write_run_quality_artifacts(
             quality_summary=quality_summary,
             safety_report=safety_report,
             local_ai_review=local_ai_review,
-            local_ai_model=local_ai_model,
+            local_ai_model=local_ai_model
+            or os.getenv(LOCAL_AI_REVIEW_MODEL_ENV)
+            or DEFAULT_MINISTRAL_MODEL,
             local_ai_timeout_seconds=local_ai_timeout_seconds,
             ollama_host=ollama_host,
         )
