@@ -123,9 +123,18 @@ def _check_eu_research_software_dossier() -> List[str]:
                 "human oversight",
                 "logging and traceability",
                 "Tauri",
+                "control matrix",
             ],
         )
     )
+    for path in [
+        "docs/governance/INTENDED_USE_AND_CLAIMS.md",
+        "docs/governance/RISK_REGISTER.md",
+        "docs/governance/DPIA_LITE.md",
+        "docs/governance/TAURI_THREAT_MODEL.md",
+    ]:
+        if not (REPO_ROOT / path).exists():
+            issues.append(f"Missing deeper EU research governance document: {path}.")
     issues.extend(
         _require_text(
             "README.md",
@@ -146,6 +155,58 @@ def _check_eu_research_software_dossier() -> List[str]:
             ],
         )
     )
+    return issues
+
+
+def _check_security_policy() -> List[str]:
+    return _require_text(
+        "SECURITY.md",
+        [
+            "Reporting a Vulnerability",
+            "private patient",
+            "not a medical device",
+            "treatment decisions",
+        ],
+    )
+
+
+def _check_eu_control_matrix() -> List[str]:
+    issues: List[str] = []
+    matrix_path = REPO_ROOT / "docs/governance/EU_RESEARCH_CONTROL_MATRIX.json"
+    if not matrix_path.exists():
+        return ["Missing EU research control matrix JSON."]
+    try:
+        payload = json.loads(matrix_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return [f"Invalid EU research control matrix JSON: {exc}"]
+
+    controls = payload.get("controls")
+    if not isinstance(controls, list) or not controls:
+        return ["EU research control matrix must contain a non-empty controls list."]
+
+    required_fields = {"id", "framework", "theme", "control", "evidence_paths", "status"}
+    seen_ids: set[str] = set()
+    for index, control in enumerate(controls, start=1):
+        if not isinstance(control, dict):
+            issues.append(f"EU control #{index} is not an object.")
+            continue
+        missing = sorted(required_fields - set(control))
+        control_id = str(control.get("id", f"<control-{index}>"))
+        if missing:
+            issues.append(f"{control_id}: missing fields {', '.join(missing)}.")
+        if control_id in seen_ids:
+            issues.append(f"Duplicate EU control id: {control_id}.")
+        seen_ids.add(control_id)
+        if str(control.get("status", "")).lower() not in {"implemented", "partial", "planned"}:
+            issues.append(f"{control_id}: status must be implemented, partial, or planned.")
+        evidence_paths = control.get("evidence_paths")
+        if not isinstance(evidence_paths, list) or not evidence_paths:
+            issues.append(f"{control_id}: evidence_paths must be a non-empty list.")
+            continue
+        for evidence in evidence_paths:
+            evidence_path = REPO_ROOT / str(evidence)
+            if not evidence_path.exists():
+                issues.append(f"{control_id}: evidence path does not exist: {evidence}.")
     return issues
 
 
@@ -194,6 +255,8 @@ def main() -> int:
         _check_dataset_licenses,
         _check_manifest_hashing,
         _check_eu_research_software_dossier,
+        _check_security_policy,
+        _check_eu_control_matrix,
         _check_tauri_security_boundary,
     ]
     issues: List[str] = []

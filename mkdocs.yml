@@ -127,6 +127,10 @@ nav:
       - Governance:
           - API Stability: governance/API_STABILITY.md
           - EU Research Software Compliance: governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md
+          - Intended Use & Claims: governance/INTENDED_USE_AND_CLAIMS.md
+          - EU Research Risk Register: governance/RISK_REGISTER.md
+          - DPIA-Lite: governance/DPIA_LITE.md
+          - Tauri Threat Model: governance/TAURI_THREAT_MODEL.md
           - Privacy Policy: governance/PRIVACY_POLICY.md
           - Terms of Use: governance/TERMS_OF_USE.md
       - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md

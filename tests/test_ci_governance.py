@@ -57,3 +57,15 @@ def test_tauri_security_boundary_has_no_current_violations() -> None:
     module = _load_governance_module()
 
     assert module._check_tauri_security_boundary() == []
+
+
+def test_security_policy_is_present() -> None:
+    module = _load_governance_module()
+
+    assert module._check_security_policy() == []
+
+
+def test_eu_control_matrix_evidence_paths_exist() -> None:
+    module = _load_governance_module()
+
+    assert module._check_eu_control_matrix() == []

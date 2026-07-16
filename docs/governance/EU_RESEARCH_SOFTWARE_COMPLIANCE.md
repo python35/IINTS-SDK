@@ -107,6 +107,16 @@ python tools/ci/check_governance.py
 
 That script checks licensing, SBOM shape, dataset registry metadata, manifest hashing, EU research-compliance documentation, privacy boundaries, README disclaimers, and Tauri permission minimisation.
 
+The deeper governance pack is split into:
+
+- [Intended Use & Claims Control](INTENDED_USE_AND_CLAIMS.md)
+- [EU Research Risk Register](RISK_REGISTER.md)
+- [DPIA-Lite for Diabetes Research Data](DPIA_LITE.md)
+- [Tauri Desktop Threat Model](TAURI_THREAT_MODEL.md)
+- [`EU_RESEARCH_CONTROL_MATRIX.json`](EU_RESEARCH_CONTROL_MATRIX.json)
+
+The JSON control matrix is intentionally machine-readable so CI can verify that each named control still has evidence in the repository.
+
 ## Official Sources
 
 - European Commission, AI Act overview: https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai
