@@ -114,6 +114,66 @@ async fn desktop_diagnostics() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn list_molecule_assets() -> Result<Value, String> {
+    run_python_bridge_async(vec!["molecules".to_string()]).await
+}
+
+#[tauri::command]
+async fn run_genomics_simulation(
+    gene: String,
+    variant: String,
+    output_dir: String,
+    duration_minutes: Option<i64>,
+) -> Result<Value, String> {
+    if variant.trim().is_empty() {
+        return Err("variant is required".to_string());
+    }
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let duration = duration_minutes.unwrap_or(360).clamp(60, 24 * 60);
+    run_python_bridge_async(vec![
+        "genomics-sim".to_string(),
+        "--gene".to_string(),
+        if gene.trim().is_empty() {
+            "INSR".to_string()
+        } else {
+            gene
+        },
+        "--variant".to_string(),
+        variant,
+        "--output-dir".to_string(),
+        output_dir,
+        "--duration-minutes".to_string(),
+        duration.to_string(),
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn run_tissue_stress(
+    muscle_percent: Option<f64>,
+    liver_percent: Option<f64>,
+    output_dir: String,
+) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let muscle = muscle_percent.unwrap_or(30.0).clamp(0.0, 100.0);
+    let liver = liver_percent.unwrap_or(100.0).clamp(0.0, 100.0);
+    run_python_bridge_async(vec![
+        "tissue-stress".to_string(),
+        "--muscle-percent".to_string(),
+        muscle.to_string(),
+        "--liver-percent".to_string(),
+        liver.to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ])
+    .await
+}
+
+#[tauri::command]
 async fn run_workflow(workflow_key: String, output_dir: String, seed: i64) -> Result<Value, String> {
     if workflow_key.trim().is_empty() {
         return Err("workflow_key is required".to_string());
@@ -340,6 +400,7 @@ fn validate_open_target(path: &Path) -> Result<(), String> {
         .to_ascii_lowercase();
     const SAFE_EXTENSIONS: &[&str] = &[
         "csv", "json", "md", "pdf", "png", "jpg", "jpeg", "svg", "html", "htm", "txt", "log",
+        "cif", "mmcif",
     ];
     if SAFE_EXTENSIONS.contains(&extension.as_str()) {
         Ok(())
@@ -377,6 +438,9 @@ fn main() {
             desktop_status,
             list_workflows,
             desktop_diagnostics,
+            list_molecule_assets,
+            run_genomics_simulation,
+            run_tissue_stress,
             run_workflow,
             preview_results,
             run_history,

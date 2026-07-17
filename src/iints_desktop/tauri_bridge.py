@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -122,6 +125,83 @@ def _diagnostics(_args: argparse.Namespace) -> int:
             "ollama_on_path": ollama_path is not None,
             "ollama_path": ollama_path,
             "recommended_checks": recommended_checks,
+        }
+    )
+
+
+def _image_data_url(path: Path) -> str | None:
+    try:
+        payload = base64.b64encode(path.read_bytes()).decode("ascii")
+    except OSError:
+        return None
+    return f"data:image/png;base64,{payload}"
+
+
+def _molecules(_args: argparse.Namespace) -> int:
+    from iints_desktop.molecules import list_molecule_assets, pae_html_path
+
+    molecules = []
+    for molecule in list_molecule_assets():
+        pae_path = pae_html_path(molecule.pae_target) if molecule.pae_target else None
+        molecules.append(
+            {
+                "key": molecule.key,
+                "title": molecule.title,
+                "uniprot_id": molecule.uniprot_id,
+                "image_path": molecule.image_path,
+                "image_data_url": _image_data_url(molecule.image_path),
+                "structure_path": molecule.structure_path,
+                "explanation": molecule.explanation,
+                "sdk_link": molecule.sdk_link,
+                "pae_target": molecule.pae_target,
+                "pae_note": molecule.pae_note,
+                "pae_path": pae_path,
+                "pae_exists": bool(pae_path and pae_path.exists()),
+            }
+        )
+    return _ok({"molecules": molecules})
+
+
+def _genomics_sim(args: argparse.Namespace) -> int:
+    from iints.research.genomics_engine import GenomicsEngine
+
+    html_path, metadata = GenomicsEngine.run_multi_scale_simulation(
+        gene=args.gene,
+        variant=args.variant,
+        out_dir=Path(args.output_dir).expanduser().resolve() / "structural",
+        duration_minutes=max(60, min(int(args.duration_minutes), 24 * 60)),
+    )
+    return _ok(
+        {
+            "html_path": html_path,
+            "output_dir": html_path.parent,
+            "metadata": metadata,
+            "research_only": True,
+            "medical_device": False,
+        }
+    )
+
+
+def _tissue_stress(args: argparse.Namespace) -> int:
+    from iints.research.tissue_stressor import TissueStressor
+
+    muscle_scalar = max(0.0, min(float(args.muscle_percent), 100.0)) / 100.0
+    liver_scalar = max(0.0, min(float(args.liver_percent), 100.0)) / 100.0
+    # TissueStressor uses Rich for CLI feedback. The Tauri bridge must emit
+    # exactly one JSON object on stdout, so capture incidental console text.
+    with contextlib.redirect_stdout(io.StringIO()):
+        html_path, metadata = TissueStressor.run_stress_test(
+            muscle_scalar=muscle_scalar,
+            liver_scalar=liver_scalar,
+            output_dir=Path(args.output_dir).expanduser().resolve() / "structural",
+        )
+    return _ok(
+        {
+            "html_path": html_path,
+            "output_dir": html_path.parent,
+            "metadata": metadata,
+            "research_only": True,
+            "medical_device": False,
         }
     )
 
@@ -260,6 +340,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     diagnostics = subcommands.add_parser("diagnostics")
     diagnostics.set_defaults(func=_diagnostics)
+
+    molecules = subcommands.add_parser("molecules")
+    molecules.set_defaults(func=_molecules)
+
+    genomics = subcommands.add_parser("genomics-sim")
+    genomics.add_argument("--gene", default="INSR")
+    genomics.add_argument("--variant", required=True)
+    genomics.add_argument("--output-dir", required=True)
+    genomics.add_argument("--duration-minutes", type=int, default=360)
+    genomics.set_defaults(func=_genomics_sim)
+
+    tissue = subcommands.add_parser("tissue-stress")
+    tissue.add_argument("--muscle-percent", type=float, default=30.0)
+    tissue.add_argument("--liver-percent", type=float, default=100.0)
+    tissue.add_argument("--output-dir", required=True)
+    tissue.set_defaults(func=_tissue_stress)
 
     run = subcommands.add_parser("run")
     run.add_argument("--workflow-key", required=True)

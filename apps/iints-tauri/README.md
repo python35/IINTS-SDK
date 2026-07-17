@@ -48,6 +48,8 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - Create local MDMP certificates for CSV outputs.
 - Start/check local Ollama and list installed models.
 - Ask a local Ollama model to interpret the loaded result CSV.
+- Browse bundled AlphaFold molecule assets and open mmCIF/PAE evidence files.
+- Run research-only genomics and tissue-specific resistance stressor plots.
 
 ## Security Notes
 
@@ -55,6 +57,7 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
 - Native file opening is limited to existing folders and safe evidence/report file types.
+- Structural evidence opening is limited to bundled/report artifacts such as PNG, HTML, and mmCIF.
 - No remote web content.
 - CSP is configured in `src-tauri/tauri.conf.json`.
 - The Rust command layer only exposes a small audited allowlist.

@@ -52,6 +52,20 @@ def test_tauri_bridge_reports_desktop_diagnostics() -> None:
     assert isinstance(data["recommended_checks"], list)  # type: ignore[index]
 
 
+def test_tauri_bridge_lists_molecule_assets() -> None:
+    payload = _bridge("molecules")
+
+    assert payload["ok"] is True
+    molecules = payload["data"]["molecules"]  # type: ignore[index]
+    assert isinstance(molecules, list)
+    assert len(molecules) >= 5
+    first = molecules[0]
+    assert "image_data_url" in first
+    assert str(first["image_data_url"]).startswith("data:image/png;base64,")
+    assert first["structure_path"]
+    assert first["sdk_link"].startswith("Connects to:")
+
+
 def test_tauri_bridge_previews_results_csv(tmp_path: Path) -> None:
     csv_path = tmp_path / "results.csv"
     csv_path.write_text(

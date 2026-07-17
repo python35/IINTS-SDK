@@ -6,6 +6,9 @@ let workflows = [];
 let lastPreview = null;
 let lastRun = null;
 let lastMdmp = null;
+let molecules = [];
+let lastGenomics = null;
+let lastTissue = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -92,6 +95,71 @@ async function runDiagnostics() {
   } catch (error) {
     grid.replaceChildren(statusPill("bad", errorMessage(error)));
   }
+}
+
+async function loadMolecules() {
+  const list = $("molecule-list");
+  list.replaceChildren(statusPill("loading", "Loading molecule assets..."));
+  try {
+    const payload = await call("list_molecule_assets");
+    molecules = payload.molecules || [];
+    renderMolecules(molecules);
+  } catch (error) {
+    list.replaceChildren(statusPill("bad", errorMessage(error)));
+  }
+}
+
+function renderMolecules(items) {
+  const list = $("molecule-list");
+  list.replaceChildren();
+  if (!items.length) {
+    list.appendChild(statusPill("warn", "No molecule assets found."));
+    return;
+  }
+  for (const molecule of items) {
+    const card = document.createElement("article");
+    card.className = "molecule-card";
+
+    if (molecule.image_data_url) {
+      const image = document.createElement("img");
+      image.src = molecule.image_data_url;
+      image.alt = `${molecule.title} AlphaFold render`;
+      image.loading = "lazy";
+      card.appendChild(image);
+    }
+
+    const body = document.createElement("div");
+    body.className = "molecule-body";
+    body.innerHTML = `
+      <h3>${escapeHtml(molecule.title)}</h3>
+      <p class="muted">UniProt ${escapeHtml(molecule.uniprot_id)}</p>
+      <p>${escapeHtml(molecule.explanation)}</p>
+      <p><strong>${escapeHtml(molecule.sdk_link)}</strong></p>
+      <p class="muted">${escapeHtml(molecule.pae_note || "")}</p>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "button-row";
+    actions.appendChild(actionButton("Open PNG", () => openPath(molecule.image_path, "biology-status")));
+    actions.appendChild(actionButton("Open mmCIF", () => openPath(molecule.structure_path, "biology-status")));
+    if (molecule.pae_path) {
+      actions.appendChild(
+        actionButton(molecule.pae_exists ? "Open PAE" : "PAE not generated", () => openPath(molecule.pae_path, "biology-status"), !molecule.pae_exists)
+      );
+    }
+    body.appendChild(actions);
+    card.appendChild(body);
+    list.appendChild(card);
+  }
+}
+
+function actionButton(label, handler, disabled = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = label;
+  button.disabled = disabled;
+  button.addEventListener("click", handler);
+  return button;
 }
 
 function renderDiagnostics(payload) {
@@ -453,6 +521,83 @@ async function openLatestCertificate() {
   await openPath(lastMdmp?.certificate_path, "mdmp-status");
 }
 
+async function openStructuralFolder() {
+  await openPath(`${$("output-dir").value.trim()}/structural`, "biology-status");
+}
+
+async function runGenomicsSimulation() {
+  const gene = $("genomics-gene").value.trim() || "INSR";
+  const variant = $("genomics-variant").value.trim();
+  const outputDir = $("output-dir").value.trim();
+  if (!variant) {
+    setText("biology-status", "Variant is required, e.g. V938M.");
+    return;
+  }
+  setText("biology-status", `Running genomics simulation for ${gene} ${variant}...`);
+  setResearchBusy(true);
+  try {
+    const payload = await call("run_genomics_simulation", {
+      gene,
+      variant,
+      outputDir,
+      durationMinutes: 360
+    });
+    lastGenomics = payload;
+    setText(
+      "biology-status",
+      [
+        `Genomics simulation completed: ${gene} ${variant}`,
+        `Plot: ${payload.html_path}`,
+        `Description: ${payload.metadata?.desc || "n/a"}`,
+        `Affinity scalar: ${payload.metadata?.scalar ?? "n/a"}`,
+        "Research only: not a medical device."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("biology-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function runTissueStressTest() {
+  const outputDir = $("output-dir").value.trim();
+  const musclePercent = Number.parseFloat($("tissue-muscle").value || "30");
+  const liverPercent = Number.parseFloat($("tissue-liver").value || "100");
+  setText("biology-status", `Running tissue stress test: muscle ${musclePercent}%, liver ${liverPercent}%...`);
+  setResearchBusy(true);
+  try {
+    const payload = await call("run_tissue_stress", {
+      musclePercent,
+      liverPercent,
+      outputDir
+    });
+    lastTissue = payload;
+    setText(
+      "biology-status",
+      [
+        "Tissue-specific resistance stress test completed.",
+        `Plot: ${payload.html_path}`,
+        `Muscle scalar: ${payload.metadata?.muscle}`,
+        `Liver scalar: ${payload.metadata?.liver}`,
+        "Research only: not a medical device."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("biology-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function openGenomicsPlot() {
+  await openPath(lastGenomics?.html_path, "biology-status");
+}
+
+async function openTissuePlot() {
+  await openPath(lastTissue?.html_path, "biology-status");
+}
+
 function setBusy(isBusy) {
   $("run-btn").disabled = isBusy;
   $("refresh-btn").disabled = isBusy;
@@ -461,6 +606,12 @@ function setBusy(isBusy) {
   $("mdmp-btn").disabled = isBusy;
   $("open-run-folder-btn").disabled = isBusy;
   $("open-report-btn").disabled = isBusy;
+}
+
+function setResearchBusy(isBusy) {
+  $("genomics-run-btn").disabled = isBusy;
+  $("tissue-run-btn").disabled = isBusy;
+  $("molecule-refresh-btn").disabled = isBusy;
 }
 
 function firstIndex(columns, candidates) {
@@ -529,8 +680,15 @@ $("ai-start-btn").addEventListener("click", startAi);
 $("ai-check-btn").addEventListener("click", checkAi);
 $("ai-models-btn").addEventListener("click", listAiModels);
 $("ai-ask-btn").addEventListener("click", askAi);
+$("molecule-refresh-btn").addEventListener("click", loadMolecules);
+$("open-structural-folder-btn").addEventListener("click", openStructuralFolder);
+$("genomics-run-btn").addEventListener("click", runGenomicsSimulation);
+$("genomics-open-btn").addEventListener("click", openGenomicsPlot);
+$("tissue-run-btn").addEventListener("click", runTissueStressTest);
+$("tissue-open-btn").addEventListener("click", openTissuePlot);
 
 await loadStatus();
 await runDiagnostics();
 await loadWorkflows();
 await loadHistory();
+await loadMolecules();

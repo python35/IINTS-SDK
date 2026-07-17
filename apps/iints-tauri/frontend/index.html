@@ -127,6 +127,59 @@
         </div>
         <pre id="ai-answer" class="status-box ai-answer">AI answer will appear here after analysis.</pre>
       </section>
+
+      <section class="panel biology-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 5</p>
+          <h2>Biology & algorithm stressors</h2>
+        </div>
+        <div class="button-row">
+          <button id="molecule-refresh-btn">Load molecule assets</button>
+          <button id="open-structural-folder-btn">Open structural folder</button>
+        </div>
+        <div id="molecule-list" class="molecule-list" aria-live="polite"></div>
+
+        <div class="research-tools">
+          <article class="tool-card">
+            <h3>Genomics multi-scale simulation</h3>
+            <p>Compare a baseline virtual patient with a mutation-scaled insulin receptor scenario.</p>
+            <div class="field-grid">
+              <label>
+                Gene
+                <input id="genomics-gene" value="INSR" spellcheck="false" />
+              </label>
+              <label>
+                Variant
+                <input id="genomics-variant" value="V938M" spellcheck="false" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="genomics-run-btn">Run genomics simulation</button>
+              <button id="genomics-open-btn">Open genomics plot</button>
+            </div>
+          </article>
+
+          <article class="tool-card">
+            <h3>Tissue-specific resistance stress test</h3>
+            <p>Stress-test pump logic with separated muscle/peripheral and liver/hepatic resistance.</p>
+            <div class="field-grid">
+              <label>
+                Muscle sensitivity %
+                <input id="tissue-muscle" type="number" min="0" max="100" value="30" />
+              </label>
+              <label>
+                Liver sensitivity %
+                <input id="tissue-liver" type="number" min="0" max="100" value="100" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="tissue-run-btn">Run tissue stress test</button>
+              <button id="tissue-open-btn">Open tissue plot</button>
+            </div>
+          </article>
+        </div>
+        <pre id="biology-status" class="status-box compact">Biology tools are ready for research-only context and algorithm stress testing.</pre>
+      </section>
     </main>
 
     <footer>

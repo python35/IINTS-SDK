@@ -536,3 +536,29 @@ def test_tauri_app_exposes_diagnostics_and_safe_open_actions() -> None:
     assert "open_path" in frontend_js
     assert "diagnostics-grid" in frontend_css
     assert "allowlisted native opener" in readme
+
+
+def test_tauri_app_exposes_biology_and_stressor_actions() -> None:
+    rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
+    bridge_source = Path("src/iints_desktop/tauri_bridge.py").read_text(encoding="utf-8")
+    frontend = Path("apps/iints-tauri/frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = Path("apps/iints-tauri/frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = Path("apps/iints-tauri/frontend/styles.css").read_text(encoding="utf-8")
+    readme = Path("apps/iints-tauri/README.md").read_text(encoding="utf-8")
+
+    assert "async fn list_molecule_assets" in rust_source
+    assert "async fn run_genomics_simulation" in rust_source
+    assert "async fn run_tissue_stress" in rust_source
+    assert '"cif", "mmcif"' in rust_source
+    assert "def _molecules" in bridge_source
+    assert "def _genomics_sim" in bridge_source
+    assert "def _tissue_stress" in bridge_source
+    assert "contextlib.redirect_stdout" in bridge_source
+    assert "molecule-list" in frontend
+    assert "genomics-run-btn" in frontend
+    assert "tissue-run-btn" in frontend
+    assert "list_molecule_assets" in frontend_js
+    assert "run_genomics_simulation" in frontend_js
+    assert "run_tissue_stress" in frontend_js
+    assert "molecule-card" in frontend_css
+    assert "genomics and tissue-specific resistance stressor plots" in readme
