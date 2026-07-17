@@ -562,3 +562,28 @@ def test_tauri_app_exposes_biology_and_stressor_actions() -> None:
     assert "run_tissue_stress" in frontend_js
     assert "molecule-card" in frontend_css
     assert "genomics and tissue-specific resistance stressor plots" in readme
+
+
+def test_tauri_app_exposes_evidence_connectors_safely() -> None:
+    rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
+    bridge_source = Path("src/iints_desktop/tauri_bridge.py").read_text(encoding="utf-8")
+    frontend = Path("apps/iints-tauri/frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = Path("apps/iints-tauri/frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = Path("apps/iints-tauri/frontend/styles.css").read_text(encoding="utf-8")
+    readme = Path("apps/iints-tauri/README.md").read_text(encoding="utf-8")
+
+    assert "async fn list_evidence_connectors" in rust_source
+    assert "async fn open_external_url" in rust_source
+    assert "ALLOWED_EXTERNAL_HOSTS" in rust_source
+    assert "Only HTTPS evidence links are allowed" in rust_source
+    assert "alphafold.ebi.ac.uk" in rust_source
+    assert "platform-docs.opentargets.org" in rust_source
+    assert "def _evidence_connectors" in bridge_source
+    assert "list_evidence_connectors" in bridge_source
+    assert "evidence-refresh-btn" in frontend
+    assert "evidence-list" in frontend
+    assert "list_evidence_connectors" in frontend_js
+    assert "open_external_url" in frontend_js
+    assert "evidence-card" in frontend_css
+    assert "Evidence connectors" in readme
+    assert "Rust HTTPS host allowlist" in readme

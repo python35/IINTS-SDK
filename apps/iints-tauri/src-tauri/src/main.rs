@@ -119,6 +119,11 @@ async fn list_molecule_assets() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn list_evidence_connectors() -> Result<Value, String> {
+    run_python_bridge_async(vec!["evidence-connectors".to_string()]).await
+}
+
+#[tauri::command]
 async fn run_genomics_simulation(
     gene: String,
     variant: String,
@@ -348,6 +353,11 @@ async fn open_path(path: String) -> Result<(), String> {
     open_path_allowlisted(path).await
 }
 
+#[tauri::command]
+async fn open_external_url(url: String) -> Result<(), String> {
+    open_external_url_allowlisted(url).await
+}
+
 async fn open_path_allowlisted(path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let resolved = resolve_user_path(&path)?;
@@ -356,6 +366,15 @@ async fn open_path_allowlisted(path: String) -> Result<(), String> {
     })
     .await
     .map_err(|error| format!("Open-path task failed: {error}"))?
+}
+
+async fn open_external_url_allowlisted(url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        validate_external_url(&url)?;
+        open_url_with_platform(&url)
+    })
+    .await
+    .map_err(|error| format!("Open-url task failed: {error}"))?
 }
 
 fn resolve_user_path(raw: &str) -> Result<PathBuf, String> {
@@ -386,6 +405,70 @@ fn home_dir() -> Option<PathBuf> {
     }
 }
 
+fn validate_external_url(raw: &str) -> Result<(), String> {
+    let trimmed = raw.trim();
+    if !trimmed.starts_with("https://") {
+        return Err("Only HTTPS evidence links are allowed.".to_string());
+    }
+    let host = extract_https_host(trimmed)?;
+    const ALLOWED_EXTERNAL_HOSTS: &[&str] = &[
+        "alphafold.ebi.ac.uk",
+        "rest.ensembl.org",
+        "platform.opentargets.org",
+        "platform-docs.opentargets.org",
+        "reactome.org",
+        "www.rcsb.org",
+        "data.rcsb.org",
+        "search.rcsb.org",
+        "www.uniprot.org",
+        "rest.uniprot.org",
+        "www.proteinatlas.org",
+        "gtexportal.org",
+        "www.ebi.ac.uk",
+        "chembl.gitbook.io",
+        "api.pharmgkb.org",
+        "string-db.org",
+        "clinicaltables.nlm.nih.gov",
+        "www.ncbi.nlm.nih.gov",
+    ];
+    if ALLOWED_EXTERNAL_HOSTS.contains(&host.as_str()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "Refusing to open non-allowlisted external evidence host: {host}"
+        ))
+    }
+}
+
+fn extract_https_host(raw: &str) -> Result<String, String> {
+    let without_scheme = raw
+        .strip_prefix("https://")
+        .ok_or_else(|| "Only HTTPS evidence links are allowed.".to_string())?;
+    let authority = without_scheme
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or("")
+        .trim();
+    if authority.is_empty() {
+        return Err("Evidence URL is missing a host.".to_string());
+    }
+    if authority.contains('@') {
+        return Err("Evidence URLs with user information are not allowed.".to_string());
+    }
+    let host = authority
+        .split(':')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    if host.is_empty() {
+        Err("Evidence URL is missing a host.".to_string())
+    } else {
+        Ok(host)
+    }
+}
+
 fn validate_open_target(path: &Path) -> Result<(), String> {
     if path.is_dir() {
         return Ok(());
@@ -410,6 +493,26 @@ fn validate_open_target(path: &Path) -> Result<(), String> {
             extension
         ))
     }
+}
+
+fn open_url_with_platform(url: &str) -> Result<(), String> {
+    let mut command = if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.arg(url);
+        command
+    } else if cfg!(target_os = "windows") {
+        let mut command = Command::new("explorer");
+        command.arg(url);
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(url);
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Could not open evidence URL {url}: {error}"))
 }
 
 fn open_with_platform(path: &Path) -> Result<(), String> {
@@ -439,6 +542,7 @@ fn main() {
             list_workflows,
             desktop_diagnostics,
             list_molecule_assets,
+            list_evidence_connectors,
             run_genomics_simulation,
             run_tissue_stress,
             run_workflow,
@@ -449,7 +553,8 @@ fn main() {
             list_local_ai_models,
             start_local_ai,
             ask_local_ai,
-            open_path
+            open_path,
+            open_external_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");

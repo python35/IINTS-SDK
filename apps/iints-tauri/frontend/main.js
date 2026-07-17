@@ -7,6 +7,7 @@ let lastPreview = null;
 let lastRun = null;
 let lastMdmp = null;
 let molecules = [];
+let evidenceConnectors = [];
 let lastGenomics = null;
 let lastTissue = null;
 
@@ -106,6 +107,54 @@ async function loadMolecules() {
     renderMolecules(molecules);
   } catch (error) {
     list.replaceChildren(statusPill("bad", errorMessage(error)));
+  }
+}
+
+async function loadEvidenceConnectors() {
+  const list = $("evidence-list");
+  list.replaceChildren(statusPill("loading", "Loading official evidence connectors..."));
+  setText("evidence-status", "Loading evidence connector metadata from the Python SDK bridge...");
+  try {
+    const payload = await call("list_evidence_connectors");
+    evidenceConnectors = payload.connectors || [];
+    renderEvidenceConnectors(evidenceConnectors);
+    setText(
+      "evidence-status",
+      `Loaded ${evidenceConnectors.length} allowlisted evidence connectors. External portals open in your browser; the SDK does not embed remote web content.`
+    );
+  } catch (error) {
+    list.replaceChildren(statusPill("bad", errorMessage(error)));
+    setText("evidence-status", errorMessage(error));
+  }
+}
+
+function renderEvidenceConnectors(items) {
+  const list = $("evidence-list");
+  list.replaceChildren();
+  if (!items.length) {
+    list.appendChild(statusPill("warn", "No evidence connectors returned by the SDK bridge."));
+    return;
+  }
+  for (const connector of items) {
+    const card = document.createElement("article");
+    card.className = "evidence-card";
+    card.innerHTML = `
+      <div class="connector-meta">
+        <span>${escapeHtml(connector.category || "Evidence")}</span>
+        <span class="connector-status">${escapeHtml(connector.integration_status || "Connector")}</span>
+      </div>
+      <h3>${escapeHtml(connector.title || connector.key || "Evidence connector")}</h3>
+      <p>${escapeHtml(connector.why_it_matters || "")}</p>
+      <p><strong>Workbench use:</strong> ${escapeHtml(connector.app_use || "")}</p>
+      <p class="muted"><strong>Typical query:</strong> ${escapeHtml(connector.default_query || "")}</p>
+    `;
+
+    const actions = document.createElement("div");
+    actions.className = "button-row";
+    actions.appendChild(actionButton("Open portal", () => openExternalUrl(connector.primary_url, "evidence-status"), !connector.primary_url));
+    actions.appendChild(actionButton("Open API docs", () => openExternalUrl(connector.docs_url, "evidence-status"), !connector.docs_url));
+    card.appendChild(actions);
+    list.appendChild(card);
   }
 }
 
@@ -501,6 +550,19 @@ async function openPath(path, statusId = "run-status") {
   }
 }
 
+async function openExternalUrl(url, statusId = "evidence-status") {
+  if (!url) {
+    setText(statusId, "No evidence URL available for this connector.");
+    return;
+  }
+  try {
+    await call("open_external_url", { url });
+    setText(statusId, `Opened allowlisted evidence link:\n${url}`);
+  } catch (error) {
+    setText(statusId, errorMessage(error));
+  }
+}
+
 async function openOutputFolder() {
   await openPath($("output-dir").value.trim(), "run-status");
 }
@@ -686,9 +748,11 @@ $("genomics-run-btn").addEventListener("click", runGenomicsSimulation);
 $("genomics-open-btn").addEventListener("click", openGenomicsPlot);
 $("tissue-run-btn").addEventListener("click", runTissueStressTest);
 $("tissue-open-btn").addEventListener("click", openTissuePlot);
+$("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
 await loadStatus();
 await runDiagnostics();
 await loadWorkflows();
 await loadHistory();
 await loadMolecules();
+await loadEvidenceConnectors();

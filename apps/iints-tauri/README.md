@@ -50,6 +50,16 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - Ask a local Ollama model to interpret the loaded result CSV.
 - Browse bundled AlphaFold molecule assets and open mmCIF/PAE evidence files.
 - Run research-only genomics and tissue-specific resistance stressor plots.
+- Browse official evidence connectors for AlphaFold, Ensembl VEP/AlphaMissense, Open Targets,
+  Reactome, RCSB PDB, UniProt, Human Protein Atlas, GTEx, ChEMBL, ClinPGx/PharmGKB,
+  BioModels, STRING DB, and ClinVar.
+
+## Evidence connectors
+
+The evidence connector panel lists official biology, pharmacology, variant, pathway, and model
+provenance resources that are useful while interpreting SDK experiments. These portals are opened
+outside the app in the system browser through an audited Rust HTTPS host allowlist; the app does not
+embed remote research websites or use them as treatment logic.
 
 ## Security Notes
 
@@ -58,6 +68,7 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 - No broad filesystem plugin.
 - Native file opening is limited to existing folders and safe evidence/report file types.
 - Structural evidence opening is limited to bundled/report artifacts such as PNG, HTML, and mmCIF.
-- No remote web content.
+- Official evidence resources open only in the system browser through a Rust HTTPS host allowlist.
+- No embedded remote web content.
 - CSP is configured in `src-tauri/tauri.conf.json`.
 - The Rust command layer only exposes a small audited allowlist.

@@ -66,6 +66,31 @@ def test_tauri_bridge_lists_molecule_assets() -> None:
     assert first["sdk_link"].startswith("Connects to:")
 
 
+def test_tauri_bridge_lists_evidence_connectors() -> None:
+    payload = _bridge("evidence-connectors")
+
+    assert payload["ok"] is True
+    connectors = payload["data"]["connectors"]  # type: ignore[index]
+    assert isinstance(connectors, list)
+    keys = {connector["key"] for connector in connectors}
+    assert {
+        "alphafold-db",
+        "ensembl-vep-alphamissense",
+        "open-targets",
+        "reactome",
+        "rcsb-pdb",
+        "uniprot",
+        "human-protein-atlas",
+        "gtex",
+        "chembl",
+        "clinpgx-pharmgkb",
+        "biomodels",
+        "string-db",
+        "clinvar",
+    }.issubset(keys)
+    assert all(str(connector["primary_url"]).startswith("https://") for connector in connectors)
+
+
 def test_tauri_bridge_previews_results_csv(tmp_path: Path) -> None:
     csv_path = tmp_path / "results.csv"
     csv_path.write_text(

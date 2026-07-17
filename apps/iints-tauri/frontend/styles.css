@@ -109,6 +109,10 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.evidence-panel {
+  grid-column: 1 / -1;
+}
+
 .diagnostics-panel {
   grid-column: 1 / -1;
 }
@@ -382,6 +386,57 @@ button.primary {
   margin-top: 14px;
 }
 
+.evidence-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.evidence-card {
+  min-width: 0;
+  border: 1px solid #dce6ee;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fbfdff, #f5f9fc);
+  padding: 13px;
+}
+
+.connector-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.connector-meta span {
+  border: 1px solid #d6e2ea;
+  border-radius: 999px;
+  background: #eef5fa;
+  color: var(--blue-dark);
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.connector-meta .connector-status {
+  background: #edf8f4;
+  color: var(--green);
+}
+
+.evidence-card h3 {
+  color: var(--blue-dark);
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.evidence-card p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.42;
+  margin: 6px 0;
+}
+
 .history-item {
   display: grid;
   gap: 8px;
@@ -505,7 +560,9 @@ footer {
 
   .results-panel,
   .ai-panel,
-  .history-panel {
+  .history-panel,
+  .biology-panel,
+  .evidence-panel {
     grid-column: auto;
   }
 

@@ -20,6 +20,7 @@ from iints_desktop.engine import (
     read_run_history,
     run_demo_preset,
 )
+from iints_desktop.evidence_connectors import list_evidence_connectors
 from iints_desktop.local_ai import (
     ask_local_ai,
     check_local_ai,
@@ -160,6 +161,17 @@ def _molecules(_args: argparse.Namespace) -> int:
             }
         )
     return _ok({"molecules": molecules})
+
+
+def _evidence_connectors(_args: argparse.Namespace) -> int:
+    connectors = [asdict(connector) for connector in list_evidence_connectors()]
+    return _ok(
+        {
+            "connectors": connectors,
+            "research_only": True,
+            "medical_device": False,
+        }
+    )
 
 
 def _genomics_sim(args: argparse.Namespace) -> int:
@@ -343,6 +355,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     molecules = subcommands.add_parser("molecules")
     molecules.set_defaults(func=_molecules)
+
+    evidence = subcommands.add_parser("evidence-connectors")
+    evidence.set_defaults(func=_evidence_connectors)
 
     genomics = subcommands.add_parser("genomics-sim")
     genomics.add_argument("--gene", default="INSR")
