@@ -8,6 +8,7 @@ let lastRun = null;
 let lastMdmp = null;
 let molecules = [];
 let evidenceConnectors = [];
+let updateInfo = null;
 let lastGenomics = null;
 let lastTissue = null;
 
@@ -95,6 +96,73 @@ async function runDiagnostics() {
     renderDiagnostics(payload);
   } catch (error) {
     grid.replaceChildren(statusPill("bad", errorMessage(error)));
+  }
+}
+
+async function loadUpdateInfo() {
+  setText("update-status", "Checking SDK/app update information...");
+  try {
+    updateInfo = await call("desktop_update_info");
+    setText(
+      "update-status",
+      [
+        `Installed SDK: ${updateInfo.current_version || "unknown"}`,
+        `Python: ${updateInfo.python_executable || "unknown"}`,
+        `Package: ${updateInfo.package_spec}`,
+        "",
+        "SDK update command:",
+        updateInfo.pip_command,
+        "",
+        "Use Open app downloads for .exe/.dmg/Linux bundles."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("update-status", errorMessage(error));
+  }
+}
+
+async function openAppDownloads() {
+  const url = updateInfo?.app_download_url || "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest";
+  await openExternalUrl(url, "update-status");
+}
+
+async function openUpdateDocs() {
+  const url = updateInfo?.update_docs_url || "https://python35.github.io/IINTS-SDK/APP_INSTALL/";
+  await openExternalUrl(url, "update-status");
+}
+
+async function copyUpdateCommand() {
+  if (!updateInfo) {
+    await loadUpdateInfo();
+  }
+  const command = updateInfo?.pip_command;
+  if (!command) {
+    setText("update-status", "No SDK update command available yet.");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(command);
+    setText("update-status", `Copied SDK update command:\n${command}`);
+  } catch (_error) {
+    setText("update-status", `Copy failed. Select and copy manually:\n${command}`);
+  }
+}
+
+async function openSdkUpdateTerminal() {
+  setText("update-status", "Opening a terminal with the fixed SDK update command...");
+  try {
+    await call("open_sdk_update_terminal");
+    setText(
+      "update-status",
+      [
+        "SDK update terminal launched.",
+        "The command is fixed by the Rust layer and updates the Python SDK package with desktop/research extras.",
+        "",
+        updateInfo?.pip_command || "Run Check update info to see the exact command."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("update-status", errorMessage(error));
   }
 }
 
@@ -732,6 +800,11 @@ $("refresh-btn").addEventListener("click", loadWorkflows);
 $("history-btn").addEventListener("click", loadHistory);
 $("diagnostics-btn").addEventListener("click", runDiagnostics);
 $("open-output-btn").addEventListener("click", openOutputFolder);
+$("update-refresh-btn").addEventListener("click", loadUpdateInfo);
+$("update-download-btn").addEventListener("click", openAppDownloads);
+$("update-docs-btn").addEventListener("click", openUpdateDocs);
+$("update-copy-btn").addEventListener("click", copyUpdateCommand);
+$("update-terminal-btn").addEventListener("click", openSdkUpdateTerminal);
 $("open-run-folder-btn").addEventListener("click", openLatestRunFolder);
 $("open-report-btn").addEventListener("click", openLatestReport);
 $("preview-btn").addEventListener("click", previewCsv);
@@ -752,6 +825,7 @@ $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
 await loadStatus();
 await runDiagnostics();
+await loadUpdateInfo();
 await loadWorkflows();
 await loadHistory();
 await loadMolecules();

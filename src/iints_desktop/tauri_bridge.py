@@ -28,6 +28,7 @@ from iints_desktop.local_ai import (
     start_local_ai_stack,
 )
 from iints_desktop.results import load_results_preview
+from iints_desktop.update import get_desktop_update_info
 
 
 def _json_safe(value: Any) -> Any:
@@ -128,6 +129,10 @@ def _diagnostics(_args: argparse.Namespace) -> int:
             "recommended_checks": recommended_checks,
         }
     )
+
+
+def _update_info(_args: argparse.Namespace) -> int:
+    return _ok(asdict(get_desktop_update_info()))
 
 
 def _image_data_url(path: Path) -> str | None:
@@ -352,6 +357,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     diagnostics = subcommands.add_parser("diagnostics")
     diagnostics.set_defaults(func=_diagnostics)
+
+    update_info = subcommands.add_parser("update-info")
+    update_info.set_defaults(func=_update_info)
 
     molecules = subcommands.add_parser("molecules")
     molecules.set_defaults(func=_molecules)

@@ -39,6 +39,8 @@ python ../../tools/desktop/build_tauri_desktop_app.py
 ## Current Scope
 
 - Load SDK version/status.
+- Show SDK/app update information, copy the fixed SDK update command, open app downloads/docs,
+  and launch a fixed update terminal.
 - Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.
@@ -66,6 +68,7 @@ embed remote research websites or use them as treatment logic.
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
+- The SDK update terminal is a fixed Rust-owned command, not user-provided shell text.
 - Native file opening is limited to existing folders and safe evidence/report file types.
 - Structural evidence opening is limited to bundled/report artifacts such as PNG, HTML, and mmCIF.
 - Official evidence resources open only in the system browser through a Rust HTTPS host allowlist.

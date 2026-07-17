@@ -39,10 +39,14 @@ from iints_desktop.molecules import MoleculeAsset, list_molecule_assets, pae_htm
 from iints_desktop.results import ResultPreview, load_results_preview
 from iints_desktop.fetcher import fetch_alphafold_structure
 from iints_desktop.render_3dmol import generate_3dmol_html
+from iints_desktop.update import (
+    DESKTOP_RELEASE_URL,
+    UPDATE_DOCS_URL,
+    build_python_sdk_update_args,
+    build_python_sdk_update_command,
+)
 
-DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"
-UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
-PYTHON_SDK_UPDATE_COMMAND = 'python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"'
+PYTHON_SDK_UPDATE_COMMAND = build_python_sdk_update_command()
 ENABLE_EMBEDDED_WEBENGINE = os.environ.get("QT_QPA_PLATFORM") != "offscreen"
 _CRASH_LOG_HANDLE: Any | None = None
 
@@ -2721,7 +2725,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
             from iints_desktop.terminal_utils import open_terminal_and_run
 
-            success = open_terminal_and_run(PYTHON_SDK_UPDATE_COMMAND)
+            success = open_terminal_and_run(build_python_sdk_update_args())
             if success:
                 self.update_status.setText("Update command launched in external terminal.")
                 self.update_log.setPlainText(PYTHON_SDK_UPDATE_COMMAND + "\n\nSee external terminal for progress.")

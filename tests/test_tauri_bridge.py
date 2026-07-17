@@ -52,6 +52,18 @@ def test_tauri_bridge_reports_desktop_diagnostics() -> None:
     assert isinstance(data["recommended_checks"], list)  # type: ignore[index]
 
 
+def test_tauri_bridge_reports_update_info() -> None:
+    payload = _bridge("update-info")
+
+    assert payload["ok"] is True
+    data = payload["data"]
+    assert data["package_spec"] == "iints-sdk-python35[full,desktop,mdmp,research,edge]"  # type: ignore[index]
+    assert "pip install -U" in str(data["pip_command"])  # type: ignore[index]
+    assert data["app_download_url"] == "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"  # type: ignore[index]
+    assert data["update_docs_url"] == "https://python35.github.io/IINTS-SDK/APP_INSTALL/"  # type: ignore[index]
+    assert data["medical_device"] is False  # type: ignore[index]
+
+
 def test_tauri_bridge_lists_molecule_assets() -> None:
     payload = _bridge("molecules")
 

@@ -350,15 +350,17 @@ def test_qt_app_exposes_mdmp_and_model_selector_actions() -> None:
 
 def test_qt_app_exposes_desktop_update_panel() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    update_source = Path("src/iints_desktop/update.py").read_text(encoding="utf-8")
 
     assert "DESKTOP_RELEASE_URL" in source
-    assert "desktop-beta-latest" in source
+    assert "desktop-beta-latest" in update_source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
     assert "Copy Update Command" in source
     assert "Update Python SDK Package" in source
     assert "Developer Settings" in source
-    assert "iints-sdk-python35[full,desktop,mdmp]" in source
+    assert "build_python_sdk_update_args()" in source
+    assert "iints-sdk-python35[full,desktop,mdmp,research,edge]" in update_source
 
 
 def test_desktop_extra_installs_pyside6_automatically() -> None:
@@ -387,8 +389,11 @@ def test_qt_app_update_terminal_is_cross_platform() -> None:
     source = Path("src/iints_desktop/terminal_utils.py").read_text(encoding="utf-8")
 
     assert "open_terminal_and_run" in source
+    assert "_escape_applescript_string" in source
+    assert "shlex.join" in source
     assert "osascript" in source
     assert "cmd.exe" in source
+    assert "x-terminal-emulator" in source
     assert "gnome-terminal" in source
     assert "konsole" in source
     assert "xfce4-terminal" in source
@@ -452,6 +457,7 @@ def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
 
 def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
     source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    update_source = Path("src/iints_desktop/update.py").read_text(encoding="utf-8")
     readme = Path("README.md").read_text(encoding="utf-8")
     app_install = Path("docs/APP_INSTALL.md").read_text(encoding="utf-8")
     desktop_docs = Path("docs/DESKTOP_APP.md").read_text(encoding="utf-8")
@@ -466,7 +472,7 @@ def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
     assert release_tag in readme
     assert release_tag in app_install
     assert release_tag in desktop_docs
-    assert release_tag in source
+    assert release_tag in source or release_tag in update_source
     assert release_tag in workflow
     assert not re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", combined)
     assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
@@ -536,6 +542,30 @@ def test_tauri_app_exposes_diagnostics_and_safe_open_actions() -> None:
     assert "open_path" in frontend_js
     assert "diagnostics-grid" in frontend_css
     assert "allowlisted native opener" in readme
+
+
+def test_tauri_app_exposes_sdk_update_actions_safely() -> None:
+    rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
+    bridge_source = Path("src/iints_desktop/tauri_bridge.py").read_text(encoding="utf-8")
+    frontend = Path("apps/iints-tauri/frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = Path("apps/iints-tauri/frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = Path("apps/iints-tauri/frontend/styles.css").read_text(encoding="utf-8")
+    readme = Path("apps/iints-tauri/README.md").read_text(encoding="utf-8")
+
+    assert "async fn desktop_update_info" in rust_source
+    assert "async fn open_sdk_update_terminal" in rust_source
+    assert "build_sdk_update_command_parts" in rust_source
+    assert "iints-sdk-python35[full,desktop,mdmp,research,edge]" in rust_source
+    assert "github.com" in rust_source
+    assert "python35.github.io" in rust_source
+    assert "def _update_info" in bridge_source
+    assert "update-info" in bridge_source
+    assert "update-terminal-btn" in frontend
+    assert "update-status" in frontend
+    assert "desktop_update_info" in frontend_js
+    assert "open_sdk_update_terminal" in frontend_js
+    assert "update-panel" in frontend_css
+    assert "fixed Rust-owned command" in readme
 
 
 def test_tauri_app_exposes_biology_and_stressor_actions() -> None:

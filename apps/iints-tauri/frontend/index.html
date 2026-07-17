@@ -31,6 +31,25 @@
         <div id="diagnostics-grid" class="diagnostics-grid" aria-live="polite"></div>
       </section>
 
+      <section class="panel update-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Maintenance</p>
+          <h2>Updates</h2>
+        </div>
+        <p class="muted">
+          Keep the Python SDK and desktop app current. The app can show the exact SDK update command,
+          copy it, or open a fixed update terminal; app bundle updates still come from GitHub releases.
+        </p>
+        <div class="button-row">
+          <button id="update-refresh-btn">Check update info</button>
+          <button id="update-download-btn">Open app downloads</button>
+          <button id="update-docs-btn">Open update docs</button>
+          <button id="update-copy-btn">Copy SDK update command</button>
+          <button id="update-terminal-btn" class="primary">Open SDK update terminal</button>
+        </div>
+        <pre id="update-status" class="status-box compact">Update info not checked yet.</pre>
+      </section>
+
       <section class="panel protocol-panel">
         <div class="panel-heading">
           <p class="eyebrow">Step 1</p>

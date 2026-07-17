@@ -114,6 +114,11 @@ async fn desktop_diagnostics() -> Result<Value, String> {
 }
 
 #[tauri::command]
+async fn desktop_update_info() -> Result<Value, String> {
+    run_python_bridge_async(vec!["update-info".to_string()]).await
+}
+
+#[tauri::command]
 async fn list_molecule_assets() -> Result<Value, String> {
     run_python_bridge_async(vec!["molecules".to_string()]).await
 }
@@ -358,6 +363,11 @@ async fn open_external_url(url: String) -> Result<(), String> {
     open_external_url_allowlisted(url).await
 }
 
+#[tauri::command]
+async fn open_sdk_update_terminal() -> Result<(), String> {
+    open_sdk_update_terminal_allowlisted().await
+}
+
 async fn open_path_allowlisted(path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let resolved = resolve_user_path(&path)?;
@@ -375,6 +385,15 @@ async fn open_external_url_allowlisted(url: String) -> Result<(), String> {
     })
     .await
     .map_err(|error| format!("Open-url task failed: {error}"))?
+}
+
+async fn open_sdk_update_terminal_allowlisted() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let command = build_sdk_update_command_text()?;
+        open_terminal_with_command(&command)
+    })
+    .await
+    .map_err(|error| format!("Open-update-terminal task failed: {error}"))?
 }
 
 fn resolve_user_path(raw: &str) -> Result<PathBuf, String> {
@@ -430,6 +449,8 @@ fn validate_external_url(raw: &str) -> Result<(), String> {
         "string-db.org",
         "clinicaltables.nlm.nih.gov",
         "www.ncbi.nlm.nih.gov",
+        "github.com",
+        "python35.github.io",
     ];
     if ALLOWED_EXTERNAL_HOSTS.contains(&host.as_str()) {
         Ok(())
@@ -495,6 +516,125 @@ fn validate_open_target(path: &Path) -> Result<(), String> {
     }
 }
 
+fn build_sdk_update_command_parts() -> Result<Vec<String>, String> {
+    let candidate = python_candidates()
+        .into_iter()
+        .next()
+        .ok_or_else(|| "No Python executable candidate is available.".to_string())?;
+    let mut parts = vec![candidate.program];
+    parts.extend(candidate.prefix_args);
+    parts.extend([
+        "-m".to_string(),
+        "pip".to_string(),
+        "install".to_string(),
+        "-U".to_string(),
+        "iints-sdk-python35[full,desktop,mdmp,research,edge]".to_string(),
+    ]);
+    Ok(parts)
+}
+
+fn quote_posix_arg(value: &str) -> String {
+    if value.is_empty() {
+        return "''".to_string();
+    }
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || "-_./:=+,@%".contains(ch))
+    {
+        return value.to_string();
+    }
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+fn quote_cmd_arg(value: &str) -> String {
+    if value.is_empty() {
+        return "\"\"".to_string();
+    }
+    if !value
+        .chars()
+        .any(|ch| matches!(ch, ' ' | '\t' | '"' | '&' | '|' | '<' | '>' | '^'))
+    {
+        return value.to_string();
+    }
+    format!("\"{}\"", value.replace('"', "\\\""))
+}
+
+fn program_on_path(program: &str) -> bool {
+    let Some(paths) = env::var_os("PATH") else {
+        return false;
+    };
+    env::split_paths(&paths).any(|dir| {
+        let candidate = dir.join(program);
+        if candidate.is_file() {
+            return true;
+        }
+        if cfg!(target_os = "windows") {
+            return dir.join(format!("{program}.exe")).is_file();
+        }
+        false
+    })
+}
+
+fn build_sdk_update_command_text() -> Result<String, String> {
+    let parts = build_sdk_update_command_parts()?;
+    if cfg!(target_os = "windows") {
+        Ok(parts.iter().map(|part| quote_cmd_arg(part)).collect::<Vec<_>>().join(" "))
+    } else {
+        Ok(parts.iter().map(|part| quote_posix_arg(part)).collect::<Vec<_>>().join(" "))
+    }
+}
+
+fn escape_applescript_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn open_terminal_with_command(command_text: &str) -> Result<(), String> {
+    if cfg!(target_os = "macos") {
+        let held_command = format!(
+            "{}; echo; echo 'IINTS update finished. You may close this terminal.'; exec zsh",
+            command_text
+        );
+        let script = format!(
+            "tell application \"Terminal\" to do script \"{}\"",
+            escape_applescript_string(&held_command)
+        );
+        Command::new("osascript")
+            .args(["-e", &script])
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("Could not open Terminal.app: {error}"))
+    } else if cfg!(target_os = "windows") {
+        Command::new("cmd.exe")
+            .args(["/c", "start", "IINTS SDK Update", "cmd.exe", "/k", command_text])
+            .spawn()
+            .map(|_| ())
+            .map_err(|error| format!("Could not open Windows terminal: {error}"))
+    } else {
+        let held_command = format!(
+            "{}; echo; echo 'IINTS update finished. You may close this terminal.'; exec bash",
+            command_text
+        );
+        let terminals: [(&str, Vec<&str>); 6] = [
+            ("x-terminal-emulator", vec!["-e", "bash", "-lc", held_command.as_str()]),
+            ("gnome-terminal", vec!["--", "bash", "-lc", held_command.as_str()]),
+            ("konsole", vec!["-e", "bash", "-lc", held_command.as_str()]),
+            ("xfce4-terminal", vec!["-x", "bash", "-lc", held_command.as_str()]),
+            ("xterm", vec!["-e", "bash", "-lc", held_command.as_str()]),
+            ("alacritty", vec!["-e", "bash", "-lc", held_command.as_str()]),
+        ];
+        for (program, args) in terminals {
+            if program_on_path(program) {
+                return Command::new(program)
+                    .args(args)
+                    .spawn()
+                    .map(|_| ())
+                    .map_err(|error| format!("Could not open {program}: {error}"));
+            }
+        }
+        Err("No supported Linux terminal emulator was found.".to_string())
+    }
+}
+
 fn open_url_with_platform(url: &str) -> Result<(), String> {
     let mut command = if cfg!(target_os = "macos") {
         let mut command = Command::new("open");
@@ -541,6 +681,7 @@ fn main() {
             desktop_status,
             list_workflows,
             desktop_diagnostics,
+            desktop_update_info,
             list_molecule_assets,
             list_evidence_connectors,
             run_genomics_simulation,
@@ -554,7 +695,8 @@ fn main() {
             start_local_ai,
             ask_local_ai,
             open_path,
-            open_external_url
+            open_external_url,
+            open_sdk_update_terminal
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");

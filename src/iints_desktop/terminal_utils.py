@@ -1,47 +1,72 @@
-import platform
-import subprocess
-import shutil
-from typing import Optional
+from __future__ import annotations
 
-def open_terminal_and_run(command: str) -> bool:
+import platform
+import shlex
+import shutil
+import subprocess
+from collections.abc import Sequence
+
+
+def _command_to_shell_text(command: str | Sequence[str]) -> str:
+    if isinstance(command, str):
+        return command
+    return shlex.join([str(part) for part in command])
+
+
+def _escape_applescript_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _hold_open_shell(command_text: str) -> str:
+    return f"{command_text}; echo; echo 'IINTS update finished. You may close this terminal.'; exec bash"
+
+
+def _hold_open_zsh(command_text: str) -> str:
+    return f"{command_text}; echo; echo 'IINTS update finished. You may close this terminal.'; exec zsh"
+
+
+def open_terminal_and_run(command: str | Sequence[str]) -> bool:
     """
-    Opens a native system terminal window and executes the given command.
-    Returns True if successfully launched, False otherwise.
+    Open a native terminal window and execute a prebuilt command.
+
+    The function accepts either a shell string or a list of argv parts. Prefer a
+    list for SDK-owned commands so paths/extras with spaces or brackets are
+    quoted deterministically before reaching the terminal.
     """
     system = platform.system().lower()
+    command_text = _command_to_shell_text(command)
 
     try:
         if system == "darwin":
-            # macOS: Use AppleScript to open Terminal.app and run the command
-            script = f'tell application "Terminal" to do script "{command}"'
+            script_command = _escape_applescript_string(_hold_open_zsh(command_text))
+            script = f'tell application "Terminal" to do script "{script_command}"'
             subprocess.Popen(["osascript", "-e", script])
             return True
 
-        elif system == "windows":
-            # Windows: Launch a new cmd window that remains open (/k)
-            subprocess.Popen(["cmd.exe", "/c", "start", "cmd.exe", "/k", command])
+        if system == "windows":
+            subprocess.Popen(["cmd.exe", "/c", "start", "IINTS SDK Update", "cmd.exe", "/k", command_text])
             return True
 
-        elif system == "linux":
-            # Linux: Try common terminal emulators
+        if system == "linux":
+            shell_command = _hold_open_shell(command_text)
             terminals = [
-                ("gnome-terminal", ["--", "bash", "-c", f"{command}; exec bash"]),
-                ("xterm", ["-e", f"{command}; bash"]),
-                ("konsole", ["-e", f"bash -c '{command}; exec bash'"]),
-                ("xfce4-terminal", ["-x", "bash", "-c", f"{command}; exec bash"]),
-                ("alacritty", ["-e", "bash", "-c", f"{command}; exec bash"])
+                ("x-terminal-emulator", ["-e", "bash", "-lc", shell_command]),
+                ("gnome-terminal", ["--", "bash", "-lc", shell_command]),
+                ("konsole", ["-e", "bash", "-lc", shell_command]),
+                ("xfce4-terminal", ["-x", "bash", "-lc", shell_command]),
+                ("xterm", ["-e", "bash", "-lc", shell_command]),
+                ("alacritty", ["-e", "bash", "-lc", shell_command]),
             ]
-            
+
             for term, args in terminals:
                 if shutil.which(term):
-                    subprocess.Popen([term] + args)
+                    subprocess.Popen([term, *args])
                     return True
-            
+
             return False
 
-        else:
-            return False
-            
-    except Exception as e:
-        print(f"Failed to open terminal: {e}")
+        return False
+
+    except Exception as exc:
+        print(f"Failed to open terminal: {exc}")
         return False

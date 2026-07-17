@@ -117,6 +117,10 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.update-panel {
+  grid-column: 1 / -1;
+}
+
 .panel-heading {
   display: flex;
   justify-content: space-between;
@@ -562,7 +566,8 @@ footer {
   .ai-panel,
   .history-panel,
   .biology-panel,
-  .evidence-panel {
+  .evidence-panel,
+  .update-panel {
     grid-column: auto;
   }
 
