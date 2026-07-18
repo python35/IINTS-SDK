@@ -438,7 +438,8 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert 'if args.backend == "qt"' in build_source
     assert 'if args.backend == "cocoa"' in build_source
     assert "require_pkg_resources_runtime_hook_compatibility" not in build_source
-    assert "pkg_resources" not in build_source
+    assert '"--exclude-module",\n        "pytest"' in build_source
+    assert '"--exclude-module",\n        "pkg_resources"' in build_source
     assert "--osx-bundle-identifier" in build_source
     assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
     assert "desktop-macos" in workflow

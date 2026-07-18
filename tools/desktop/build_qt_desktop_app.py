@@ -57,6 +57,12 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
         "iints_desktop",
         "--hidden-import",
         "iints.core.algorithms.clinical_baseline",
+        # Pandas exposes optional test helpers that can pull pytest and the
+        # removed pkg_resources API into an otherwise production-only bundle.
+        "--exclude-module",
+        "pytest",
+        "--exclude-module",
+        "pkg_resources",
     ]
     if icon_path.exists():
         command.extend(["--icon", str(icon_path)])
