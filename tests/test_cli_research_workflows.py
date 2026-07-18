@@ -244,6 +244,9 @@ def test_run_quality_artifacts_skip_local_ai_when_ollama_unavailable(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    # Exercise the offline-backend path rather than the separate CI auto-skip policy.
+    monkeypatch.delenv("CI", raising=False)
+
     class OfflineOllamaBackend:
         def __init__(self, **_: object) -> None:
             self.base_url = "http://127.0.0.1:11434"
