@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+## v1.5.30
+
+Release date: 2026-07-18
+
+### Fixed
+
+- stopped treating AlphaFold pLDDT confidence as mutation pathogenicity or a physiological effect estimate
+- blocked unknown genetic variants from entering physiological simulations without an explicit functional scalar
+- made genomics and tissue-sensitivity comparison arms deterministic by sharing a caller-controlled seed
+- rejected enabled Bergman-only stem-cell research parameters for patient models that cannot implement them
+- corrected the Qt Scenario Builder payload to use the public patient and scenario schemas
+- fixed Qt worker lifecycle, terminal stream restoration, current SDK result-column comparison, and workspace-relative structural outputs
+- made desktop update commands use native Windows quoting and select a Python interpreter that actually contains the IINTS SDK
+
+### Changed
+
+- reorganized the documentation into learn, use, research, hardware, development, reference, and release paths
+- added concise learning-path, core-concepts, and run-output guides and enabled strict documentation CI
+- added reproducible npm and Cargo lockfiles for the Tauri workbench
+- separated the reliable Tauri executable build from optional platform installer bundling
+- refreshed security-sensitive dependency floors and synchronized the Python lockfile
+
+### Safety
+
+- genetic and tissue-specific simulations now identify their functional scalars as research scenario assumptions, not clinical estimates
+- local AI remains explanatory only; deterministic SDK code remains the numerical authority
+
+### Verified
+
+- full test suite: `716 passed, 2 skipped`
+- mypy: `Success: no issues found in 204 source files`
+- Rust/Tauri: `3 passed`, clippy/fmt/check passed, native executable built
+- strict docs, manual PDF, wheel/sdist, clean-wheel smoke, and Qt smoke passed
+- Python runtime and npm dependency audits found no known vulnerabilities
+
 ## v1.5.29
 
 Release date: 2026-07-15

@@ -273,9 +273,10 @@ class Simulator:
 
         history_slice = self._predictor_history[-self._predictor_history_steps :]
         try:
-            import numpy as np
-
-            X = np.zeros((1, self._predictor_history_steps, len(self._predictor_feature_columns)), dtype=float)
+            X: np.ndarray = np.zeros(
+                (1, self._predictor_history_steps, len(self._predictor_feature_columns)),
+                dtype=float,
+            )
             for i, row in enumerate(history_slice):
                 for j, col in enumerate(self._predictor_feature_columns):
                     X[0, i, j] = float(row.get(col, 0.0))

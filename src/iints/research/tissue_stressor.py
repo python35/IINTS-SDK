@@ -1,4 +1,4 @@
-"""Engine for testing tissue-specific insulin resistance on pump algorithms."""
+"""Engine for testing tissue-specific sensitivity assumptions on algorithms."""
 
 from __future__ import annotations
 
@@ -13,14 +13,52 @@ from iints.core.algorithms.fixed_basal_bolus import FixedBasalBolus
 
 console = Console()
 
+
+def _simulate_arm(
+    *,
+    muscle_scalar: float,
+    liver_scalar: float,
+    basal_rate: float,
+    duration_minutes: int,
+    seed: int,
+) -> Any:
+    """Run one comparison arm with a caller-controlled random seed."""
+
+    patient = HovorkaPatientModel(
+        basal_insulin_rate=basal_rate,
+        muscle_sensitivity_scalar=muscle_scalar,
+        liver_sensitivity_scalar=liver_scalar,
+    )
+    controller = FixedBasalBolus(
+        {
+            "fixed_basal_rate": basal_rate,
+            "carb_ratio": 10.0,
+            "correction_factor": 50.0,
+            "target_glucose": 120.0,
+        }
+    )
+    simulator = Simulator(
+        patient_model=patient,  # type: ignore[arg-type]
+        algorithm=controller,
+        seed=seed,
+    )
+    simulator.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
+    simulator.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
+    simulator.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
+    results, _ = simulator.run(duration_minutes=duration_minutes)
+    return results
+
+
 class TissueStressor:
-    """Runs comparative multi-scale simulations for tissue-specific insulin resistance."""
+    """Runs comparative simulations for tissue-specific sensitivity hypotheses."""
 
     @staticmethod
     def run_stress_test(
         muscle_scalar: float,
         liver_scalar: float,
-        output_dir: Path
+        output_dir: Path,
+        *,
+        seed: int = 42,
     ) -> tuple[Path, dict[str, Any]]:
         """
         Runs a simulation comparing Baseline vs Hepatic Resistance vs Peripheral Resistance.
@@ -29,6 +67,7 @@ class TissueStressor:
             muscle_scalar: The scalar for muscle sensitivity (0.0 to 1.0).
             liver_scalar: The scalar for liver sensitivity (0.0 to 1.0).
             output_dir: Where to save the Plotly HTML output.
+            seed: Shared random seed for every comparison arm.
             
         Returns:
             A tuple of (html_path, metadata_dict).
@@ -38,50 +77,38 @@ class TissueStressor:
         except ImportError:
             raise RuntimeError("Plotly is required for tissue stressor. Install with: pip install plotly")
 
+        if not 0.0 <= muscle_scalar <= 1.0:
+            raise ValueError("muscle_scalar must be between 0.0 and 1.0")
+        if not 0.0 <= liver_scalar <= 1.0:
+            raise ValueError("liver_scalar must be between 0.0 and 1.0")
+
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # We will simulate a standard meal scenario
         duration_minutes = 24 * 60
         basal_rate = 0.8
         
-        # 1. Baseline
-        baseline_patient = HovorkaPatientModel(
-            basal_insulin_rate=basal_rate,
-            muscle_sensitivity_scalar=1.0,
-            liver_sensitivity_scalar=1.0
+        baseline_results = _simulate_arm(
+            muscle_scalar=1.0,
+            liver_scalar=1.0,
+            basal_rate=basal_rate,
+            duration_minutes=duration_minutes,
+            seed=seed,
         )
-        baseline_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
-        baseline_sim = Simulator(patient_model=baseline_patient, algorithm=baseline_controller)  # type: ignore[arg-type]
-        baseline_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
-        baseline_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
-        baseline_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
-        baseline_results, _ = baseline_sim.run(duration_minutes=duration_minutes)
-        
-        # 2. Hepatic Resistance (Liver only)
-        hepatic_patient = HovorkaPatientModel(
-            basal_insulin_rate=basal_rate,
-            muscle_sensitivity_scalar=1.0,
-            liver_sensitivity_scalar=liver_scalar
+        hepatic_results = _simulate_arm(
+            muscle_scalar=1.0,
+            liver_scalar=liver_scalar,
+            basal_rate=basal_rate,
+            duration_minutes=duration_minutes,
+            seed=seed,
         )
-        hepatic_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
-        hepatic_sim = Simulator(patient_model=hepatic_patient, algorithm=hepatic_controller)  # type: ignore[arg-type]
-        hepatic_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
-        hepatic_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
-        hepatic_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
-        hepatic_results, _ = hepatic_sim.run(duration_minutes=duration_minutes)
-
-        # 3. Peripheral Resistance (Muscle only)
-        peripheral_patient = HovorkaPatientModel(
-            basal_insulin_rate=basal_rate,
-            muscle_sensitivity_scalar=muscle_scalar,
-            liver_sensitivity_scalar=1.0
+        peripheral_results = _simulate_arm(
+            basal_rate=basal_rate,
+            muscle_scalar=muscle_scalar,
+            liver_scalar=1.0,
+            duration_minutes=duration_minutes,
+            seed=seed,
         )
-        peripheral_controller = FixedBasalBolus({"fixed_basal_rate": basal_rate, "carb_ratio": 10.0, "correction_factor": 50.0, "target_glucose": 120.0})
-        peripheral_sim = Simulator(patient_model=peripheral_patient, algorithm=peripheral_controller)  # type: ignore[arg-type]
-        peripheral_sim.add_stress_event(StressEvent(start_time=8 * 60, event_type="meal", value=60.0))
-        peripheral_sim.add_stress_event(StressEvent(start_time=13 * 60, event_type="meal", value=80.0))
-        peripheral_sim.add_stress_event(StressEvent(start_time=19 * 60, event_type="meal", value=70.0))
-        peripheral_results, _ = peripheral_sim.run(duration_minutes=duration_minutes)
 
         # Plotting
         fig = go.Figure()
@@ -110,7 +137,7 @@ class TissueStressor:
         fig.add_hline(y=180, line_dash="dot", line_color="orange", annotation_text="Hyper")
 
         fig.update_layout(
-            title=f"Pump Algorithm Stress Test: GTEx Tissue-Specific Resistance",
+            title=f"Pump Algorithm Stress Test: Tissue-Sensitivity Hypotheses (seed {seed})",
             xaxis_title="Time (Hours)",
             yaxis_title="Blood Glucose (mg/dL)",
             template="plotly_white",
@@ -126,6 +153,9 @@ class TissueStressor:
         metadata = {
             "muscle": muscle_scalar,
             "liver": liver_scalar,
-            "html_path": str(html_path)
+            "seed": seed,
+            "html_path": str(html_path),
+            "research_only": True,
+            "scalars_are_scenario_assumptions": True,
         }
         return html_path, metadata

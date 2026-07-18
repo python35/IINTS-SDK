@@ -1,80 +1,65 @@
 # Documentation By Role
 
-This is the slower, exhaustive index. If you only need the fastest next click, start with [Choose Your Path](USER_GUIDE_MAP.md).
+The main navigation follows a learning sequence. This page gives an alternative index by responsibility.
 
-## If You Are New
+## First-Time User
 
-Start in this order:
+1. [Learning Path](LEARNING_PATH.md)
+2. [Installation](INSTALLATION.md)
+3. [First Run](QUICKSTART.md)
+4. [Core Concepts](CORE_CONCEPTS.md)
+5. [Understand A Run](RUN_OUTPUTS.md)
 
-1. [Choose Your Path](USER_GUIDE_MAP.md)
-2. [Quickstart](QUICKSTART.md)
-3. [Command Cheatsheet](CLI_CHEATSHEET.md)
-4. [Getting Started](GETTING_STARTED.md)
-5. [Installation](INSTALLATION.md)
-6. [Troubleshooting](TROUBLESHOOTING.md)
-7. [Command Reference](COMMAND_REFERENCE.md)
+## Simulation Researcher
 
-Beginner-friendly CLI entry points:
-- `iints start`
-- `iints guide`
-- `iints demo`
-- `iints run --wizard`
-- `iints doctor --full --suggest`
+1. [Complete First Workflow](GETTING_STARTED.md)
+2. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+3. [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
+4. [Study Analysis](STUDY_ANALYSIS.md)
+5. [Evidence Bundle](EVIDENCE_BUNDLE.md)
 
-## If You Are A Research User
+## Data Reviewer
 
-Go here first:
-- [Workflow Hub](WORKFLOWS.md)
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
-- [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md)
-- [Local AI Research](LOCAL_AI_RESEARCH.md)
-- [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
-- [MDMP Quickstart](MDMP_QUICKSTART.md)
-- [Complete Source Library](SOURCE_LIBRARY.md)
-- [Evidence Base](EVIDENCE_BASE.md)
-- [Full Technical Manual](manuals/IINTS-AF_SDK_Manual.md)
+1. [Certification Quickstart](MDMP_QUICKSTART.md)
+2. [Certification Guide](MDMP_FULL_GUIDE.md)
+3. [MDMP Specification](MDMP.md)
+4. [Real-Data Realism Gate](REAL_DATA_REALISM.md)
 
-## If You Are Working On Edge Hardware
+## AI Researcher
 
-Start here:
-- [Hardware Hub](HARDWARE.md)
-- [Edge Hardware & SBC Matrix](EDGE_HARDWARE.md)
-- [Jetson Endurance Mode](JETSON_ENDURANCE.md)
-- [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md)
-- [Maker Faire Pi Mode](MAKERFAIRE_PI.md)
-- [Maker Faire Pi Checklist](MAKERFAIRE_PI_CHECKLIST.md)
-- [Arduino UNO Q Setup](ARDUINO_UNO_Q.md)
+1. [AI Assistant](AI_ASSISTANT.md) for run explanation
+2. [Glucose Forecast Model](GLUCOSE_MODEL.md) for prediction
+3. [Interpreting Models](comparison_interpretation.md) for evaluation
+4. [AI Safety Gates](LOCAL_AI_SAFETY_GATES.md) for boundaries
+5. [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) for data provenance
 
-## If You Need A Fast CLI Map
+## Hardware Researcher
 
-Read:
-- [Reference Hub](REFERENCE_OVERVIEW.md)
+1. [Hardware Hub](HARDWARE.md)
+2. [Edge Hardware Matrix](EDGE_HARDWARE.md)
+3. the selected board guide
+4. [Remote Deploy](EDGE_REMOTE_DEPLOY.md) if the device is remote
+
+## SDK Contributor
+
+1. [Developer Portal](DEVELOPER_PORTAL.md)
+2. [Visual Architecture](ARCHITECTURE_OVERVIEW.md)
+3. [API Reference](API_REFERENCE.md)
+4. [Contribute Safely](CONTRIBUTING_SAFELY.md)
+5. [Maintainer Guide](MAINTAINER_GUIDE.md) when release responsibilities apply
+
+## Reviewer Or Jury Member
+
+1. [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md)
+2. [Project Boundaries](PROJECT_BOUNDARIES.md)
+3. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+4. [Evidence Base](EVIDENCE_BASE.md)
+5. [Intended Use And Claims](governance/INTENDED_USE_AND_CLAIMS.md)
+
+## Fast Lookup
+
 - [Command Cheatsheet](CLI_CHEATSHEET.md)
-- [Command Reference](COMMAND_REFERENCE.md)
-- [CLI & Advanced Reference](TECHNICAL_README.md)
-
-## If Something Broke
-
-Start here:
+- [Complete Command Reference](COMMAND_REFERENCE.md)
+- [Reference Hub](REFERENCE_OVERVIEW.md)
 - [Troubleshooting](TROUBLESHOOTING.md)
-- [Installation](INSTALLATION.md)
-- `iints doctor --full --suggest`
-
-## If You Maintain The SDK
-
-Use:
-- [Developer Portal](DEVELOPER_PORTAL.md)
-- [Visual Architecture](ARCHITECTURE_OVERVIEW.md)
-- [API Reference](API_REFERENCE.md)
-- [Contribute Safely](CONTRIBUTING_SAFELY.md)
-- [Maintainer Guide](MAINTAINER_GUIDE.md)
-- [Documentation Coverage Reference](PUBLIC_DOCUMENTATION.md)
-- [Maintainer Release Checklist](PUBLIC_RELEASE_CHECKLIST.md)
 - [Release Archive](releases/INDEX.md)
-- [MDMP Packaging Workflow](DUAL_REPO_WORKFLOW.md)
-
-## If You Want The Whole Map
-
-Read [Choose Your Path](USER_GUIDE_MAP.md). It connects the public docs into a single route for external users, researchers, edge users, and maintainers.

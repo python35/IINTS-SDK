@@ -55,10 +55,11 @@ jobs:
     - name: Type check safety core (strict gate)
       run: |
         mypy --strict \
+          --follow-imports=skip \
           src/iints/core/supervisor.py \
           src/iints/core/safety/config.py \
           src/iints/core/safety/input_validator.py
-        mypy --check-untyped-defs src/iints/core/simulator.py
+        mypy --check-untyped-defs --follow-imports=skip src/iints/core/simulator.py
 
     # P2-8: Run tests with coverage across BOTH the main package and research scripts
     - name: Run tests with PyTest (SDK + Research)

@@ -39,7 +39,47 @@ def test_genomics_engine_known_mutation_metadata_is_deterministic() -> None:
 
     assert data["scalar"] == 0.1
     assert data["residue"] == 938
-    assert "Donohue" in data["desc"]
+    assert data["supported"] is True
+    assert data["evidence_type"] == "illustrative_scenario_assumption"
+    assert "not a clinical estimate" in data["desc"]
+
+
+def test_unknown_mutation_never_infers_function_from_plddt(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "iints.research.alphafold_engine.AlphaFoldGenomicsEngine.evaluate_plddt_impact",
+        lambda *_args: {
+            "plddt": 98.0,
+            "confidence_band": "very_high",
+            "supports_functional_inference": False,
+            "conclusion": "Structural confidence only.",
+        },
+    )
+
+    data = GenomicsEngine.evaluate_mutation("INSR", "A999V")
+
+    assert data["scalar"] is None
+    assert data["supported"] is False
+    assert data["evidence_type"] == "structural_context_only"
+
+
+def test_unknown_mutation_is_not_simulated_without_functional_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    monkeypatch.setattr(
+        GenomicsEngine,
+        "evaluate_mutation",
+        staticmethod(
+            lambda *_args: {
+                "scalar": None,
+                "supported": False,
+                "desc": "No functional evidence.",
+            }
+        ),
+    )
+
+    with pytest.raises(ValueError, match="pLDDT is structural confidence"):
+        GenomicsEngine.run_multi_scale_simulation("INSR", "A999V", tmp_path)
 
 
 def test_plotly_dependency_error_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:

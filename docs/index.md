@@ -1,73 +1,85 @@
-# IINTS-AF SDK Documentation
+# IINTS-AF SDK
 
-IINTS-AF is a research and education SDK for insulin-algorithm simulation, glucose-data quality review, local AI experiments, and bench-only hardware workflows.
+IINTS-AF is an open-source research SDK for building reproducible diabetes-technology experiments. It combines virtual patients, glucose and insulin scenarios, candidate algorithms, deterministic safety checks, data-quality tools, and research reports in one workflow.
 
-!!! warning "Scope"
-    IINTS-AF is not a medical device, does not provide clinical dosing advice, and is not intended for real insulin delivery. Use it for simulation, teaching, benchmarking, documentation, and controlled bench research.
+It is designed for **simulation, education, benchmarking, and pre-clinical software research**.
 
-## Start Here
+!!! warning "Research boundary"
+    IINTS-AF is not a medical device. It must not be used for insulin dosing, diagnosis, treatment decisions, or real-time patient care.
 
-| Need | Page | Command |
+## Start In The Right Place
+
+| Your goal | Start here | You will learn to |
 | --- | --- | --- |
-| Install and verify the SDK | [Quickstart](QUICKSTART.md) | `iints doctor --smoke-run` |
-| Choose the right workflow | [Choose Your Path](USER_GUIDE_MAP.md) | `iints guide` |
-| Look up practical commands | [Command Cheatsheet](CLI_CHEATSHEET.md) | `iints --help` |
-| Prepare a live demonstration | [Booth Demo & Presentation](BOOTH_DEMO.md) | `iints demo eucys` |
-| Keep the install current | [Updating The SDK](UPDATING.md) | `iints update` |
-| Explain the safety boundary | [Project Boundaries](PROJECT_BOUNDARIES.md) | `iints safety-visualize` |
-| Understand sources and assumptions | [Complete Source Library](SOURCE_LIBRARY.md) | `iints sources` |
-| Work with hardware | [Hardware Hub](HARDWARE.md) | `iints edge doctor` |
+| Learn the SDK from the beginning | [Learning Path](LEARNING_PATH.md) | install, run, inspect, and validate an experiment |
+| Get one result quickly | [First Run](QUICKSTART.md) | verify the installation and create a demo bundle |
+| Use the desktop interface | [Desktop App](DESKTOP_APP.md) | run workflows and inspect outputs without memorising CLI commands |
+| Work with data or local AI | [Workflow Hub](WORKFLOWS.md) | choose the correct data, AI, study, or reporting route |
+| Understand the scientific assumptions | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | separate implementation, evidence, calibration, and limitations |
+| Contribute code | [Developer Portal](DEVELOPER_PORTAL.md) | navigate the architecture and run the required checks |
 
-## What The SDK Covers
+## How The SDK Works
 
-| Area | What it does | Main pages |
-| --- | --- | --- |
-| Simulation | Runs virtual-patient scenarios with algorithms, safety supervision, and reproducible outputs | [Getting Started](GETTING_STARTED.md), [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
-| Data quality | Imports CGM/pump data, checks realism, and creates MDMP-style certification artifacts | [MDMP Quickstart](MDMP_QUICKSTART.md), [Real-Data Realism Gate](REAL_DATA_REALISM.md) |
-| Research AI | Tracks local AI setup, Mistral model migration, and public/request-gated diabetes datasets for research | [AI Assistant](AI_ASSISTANT.md), [Mistral Model Migration](MISTRAL_MODEL_MIGRATION.md), [Local AI Research](LOCAL_AI_RESEARCH.md) |
-| Reports | Generates run reports, evidence bundles, posters, and AGP-style research glucose summaries | [Research Evidence Bundle](EVIDENCE_BUNDLE.md), [Command Reference](COMMAND_REFERENCE.md) |
-| Edge hardware | Supports Raspberry Pi, Jetson endurance runs, bench-only Pico/UNO workflows, and FPGA safety-core experiments | [Hardware Hub](HARDWARE.md), [Jetson Endurance Mode](JETSON_ENDURANCE.md), [FPGA Mode](FPGA_MODE.md) |
-| Development | Documents architecture, API symbols, contribution checks, and release maintenance | [Developer Portal](DEVELOPER_PORTAL.md), [API Reference](API_REFERENCE.md), [Maintainer Guide](MAINTAINER_GUIDE.md) |
+```mermaid
+flowchart LR
+    A["Patient and scenario"] --> B["Simulation engine"]
+    B --> C["Candidate algorithm"]
+    C --> D["Deterministic safety checks"]
+    D --> E["Run bundle"]
+    E --> F["Validation, reports, and optional AI review"]
+```
 
-## Core Workflow
+The important separation is:
 
-1. Configure a patient, scenario, algorithm, seed, and safety settings.
-2. Run a simulation or long study and preserve the output bundle.
-3. Validate results with realism, safety, and reproducibility checks.
-4. Package evidence through reports, manifests, plots, and citations.
+1. **The simulator** computes the virtual physiological state.
+2. **The candidate algorithm** proposes an experimental action.
+3. **The safety layer** applies fixed, reviewable limits.
+4. **The evidence layer** records inputs, outputs, versions, and checks.
+5. **The optional AI layer** explains validated results; it is not the source of numerical truth.
 
-## First Commands
+Read [Core Concepts](CORE_CONCEPTS.md) for the vocabulary used throughout the documentation.
+
+## First Installation
+
+IINTS-AF supports Python 3.10 through 3.14.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge]"
+python -m pip install --upgrade pip
+python -m pip install "iints-sdk-python35[full,mdmp]"
 
 iints doctor --smoke-run
-iints update --dry-run
-iints demo eucys --output-dir results/live_demo
+iints demo quick --output-dir results/first_run
 ```
 
-For source-install testing from the latest GitHub version:
+On Windows PowerShell, activate the environment with:
 
-```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge] @ git+https://github.com/python35/IINTS-SDK.git"
+```powershell
+.venv\Scripts\Activate.ps1
 ```
 
-## What To Read Next
+See [Installation](INSTALLATION.md) for source installs, optional research dependencies, and platform-specific help.
 
-| If you are... | Read next |
-| --- | --- |
-| A first-time user | [Quickstart](QUICKSTART.md) then [Getting Started](GETTING_STARTED.md) |
-| Preparing for a jury or booth demo | [Booth Demo & Presentation](BOOTH_DEMO.md) then [Command Cheatsheet](CLI_CHEATSHEET.md) |
-| Training local AI models | [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) then [Local AI Research](LOCAL_AI_RESEARCH.md) |
-| Reviewing evidence | [Complete Source Library](SOURCE_LIBRARY.md) then [Research Evidence Bundle](EVIDENCE_BUNDLE.md) |
-| Building hardware demos | [Hardware Hub](HARDWARE.md) then the board-specific guide |
-| Maintaining the SDK | [Developer Portal](DEVELOPER_PORTAL.md) then [Contribute Safely](CONTRIBUTING_SAFELY.md) |
+## What You Can Build
 
-## Project Boundary
+- deterministic virtual-patient simulations
+- repeatable scenario and algorithm comparisons
+- glucose-data quality and MDMP certification artifacts
+- AGP-style research reports, study summaries, and evidence bundles
+- local Ollama-assisted explanations of completed runs
+- glucose forecasting experiments with explicit evaluation gates
+- bench-only Raspberry Pi, Pico, UNO Q, Jetson, and FPGA workflows
+- interactive structural-biology and genomics research demonstrations
 
-IINTS-AF is useful for asking research questions such as whether a simulation is reproducible, whether a glucose trace is plausible, whether a controller behaves safely in a virtual patient, and whether a demo can be explained transparently.
+Each advanced feature has its own limitations. The documentation distinguishes between **implemented behavior**, **scientific inspiration**, **empirical calibration**, and **clinical validation**. Those terms are not interchangeable.
 
-It is not proof that an insulin algorithm is clinically safe. Any real-world medical use would require clinical validation, regulatory review, cybersecurity review, hardware verification, and qualified medical oversight outside the scope of this SDK.
+## A Good First Session
+
+1. Complete the [First Run](QUICKSTART.md).
+2. Read [Core Concepts](CORE_CONCEPTS.md).
+3. Learn how to [Understand A Run](RUN_OUTPUTS.md).
+4. Complete the [First Workflow](GETTING_STARTED.md).
+5. Choose a specialised route from the [Workflow Hub](WORKFLOWS.md).
+
+For the project website, visit [iints.org](https://iints.org). For source code and issues, use [GitHub](https://github.com/python35/IINTS-SDK).

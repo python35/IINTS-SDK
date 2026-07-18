@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import platform
-import shlex
 import shutil
 import subprocess
 from collections.abc import Sequence
+
+from iints_desktop.update import format_shell_command
 
 
 def _command_to_shell_text(command: str | Sequence[str]) -> str:
     if isinstance(command, str):
         return command
-    return shlex.join([str(part) for part in command])
+    return format_shell_command([str(part) for part in command])
 
 
 def _escape_applescript_string(value: str) -> str:

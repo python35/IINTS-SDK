@@ -49,6 +49,7 @@ from iints_desktop.update import (
 PYTHON_SDK_UPDATE_COMMAND = build_python_sdk_update_command()
 ENABLE_EMBEDDED_WEBENGINE = os.environ.get("QT_QPA_PLATFORM") != "offscreen"
 _CRASH_LOG_HANDLE: Any | None = None
+_QWEBENGINE_VIEW: Any = None
 
 
 
@@ -124,12 +125,13 @@ try:  # pragma: no cover - optional GUI dependency
     )
 except ModuleNotFoundError as exc:  # pragma: no cover - optional GUI dependency
     _PYSIDE_IMPORT_ERROR: ModuleNotFoundError | None = exc
-    _QWEBENGINE_VIEW = None
 else:  # pragma: no cover - optional GUI dependency
     _PYSIDE_IMPORT_ERROR = None
     if ENABLE_EMBEDDED_WEBENGINE:
         try:
-            from PySide6.QtWebEngineWidgets import QWebEngineView as _QWEBENGINE_VIEW  # type: ignore[import-not-found,no-redef]
+            from PySide6.QtWebEngineWidgets import QWebEngineView  # type: ignore[import-not-found]
+
+            _QWEBENGINE_VIEW = QWebEngineView
         except ModuleNotFoundError:
             _QWEBENGINE_VIEW = None
     else:
@@ -279,16 +281,17 @@ if _PYSIDE_IMPORT_ERROR is None:
         finished = Signal(object)
         failed = Signal(str)
 
-        def __init__(self, *, target: str) -> None:
+        def __init__(self, *, target: str, output_dir: Path) -> None:
             super().__init__()
             self.target = target
+            self.output_dir = output_dir
 
         @Slot()
         def run(self) -> None:
             try:
                 from iints.research.structure import render_pae
 
-                results = render_pae(self.target)
+                results = render_pae(self.target, output_dir=self.output_dir)
                 self.finished.emit(results[0] if results else None)
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
@@ -299,17 +302,16 @@ if _PYSIDE_IMPORT_ERROR is None:
         finished = Signal(object)
         failed = Signal(str)
 
-        def __init__(self, uniprot_id: str):
+        def __init__(self, uniprot_id: str, output_dir: Path):
             super().__init__()
             self.uniprot_id = uniprot_id
+            self.output_dir = output_dir
 
         @Slot()
         def run(self) -> None:
             try:
-                from pathlib import Path
-                out_dir = Path("results") / "structural"
-                cif_path = fetch_alphafold_structure(self.uniprot_id, out_dir)
-                html_path = generate_3dmol_html(cif_path, out_dir)
+                cif_path = fetch_alphafold_structure(self.uniprot_id, self.output_dir)
+                html_path = generate_3dmol_html(cif_path, self.output_dir)
                 self.finished.emit((cif_path, html_path, self.uniprot_id))
             except Exception as exc:
                 self.failed.emit(str(exc))
@@ -332,10 +334,11 @@ if _PYSIDE_IMPORT_ERROR is None:
                 from iints.research.genomics_engine import GenomicsEngine
                 html_path, data = GenomicsEngine.run_multi_scale_simulation(self.gene, self.variant, self.out_dir)
 
-                msg = f"Simulated {self.gene} {self.variant}. " \
-                      f"Impact: {int(data['scalar']*100)}% affinity. " \
-                      f"Description: {data['desc']}. " \
-                      f"Plot saved to: {html_path}"
+                msg = (
+                    f"Illustrative comparison for {self.gene} {self.variant}. "
+                    f"Scenario assumption: {int(data['scalar'] * 100)}% retained function. "
+                    f"Description: {data['desc']}. Plot saved to: {html_path}"
+                )
                 self.finished.emit((msg, data))
             except Exception:  # pragma: no cover - GUI error path
                 self.failed.emit(traceback.format_exc())
@@ -429,6 +432,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.result_graph_label = QLabel("Load a results CSV to view a glucose graph.")
             self.result_graph_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.result_graph_stack.addWidget(self.result_graph_label)
+            self.result_graph_web: Any | None
             if _QWEBENGINE_VIEW:
                 self.result_graph_web = _QWEBENGINE_VIEW()
                 self.result_graph_stack.addWidget(self.result_graph_web)
@@ -437,7 +441,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.history_table = QTableWidget(0, 7)
             self.ai_model = QComboBox()
             self.ai_model.setEditable(True)
-            self.batch_queue = []
+            self.batch_queue: list[dict[str, Any]] = []
             self.batch_running = False
             self.batch_list_widget = QListWidget()
             self.ai_model.addItems(list(RECOMMENDED_OLLAMA_MODELS))
@@ -544,7 +548,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             icon = QIcon(str(icon_path))
             if not icon.isNull():
                 self.setWindowIcon(icon)
-                app = QApplication.instance()
+                app = cast(QApplication | None, QApplication.instance())
                 if app is not None:
                     app.setWindowIcon(icon)
 
@@ -621,13 +625,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.terminal_dock.hide() # Hidden by default
 
             # Redirect stdout/stderr
+            self._original_stdout = sys.stdout
+            self._original_stderr = sys.stderr
             self.stream_redirector = EmittingStream()
-            self.stream_redirector.textWritten.connect(
-                lambda text: (
-                    self.terminal_text.moveCursor(QTextCursor.MoveOperation.End),
-                    self.terminal_text.insertPlainText(text)
-                )
-            )
+            self.stream_redirector.textWritten.connect(self._append_terminal_text)
             sys.stdout = self.stream_redirector
             sys.stderr = self.stream_redirector
             self._build_run_tab(run_tab)
@@ -660,6 +661,18 @@ if _PYSIDE_IMPORT_ERROR is None:
             status_bar.addPermanentWidget(workspace_label)
             self.workspace_status = workspace_label
             self.setStatusBar(status_bar)
+
+        @Slot(str)
+        def _append_terminal_text(self, text: str) -> None:
+            self.terminal_text.moveCursor(QTextCursor.MoveOperation.End)
+            self.terminal_text.insertPlainText(text)
+
+        def closeEvent(self, event: Any) -> None:
+            if sys.stdout is self.stream_redirector:
+                sys.stdout = self._original_stdout
+            if sys.stderr is self.stream_redirector:
+                sys.stderr = self._original_stderr
+            super().closeEvent(event)
 
 
         def _build_menu_bar(self) -> None:
@@ -1028,7 +1041,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
             self.history_table.setHorizontalHeaderLabels(["Time", "Workflow", "Preset", "Seed", "Run ID", "PDF", "CSV"])
             self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-            self.history_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+            self.history_table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
             self.history_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
             self.history_table.itemSelectionChanged.connect(self._update_history_action_buttons)
             header = self.history_table.horizontalHeader()
@@ -1273,7 +1286,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             config_layout.addRow("Random Seed:", self.custom_seed)
 
             self.custom_basal = QDoubleSpinBox()
-            self.custom_basal.setRange(0.0, 5.0)
+            self.custom_basal.setRange(0.0, 3.0)
             self.custom_basal.setSingleStep(0.1)
             self.custom_basal.setValue(0.8)
             self.custom_basal.setToolTip("Basal Rate [U/h]:\nThe continuous background insulin infusion rate modeled via subcutaneous absorption kinetics.")
@@ -1286,7 +1299,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             config_layout.addRow("Insulin Sensitivity (ISF):", self.custom_isf)
 
             self.custom_cr = QDoubleSpinBox()
-            self.custom_cr.setRange(1.0, 50.0)
+            self.custom_cr.setRange(3.0, 30.0)
             self.custom_cr.setValue(10.0)
             self.custom_cr.setToolTip("Carbohydrate Ratio [g/U]:\nThe grams of carbohydrates that are covered by 1 Unit of insulin during a meal bolus calculation.")
             config_layout.addRow("Carb Ratio (g/U):", self.custom_cr)
@@ -1412,7 +1425,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.seed.setValue(config["seed"])
                 self._run_selected_workflow()
             else:
-                self._run_custom_payload(config["payload"])
+                self._run_custom_payload(config["payload"], seed=int(config["seed"]))
 
         def _add_custom_meal(self) -> None:
             row = self.meals_table.rowCount()
@@ -1421,8 +1434,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.meals_table.setItem(row, 1, QTableWidgetItem("60"))
 
         def _remove_custom_meal(self) -> None:
-            for item in self.meals_table.selectedItems():
-                self.meals_table.removeRow(item.row())
+            selected_rows = {item.row() for item in self.meals_table.selectedItems()}
+            for row in sorted(selected_rows, reverse=True):
+                self.meals_table.removeRow(row)
 
         def _get_custom_preset_dict(self) -> dict[str, Any]:
             meals = []
@@ -1433,7 +1447,13 @@ if _PYSIDE_IMPORT_ERROR is None:
                     if time_item and carbs_item:
                         time_min = int(time_item.text())
                         carbs_g = float(carbs_item.text())
-                        meals.append({"time_minutes": time_min, "carbohydrates_g": carbs_g})
+                        meals.append(
+                            {
+                                "start_time": time_min,
+                                "event_type": "meal",
+                                "value": carbs_g,
+                            }
+                        )
                 except ValueError:
                     pass
 
@@ -1442,27 +1462,39 @@ if _PYSIDE_IMPORT_ERROR is None:
                 "duration_minutes": self.custom_duration.value(),
                 "time_step_minutes": self.custom_timestep.value(),
                 "patient_config": {
-                    "base_basal_rate": self.custom_basal.value(),
-                    "insulin_sensitivity_factor": self.custom_isf.value(),
-                    "carb_ratio": self.custom_cr.value(),
+                    "basal_insulin_rate": self.custom_basal.value(),
+                    "insulin_sensitivity": self.custom_isf.value(),
+                    "carb_factor": self.custom_cr.value(),
                     "stem_cell_engraftment_percent": self.custom_engraftment.value(),
                     "stem_cell_subq_fraction": self.custom_subq_fraction.value(),
                     "immune_rejection_rate": self.custom_immune_decay.value(),
                 },
                 "scenario": {
-                    "meals": meals,
-                }
+                    "scenario_name": "Desktop custom scenario",
+                    "scenario_version": "1.0",
+                    "description": "Scenario created with the IINTS-AF desktop workbench.",
+                    "stress_events": meals,
+                },
             }
 
         def _run_custom_scenario(self) -> None:
+            self._run_custom_payload(
+                self._get_custom_preset_dict(),
+                seed=int(self.custom_seed.value()),
+            )
+
+        def _run_custom_payload(self, payload: dict[str, Any], *, seed: int) -> None:
             output_dir = self.output_dir.text().strip()
             if not output_dir:
                 self.status.setText("Output workspace not selected.")
                 return
+            if self.current_thread is not None:
+                self.status.setText("A simulation is already running.")
+                return
 
+            self._set_running_state(True)
             self.status.setText("Running Custom Scenario...")
             self.progress_bar.show()
-            self.run_button.setEnabled(False)
             self._write_log("\nStarting custom workflow from Scenario Builder.\n")
             if self.tabs is not None:
                 self.tabs.setCurrentIndex(0)
@@ -1470,13 +1502,13 @@ if _PYSIDE_IMPORT_ERROR is None:
             thread = QThread(self)
             worker = RunWorker(
                 output_dir=output_dir,
-                seed=self.custom_seed.value(),
-                custom_preset=self._get_custom_preset_dict()
+                seed=seed,
+                custom_preset=payload,
             )
             worker.moveToThread(thread)
             thread.started.connect(worker.run)
-            worker.finished.connect(self._handle_run_success)
-            worker.failed.connect(self._handle_run_error)
+            worker.finished.connect(self._handle_success)
+            worker.failed.connect(self._handle_error)
             worker.log.connect(self._write_log)
             worker.finished.connect(thread.quit)
             worker.failed.connect(thread.quit)
@@ -1484,8 +1516,10 @@ if _PYSIDE_IMPORT_ERROR is None:
             worker.failed.connect(worker.deleteLater)
             worker.telemetry.connect(self._update_telemetry)
             thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_worker_refs)
+            self.current_thread = thread
+            self.current_worker = worker
             thread.start()
-            self._workers.append(thread)
 
         def _save_custom_json(self) -> None:
             path, _ = QFileDialog.getSaveFileName(self, "Save Custom Scenario", "", "JSON Files (*.json)")
@@ -1503,16 +1537,37 @@ if _PYSIDE_IMPORT_ERROR is None:
                     self.custom_duration.setValue(data.get("duration_minutes", 1440))
                     self.custom_timestep.setValue(data.get("time_step_minutes", 5))
                     patient = data.get("patient_config", {})
-                    self.custom_basal.setValue(patient.get("base_basal_rate", 0.8))
-                    self.custom_isf.setValue(patient.get("insulin_sensitivity_factor", 45.0))
-                    self.custom_cr.setValue(patient.get("carb_ratio", 10.0))
+                    self.custom_basal.setValue(
+                        patient.get("basal_insulin_rate", patient.get("base_basal_rate", 0.8))
+                    )
+                    self.custom_isf.setValue(
+                        patient.get("insulin_sensitivity", patient.get("insulin_sensitivity_factor", 45.0))
+                    )
+                    self.custom_cr.setValue(patient.get("carb_factor", patient.get("carb_ratio", 10.0)))
+                    self.custom_engraftment.setValue(patient.get("stem_cell_engraftment_percent", 0.0))
+                    self.custom_subq_fraction.setValue(patient.get("stem_cell_subq_fraction", 0.0))
+                    self.custom_immune_decay.setValue(patient.get("immune_rejection_rate", 0.0))
 
                     self.meals_table.setRowCount(0)
-                    for meal in data.get("scenario", {}).get("meals", []):
+                    scenario = data.get("scenario", {})
+                    meals = [
+                        event
+                        for event in scenario.get("stress_events", [])
+                        if event.get("event_type") == "meal"
+                    ]
+                    if not meals:
+                        meals = scenario.get("meals", [])
+                    for meal in meals:
                         self._add_custom_meal()
                         row = self.meals_table.rowCount() - 1
-                        self.meals_table.item(row, 0).setText(str(meal.get("time_minutes", 0)))
-                        self.meals_table.item(row, 1).setText(str(meal.get("carbohydrates_g", 0)))
+                        time_value = meal.get("start_time", meal.get("time_minutes", 0))
+                        carb_value = meal.get("value", meal.get("carbohydrates_g", 0))
+                        time_item = self.meals_table.item(row, 0)
+                        carb_item = self.meals_table.item(row, 1)
+                        if time_item is not None:
+                            time_item.setText(str(time_value))
+                        if carb_item is not None:
+                            carb_item.setText(str(carb_value))
                     self.status.setText(f"Loaded custom scenario from {path}")
                 except Exception as e:
                     self.status.setText(f"Failed to load JSON: {e}")
@@ -1575,7 +1630,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             dev_box = QGroupBox("Developer Settings")
             dev_layout = QVBoxLayout(dev_box)
             self.show_terminal_checkbox = QCheckBox("Show Integrated Terminal")
-            self.show_terminal_checkbox.toggled.connect(self.terminal_dock.setVisible)
+            terminal_dock = self.terminal_dock
+            if terminal_dock is not None:
+                self.show_terminal_checkbox.toggled.connect(terminal_dock.setVisible)
             dev_layout.addWidget(self.show_terminal_checkbox)
             layout.addWidget(dev_box)
 
@@ -2288,7 +2345,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.molecule_structure_status.setText(f"Fetching {uniprot_id} from AlphaFold...")
 
             thread = QThread(self)
-            worker = AlphaFoldFetchWorker(uniprot_id)
+            worker = AlphaFoldFetchWorker(uniprot_id, self._structural_output_dir())
             worker.moveToThread(thread)
 
             thread.started.connect(worker.run)
@@ -2378,7 +2435,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             if web_view is not None:
                 from iints_desktop.render_3dmol import generate_3dmol_html
                 try:
-                    out_dir = Path("results") / "structural"
+                    out_dir = self._structural_output_dir()
                     html_path = generate_3dmol_html(molecule.structure_path, out_dir)
                     web_view.setUrl(QUrl.fromLocalFile(str(html_path.absolute())))
                     viewer.hide()
@@ -2406,7 +2463,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             from iints_desktop.render_3dmol import generate_3dmol_html
             try:
                 from pathlib import Path
-                out_dir = Path("results") / "structural"
+                out_dir = self._structural_output_dir()
                 html_path = generate_3dmol_html(molecule.structure_path, out_dir)
                 import webbrowser
                 webbrowser.open(html_path.absolute().as_uri())
@@ -2422,7 +2479,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _selected_pae_html_path(self) -> Path | None:
             target = self._selected_pae_target()
-            return pae_html_path(target) if target else None
+            return pae_html_path(target, self._structural_output_dir()) if target else None
 
         def _update_pae_controls(self) -> None:
             molecule = self._selected_molecule()
@@ -2435,7 +2492,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.open_pae_folder_button.setEnabled(False)
                 return
 
-            html_path = pae_html_path(target)
+            html_path = pae_html_path(target, self._structural_output_dir())
             state = "available" if html_path.exists() else "not generated yet"
             self.molecule_pae_status.setText(
                 f"Target: {target} / output: {html_path}\n"
@@ -2464,7 +2521,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Generating PAE heatmap")
 
             thread = QThread(self)
-            worker = PAEWorker(target=target)
+            worker = PAEWorker(target=target, output_dir=self._structural_output_dir())
             worker.moveToThread(thread)
             thread.started.connect(worker.run)
             worker.finished.connect(self._handle_pae_success)
@@ -2520,7 +2577,7 @@ if _PYSIDE_IMPORT_ERROR is None:
 
         def _open_pae_folder(self) -> None:
             html_path = self._selected_pae_html_path()
-            folder = html_path.parent if html_path else Path("results") / "structural"
+            folder = html_path.parent if html_path else self._structural_output_dir()
             folder.mkdir(parents=True, exist_ok=True)
             self._open_path(folder)
 
@@ -2567,7 +2624,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Running genomics simulation")
             self.progress_bar.show()
 
-            out_dir = Path("results") / "structural"
+            out_dir = self._structural_output_dir()
             thread = QThread(self)
             worker = GenomicsWorker(gene=gene, variant=variant, out_dir=out_dir)
             worker.moveToThread(thread)
@@ -2598,7 +2655,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.status.setText("Running tissue stress simulation")
             self.progress_bar.show()
 
-            out_dir = Path("results") / "structural"
+            out_dir = self._structural_output_dir()
             thread = QThread(self)
             worker = TissueStressorWorker(muscle_scalar=muscle_val, liver_scalar=liver_val, out_dir=out_dir)
             worker.moveToThread(thread)
@@ -2659,7 +2716,7 @@ if _PYSIDE_IMPORT_ERROR is None:
                 full_input = self.genomics_variant_input.text().strip().upper()
                 parts = full_input.split(maxsplit=1)
                 gene, variant = (parts[0], parts[1]) if len(parts) == 2 else ("INSR", full_input)
-                plot_path = Path("results") / "structural" / f"multiscale_{gene}_{variant}.html"
+                plot_path = self._structural_output_dir() / f"multiscale_{gene}_{variant}.html"
             if plot_path.exists():
                 self._open_path(plot_path)
 
@@ -2690,9 +2747,22 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.tissue_liver_input.setEnabled(not is_running)
 
         def _open_structural_folder(self) -> None:
-            folder = Path("results") / "structural"
-            folder.mkdir(parents=True, exist_ok=True)
+            folder = self._structural_output_dir()
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                QMessageBox.critical(
+                    self,
+                    "Could not open structural output folder",
+                    str(exc),
+                )
+                return
             self._open_path(folder)
+
+        def _structural_output_dir(self) -> Path:
+            base_text = self.output_dir.text().strip()
+            base = Path(base_text).expanduser() if base_text else Path.home() / "IINTS-Desktop-Runs"
+            return base.resolve() / "structural"
 
         def _open_app_downloads(self) -> None:
             QDesktopServices.openUrl(QUrl(DESKTOP_RELEASE_URL))
@@ -2849,18 +2919,31 @@ if _PYSIDE_IMPORT_ERROR is None:
             fig = go.Figure()
             valid_runs = 0
 
-            for row in rows:
-                if row >= len(self._history_entries):
+            for row in sorted(rows):
+                if row >= len(self.history_entries):
                     continue
-                entry = self._history_entries[row]
+                entry = self.history_entries[row]
                 if not entry.results_csv or not Path(entry.results_csv).exists():
                     continue
 
                 try:
                     df = pd.read_csv(entry.results_csv)
-                    if "time" in df.columns and "glucose" in df.columns:
+                    time_column = "time_minutes" if "time_minutes" in df.columns else "time"
+                    glucose_column = (
+                        "glucose_actual_mgdl"
+                        if "glucose_actual_mgdl" in df.columns
+                        else "glucose"
+                    )
+                    if time_column in df.columns and glucose_column in df.columns:
                         name = f"{entry.preset_name} (Seed: {entry.seed})"
-                        fig.add_trace(go.Scatter(x=df["time"], y=df["glucose"], mode="lines", name=name))
+                        fig.add_trace(
+                            go.Scatter(
+                                x=df[time_column],
+                                y=df[glucose_column],
+                                mode="lines",
+                                name=name,
+                            )
+                        )
                         valid_runs += 1
                 except Exception as e:
                     self._write_log(f"Failed to load CSV for {entry.preset_name}: {e}\n")
@@ -2937,6 +3020,7 @@ def main() -> int:
                 f"workflows={window.workflow_combo.count()}",
                 f"history_rows={window.history_table.rowCount()}",
                 f"min={window.minimumWidth()}x{window.minimumHeight()}",
+                file=sys.__stdout__,
             )
             window.close()
             app.quit()

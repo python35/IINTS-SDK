@@ -6,6 +6,13 @@ MODE="${1:-quick}"
 
 cd "$ROOT_DIR"
 
+# Always validate the checkout being released, even when another IINTS version
+# is installed globally or in the active environment.
+export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+export MPLCONFIGDIR="${MPLCONFIGDIR:-${TMPDIR:-/tmp}/iints-mpl-sdk-check}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${TMPDIR:-/tmp}/iints-cache-sdk-check}"
+mkdir -p "$MPLCONFIGDIR" "$XDG_CACHE_HOME"
+
 usage() {
   cat <<'USAGE'
 Usage: tools/dev/sdk_check.sh [quick|edge|docs|full|release]

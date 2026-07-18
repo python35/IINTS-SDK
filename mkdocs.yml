@@ -1,11 +1,13 @@
 site_name: IINTS-AF SDK Documentation
-site_description: Safety-first simulation SDK for insulin algorithm research.
+site_description: Learn to simulate, inspect, and document diabetes-technology experiments with IINTS-AF.
 site_url: https://python35.github.io/IINTS-SDK/
 repo_url: https://github.com/python35/IINTS-SDK
 repo_name: python35/IINTS-SDK
 edit_uri: edit/main/docs/
 exclude_docs: |
   obsidian/**
+not_in_nav: |
+  releases/v*.md
 
 theme:
   name: material
@@ -20,7 +22,9 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
+    - navigation.indexes
     - navigation.top
+    - navigation.footer
     - navigation.instant
     - content.code.copy
     - search.suggest
@@ -42,138 +46,118 @@ markdown_extensions:
       permalink: true
 
 extra_javascript:
-  - javascripts/force-light.js
   - javascripts/mathjax.js
-  - https://polyfill.io/v3/polyfill.min.js?features=es6
   - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
   - https://unpkg.com/mermaid@11/dist/mermaid.min.js
   - javascripts/mermaid.js
 
 extra_css:
   - stylesheets/extra.css
-  - stylesheets/force-light.css
 
 nav:
   - Home: index.md
-  - Start:
-      - Choose Your Path: USER_GUIDE_MAP.md
-      - Public Obsidian Vault: OBSIDIAN_PUBLIC_VAULT.md
+  - Learn:
+      - Learning Path: LEARNING_PATH.md
+      - Choose By Goal: USER_GUIDE_MAP.md
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Project Boundaries: PROJECT_BOUNDARIES.md
-      - 5-Minute Quickstart: QUICKSTART.md
-      - Desktop App: DESKTOP_APP.md
-      - Desktop App Install: APP_INSTALL.md
-      - Desktop App Signing: DESKTOP_SIGNING.md
-      - Tauri Desktop Shell: TAURI_DESKTOP.md
-      - Command Cheatsheet: CLI_CHEATSHEET.md
-      - Getting Started: GETTING_STARTED.md
       - Installation: INSTALLATION.md
+      - First Run: QUICKSTART.md
+      - Core Concepts: CORE_CONCEPTS.md
+      - Complete First Workflow: GETTING_STARTED.md
+      - Understand A Run: RUN_OUTPUTS.md
       - Troubleshooting: TROUBLESHOOTING.md
-      - Updating The SDK: UPDATING.md
-  - Workflows:
+  - Use:
       - Workflow Hub: WORKFLOWS.md
+      - Desktop App:
+          - Use The Desktop App: DESKTOP_APP.md
+          - Install The Desktop App: APP_INSTALL.md
+          - Update The SDK: UPDATING.md
+      - Data Quality:
+          - Certification Quickstart: MDMP_QUICKSTART.md
+          - Certification Guide: MDMP_FULL_GUIDE.md
+          - MDMP Specification: MDMP.md
+      - Local AI:
+          - AI Assistant: AI_ASSISTANT.md
+          - Mistral Model Migration: MISTRAL_MODEL_MIGRATION.md
+      - Studies And Reports:
+          - Study Analysis: STUDY_ANALYSIS.md
+          - Research Evidence Bundle: EVIDENCE_BUNDLE.md
+          - Booth Demo: BOOTH_DEMO.md
+  - Research:
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
-      - Study Analysis: STUDY_ANALYSIS.md
-      - Research Evidence Bundle: EVIDENCE_BUNDLE.md
-      - Data Certification Quickstart: MDMP_QUICKSTART.md
-      - Data Certification Guide: MDMP_FULL_GUIDE.md
-      - AI Assistant: AI_ASSISTANT.md
-      - Mistral Model Migration: MISTRAL_MODEL_MIGRATION.md
-      - Booth Demo & Presentation: BOOTH_DEMO.md
+      - Physiology And Models:
+          - Physiology Reference: PHYSIOLOGY_REFERENCE.md
+          - Formula Registry: FORMULA_REGISTRY.md
+          - Numeric Authority: NUMERIC_AUTHORITY.md
+          - Hypoglycemia Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
+          - Digital Twin Biology: DIGITAL_TWIN_BIOLOGY.md
+          - Complete Science List: ALL_SCIENTIFIC_THEORIES.md
+          - Emulation Notes: emulation_references.md
+          - Paper Technical Dossier: PAPER_TECHNICAL_DOSSIER.md
+      - Data And Realism:
+          - Real-Data Realism Gate: REAL_DATA_REALISM.md
+          - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
+      - Glucose AI:
+          - Glucose Forecast Model: GLUCOSE_MODEL.md
+          - Interpreting Models: comparison_interpretation.md
+          - Local AI Research: LOCAL_AI_RESEARCH.md
+          - AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
+          - AI Red-Team Auditor: AI_RED_TEAM_AUDITOR.md
+      - Evidence And Sources:
+          - Complete Source Library: SOURCE_LIBRARY.md
+          - Evidence Base: EVIDENCE_BASE.md
+      - Governance:
+          - Intended Use And Claims: governance/INTENDED_USE_AND_CLAIMS.md
+          - EU Research Software Compliance: governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md
+          - EU Research Risk Register: governance/RISK_REGISTER.md
+          - DPIA-Lite: governance/DPIA_LITE.md
+          - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md
+          - API Stability: governance/API_STABILITY.md
+          - Tauri Threat Model: governance/TAURI_THREAT_MODEL.md
+          - Privacy Policy: governance/PRIVACY_POLICY.md
+          - Terms Of Use: governance/TERMS_OF_USE.md
   - Hardware:
       - Hardware Hub: HARDWARE.md
       - Edge Hardware Matrix: EDGE_HARDWARE.md
       - Raspberry Pi Digital Patient: DIGITAL_PATIENT_PI.md
       - Raspberry Pi Pico Pump Lab: PICO_PUMP_LAB.md
+      - Arduino UNO Q: ARDUINO_UNO_Q.md
       - FPGA Mode: FPGA_MODE.md
-      - Medtronic CareLink Live Bridge: MEDTRONIC_CARELINK_LIVE_BRIDGE.md
-      - Medtronic Direct Pump Transport: MEDTRONIC_DIRECT_PUMP_TRANSPORT.md
-      - Arduino UNO Q Setup: ARDUINO_UNO_Q.md
-      - Jetson Endurance Mode: JETSON_ENDURANCE.md
-      - Jetson Theory Stress Lab: THEORY_STRESS_LAB.md
-      - Jetson AutoML Factory: JETSON_AUTOML_FACTORY.md
-      - Remote Deploy & Pi Connect: EDGE_REMOTE_DEPLOY.md
+      - NVIDIA Jetson:
+          - Endurance Mode: JETSON_ENDURANCE.md
+          - Theory Stress Lab: THEORY_STRESS_LAB.md
+          - AutoML Factory: JETSON_AUTOML_FACTORY.md
+      - Medtronic Research Bridges:
+          - CareLink Live Bridge: MEDTRONIC_CARELINK_LIVE_BRIDGE.md
+          - Direct Pump Transport: MEDTRONIC_DIRECT_PUMP_TRANSPORT.md
+      - Remote Deploy And Pi Connect: EDGE_REMOTE_DEPLOY.md
       - Maker Faire Pi Mode: MAKERFAIRE_PI.md
       - Maker Faire Checklist: MAKERFAIRE_PI_CHECKLIST.md
-  - Developers:
+  - Develop:
       - Developer Portal: DEVELOPER_PORTAL.md
       - Visual Architecture: ARCHITECTURE_OVERVIEW.md
-      - Architecture Hardening Plan: ARCHITECTURE_HARDENING.md
+      - Architecture And Module Guide: COMPREHENSIVE_GUIDE.md
       - API Reference: API_REFERENCE.md
+      - CLI And Advanced Reference: TECHNICAL_README.md
       - Contribute Safely: CONTRIBUTING_SAFELY.md
-      - Architecture & Module Guide: COMPREHENSIVE_GUIDE.md
-      - CLI & Advanced Reference: TECHNICAL_README.md
-      - Maintainer Guide: MAINTAINER_GUIDE.md
-      - Maintainer Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
-      - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
+      - Architecture Hardening: ARCHITECTURE_HARDENING.md
+      - Desktop Engineering:
+          - Tauri Shell: TAURI_DESKTOP.md
+          - Signing And Distribution: DESKTOP_SIGNING.md
+      - Maintenance:
+          - Maintainer Guide: MAINTAINER_GUIDE.md
+          - Release Checklist: PUBLIC_RELEASE_CHECKLIST.md
+          - MDMP Packaging Workflow: DUAL_REPO_WORKFLOW.md
   - Reference:
       - Reference Hub: REFERENCE_OVERVIEW.md
-      - Digital Twin Biology Integrations: DIGITAL_TWIN_BIOLOGY.md
-      - Paper Technical Dossier: PAPER_TECHNICAL_DOSSIER.md
-      - Complete Science List: ALL_SCIENTIFIC_THEORIES.md
-      - Physiology Reference: PHYSIOLOGY_REFERENCE.md
-      - Hypoglycemia Science Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
-      - Real-Data Realism Gate: REAL_DATA_REALISM.md
-      - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
-      - Local AI Research: LOCAL_AI_RESEARCH.md
-      - AI Red-Team Realism Auditor: AI_RED_TEAM_AUDITOR.md
-      - Glucose Forecast Model: GLUCOSE_MODEL.md
-      - Interpreting Glucose Models: comparison_interpretation.md
-      - Local AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
-      - Command Reference: COMMAND_REFERENCE.md
-      - Complete Source Library: SOURCE_LIBRARY.md
-      - Evidence Base: EVIDENCE_BASE.md
-      - MDMP Specification: MDMP.md
-      - Governance:
-          - API Stability: governance/API_STABILITY.md
-          - EU Research Software Compliance: governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md
-          - Intended Use & Claims: governance/INTENDED_USE_AND_CLAIMS.md
-          - EU Research Risk Register: governance/RISK_REGISTER.md
-          - DPIA-Lite: governance/DPIA_LITE.md
-          - Tauri Threat Model: governance/TAURI_THREAT_MODEL.md
-          - Privacy Policy: governance/PRIVACY_POLICY.md
-          - Terms of Use: governance/TERMS_OF_USE.md
-      - EU AI Pact Governance: EU_AI_PACT_GOVERNANCE.md
-      - Emulation Notes: emulation_references.md
+      - Command Cheatsheet: CLI_CHEATSHEET.md
+      - Complete Command Reference: COMMAND_REFERENCE.md
       - Documentation By Role: DOCUMENTATION_INDEX.md
-      - Documentation Coverage Reference: PUBLIC_DOCUMENTATION.md
+      - Documentation Coverage: PUBLIC_DOCUMENTATION.md
+      - Public Obsidian Vault: OBSIDIAN_PUBLIC_VAULT.md
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.29): releases/v1.5.29.md
-      - v1.5.14: releases/v1.5.14.md
-      - v1.5.13: releases/v1.5.13.md
+      - Latest (v1.5.30): releases/v1.5.30.md
       - Release Archive: releases/INDEX.md
-      - Older Releases:
-          - v1.5.12: releases/v1.5.12.md
-          - v1.5.11: releases/v1.5.11.md
-          - v1.5.10: releases/v1.5.10.md
-          - v1.5.9: releases/v1.5.9.md
-          - v1.5.8: releases/v1.5.8.md
-          - v1.5.7: releases/v1.5.7.md
-          - v1.5.6: releases/v1.5.6.md
-          - v1.5.5: releases/v1.5.5.md
-          - v1.5.4: releases/v1.5.4.md
-          - v1.5.3: releases/v1.5.3.md
-          - v1.5.2: releases/v1.5.2.md
-          - v1.5.1: releases/v1.5.1.md
-          - v1.5.0: releases/v1.5.0.md
-          - v1.4.0: releases/v1.4.0.md
-          - v1.3.2: releases/v1.3.2.md
-          - v1.3.1: releases/v1.3.1.md
-          - v1.3.0: releases/v1.3.0.md
-          - v1.2.0: releases/v1.2.0.md
-          - v1.1.3: releases/v1.1.3.md
-          - v1.1.2: releases/v1.1.2.md
-          - v1.1.1: releases/v1.1.1.md
-          - v1.1.0: releases/v1.1.0.md
-          - v1.0.0: releases/v1.0.0.md
-          - v0.1.22: releases/v0.1.22.md
-          - v0.1.21: releases/v0.1.21.md
-          - v0.1.20: releases/v0.1.20.md
-          - v0.1.18: releases/v0.1.18.md
-          - v0.1.17: releases/v0.1.17.md
-          - v0.1.15: releases/v0.1.15.md
-          - v0.1.5: releases/v0.1.5.md
-          - v0.1.4: releases/v0.1.4.md
-          - v0.0.18: releases/v0.0.18.md

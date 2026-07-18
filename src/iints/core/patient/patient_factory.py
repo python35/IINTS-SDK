@@ -2,6 +2,36 @@ import numpy as np
 from typing import Dict, Any, Optional
 from .models import CustomPatientModel
 
+_BERGMAN_ONLY_RESEARCH_PARAMETERS = (
+    "stem_cell_engraftment_percent",
+    "stem_cell_subq_fraction",
+    "immune_rejection_rate",
+)
+
+
+def _without_bergman_only_parameters(
+    kwargs: Dict[str, Any],
+    *,
+    patient_type: str,
+) -> Dict[str, Any]:
+    """Remove disabled Bergman-only defaults or reject an unsupported experiment."""
+
+    normalized = dict(kwargs)
+    enabled = {
+        name: normalized.get(name)
+        for name in _BERGMAN_ONLY_RESEARCH_PARAMETERS
+        if normalized.get(name) not in (None, 0, 0.0)
+    }
+    if enabled:
+        names = ", ".join(sorted(enabled))
+        raise ValueError(
+            f"Patient model '{patient_type}' does not support Bergman stem-cell "
+            f"research parameters: {names}. Select patient_type='bergman'."
+        )
+    for name in _BERGMAN_ONLY_RESEARCH_PARAMETERS:
+        normalized.pop(name, None)
+    return normalized
+
 try:
     from .bergman_model import BergmanPatientModel
     BERGMAN_AVAILABLE = True
@@ -53,32 +83,41 @@ class PatientFactory:
             if BERGMAN_AVAILABLE and BergmanPatientModel is not None:
                 return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
             if SIMGLUCOSE_AVAILABLE:
+                _without_bergman_only_parameters(kwargs, patient_type='simglucose')
                 patient_name = patient_id or PatientFactory.SIMGLUCOSE_PATIENTS[0]
                 return SimglucosePatientWrapper(patient_name, initial_glucose)
-            return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+            custom_kwargs = _without_bergman_only_parameters(kwargs, patient_type='custom')
+            return CustomPatientModel(initial_glucose=initial_glucose, **custom_kwargs)
         if patient_type == 'custom':
-            return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+            custom_kwargs = _without_bergman_only_parameters(kwargs, patient_type='custom')
+            return CustomPatientModel(initial_glucose=initial_glucose, **custom_kwargs)
         elif patient_type == 'bergman':
             if not BERGMAN_AVAILABLE or BergmanPatientModel is None:
                 print("Warning: Bergman model not available, falling back to custom model")
-                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+                custom_kwargs = _without_bergman_only_parameters(kwargs, patient_type='custom')
+                return CustomPatientModel(initial_glucose=initial_glucose, **custom_kwargs)
             return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
         elif patient_type in {'advanced', 'advanced_metabolic'}:
+            advanced_kwargs = _without_bergman_only_parameters(kwargs, patient_type='advanced')
             if not ADVANCED_METABOLIC_AVAILABLE or AdvancedMetabolicModel is None:
                 print("Warning: Advanced metabolic model not available, falling back to bergman/custom model")
                 if BERGMAN_AVAILABLE and BergmanPatientModel is not None:
-                    return BergmanPatientModel(initial_glucose=initial_glucose, **kwargs)
-                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
-            return AdvancedMetabolicModel(initial_glucose=initial_glucose, **kwargs)
+                    return BergmanPatientModel(initial_glucose=initial_glucose, **advanced_kwargs)
+                return CustomPatientModel(initial_glucose=initial_glucose, **advanced_kwargs)
+            return AdvancedMetabolicModel(initial_glucose=initial_glucose, **advanced_kwargs)
         elif patient_type == 'hovorka':
+            hovorka_kwargs = _without_bergman_only_parameters(kwargs, patient_type='hovorka')
             if not HOVORKA_AVAILABLE or HovorkaPatientModel is None:
                 print("Warning: Hovorka model not available, falling back to custom model")
-                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
-            return HovorkaPatientModel(initial_glucose=initial_glucose, **kwargs)
+                return CustomPatientModel(initial_glucose=initial_glucose, **hovorka_kwargs)
+            return HovorkaPatientModel(initial_glucose=initial_glucose, **hovorka_kwargs)
         elif patient_type == 'simglucose':
             if not SIMGLUCOSE_AVAILABLE:
                 print("Warning: Simglucose not available, falling back to custom model")
-                return CustomPatientModel(initial_glucose=initial_glucose, **kwargs)
+                custom_kwargs = _without_bergman_only_parameters(kwargs, patient_type='custom')
+                return CustomPatientModel(initial_glucose=initial_glucose, **custom_kwargs)
+
+            _without_bergman_only_parameters(kwargs, patient_type='simglucose')
             
             patient_name = patient_id or PatientFactory.SIMGLUCOSE_PATIENTS[0]
             return SimglucosePatientWrapper(patient_name, initial_glucose)

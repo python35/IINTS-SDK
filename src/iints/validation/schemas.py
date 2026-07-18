@@ -101,6 +101,12 @@ class PatientConfigModel(BaseModel):
     dawn_end_hour: float = Field(default=8.0, ge=0.0, le=24.0)
     carb_absorption_duration_minutes: float = Field(default=240.0, ge=30.0, le=480.0)
     max_glucose_rate_mgdl_per_min: float = Field(default=3.0, ge=0.5, le=5.0)
+    # Optional Bergman research parameters. They remain disabled by default and
+    # are accepted here so the desktop Scenario Builder uses the same strict
+    # configuration contract as the public SDK runners.
+    stem_cell_engraftment_percent: float = Field(default=0.0, ge=0.0, le=200.0)
+    stem_cell_subq_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
+    immune_rejection_rate: float = Field(default=0.0, ge=0.0, le=0.1)
 
     @model_validator(mode="after")
     def _check_peak_vs_duration(self) -> "PatientConfigModel":

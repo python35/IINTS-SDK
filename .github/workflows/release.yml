@@ -23,7 +23,7 @@ jobs:
       - name: Build artifacts
         run: |
           python -m pip install --upgrade pip
-          python -m pip install build
+          python -m pip install build wheel "setuptools>=83,<84"
           python -m build --no-isolation
 
       - name: Resolve release notes

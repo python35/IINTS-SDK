@@ -11,17 +11,15 @@ from iints.core.patient.hovorka_model import HovorkaPatientModel
 from iints.core.simulator import Simulator, StressEvent
 
 
-# Fast local mutation map used for deterministic demos and offline CI.
+# Explicit scenario assumptions used for deterministic demonstrations. These
+# retained-function scalars are not clinical estimates for the named variants.
 KNOWN_MUTATIONS: dict[str, dict[str, Any]] = {
-    # Severe mutations (Donohue syndrome, Rabson-Mendenhall)
-    "V938M": {"scalar": 0.1, "desc": "Severe Donohue syndrome (90% loss of function)", "residue": 938},
-    "R1174W": {"scalar": 0.15, "desc": "Severe insulin resistance (85% loss of function)", "residue": 1174},
-    "A1135E": {"scalar": 0.2, "desc": "Rabson-Mendenhall syndrome (80% loss of function)", "residue": 1135},
-    # Moderate mutations (Type A insulin resistance)
-    "D1150E": {"scalar": 0.4, "desc": "Moderate Type A resistance (60% loss of function)", "residue": 1150},
-    "P1178L": {"scalar": 0.6, "desc": "Mild Type A resistance (40% loss of function)", "residue": 1178},
-    # Benign / polymorphisms
-    "H1058C": {"scalar": 0.95, "desc": "Benign polymorphism (5% loss of function)", "residue": 1058},
+    "V938M": {"scalar": 0.10, "residue": 938},
+    "R1174W": {"scalar": 0.15, "residue": 1174},
+    "A1135E": {"scalar": 0.20, "residue": 1135},
+    "D1150E": {"scalar": 0.40, "residue": 1150},
+    "P1178L": {"scalar": 0.60, "residue": 1178},
+    "H1058C": {"scalar": 0.95, "residue": 1058},
 }
 
 
@@ -57,7 +55,12 @@ class GenomicsEngine:
 
     @staticmethod
     def evaluate_mutation(gene: str, variant: str) -> dict[str, Any]:
-        """Translate a variant such as ``INSR V938M`` into a functional scalar using AlphaFold."""
+        """Return an explicit demo assumption plus optional structural context.
+
+        Unknown variants deliberately receive no functional scalar. AlphaFold
+        pLDDT cannot support that inference, so callers must provide validated
+        functional evidence before running a physiological comparison.
+        """
         import re
         from iints.research.alphafold_engine import AlphaFoldGenomicsEngine
 
@@ -65,7 +68,19 @@ class GenomicsEngine:
         
         # Check known mutations first for fast/offline execution
         if gene.upper() == "INSR" and variant in KNOWN_MUTATIONS:
-            return dict(KNOWN_MUTATIONS[variant])
+            result = dict(KNOWN_MUTATIONS[variant])
+            retained_percent = int(round(float(result["scalar"]) * 100))
+            result.update(
+                {
+                    "supported": True,
+                    "evidence_type": "illustrative_scenario_assumption",
+                    "desc": (
+                        f"Illustrative INSR scenario assuming {retained_percent}% retained "
+                        "receptor function. This is not a clinical estimate for the variant."
+                    ),
+                }
+            )
+            return result
             
         # Determine UniProt ID (INSR -> P06213)
         uniprot_id = "P06213" if gene.upper() == "INSR" else gene.strip()
@@ -73,17 +88,36 @@ class GenomicsEngine:
         # Extract residue index from variant (e.g. V938M -> 938)
         match = re.search(r'\d+', variant)
         if not match:
-            return {"scalar": 0.5, "desc": "Unknown mutation format (assumed 50% loss of function)", "residue": None}
+            return {
+                "scalar": None,
+                "supported": False,
+                "evidence_type": "insufficient_evidence",
+                "desc": "Unknown mutation format; no functional effect was inferred.",
+                "residue": None,
+            }
             
         residue_idx = int(match.group())
         
         # Query AlphaFold
         af_result = AlphaFoldGenomicsEngine.evaluate_plddt_impact(uniprot_id, residue_idx)
         if "error" in af_result:
-            return {"scalar": 0.5, "desc": f"AlphaFold fallback (50% loss): {af_result['error']}", "residue": residue_idx}
+            return {
+                "scalar": None,
+                "supported": False,
+                "evidence_type": "insufficient_evidence",
+                "desc": f"No functional effect inferred. Structural lookup failed: {af_result['error']}",
+                "residue": residue_idx,
+            }
             
         desc = f"AlphaFold pLDDT: {af_result['plddt']}. {af_result['conclusion']}"
-        return {"scalar": af_result['scalar'], "desc": desc, "residue": residue_idx}
+        return {
+            "scalar": None,
+            "supported": False,
+            "evidence_type": "structural_context_only",
+            "desc": desc,
+            "residue": residue_idx,
+            "structural_context": af_result,
+        }
 
     @staticmethod
     def run_multi_scale_simulation(
@@ -92,13 +126,21 @@ class GenomicsEngine:
         out_dir: Path,
         *,
         duration_minutes: int = 360,
+        seed: int = 42,
     ) -> Tuple[Path, dict[str, Any]]:
-        """Run healthy-vs-mutated Hovorka simulations and write an HTML plot."""
+        """Run a reference-vs-assumption comparison and write an HTML plot."""
 
-        go = _plotly_graph_objects()
         normalized_variant = variant.upper().strip()
         mutation_data = GenomicsEngine.evaluate_mutation(gene, normalized_variant)
-        scalar = float(mutation_data["scalar"])
+        raw_scalar = mutation_data.get("scalar")
+        if raw_scalar is None:
+            raise ValueError(
+                f"No validated functional scalar is available for {gene.upper()} "
+                f"{normalized_variant}. AlphaFold pLDDT is structural confidence, not "
+                "mutation severity; no physiological simulation was generated."
+            )
+        scalar = float(raw_scalar)
+        go = _plotly_graph_objects()
 
         healthy_patient = HovorkaPatientModel(
             initial_glucose=100.0,
@@ -114,7 +156,7 @@ class GenomicsEngine:
                 "target_glucose": 120.0,
             }
         )
-        healthy_sim = Simulator(healthy_patient, healthy_algo)  # type: ignore[arg-type]
+        healthy_sim = Simulator(healthy_patient, healthy_algo, seed=seed)  # type: ignore[arg-type]
         healthy_sim.add_stress_event(StressEvent(start_time=60, event_type="meal", value=60.0))
         healthy_results, _ = healthy_sim.run(duration_minutes=duration_minutes)
 
@@ -132,7 +174,7 @@ class GenomicsEngine:
                 "target_glucose": 120.0,
             }
         )
-        mutated_sim = Simulator(mutated_patient, mutated_algo)  # type: ignore[arg-type]
+        mutated_sim = Simulator(mutated_patient, mutated_algo, seed=seed)  # type: ignore[arg-type]
         mutated_sim.add_stress_event(StressEvent(start_time=60, event_type="meal", value=60.0))
         mutated_results, _ = mutated_sim.run(duration_minutes=duration_minutes)
 
@@ -145,7 +187,7 @@ class GenomicsEngine:
                 x=t_healthy,
                 y=g_healthy,
                 mode="lines",
-                name="Healthy baseline (100% affinity)",
+                name="Reference scenario (100% retained function)",
                 line=dict(color="blue", width=3),
             )
         )
@@ -154,7 +196,7 @@ class GenomicsEngine:
                 x=t_mutated,
                 y=g_mutated,
                 mode="lines",
-                name=f"Mutated: {normalized_variant} ({int(scalar * 100)}% affinity)",
+                name=f"Variant hypothesis: {normalized_variant} ({int(scalar * 100)}% retained)",
                 line=dict(color="red", width=3, dash="dash"),
             )
         )
@@ -166,7 +208,10 @@ class GenomicsEngine:
             annotation_text="Meal (60g)",
         )
         fig.update_layout(
-            title=f"Multi-scale coupling: impact of {gene.upper()} {normalized_variant} on systemic glycemia",
+            title=(
+                f"Illustrative multi-scale hypothesis: {gene.upper()} "
+                f"{normalized_variant} (seed {seed})"
+            ),
             xaxis_title="Time (minutes)",
             yaxis_title="Blood glucose (mg/dL)",
             plot_bgcolor="white",
@@ -182,4 +227,7 @@ class GenomicsEngine:
 
         result_data = dict(mutation_data)
         result_data["html_path"] = str(html_path)
+        result_data["seed"] = seed
+        result_data["research_only"] = True
+        result_data["functional_scalar_is_assumption"] = True
         return html_path, result_data

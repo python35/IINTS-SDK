@@ -33,8 +33,11 @@ npm run tauri dev
 ## Build
 
 ```bash
-python ../../tools/desktop/build_tauri_desktop_app.py
+npm run build
 ```
+
+`npm run build` compiles the native executable without creating an installer. Use
+`npm run bundle` when you explicitly need platform installer artifacts such as a DMG.
 
 ## Current Scope
 

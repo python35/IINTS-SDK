@@ -87,7 +87,15 @@ npm install
 npm run build
 ```
 
-The generated desktop bundles are created by Tauri under `apps/iints-tauri/src-tauri/target/`.
+`npm run build` compiles the native executable without packaging an installer. This is the
+recommended development and CI check because it works without Finder/DMG tooling. To create
+platform installer artifacts, run:
+
+```bash
+npm run bundle
+```
+
+Generated binaries and bundles are created under `apps/iints-tauri/src-tauri/target/`.
 
 ## Security Direction
 

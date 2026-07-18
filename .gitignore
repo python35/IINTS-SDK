@@ -98,6 +98,11 @@ venv/
 docssphinx/_build/
 site/
 
+# Tauri build output and generated schemas
+apps/iints-tauri/node_modules/
+apps/iints-tauri/src-tauri/target/
+apps/iints-tauri/src-tauri/gen/
+
 # Obsidian working vaults
 docs/obsidian/
 obsidian/IINTS OS - Smart Vault v2/

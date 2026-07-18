@@ -1,85 +1,52 @@
-# Choose Your Path
+# Choose By Goal
 
-Use this page when you know what you want to achieve, but not yet which guide deserves your time.
+Use this page when you know what you want to do but not which guide to open.
 
-## If You Only Click Three Things
+## New To IINTS-AF
 
-1. [Quickstart](QUICKSTART.md) - prove the SDK works on your machine.
-2. [Getting Started](GETTING_STARTED.md) - make your first complete run bundle.
-3. [Command Cheatsheet](CLI_CHEATSHEET.md) - keep the practical commands next to you.
+Follow the [Learning Path](LEARNING_PATH.md). The shortest useful sequence is:
 
-## Choose By Goal
+1. [Installation](INSTALLATION.md)
+2. [First Run](QUICKSTART.md)
+3. [Core Concepts](CORE_CONCEPTS.md)
+4. [Understand A Run](RUN_OUTPUTS.md)
+5. [Complete First Workflow](GETTING_STARTED.md)
 
-| I want to... | Start here | Continue with | Main command |
-| --- | --- | --- | --- |
-| see the SDK work quickly | [Quickstart](QUICKSTART.md) | [Getting Started](GETTING_STARTED.md) | `iints onboard` |
-| understand the project without jargon | [Plain-Language Overview](PLAIN_LANGUAGE_GUIDE.md) | [Getting Started](GETTING_STARTED.md) | `iints start` |
-| run a scientific benchmark | [Workflow Hub](WORKFLOWS.md) | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | `iints run-study` |
-| certify data quality | [MDMP Quickstart](MDMP_QUICKSTART.md) | [Data Certification Full Guide](MDMP_FULL_GUIDE.md) | `iints data certify` |
-| analyze a finished study | [Study Analysis](STUDY_ANALYSIS.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints study analyze` |
-| understand what the physiological numbers mean | [Physiology Reference](PHYSIOLOGY_REFERENCE.md) | [Evidence Base](EVIDENCE_BASE.md) | `iints sources` |
-| train local AI models responsibly | [Local AI Research](LOCAL_AI_RESEARCH.md) | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) | `iints research train-local-ai` |
-| prepare a live demo | [Booth Demo Guide](BOOTH_DEMO.md) | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) | `iints demo` |
-| deploy hardware | [Hardware Hub](HARDWARE.md) | board-specific guide | `iints edge quickstart` |
-| change SDK code | [Developer Portal](DEVELOPER_PORTAL.md) | [Contribute Safely](CONTRIBUTING_SAFELY.md) | `tools/dev/sdk_check.sh quick` |
-| look up a command fast | [Command Cheatsheet](CLI_CHEATSHEET.md) | [Command Reference](COMMAND_REFERENCE.md) | `iints --help` |
+## Choose A Task
 
-## Choose By Role
+| I want to... | Start here | Main tool |
+| --- | --- | --- |
+| run a small simulation | [First Run](QUICKSTART.md) | `iints demo quick` |
+| create a controlled project | [Complete First Workflow](GETTING_STARTED.md) | `iints quickstart` and `iints run` |
+| use the graphical application | [Desktop App](DESKTOP_APP.md) | `iints-desktop` or a beta installer |
+| compare algorithms | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | `iints run-study` |
+| inspect completed results | [Understand A Run](RUN_OUTPUTS.md) | CSV, metadata, manifest, and report |
+| certify a dataset | [Certification Quickstart](MDMP_QUICKSTART.md) | `iints data certify` |
+| explain a run with local AI | [AI Assistant](AI_ASSISTANT.md) | `iints ai report` |
+| train a glucose predictor | [Glucose Forecast Model](GLUCOSE_MODEL.md) | `iints research glucose-model` |
+| understand the physiology | [Physiology Reference](PHYSIOLOGY_REFERENCE.md) | formula and source references |
+| use edge hardware | [Hardware Hub](HARDWARE.md) | board-specific commands |
+| present a safe live demo | [Booth Demo](BOOTH_DEMO.md) | `iints demo doctor`, `eucys`, or `booth` |
+| modify the SDK | [Developer Portal](DEVELOPER_PORTAL.md) | `tools/dev/sdk_check.sh quick` |
+| find a command | [Command Cheatsheet](CLI_CHEATSHEET.md) | `iints --help` |
 
-### First-Time User
+## Choose By Responsibility
 
-```text
-Quickstart
-  -> Getting Started
-  -> Troubleshooting if needed
-```
+**Research user:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) → [Study Analysis](STUDY_ANALYSIS.md) → [Evidence Bundle](EVIDENCE_BUNDLE.md)
 
-### Researcher
+**Data reviewer:** [Certification Quickstart](MDMP_QUICKSTART.md) → [Certification Guide](MDMP_FULL_GUIDE.md) → [MDMP Specification](MDMP.md)
 
-```text
-Workflow Hub
-  -> Scientific Workflow
-  -> Study Analysis
-  -> Evidence Base
-```
+**AI researcher:** [Glucose Forecast Model](GLUCOSE_MODEL.md) → [Interpreting Models](comparison_interpretation.md) → [AI Safety Gates](LOCAL_AI_SAFETY_GATES.md)
 
-### Data Reviewer
+**Hardware builder:** [Hardware Hub](HARDWARE.md) → device guide → [Edge Hardware Matrix](EDGE_HARDWARE.md)
 
-```text
-MDMP Quickstart
-  -> Data Certification Full Guide
-  -> Evidence Base
-```
+**Contributor:** [Developer Portal](DEVELOPER_PORTAL.md) → [Visual Architecture](ARCHITECTURE_OVERVIEW.md) → [Contribute Safely](CONTRIBUTING_SAFELY.md)
 
-### Hardware Builder
-
-```text
-Hardware Hub
-  -> Raspberry Pi / UNO Q / Jetson guide
-  -> Remote Deploy if the board is off your desk
-```
-
-### SDK Contributor
-
-```text
-Developer Portal
-  -> Visual Architecture
-  -> API Reference
-  -> Contribute Safely
-```
-
-## If You Get Lost
-
-Run:
+## If You Are Lost
 
 ```bash
-iints onboard
-iints start
+iints guide
 iints doctor --full --suggest
 ```
 
-Then return to:
-
-- [Troubleshooting](TROUBLESHOOTING.md)
-- [Reference Hub](REFERENCE_OVERVIEW.md)
-- [Documentation By Role](DOCUMENTATION_INDEX.md)
+Then return to [Learning Path](LEARNING_PATH.md) or [Troubleshooting](TROUBLESHOOTING.md).

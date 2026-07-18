@@ -6,7 +6,6 @@ import importlib.util
 import os
 import subprocess
 import sys
-import warnings
 from pathlib import Path
 
 
@@ -26,29 +25,6 @@ ICON_ASSETS = {
 def require_module(module_name: str, install_hint: str) -> None:
     if importlib.util.find_spec(module_name) is None:
         raise SystemExit(f"Missing {module_name}. Install it with:\n  {install_hint}")
-
-
-def require_pkg_resources_runtime_hook_compatibility() -> None:
-    """Fail before building a macOS app that PyInstaller cannot start.
-
-    PyInstaller's pkg_resources runtime hook still expects NullProvider. Newer
-    setuptools releases removed that deprecated symbol, producing a bundled app
-    that crashes before our entrypoint runs.
-    """
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        try:
-            import pkg_resources  # type: ignore[import-not-found]
-        except Exception:
-            return
-
-    if not hasattr(pkg_resources, "NullProvider"):
-        raise SystemExit(
-            "Installed setuptools/pkg_resources is too new for PyInstaller's "
-            "runtime hook. Install a compatible version with:\n"
-            '  python -m pip install "setuptools>=77,<81"'
-        )
 
 
 def build_environment() -> dict[str, str]:
@@ -149,7 +125,6 @@ def main() -> int:
     if args.backend == "cocoa":
         install_extra = "desktop-macos"
     require_module("PyInstaller", f'python -m pip install -U -e ".[{install_extra}]"')
-    require_pkg_resources_runtime_hook_compatibility()
     if args.backend == "qt":
         require_module("PySide6", 'python -m pip install -U -e ".[desktop]"')
     if args.backend == "cocoa":

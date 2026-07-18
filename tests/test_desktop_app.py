@@ -39,6 +39,7 @@ from iints_desktop.molecules import (
     pae_html_path,
 )
 from iints_desktop.results import build_ai_result_context, load_results_preview
+from iints_desktop.update import format_shell_command
 
 
 def _load_pyproject() -> dict[str, Any]:
@@ -390,7 +391,7 @@ def test_qt_app_update_terminal_is_cross_platform() -> None:
 
     assert "open_terminal_and_run" in source
     assert "_escape_applescript_string" in source
-    assert "shlex.join" in source
+    assert "format_shell_command" in source
     assert "osascript" in source
     assert "cmd.exe" in source
     assert "x-terminal-emulator" in source
@@ -398,6 +399,22 @@ def test_qt_app_update_terminal_is_cross_platform() -> None:
     assert "konsole" in source
     assert "xfce4-terminal" in source
     assert "xterm" in source
+
+
+def test_update_command_uses_native_windows_quoting() -> None:
+    args = ["C:\\Program Files\\Python\\python.exe", "-m", "pip", "install", "pkg[extra]"]
+
+    command = format_shell_command(args, platform_name="windows")
+
+    assert '"C:\\Program Files\\Python\\python.exe"' in command
+    assert "'" not in command
+
+
+def test_genomics_worker_labels_functional_scalar_as_scenario_assumption() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert "Scenario assumption:" in source
+    assert "Impact: {int(data['scalar']*100)}% affinity" not in source
 
 
 def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
@@ -420,13 +437,12 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source
     assert 'if args.backend == "qt"' in build_source
     assert 'if args.backend == "cocoa"' in build_source
-    assert "require_pkg_resources_runtime_hook_compatibility" in build_source
-    assert "NullProvider" in build_source
-    assert "setuptools>=77,<81" in build_source
+    assert "require_pkg_resources_runtime_hook_compatibility" not in build_source
+    assert "pkg_resources" not in build_source
     assert "--osx-bundle-identifier" in build_source
     assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
     assert "desktop-macos" in workflow
-    assert '"setuptools>=77,<81" pytest' in workflow
+    assert '"setuptools>=83,<84" pytest' in workflow
     assert 'python -m pip install -U -e ".[full,desktop,mdmp]"' in workflow
     assert 'python -m pip install -U -e ".[full,desktop-qt,mdmp]"' not in workflow
     assert "Smoke test bundled app on macOS" in workflow
@@ -452,7 +468,7 @@ def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
     assert "run_demo_preset" in source
     assert "pyobjc-framework-Cocoa" in pyproject
     assert "iints-desktop-cocoa" in pyproject
-    assert "setuptools>=77.0.0,<81.0.0" in pyproject
+    assert "setuptools>=83.0.0,<84.0.0" in pyproject
 
 
 def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:

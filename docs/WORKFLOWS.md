@@ -1,64 +1,110 @@
 # Workflow Hub
 
-Use this page after your first successful run, when the question changes from “does the SDK work?” to “what do I want to do with it?”
+Every IINTS-AF workflow should make four things clear: **input, command, output, and review rule**.
 
-## Choose The Job
+Choose the workflow that matches your question. Do not enable every feature simply because it is available.
 
-| If you need to... | Start with | Typical output |
-| --- | --- | --- |
-| compare algorithms in a reproducible study | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) | protocol bundle, study runs, comparisons |
-| summarize a completed batch of runs | [Study Analysis](STUDY_ANALYSIS.md) | aggregate metrics, evidence table, poster-ready figures |
-| build a public proof folder | [Research Evidence Bundle](EVIDENCE_BUNDLE.md) | model card, run cards, copied manifests, CSV index |
-| prove whether input data is trustworthy | [MDMP Quickstart](MDMP_QUICKSTART.md) | certification JSON, dashboard, trust grade |
-| explain validated outputs locally | [AI Assistant](AI_ASSISTANT.md) | guarded summaries and review notes |
-| present the SDK live | [Booth Demo Guide](BOOTH_DEMO.md) | showable code, poster, talk track |
+## Simulation
 
-## Recommended Routes
+**Question:** How does a candidate algorithm behave for a controlled virtual patient and scenario?
 
-### Research
+**Start:** [Complete First Workflow](GETTING_STARTED.md)
 
-```text
-Getting Started
-  -> Scientific Workflow
-  -> Physiology Reference
-  -> Study Analysis
-  -> Evidence Base
-```
+**Output:** time series, report, metadata, manifest, and optional audit/validation files.
 
-### Data Quality
+**Review rule:** confirm the experiment settings and raw time series before interpreting summary metrics.
 
-```text
-MDMP Quickstart
-  -> MDMP Full Guide
-  -> Evidence Base
-```
+## Algorithm Or Scenario Study
 
-### Presentation
+**Question:** Does one controlled change alter outcomes across seeds, patients, or scenarios?
 
-```text
-Booth Demo Guide
-  -> iints demo-live
-  -> poster + talk track + proof bundle
-```
+**Start:** [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 
-## Common Commands
+**Output:** protocol, study runs, aggregate metrics, comparisons, figures, and exclusions.
+
+**Review rule:** predefine the comparison and preserve failed runs.
+
+## Data Certification
+
+**Question:** Does a CSV satisfy an explicit schema and quality contract?
+
+**Start:** [Certification Quickstart](MDMP_QUICKSTART.md)
+
+**Output:** certification JSON, grade, validation details, optional dashboard, and integrity artifacts.
+
+**Review rule:** certification reports checks performed; it does not establish clinical fitness or remove bias.
+
+## Local AI Review
+
+**Question:** Can a local model explain or challenge a completed, validated run?
+
+**Start:** [AI Assistant](AI_ASSISTANT.md)
+
+**Output:** review notes or a structured explanation linked to prepared evidence.
+
+**Review rule:** verify every number and causal claim against deterministic artifacts.
+
+## Glucose Forecast Research
+
+**Question:** How accurately and plausibly can a model forecast future glucose at defined horizons?
+
+**Start:** [Glucose Forecast Model](GLUCOSE_MODEL.md)
+
+**Output:** checkpoint, resolved configuration, split manifest, horizon metrics, hypo-detection metrics, violation metrics, and model card.
+
+**Review rule:** prevent subject leakage and report horizon-specific performance, uncertainty, and physiological violations.
+
+## Results Management
+
+**Question:** How can many completed runs be indexed and compared without losing provenance?
+
+**Start:** [Study Analysis](STUDY_ANALYSIS.md)
+
+**Output:** run index, aggregate tables, study summaries, and evidence-ready exports.
+
+**Review rule:** keep immutable source run bundles and derive summaries from them.
+
+## Reports And Public Evidence
+
+**Question:** How can a completed experiment be communicated without hiding assumptions?
+
+**Start:** [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
+
+**Output:** copied manifests, run cards, model/data context, figures, and a public file index.
+
+**Review rule:** include limitations, intended use, sources, and failed or excluded results.
+
+## Desktop Workflow
+
+**Question:** Can the same SDK operations be used through a graphical workbench?
+
+**Start:** [Desktop App](DESKTOP_APP.md)
+
+**Output:** normal SDK run bundles. The app is a shell; it does not define separate scientific behavior.
+
+**Review rule:** keep the output folder and command-equivalent settings available for reproducibility.
+
+## Hardware Workflow
+
+**Question:** How does SDK logic behave on a bench device or edge computer?
+
+**Start:** [Hardware Hub](HARDWARE.md)
+
+**Output:** device diagnostics, transport logs, timing measurements, comparison artifacts, or bench reports.
+
+**Review rule:** no real patient connection or insulin delivery; document hardware, firmware, transport, and timing.
+
+## Quick Command Map
 
 ```bash
-iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
-iints run-doctor --algo algorithms/example_algorithm.py --patient-config-path patients/stable_patient.yaml --scenario-path scenarios/clinic_safe_baseline.json
-iints evidence build --run demo=results/study_ready --output-dir results/evidence_bundle
-iints data certify contracts/clinical_mdmp_contract.yaml data/my_trace.csv --output-json results/certification.json
-iints ai report results/<run_id>
-iints demo --output-dir results/live_demo --audience jury
+iints demo quick --output-dir results/demo
+iints run --dry-run --preset baseline_t1d
+iints validation-profiles
+iints data certify --help
+iints ai local-check
+iints run-study --help
+iints evidence build --help
+iints edge doctor
 ```
 
-## Read Next
-
-- [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
-- [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
-- [Local AI Research](LOCAL_AI_RESEARCH.md)
-- [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
-- [Study Analysis](STUDY_ANALYSIS.md)
-- [MDMP Quickstart](MDMP_QUICKSTART.md)
-- [AI Assistant](AI_ASSISTANT.md)
-- [Booth Demo Guide](BOOTH_DEMO.md)
+For exact arguments, use [Command Cheatsheet](CLI_CHEATSHEET.md) or the command's `--help` output.

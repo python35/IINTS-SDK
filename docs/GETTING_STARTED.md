@@ -1,167 +1,152 @@
-# Getting Started
+# Complete First Workflow
 
-Use this page when you want the first complete SDK workflow, not only a demo.
+This tutorial moves from a bundled demo to a controlled project with explicit patient, scenario, algorithm, and data-quality artifacts.
 
-By the end, you will have installed the SDK, created a project, run a baseline simulation, certified the output, and reviewed the resulting bundle.
+Complete [First Run](QUICKSTART.md) before starting.
 
-**Read before:** [Quickstart](QUICKSTART.md) if you have not run `iints demo` yet.
+## What You Will Produce
 
-**Read next:** [Workflow Hub](WORKFLOWS.md), [MDMP Quickstart](MDMP_QUICKSTART.md), or [Hardware Hub](HARDWARE.md), depending on your goal.
-
-## The Workflow In One View
-
-1. run a simulation
-2. certify the output data
-3. review the run report
-
-If you mainly need help choosing folders, install extras, or repository vs package usage, read [Installation](INSTALLATION.md) first.
-
-## 1) Create and Activate a Virtual Environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
+```text
+iints_quickstart/
+├── algorithms/
+├── scenarios/
+├── patients/
+├── contracts/
+├── data/
+├── audit/
+└── results/
 ```
 
-All commands below assume this `.venv` is active.
+The project keeps inputs separate from generated evidence. Do not edit a completed run folder to change an experiment; change the source configuration and create a new run.
 
-## 2) Install The SDK
+## 1. Create The Project
 
-```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp]"
-```
-
-Optional extras:
-
-```bash
-pip install "iints-sdk-python35[research]"
-pip install "iints-sdk-python35[nightscout]"
-pip install "iints-sdk-python35[edge,mdmp]"
-```
-
-## 3) Verify The Environment
-
-```bash
-iints doctor --smoke-run
-```
-
-If this fails, fix the environment before starting longer runs.
-
-## 4) Create A Project
+From the folder where you keep research projects:
 
 ```bash
 iints quickstart --project-name iints_quickstart
 cd iints_quickstart
 ```
 
-The generated structure includes:
-- `algorithms/`
-- `scenarios/`
-- `patients/`
-- `contracts/`
-- `data/demo/`
-- `audit/`
-- `results/`
+Review these files before running anything:
 
-Important:
-- before `iints quickstart`, commands can be run from any folder
-- after `iints quickstart`, move into the generated project folder
-- repository helper scripts such as `./scripts/run_live_stage_demo.sh` belong to the SDK repository, not the quickstart project
-- custom algorithms can be installed later with `iints plugin install algorithms/my_algo.py`
+- `algorithms/example_algorithm.py`
+- `patients/stable_patient.yaml`
+- `scenarios/clinic_safe_baseline.json`
+- `contracts/clinical_mdmp_contract.yaml`
 
-## 5) Run A Baseline Simulation
+## 2. Validate The Plan
+
+Use a dry run first:
 
 ```bash
-iints run --algo algorithms/example_algorithm.py \
+iints run \
+  --algo algorithms/example_algorithm.py \
   --patient-config-path patients/stable_patient.yaml \
   --scenario-path scenarios/clinic_safe_baseline.json \
-  --duration 1440
+  --duration 1440 \
+  --seed 42 \
+  --dry-run
 ```
 
-## 6) Certify The Run Data
+Check the patient, scenario, duration, time step, seed, output location, and algorithm source printed by the CLI.
 
-Use the generated results CSV plus the project contract:
+## 3. Execute The Simulation
+
+```bash
+iints run \
+  --algo algorithms/example_algorithm.py \
+  --patient-config-path patients/stable_patient.yaml \
+  --scenario-path scenarios/clinic_safe_baseline.json \
+  --duration 1440 \
+  --seed 42 \
+  --output-dir results/baseline_seed_42
+```
+
+Do not close the terminal until the run completes or records an explicit termination reason.
+
+## 4. Inspect Before Scoring
+
+Follow [Understand A Run](RUN_OUTPUTS.md). At minimum:
+
+1. verify the CSV timestamps and duration
+2. check meals, insulin, and safety events
+3. review metadata and the seed
+4. compare report metrics with the CSV
+5. record warnings or early termination
+
+## 5. Validate The Run
+
+List available validation profiles:
+
+```bash
+iints validation-profiles
+```
+
+Then validate the run with the profile appropriate to your experiment. For the scaffolded baseline:
+
+```bash
+iints validate-run \
+  --results-csv results/baseline_seed_42/results.csv \
+  --profile research_default \
+  --output-json results/baseline_seed_42/validation_report.json
+```
+
+Validation is evidence about configured checks. It is not a clinical approval.
+
+## 6. Certify The Output Data
 
 ```bash
 iints data certify \
   contracts/clinical_mdmp_contract.yaml \
-  results/<run_id>/results.csv \
-  --output-json results/<run_id>/certification.json
+  results/baseline_seed_42/results.csv \
+  --output-json results/baseline_seed_42/certification.json
 ```
 
-Optional dashboard:
+Optional visual summary:
 
 ```bash
 iints data certify-visualizer \
-  results/<run_id>/certification.json \
-  --output-html results/<run_id>/certification_dashboard.html
+  results/baseline_seed_42/certification.json \
+  --output-html results/baseline_seed_42/certification_dashboard.html
 ```
 
-## 7) Review The Run With The Local AI Layer
+Read [Certification Quickstart](MDMP_QUICKSTART.md) to understand grades, contracts, and limitations.
+
+## 7. Add Optional AI Review
+
+Only after deterministic validation:
 
 ```bash
-iints ai report results/<run_id>
+iints ai report results/baseline_seed_42
 ```
 
-That gives the main SDK workflow in three commands:
+This requires a configured local AI backend. AI output is commentary, not an authoritative metric or dosing decision. See [AI Assistant](AI_ASSISTANT.md).
 
-1. `iints presets run`
-2. `iints data certify`
-3. `iints ai report`
+## 8. Make A Controlled Comparison
 
-## 8) Inspect The Outputs
+Change one intended factor at a time. For example, use a different algorithm while keeping patient, scenario, duration, time step, and seed fixed.
 
-A typical run writes:
-- `results.csv`: time-series simulation output
-- `clinical_report.pdf`: summary report for review
-- `audit/`: safety and decision trail
-- `run_manifest.json`: file hashes for reproducibility
-- `run_metadata.json`: run configuration, environment details, SDK version, and data-format versions
-- `certification.json`: trust grade and dataset checks after `iints data certify`
+Store each run in a separate folder. Never overwrite the baseline.
 
-## 9) Build A Study-Ready Bundle
+For multi-run studies, continue with [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) rather than scripting ad hoc comparisons.
 
-```bash
-iints study-ready --algo algorithms/example_algorithm.py --output-dir results/study_ready
-```
+## Completion Checklist
 
-This adds:
-- `validation_report.json`
-- `sources_manifest.json`
-- `SUMMARY.md`
+- [ ] The environment and SDK version are known.
+- [ ] Patient, scenario, algorithm, duration, time step, and seed are explicit.
+- [ ] The run completed or recorded why it stopped.
+- [ ] CSV, report, metadata, and manifest agree.
+- [ ] Validation and certification artifacts are preserved.
+- [ ] AI output, if used, was checked against deterministic evidence.
+- [ ] Limitations and failed runs are documented.
 
-## 10) Pick Your Next Workflow
+## Continue By Goal
 
-The IINTS-AF SDK supports many advanced workflows that are outside the scope of a basic simulation, including:
-
-- **Importing personal pump/CGM data** (CareLink, Tidepool, Nightscout).
-- **Running local AI Models** (Ollama) to automatically audit and explain simulation runs.
-- **Generating Poster Summaries** for academic conferences.
-- **Deploying to Edge devices** like the Raspberry Pi or Arduino UNO Q for live hardware testing.
-
-To keep this Getting Started guide clean, all these advanced flows have been moved to their respective guides. 
-Please refer to the [Workflow Hub](WORKFLOWS.md), [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md), or the [AI Assistant](AI_ASSISTANT.md) guide for full commands on these topics.
-
-## Where To Go Next
-
-| If you finished this page and want to... | Continue with |
-|---|---|
-| turn one run into a formal benchmark | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
-| aggregate several runs | [Study Analysis](STUDY_ANALYSIS.md) |
-| certify datasets and outputs | [MDMP Quickstart](MDMP_QUICKSTART.md) |
-| use local AI reporting | [AI Assistant](AI_ASSISTANT.md) |
-| deploy to Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
-
-More references:
-
-- [Choose Your Path](USER_GUIDE_MAP.md)
-- [Updating The SDK](UPDATING.md)
-- [Evidence Base](EVIDENCE_BASE.md)
-- [CLI & Advanced Reference](TECHNICAL_README.md)
-
-## Safety Scope
-
-- Research use only.
-- Not a medical device.
-- No clinical dosing advice.
+| Goal | Next page |
+| --- | --- |
+| compare algorithms or patient groups | [Scientific Workflow](SCIENTIFIC_WORKFLOW.md) |
+| aggregate completed runs | [Study Analysis](STUDY_ANALYSIS.md) |
+| work with imported diabetes data | [Certification Guide](MDMP_FULL_GUIDE.md) |
+| train a glucose predictor | [Glucose Forecast Model](GLUCOSE_MODEL.md) |
+| use Raspberry Pi, Jetson, UNO Q, Pico, or FPGA | [Hardware Hub](HARDWARE.md) |

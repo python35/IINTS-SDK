@@ -57,10 +57,7 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
                 if !output.status.success() && stdout.is_empty() {
                     attempts.push(format!(
                         "{} {:?}: exit {}; {}",
-                        candidate.program,
-                        candidate.prefix_args,
-                        output.status,
-                        stderr
+                        candidate.program, candidate.prefix_args, output.status, stderr
                     ));
                     continue;
                 }
@@ -77,7 +74,10 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
                     .get("error")
                     .and_then(Value::as_str)
                     .unwrap_or("Python bridge reported an error");
-                let details = envelope.get("details").and_then(Value::as_str).unwrap_or("");
+                let details = envelope
+                    .get("details")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
                 return Err(format!("{message}\n{details}").trim().to_string());
             }
             Err(error) => attempts.push(format!(
@@ -184,7 +184,11 @@ async fn run_tissue_stress(
 }
 
 #[tauri::command]
-async fn run_workflow(workflow_key: String, output_dir: String, seed: i64) -> Result<Value, String> {
+async fn run_workflow(
+    workflow_key: String,
+    output_dir: String,
+    seed: i64,
+) -> Result<Value, String> {
     if workflow_key.trim().is_empty() {
         return Err("workflow_key is required".to_string());
     }
@@ -411,9 +415,12 @@ fn resolve_user_path(raw: &str) -> Result<PathBuf, String> {
     } else {
         PathBuf::from(trimmed)
     };
-    expanded
-        .canonicalize()
-        .map_err(|error| format!("Cannot open path because it does not exist: {} ({error})", expanded.display()))
+    expanded.canonicalize().map_err(|error| {
+        format!(
+            "Cannot open path because it does not exist: {} ({error})",
+            expanded.display()
+        )
+    })
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -495,7 +502,10 @@ fn validate_open_target(path: &Path) -> Result<(), String> {
         return Ok(());
     }
     if !path.is_file() {
-        return Err(format!("Open target is not a regular file or folder: {}", path.display()));
+        return Err(format!(
+            "Open target is not a regular file or folder: {}",
+            path.display()
+        ));
     }
     let extension = path
         .extension()
@@ -519,8 +529,10 @@ fn validate_open_target(path: &Path) -> Result<(), String> {
 fn build_sdk_update_command_parts() -> Result<Vec<String>, String> {
     let candidate = python_candidates()
         .into_iter()
-        .next()
-        .ok_or_else(|| "No Python executable candidate is available.".to_string())?;
+        .find(python_candidate_has_iints_sdk)
+        .ok_or_else(|| {
+            "Could not find a Python interpreter with iints-sdk-python35 installed. Set IINTS_PYTHON to the correct executable before updating.".to_string()
+        })?;
     let mut parts = vec![candidate.program];
     parts.extend(candidate.prefix_args);
     parts.extend([
@@ -531,6 +543,20 @@ fn build_sdk_update_command_parts() -> Result<Vec<String>, String> {
         "iints-sdk-python35[full,desktop,mdmp,research,edge]".to_string(),
     ]);
     Ok(parts)
+}
+
+fn python_candidate_has_iints_sdk(candidate: &PythonCandidate) -> bool {
+    let mut command = Command::new(&candidate.program);
+    command.args(&candidate.prefix_args);
+    command.args([
+        "-c",
+        "import importlib.metadata; importlib.metadata.version('iints-sdk-python35')",
+    ]);
+    command.env("PYTHONUTF8", "1");
+    command
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 fn quote_posix_arg(value: &str) -> String {
@@ -578,9 +604,17 @@ fn program_on_path(program: &str) -> bool {
 fn build_sdk_update_command_text() -> Result<String, String> {
     let parts = build_sdk_update_command_parts()?;
     if cfg!(target_os = "windows") {
-        Ok(parts.iter().map(|part| quote_cmd_arg(part)).collect::<Vec<_>>().join(" "))
+        Ok(parts
+            .iter()
+            .map(|part| quote_cmd_arg(part))
+            .collect::<Vec<_>>()
+            .join(" "))
     } else {
-        Ok(parts.iter().map(|part| quote_posix_arg(part)).collect::<Vec<_>>().join(" "))
+        Ok(parts
+            .iter()
+            .map(|part| quote_posix_arg(part))
+            .collect::<Vec<_>>()
+            .join(" "))
     }
 }
 
@@ -605,7 +639,14 @@ fn open_terminal_with_command(command_text: &str) -> Result<(), String> {
             .map_err(|error| format!("Could not open Terminal.app: {error}"))
     } else if cfg!(target_os = "windows") {
         Command::new("cmd.exe")
-            .args(["/c", "start", "IINTS SDK Update", "cmd.exe", "/k", command_text])
+            .args([
+                "/c",
+                "start",
+                "IINTS SDK Update",
+                "cmd.exe",
+                "/k",
+                command_text,
+            ])
             .spawn()
             .map(|_| ())
             .map_err(|error| format!("Could not open Windows terminal: {error}"))
@@ -615,12 +656,24 @@ fn open_terminal_with_command(command_text: &str) -> Result<(), String> {
             command_text
         );
         let terminals: [(&str, Vec<&str>); 6] = [
-            ("x-terminal-emulator", vec!["-e", "bash", "-lc", held_command.as_str()]),
-            ("gnome-terminal", vec!["--", "bash", "-lc", held_command.as_str()]),
+            (
+                "x-terminal-emulator",
+                vec!["-e", "bash", "-lc", held_command.as_str()],
+            ),
+            (
+                "gnome-terminal",
+                vec!["--", "bash", "-lc", held_command.as_str()],
+            ),
             ("konsole", vec!["-e", "bash", "-lc", held_command.as_str()]),
-            ("xfce4-terminal", vec!["-x", "bash", "-lc", held_command.as_str()]),
+            (
+                "xfce4-terminal",
+                vec!["-x", "bash", "-lc", held_command.as_str()],
+            ),
             ("xterm", vec!["-e", "bash", "-lc", held_command.as_str()]),
-            ("alacritty", vec!["-e", "bash", "-lc", held_command.as_str()]),
+            (
+                "alacritty",
+                vec!["-e", "bash", "-lc", held_command.as_str()],
+            ),
         ];
         for (program, args) in terminals {
             if program_on_path(program) {
@@ -700,4 +753,37 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn evidence_urls_require_an_exact_allowlisted_https_host() {
+        assert!(validate_external_url("https://alphafold.ebi.ac.uk/entry/P01308").is_ok());
+        assert!(validate_external_url("http://alphafold.ebi.ac.uk/entry/P01308").is_err());
+        assert!(validate_external_url("https://alphafold.ebi.ac.uk.example.com/").is_err());
+        assert!(validate_external_url("https://user@alphafold.ebi.ac.uk/").is_err());
+    }
+
+    #[test]
+    fn posix_update_arguments_are_shell_quoted() {
+        assert_eq!(quote_posix_arg("python3"), "python3");
+        assert_eq!(quote_posix_arg("/tmp/IINTS Python"), "'/tmp/IINTS Python'");
+        assert_eq!(
+            quote_posix_arg("value'; echo unsafe"),
+            "'value'\"'\"'; echo unsafe'"
+        );
+    }
+
+    #[test]
+    fn windows_update_arguments_quote_shell_metacharacters() {
+        assert_eq!(quote_cmd_arg("python.exe"), "python.exe");
+        assert_eq!(
+            quote_cmd_arg(r"C:\Program Files\Python\python.exe"),
+            r#""C:\Program Files\Python\python.exe""#
+        );
+        assert_eq!(quote_cmd_arg("package&command"), r#""package&command""#);
+    }
 }

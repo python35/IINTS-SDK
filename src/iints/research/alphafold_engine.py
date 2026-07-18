@@ -4,14 +4,21 @@ from typing import Dict, Any
 
 class AlphaFoldGenomicsEngine:
     """
-    Bridges deep 3D structural AI (AlphaFold) to physiological equations.
+    Retrieves residue-level AlphaFold confidence for structural context.
+
+    AlphaFold pLDDT is a confidence score for the predicted local structure. It
+    is not a pathogenicity score and must not be converted into a physiological
+    effect size, binding-affinity loss, or clinical classification.
     """
 
     @staticmethod
     def evaluate_plddt_impact(uniprot_id: str, residue_index: int) -> Dict[str, Any]:
         """
-        Fetches AlphaFold structure, finds the pLDDT for the residue,
-        and mathematically translates it into a molecular_affinity_scalar.
+        Fetch the local pLDDT score without inferring a mutation effect.
+
+        The historical method name is retained for API compatibility. Callers
+        must use a separately sourced functional effect size before changing a
+        patient-model parameter.
         """
         api_url = f"https://alphafold.ebi.ac.uk/api/prediction/{uniprot_id}"
         
@@ -67,25 +74,28 @@ class AlphaFoldGenomicsEngine:
             
         avg_plddt = sum(plddt_values) / len(plddt_values)
         
-        # Mathematical translation
+        # pLDDT bands describe model confidence only. They do not establish
+        # conservation, pathogenicity, receptor function, or binding affinity.
         if avg_plddt >= 90:
-            scalar = 0.15
-            conclusion = "Highly structured core domain. Mutation is likely catastrophic."
+            confidence_band = "very_high"
         elif avg_plddt >= 70:
-            scalar = 0.40
-            conclusion = "Structured domain. Mutation likely impairs function."
+            confidence_band = "confident"
         elif avg_plddt >= 50:
-            scalar = 0.75
-            conclusion = "Moderate flexibility. Mutation partially tolerated."
+            confidence_band = "low"
         else:
-            scalar = 0.95
-            conclusion = "Intrinsically disordered/flexible region. Mutation is highly tolerated."
+            confidence_band = "very_low"
+
+        conclusion = (
+            "Local AlphaFold prediction confidence only; no mutation severity, "
+            "pathogenicity, or functional effect is inferred."
+        )
             
         return {
             "uniprot_id": uniprot_id,
             "residue_index": residue_index,
             "plddt": round(avg_plddt, 2),
-            "scalar": scalar,
+            "confidence_band": confidence_band,
+            "supports_functional_inference": False,
             "conclusion": conclusion,
             "pdb_url": pdb_url
         }

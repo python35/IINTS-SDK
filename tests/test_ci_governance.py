@@ -69,3 +69,30 @@ def test_eu_control_matrix_evidence_paths_exist() -> None:
     module = _load_governance_module()
 
     assert module._check_eu_control_matrix() == []
+
+
+def test_sdk_check_validates_the_current_checkout() -> None:
+    source = Path("tools/dev/sdk_check.sh").read_text(encoding="utf-8")
+
+    assert 'export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"' in source
+    assert "MPLCONFIGDIR" in source
+    assert "XDG_CACHE_HOME" in source
+
+
+def test_safety_type_gate_does_not_strict_check_unrelated_imports() -> None:
+    workflow = Path(".github/workflows/python-package.yml").read_text(encoding="utf-8")
+    gate = workflow.split("Type check safety core (strict gate)", 1)[1].split(
+        "Run tests with PyTest",
+        1,
+    )[0]
+
+    assert gate.count("--follow-imports=skip") == 2
+    assert "mypy --strict" in gate
+    assert "mypy --check-untyped-defs" in gate
+
+
+def test_release_workflow_installs_declared_build_backend() -> None:
+    workflow = Path(".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert '"setuptools>=83,<84"' in workflow
+    assert "python -m build --no-isolation" in workflow
