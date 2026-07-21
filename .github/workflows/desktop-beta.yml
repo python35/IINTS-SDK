@@ -113,6 +113,10 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             python tools/desktop/build_qt_desktop_app.py --backend qt --onedir --name "${APP_NAME}"
+          elif [[ "$RUNNER_OS" == "Linux" ]]; then
+            # Keep stderr attached on Linux so a frozen-app startup failure is
+            # diagnosable from a terminal and from GitHub Actions.
+            python tools/desktop/build_qt_desktop_app.py --backend qt --console --name "${APP_NAME}"
           else
             python tools/desktop/build_qt_desktop_app.py --backend qt --name "${APP_NAME}"
           fi
@@ -135,7 +139,11 @@ jobs:
             cat linux-smoke.log || true
             echo "---- IINTS desktop startup log ----"
             cat "$HOME/.local/state/iints-af-desktop/desktop.log" || true
-            summary="$(tail -c 3500 linux-smoke.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            {
+              cat linux-smoke.log 2>/dev/null || true
+              cat "$HOME/.local/state/iints-af-desktop/desktop.log" 2>/dev/null || true
+            } > linux-smoke-combined.log
+            summary="$(tail -c 6000 linux-smoke-combined.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
             echo "::error title=Linux desktop smoke failed::${summary:-No console traceback was captured; inspect the uploaded debug artifact.}"
             exit "$status"
           fi

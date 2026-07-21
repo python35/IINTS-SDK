@@ -498,9 +498,11 @@ def test_qt_desktop_full_smoke_verifies_bundled_research_engines() -> None:
     assert workflow.count("--smoke-full") == 3
     assert "Best-effort bundled smoke on Windows" not in workflow
     assert "linux-smoke.log" in workflow
+    assert "linux-smoke-combined.log" in workflow
     assert "Linux desktop smoke failed" in workflow
     assert 'cat "$HOME/.local/state/iints-af-desktop/desktop.log"' in workflow
     assert "libxkbcommon-x11-0" in workflow
+    assert '--backend qt --console --name "${APP_NAME}"' in workflow
 
 
 def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
