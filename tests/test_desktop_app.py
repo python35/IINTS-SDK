@@ -686,6 +686,8 @@ def test_tauri_beta_workflow_builds_native_installers_with_stable_links() -> Non
     assert "npm run tauri -- build --bundles" in workflow
     assert '"$executable" --smoke' in workflow
     assert "cargo clippy" in workflow
+    assert 'echo "APPLE_SIGNING_IDENTITY=$MACOS_SIGNING_IDENTITY" >> "$GITHUB_ENV"' in workflow
+    assert "APPLE_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}" not in workflow
     assert "package_tauri_bundle.py" in workflow
     assert "IINTS-AF-Research-Workbench-windows-x64-setup.exe" in packager
     assert "IINTS-AF-Research-Workbench-macos.dmg" in packager
