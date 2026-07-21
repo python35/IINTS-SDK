@@ -172,6 +172,38 @@ iints safety-visualize \
   --output-json results/live_demo/safety_visualizer.json
 ```
 
+## Cross-scale Reference Labs
+
+Inspect external models before allowing an external engine to execute them:
+
+```bash
+iints research copasi status
+iints research copasi inspect models/sensitivity.cps
+iints research copasi run models/sensitivity.cps \
+  --output-dir results/copasi \
+  --allow-external-execution
+
+iints research cellml status
+iints research cellml inspect models/reference.cellml
+iints research cellml validate models/reference.cellml \
+  --output-dir results/cellml
+
+iints research fmi status
+iints research fmi inspect models/pump_flow.fmu
+iints research fmi run models/pump_flow.fmu \
+  --output-dir results/fmi \
+  --start 0 --end 60 --output-interval 0.1 \
+  --variable flow_ml_min \
+  --trust-native-code
+
+iints research binding query \
+  --uniprot P06213 \
+  --cutoff-nm 10000 \
+  --output-dir results/bindingdb
+```
+
+The COPASI task and fitting objective must already be configured in the `.cps` file. CellML inspection is local; OpenCOR validation is an independent engine step. An FMU may contain executable native code, so never use `--trust-native-code` for an unknown file. BindingDB records retain `Ki`, `Kd`, and `IC50` as distinct assay types and are not converted automatically into patient or PK/PD parameters. See the [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) guide.
+
 ## Real Data And Datasets
 
 List and inspect datasets:

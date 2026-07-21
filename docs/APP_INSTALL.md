@@ -23,7 +23,7 @@ The links below use the stable `desktop-beta-latest` release tag, so the README 
 | macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) | open the `.dmg`, then open the app |
 | Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) | mark executable if needed, then run it |
 
-The macOS DMG uses the small native Cocoa shell for now. That keeps the beta app opening reliably on unsigned/downloaded macOS builds while the richer Qt bundle is being hardened. The Qt app is still available through the Python install below.
+Windows, macOS, and Linux use the same rich Qt research workbench. Each packaged build contains its own Python/Qt runtime plus the supported report, MDMP, plotting, serial, SBML/libRoadRunner, and FMI/FMPy dependencies.
 
 These beta builds are unsigned unless release signing secrets are configured. Windows or macOS may show a security warning until the project has code-signing certificates. See [Desktop App Signing](DESKTOP_SIGNING.md).
 
@@ -34,7 +34,7 @@ The app also includes an update panel that links back to the latest app release 
 This is the easiest path for most users:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
+python -m pip install -U "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
 
@@ -60,7 +60,7 @@ cd IINTS-SDK
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U -e ".[full,desktop,mdmp]"
+python -m pip install -U -e ".[desktop-all]"
 iints-desktop
 ```
 
@@ -72,7 +72,7 @@ cd IINTS-SDK
 py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -U pip
-python -m pip install -U -e ".[full,desktop,mdmp]"
+python -m pip install -U -e ".[desktop-all]"
 iints-desktop
 ```
 
@@ -92,7 +92,7 @@ iints-desktop
 - It does not replace the SDK engine.
 - It does not contain separate medical formulas.
 - It does not make treatment decisions.
-- It does not silently install Ollama itself.
+- It does not silently install external applications or AI model files.
 - It does not connect to a real patient or real pump.
 
 ## Local AI Setup
@@ -106,13 +106,13 @@ The app can start the local Ollama server and prepare the selected model when th
 If the app command is missing, reinstall with the desktop extra:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
+python -m pip install -U "iints-sdk-python35[desktop-all]"
 ```
 
 If the Qt app fails because PySide6 is missing, reinstall the SDK with the desktop extra. The desktop extra installs PySide6 automatically:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
+python -m pip install -U "iints-sdk-python35[desktop-all]"
 ```
 
 If you want to verify the SDK first:

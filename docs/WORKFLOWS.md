@@ -54,6 +54,26 @@ Choose the workflow that matches your question. Do not enable every feature simp
 
 **Review rule:** prevent subject leakage and report horizon-specific performance, uncertainty, and physiological violations.
 
+## Mechanistic Reference Model
+
+**Question:** Does an independent published or externally supplied equation model reproduce, challenge, or clarify one IINTS physiological assumption?
+
+**Start:** [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md)
+
+**Output:** SBML structural summary, exact model hash, independent time-course CSV, execution manifest, and review report.
+
+**Review rule:** verify source, licence, model population, units, variables, and mappings before comparing outputs; never calibrate IINTS silently.
+
+## Cross-scale Reference Evidence
+
+**Question:** Which assumptions remain stable when challenged by sensitivity analysis, independent CellML validation, a device-physics FMU, or measured binding assays?
+
+**Start:** [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md)
+
+**Output:** model inspections, exact hashes, engine logs, optional time-course CSVs, affinity records, manifests, and reviewer notes.
+
+**Review rule:** keep structural confidence, assay affinity, dynamic physiology, physical-device behaviour, and clinical outcomes separate; never execute an untrusted FMU.
+
 ## Results Management
 
 **Question:** How can many completed runs be indexed and compared without losing provenance?
@@ -73,6 +93,16 @@ Choose the workflow that matches your question. Do not enable every feature simp
 **Output:** copied manifests, run cards, model/data context, figures, and a public file index.
 
 **Review rule:** include limitations, intended use, sources, and failed or excluded results.
+
+## Academic Reproducibility Package
+
+**Question:** Can another researcher identify and verify the exact files, software revision, settings, seed, and references behind one completed run?
+
+**Start:** [Academic Research Workbench](ACADEMIC_RESEARCH_WORKBENCH.md)
+
+**Output:** RO-Crate JSON-LD, SHA-256 artifact inventory, reproducibility audit, source-registry snapshot, and review guide.
+
+**Review rule:** resolve audit findings and complete privacy, licence, and claim-level source review before sharing.
 
 ## Desktop Workflow
 
@@ -104,6 +134,8 @@ iints data certify --help
 iints ai local-check
 iints run-study --help
 iints evidence build --help
+iints research academic-bundle --help
+iints research mechanistic inspect --help
 iints edge doctor
 ```
 

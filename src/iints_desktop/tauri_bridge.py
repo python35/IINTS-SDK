@@ -100,16 +100,26 @@ def _diagnostics(_args: argparse.Namespace) -> int:
         "pandas": _module_available("pandas"),
         "matplotlib": _module_available("matplotlib"),
         "plotly": _module_available("plotly"),
+        "roadrunner": _module_available("roadrunner"),
+        "fmpy": _module_available("fmpy"),
         "mdmp_core.crypto": _module_available("mdmp_core.crypto"),
         "PySide6": _module_available("PySide6"),
     }
     recommended_checks = []
     if not optional_modules["pandas"]:
-        recommended_checks.append("Install the SDK with desktop/full extras so CSV previews can load.")
+        recommended_checks.append("Install the SDK with the desktop-all extra so CSV previews can load.")
     if not optional_modules["matplotlib"]:
         recommended_checks.append("Install matplotlib for generated preview graphs.")
     if not optional_modules["mdmp_core.crypto"]:
         recommended_checks.append("Install the mdmp extra before creating signed MDMP certificates.")
+    if not optional_modules["roadrunner"]:
+        recommended_checks.append(
+            "Install the desktop-all or mechanistic extra to execute SBML models; safe structural inspection remains available."
+        )
+    if not optional_modules["fmpy"]:
+        recommended_checks.append(
+            "Install the desktop-all or fmi extra only when trusted FMU execution is needed; static inspection remains available."
+        )
     ollama_path = shutil.which("ollama")
     if ollama_path is None:
         recommended_checks.append("Install Ollama if you want local AI analysis.")
@@ -223,6 +233,140 @@ def _tissue_stress(args: argparse.Namespace) -> int:
     )
 
 
+def _mechanistic_status(_args: argparse.Namespace) -> int:
+    from iints.research.mechanistic_models import roadrunner_status
+
+    return _ok({**roadrunner_status(), "inspection_available": True, "research_only": True})
+
+
+def _mechanistic_inspect(args: argparse.Namespace) -> int:
+    from iints.research.mechanistic_models import inspect_sbml_model, sbml_summary_payload
+
+    summary = inspect_sbml_model(Path(args.model))
+    return _ok(
+        {
+            "summary": sbml_summary_payload(summary),
+            "research_only": True,
+            "medical_device": False,
+            "schema_validation_performed": False,
+        }
+    )
+
+
+def _mechanistic_run(args: argparse.Namespace) -> int:
+    from iints.research.mechanistic_models import run_sbml_model
+
+    result = run_sbml_model(
+        Path(args.model),
+        Path(args.output_dir),
+        start=float(args.start),
+        end=float(args.end),
+        points=int(args.points),
+        variables=args.variable or (),
+        source_url=args.source_url,
+        model_license=args.model_license,
+    )
+    return _ok(
+        {
+            **asdict(result),
+            "research_only": True,
+            "medical_device": False,
+        }
+    )
+
+
+def _cross_scale_status(_args: argparse.Namespace) -> int:
+    from iints.research.cellml_models import opencor_status
+    from iints.research.copasi_models import copasi_status
+    from iints.research.fmi_models import fmpy_status
+
+    return _ok(
+        {
+            "copasi": copasi_status(),
+            "opencor": opencor_status(),
+            "fmpy": fmpy_status(),
+            "static_inspection": {"copasi": True, "cellml": True, "fmu": True},
+            "bindingdb": {"available": True, "network_required": True, "verified_tls": True},
+            "research_only": True,
+            "medical_device": False,
+        }
+    )
+
+
+def _copasi_inspect(args: argparse.Namespace) -> int:
+    from iints.research.copasi_models import copasi_summary_payload, inspect_copasi_model
+
+    summary = inspect_copasi_model(Path(args.model))
+    return _ok({"summary": copasi_summary_payload(summary), "research_only": True, "medical_device": False})
+
+
+def _copasi_run(args: argparse.Namespace) -> int:
+    from iints.research.copasi_models import run_copasi_model
+
+    result = run_copasi_model(
+        Path(args.model),
+        Path(args.output_dir),
+        scheduled_task=args.task,
+        timeout_seconds=int(args.timeout_seconds),
+        allow_external_execution=bool(args.allow_external_execution),
+    )
+    return _ok({**asdict(result), "research_only": True, "medical_device": False})
+
+
+def _cellml_inspect(args: argparse.Namespace) -> int:
+    from iints.research.cellml_models import cellml_summary_payload, inspect_cellml_model
+
+    summary = inspect_cellml_model(Path(args.model))
+    return _ok({"summary": cellml_summary_payload(summary), "research_only": True, "medical_device": False})
+
+
+def _cellml_validate(args: argparse.Namespace) -> int:
+    from iints.research.cellml_models import validate_cellml_model
+
+    result = validate_cellml_model(
+        Path(args.model),
+        Path(args.output_dir),
+        timeout_seconds=int(args.timeout_seconds),
+    )
+    return _ok({**asdict(result), "research_only": True, "medical_device": False})
+
+
+def _fmi_inspect(args: argparse.Namespace) -> int:
+    from iints.research.fmi_models import fmu_summary_payload, inspect_fmu_model
+
+    summary = inspect_fmu_model(Path(args.model))
+    return _ok({"summary": fmu_summary_payload(summary), "research_only": True, "medical_device": False})
+
+
+def _fmi_run(args: argparse.Namespace) -> int:
+    from iints.research.fmi_models import run_fmu_model
+
+    result = run_fmu_model(
+        Path(args.model),
+        Path(args.output_dir),
+        start=float(args.start),
+        end=float(args.end),
+        output_interval=float(args.output_interval),
+        variables=args.variable or (),
+        timeout_seconds=int(args.timeout_seconds),
+        allow_native_execution=bool(args.trust_native_code),
+    )
+    return _ok({**asdict(result), "research_only": True, "medical_device": False})
+
+
+def _binding_query(args: argparse.Namespace) -> int:
+    from iints.research.binding_evidence import query_bindingdb_uniprot
+
+    result = query_bindingdb_uniprot(
+        args.uniprot,
+        Path(args.output_dir),
+        cutoff_nm=int(args.cutoff_nm),
+        max_records=int(args.max_records),
+        timeout_seconds=int(args.timeout_seconds),
+    )
+    return _ok({**asdict(result), "research_only": True, "medical_device": False})
+
+
 def _run(args: argparse.Namespace) -> int:
     result = run_demo_preset(
         output_dir=Path(args.output_dir),
@@ -287,6 +431,27 @@ def _mdmp_certify(args: argparse.Namespace) -> int:
             "compliance_score": result.compliance_score,
             "row_count": result.row_count,
             "quick": not bool(args.full),
+        }
+    )
+
+
+def _academic_bundle(args: argparse.Namespace) -> int:
+    from iints.research.academic_bundle import build_academic_bundle
+
+    result = build_academic_bundle(
+        Path(args.run_dir),
+        title=args.title,
+        description=args.description,
+        creator_name=args.creator,
+        creator_orcid=args.orcid,
+        license_id=args.license_id,
+        source_ids=args.source_id or (),
+    )
+    return _ok(
+        {
+            **asdict(result),
+            "research_only": True,
+            "medical_device": False,
         }
     )
 
@@ -380,6 +545,72 @@ def build_parser() -> argparse.ArgumentParser:
     tissue.add_argument("--output-dir", required=True)
     tissue.set_defaults(func=_tissue_stress)
 
+    mechanistic_status = subcommands.add_parser("mechanistic-status")
+    mechanistic_status.set_defaults(func=_mechanistic_status)
+
+    mechanistic_inspect = subcommands.add_parser("mechanistic-inspect")
+    mechanistic_inspect.add_argument("--model", required=True)
+    mechanistic_inspect.set_defaults(func=_mechanistic_inspect)
+
+    mechanistic_run = subcommands.add_parser("mechanistic-run")
+    mechanistic_run.add_argument("--model", required=True)
+    mechanistic_run.add_argument("--output-dir", required=True)
+    mechanistic_run.add_argument("--start", type=float, default=0.0)
+    mechanistic_run.add_argument("--end", type=float, default=1440.0)
+    mechanistic_run.add_argument("--points", type=int, default=289)
+    mechanistic_run.add_argument("--variable", action="append", default=[])
+    mechanistic_run.add_argument("--source-url", default=None)
+    mechanistic_run.add_argument("--model-license", default="NOASSERTION")
+    mechanistic_run.set_defaults(func=_mechanistic_run)
+
+    cross_scale_status = subcommands.add_parser("cross-scale-status")
+    cross_scale_status.set_defaults(func=_cross_scale_status)
+
+    copasi_inspect = subcommands.add_parser("copasi-inspect")
+    copasi_inspect.add_argument("--model", required=True)
+    copasi_inspect.set_defaults(func=_copasi_inspect)
+
+    copasi_run = subcommands.add_parser("copasi-run")
+    copasi_run.add_argument("--model", required=True)
+    copasi_run.add_argument("--output-dir", required=True)
+    copasi_run.add_argument("--task", default=None)
+    copasi_run.add_argument("--timeout-seconds", type=int, default=900)
+    copasi_run.add_argument("--allow-external-execution", action="store_true")
+    copasi_run.set_defaults(func=_copasi_run)
+
+    cellml_inspect = subcommands.add_parser("cellml-inspect")
+    cellml_inspect.add_argument("--model", required=True)
+    cellml_inspect.set_defaults(func=_cellml_inspect)
+
+    cellml_validate = subcommands.add_parser("cellml-validate")
+    cellml_validate.add_argument("--model", required=True)
+    cellml_validate.add_argument("--output-dir", required=True)
+    cellml_validate.add_argument("--timeout-seconds", type=int, default=120)
+    cellml_validate.set_defaults(func=_cellml_validate)
+
+    fmi_inspect = subcommands.add_parser("fmi-inspect")
+    fmi_inspect.add_argument("--model", required=True)
+    fmi_inspect.set_defaults(func=_fmi_inspect)
+
+    fmi_run = subcommands.add_parser("fmi-run")
+    fmi_run.add_argument("--model", required=True)
+    fmi_run.add_argument("--output-dir", required=True)
+    fmi_run.add_argument("--start", type=float, default=0.0)
+    fmi_run.add_argument("--end", type=float, default=60.0)
+    fmi_run.add_argument("--output-interval", type=float, default=0.1)
+    fmi_run.add_argument("--variable", action="append", default=[])
+    fmi_run.add_argument("--timeout-seconds", type=int, default=300)
+    fmi_run.add_argument("--trust-native-code", action="store_true")
+    fmi_run.set_defaults(func=_fmi_run)
+
+    binding_query = subcommands.add_parser("binding-query")
+    binding_query.add_argument("--uniprot", default="P06213")
+    binding_query.add_argument("--output-dir", required=True)
+    binding_query.add_argument("--cutoff-nm", type=int, default=10_000)
+    binding_query.add_argument("--max-records", type=int, default=5_000)
+    binding_query.add_argument("--timeout-seconds", type=int, default=30)
+    binding_query.set_defaults(func=_binding_query)
+
     run = subcommands.add_parser("run")
     run.add_argument("--workflow-key", required=True)
     run.add_argument("--output-dir", required=True)
@@ -401,6 +632,16 @@ def build_parser() -> argparse.ArgumentParser:
     mdmp.add_argument("--quick-rows", type=int, default=5000)
     mdmp.add_argument("--full", action="store_true")
     mdmp.set_defaults(func=_mdmp_certify)
+
+    academic = subcommands.add_parser("academic-bundle")
+    academic.add_argument("--run-dir", required=True)
+    academic.add_argument("--title", default=None)
+    academic.add_argument("--description", default=None)
+    academic.add_argument("--creator", default=None)
+    academic.add_argument("--orcid", default=None)
+    academic.add_argument("--license", dest="license_id", default="NOASSERTION")
+    academic.add_argument("--source-id", action="append", default=[])
+    academic.set_defaults(func=_academic_bundle)
 
     ai_check = subcommands.add_parser("ai-check")
     ai_check.add_argument("--model", default="ministral-3:8b")

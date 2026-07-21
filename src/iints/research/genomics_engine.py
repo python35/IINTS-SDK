@@ -55,25 +55,30 @@ class GenomicsEngine:
 
     @staticmethod
     def evaluate_mutation(gene: str, variant: str) -> dict[str, Any]:
-        """Return an explicit demo assumption plus optional structural context.
+        """Return an explicit demo assumption plus external evidence context.
 
         Unknown variants deliberately receive no functional scalar. AlphaFold
-        pLDDT cannot support that inference, so callers must provide validated
-        functional evidence before running a physiological comparison.
+        pLDDT and ClinVar classification cannot quantify retained receptor
+        function, so callers must provide validated functional evidence before
+        running a physiological comparison.
         """
         import re
         from iints.research.alphafold_engine import AlphaFoldGenomicsEngine
+        from iints.research.clinvar_engine import ClinVarEngine
 
+        normalized_gene = gene.upper().strip()
         variant = variant.upper().strip()
-        
+
         # Check known mutations first for fast/offline execution
-        if gene.upper() == "INSR" and variant in KNOWN_MUTATIONS:
+        if normalized_gene == "INSR" and variant in KNOWN_MUTATIONS:
             result = dict(KNOWN_MUTATIONS[variant])
             retained_percent = int(round(float(result["scalar"]) * 100))
             result.update(
                 {
                     "supported": True,
+                    "physiological_simulation_allowed": True,
                     "evidence_type": "illustrative_scenario_assumption",
+                    "functional_scalar_provenance": "versioned SDK scenario assumption",
                     "desc": (
                         f"Illustrative INSR scenario assuming {retained_percent}% retained "
                         "receptor function. This is not a clinical estimate for the variant."
@@ -81,42 +86,68 @@ class GenomicsEngine:
                 }
             )
             return result
-            
+
         # Determine UniProt ID (INSR -> P06213)
-        uniprot_id = "P06213" if gene.upper() == "INSR" else gene.strip()
-        
+        uniprot_id = "P06213" if normalized_gene == "INSR" else gene.strip()
+
         # Extract residue index from variant (e.g. V938M -> 938)
-        match = re.search(r'\d+', variant)
+        match = re.search(r"\d+", variant)
         if not match:
             return {
                 "scalar": None,
                 "supported": False,
+                "physiological_simulation_allowed": False,
                 "evidence_type": "insufficient_evidence",
                 "desc": "Unknown mutation format; no functional effect was inferred.",
                 "residue": None,
             }
-            
+
         residue_idx = int(match.group())
-        
-        # Query AlphaFold
+
+        clinvar_result = ClinVarEngine.lookup_variant(normalized_gene, variant)
         af_result = AlphaFoldGenomicsEngine.evaluate_plddt_impact(uniprot_id, residue_idx)
+
+        description_parts: list[str] = []
+        if clinvar_result.get("found"):
+            description_parts.append(
+                "ClinVar context: "
+                f"{clinvar_result.get('aggregate_classification', 'not_available')}. "
+                "This condition-specific classification is not a quantitative functional assay."
+            )
+        else:
+            description_parts.append(str(clinvar_result.get("warning", "No ClinVar context available.")))
+
         if "error" in af_result:
-            return {
-                "scalar": None,
-                "supported": False,
-                "evidence_type": "insufficient_evidence",
-                "desc": f"No functional effect inferred. Structural lookup failed: {af_result['error']}",
-                "residue": residue_idx,
-            }
-            
-        desc = f"AlphaFold pLDDT: {af_result['plddt']}. {af_result['conclusion']}"
+            description_parts.append(f"AlphaFold structural lookup failed: {af_result['error']}")
+            structural_context: dict[str, Any] | None = None
+        else:
+            description_parts.append(
+                f"AlphaFold pLDDT {af_result['plddt']}: {af_result['conclusion']}"
+            )
+            structural_context = af_result
+
+        description_parts.append(
+            "REJECTED: no physiological effect is simulated without an explicit, "
+            "quantitative functional scalar and provenance."
+        )
+        if clinvar_result.get("found") and structural_context is not None:
+            evidence_type = "classification_and_structural_context_only"
+        elif clinvar_result.get("found"):
+            evidence_type = "clinical_classification_context_only"
+        elif structural_context is not None:
+            evidence_type = "structural_context_only"
+        else:
+            evidence_type = "insufficient_evidence"
+
         return {
             "scalar": None,
             "supported": False,
-            "evidence_type": "structural_context_only",
-            "desc": desc,
+            "physiological_simulation_allowed": False,
+            "evidence_type": evidence_type,
+            "desc": " ".join(description_parts),
             "residue": residue_idx,
-            "structural_context": af_result,
+            "clinvar_context": clinvar_result,
+            "structural_context": structural_context,
         }
 
     @staticmethod
@@ -137,7 +168,8 @@ class GenomicsEngine:
             raise ValueError(
                 f"No validated functional scalar is available for {gene.upper()} "
                 f"{normalized_variant}. AlphaFold pLDDT is structural confidence, not "
-                "mutation severity; no physiological simulation was generated."
+                "mutation severity, and ClinVar classification is not a quantitative "
+                "effect size; no physiological simulation was generated."
             )
         scalar = float(raw_scalar)
         go = _plotly_graph_objects()

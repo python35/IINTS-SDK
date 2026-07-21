@@ -24,6 +24,8 @@ def test_formula_specs_have_sources_units_and_implementation_paths() -> None:
     for formula in FORMULAS:
         assert formula.formula_id.startswith("F")
         assert formula.canonical_expression
+        assert formula.latex_expression
+        assert "```" not in formula.latex_expression
         assert formula.solved_or_runtime_form
         assert formula.units
         assert formula.literature_basis
@@ -62,5 +64,9 @@ def test_formula_registry_markdown_lists_all_formulas() -> None:
     markdown = formula_registry_markdown()
 
     assert "# IINTS-AF Formula Registry" in markdown
+    assert markdown.count("\\[") == 15
+    assert markdown.count("\\]") == 15
+    assert markdown.count("Plain-text runtime notation") == 15
     for formula in FORMULAS:
         assert formula.formula_id in markdown
+        assert formula.latex_expression in markdown

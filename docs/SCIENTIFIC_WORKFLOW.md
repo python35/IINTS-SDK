@@ -141,6 +141,19 @@ When the richer study fields are present, the poster includes:
 - a safety outcomes panel
 - a profile heatmap panel
 
+### 6. Package Final Runs For Review
+
+After selecting the runs that support the reported analysis, add checksums and reviewable metadata to each source run:
+
+```bash
+iints research academic-bundle \
+  results/study_bundle/study_clean/<algorithm>/<profile>/<run> \
+  --creator "Researcher Name" \
+  --license "CC-BY-4.0"
+```
+
+Do not package only the best-looking run. Preserve the complete study index, failures, exclusions, and comparison logic separately. See [Academic Research Workbench](ACADEMIC_RESEARCH_WORKBENCH.md).
+
 ## What `study-protocol` Encodes
 
 The protocol bundle now acts as the authoritative benchmark design writer.
@@ -293,5 +306,7 @@ That gives you one deterministic package for:
 | interpret study outputs | [Study Analysis](STUDY_ANALYSIS.md) |
 | certify data before running studies | [MDMP Quickstart](MDMP_QUICKSTART.md) |
 | explain source evidence | [Evidence Base](EVIDENCE_BASE.md) |
+| package a final run for reproducibility review | [Academic Research Workbench](ACADEMIC_RESEARCH_WORKBENCH.md) |
+| challenge assumptions with sensitivity, CellML, FMI, or affinity evidence | [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) |
 | run studies on a Raspberry Pi | [Raspberry Pi Digital Patient](DIGITAL_PATIENT_PI.md) |
 | inspect all study commands | [Command Reference](COMMAND_REFERENCE.md) |

@@ -21,6 +21,7 @@ class FormulaSpec:
     title: str
     category: FormulaCategory
     canonical_expression: str
+    latex_expression: str
     solved_or_runtime_form: str
     state_variables: tuple[str, ...]
     parameters: tuple[str, ...]
@@ -42,6 +43,11 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         canonical_expression=(
             "dG/dt = -(p1_eff + X)G + p1_eff*Gb_eff + Ra + dawn - U_exercise - F_R"
         ),
+        latex_expression=(
+            r"\frac{dG}{dt}=-(p_{1,\mathrm{eff}}+X)G"
+            r"+p_{1,\mathrm{eff}}G_{b,\mathrm{eff}}+R_a+D_{\mathrm{dawn}}"
+            r"-U_{\mathrm{exercise}}-F_R"
+        ),
         solved_or_runtime_form=(
             "Integrated by scipy.solve_ivp over each simulator step; glucose transition is rate-guarded "
             "after integration."
@@ -61,6 +67,9 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         title="Remote insulin action",
         category="physiology",
         canonical_expression="dX/dt = -p2*X + p3_eff*max(I - Ib, 0)",
+        latex_expression=(
+            r"\frac{dX}{dt}=-p_2X+p_{3,\mathrm{eff}}\max\!\left(I-I_b,0\right)"
+        ),
         solved_or_runtime_form="First-order action compartment integrated inside the Bergman ODE RHS.",
         state_variables=("X", "I"),
         parameters=("p2", "p3_eff", "Ib"),
@@ -78,6 +87,10 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         category="physiology",
         canonical_expression=(
             "dI/dt = -n(I - Ib) + gamma*M_graft*max(G - h, 0)*(1-f_subq) + Ra_I / V_I"
+        ),
+        latex_expression=(
+            r"\frac{dI}{dt}=-n(I-I_b)+\gamma M_{\mathrm{graft}}"
+            r"\max\!\left(G-h,0\right)(1-f_{\mathrm{subq}})+\frac{R_{a,I}}{V_I}"
         ),
         solved_or_runtime_form=(
             "Integrated in Bergman mode; gamma defaults to 0 for T1D research profiles. "
@@ -97,6 +110,14 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         canonical_expression=(
             "dS1/dt = u_I + gamma*M_graft*max(G-h,0)*f_subq - k*S1; "
             "dS2/dt = k*S1 - k*S2; U_I = k*S2"
+        ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dS_1}{dt}&=u_I+\gamma M_{\mathrm{graft}}\max\!\left(G-h,0\right)"
+            r"f_{\mathrm{subq}}-kS_1\\"
+            r"\frac{dS_2}{dt}&=kS_1-kS_2\\"
+            r"U_I&=kS_2"
+            r"\end{aligned}"
         ),
         solved_or_runtime_form="Bergman uses k_a; Hovorka uses 1/t_max_I. The state equations are integrated each step.",
         state_variables=("S1", "S2", "G", "M_graft"),
@@ -120,6 +141,14 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "dD1/dt=-k_solid*D1; dD2/dt=k_solid*D1-k_empt*D2; "
             "dD3/dt=k_empt*D2-k_abs*D3; U_G=k_abs*D3*A_G"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dD_1}{dt}&=-k_{\mathrm{solid}}D_1\\"
+            r"\frac{dD_2}{dt}&=k_{\mathrm{solid}}D_1-k_{\mathrm{empt}}D_2\\"
+            r"\frac{dD_3}{dt}&=k_{\mathrm{empt}}D_2-k_{\mathrm{abs}}D_3\\"
+            r"U_G&=k_{\mathrm{abs}}D_3A_G"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Meal mass is converted from grams to mg and pushed through deterministic stomach/gut compartments.",
         state_variables=("D1", "D2", "D3", "Q_sto1", "Q_sto2", "Q_gut"),
         parameters=("k_solid", "k_empt", "k_abs", "A_G", "f_bio"),
@@ -142,6 +171,13 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "dQ1/dt = -(NIMGU + F_R) - x1*Q1 + k12*Q2 + EGP0*max(0, 1 - x3 + x_gluc) + U_G; "
             "dQ2/dt = x1*Q1 - (k12 + x2)*Q2"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dQ_1}{dt}&=-(\mathrm{NIMGU}+F_R)-x_1Q_1+k_{12}Q_2"
+            r"+\mathrm{EGP}_0\max\!\left(0,1-x_3+x_{\mathrm{gluc}}\right)+U_G\\"
+            r"\frac{dQ_2}{dt}&=x_1Q_1-(k_{12}+x_2)Q_2"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Integrated by scipy.solve_ivp; concentration is G = Q1 / V_G_dL after integration.",
         state_variables=("Q1", "Q2", "x1", "x2", "x3", "x_gluc"),
         parameters=("NIMGU", "F_R", "k12", "EGP0", "U_G", "V_G_dL"),
@@ -161,6 +197,14 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "dx1/dt=-ka1*x1+kb1*I; dx2/dt=-ka2*x2+kb2*I; dx3/dt=-ka3*x3+kb3*I; "
             "kb_i includes molecular_affinity_scalar"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dx_1}{dt}&=-k_{a1}x_1+k_{b1}I\\"
+            r"\frac{dx_2}{dt}&=-k_{a2}x_2+k_{b2}I\\"
+            r"\frac{dx_3}{dt}&=-k_{a3}x_3+k_{b3}I,"
+            r"\qquad k_{b,i}\propto A_{\mathrm{affinity}}"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="kb1/kb2/kb3 are deterministic sensitivity products before ODE integration.",
         state_variables=("x1", "x2", "x3", "I"),
         parameters=("ka1", "ka2", "ka3", "S_IT", "S_ID", "S_IE", "S_overall", "molecular_affinity_scalar"),
@@ -176,6 +220,16 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         canonical_expression=(
             "dH_stress/dt=(target_stress-H_stress)/20; dH_exercise/dt=(target_exercise-H_exercise)/10; "
             "S_overall=(1-0.7*H_stress)*(1+2*H_exercise); EGP_stress=1+0.5*H_stress"
+        ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dH_{\mathrm{stress}}}{dt}&="
+            r"\frac{H_{\mathrm{stress,target}}-H_{\mathrm{stress}}}{20}\\"
+            r"\frac{dH_{\mathrm{exercise}}}{dt}&="
+            r"\frac{H_{\mathrm{exercise,target}}-H_{\mathrm{exercise}}}{10}\\"
+            r"S_{\mathrm{overall}}&=(1-0.7H_{\mathrm{stress}})(1+2H_{\mathrm{exercise}})\\"
+            r"\mathrm{EGP}_{\mathrm{stress}}&=1+0.5H_{\mathrm{stress}}"
+            r"\end{aligned}"
         ),
         solved_or_runtime_form="Pseudo-hormone states are first-order deterministic filters of scenario inputs.",
         state_variables=("H_stress", "H_exercise"),
@@ -193,6 +247,13 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "dGLUT4/dt = k_act*H_exercise*(1-GLUT4) - k_deact*GLUT4; "
             "NIMGU = F_01c*(1 + 1.5*GLUT4)"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{d\mathrm{GLUT4}}{dt}&=k_{\mathrm{act}}H_{\mathrm{exercise}}"
+            r"(1-\mathrm{GLUT4})-k_{\mathrm{deact}}\mathrm{GLUT4}\\"
+            r"\mathrm{NIMGU}&=F_{01c}(1+1.5\,\mathrm{GLUT4})"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Exercise can increase non-insulin-mediated glucose uptake without LLM calculation.",
         state_variables=("GLUT4", "H_exercise"),
         parameters=("k_act", "k_deact", "F_01c"),
@@ -209,6 +270,13 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "phi=2*pi*(t_day-t_dawn_mid)/1440; C(phi)=0.15*cos(phi)+0.05*cos(2*phi); "
             "EGP_circadian=1+s_dawn*C(phi)"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\phi&=\frac{2\pi(t_{\mathrm{day}}-t_{\mathrm{dawn,mid}})}{1440}\\"
+            r"C(\phi)&=0.15\cos(\phi)+0.05\cos(2\phi)\\"
+            r"\mathrm{EGP}_{\mathrm{circadian}}&=1+s_{\mathrm{dawn}}C(\phi)"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Computed directly from time of day; effect is gated by configured dawn_phenomenon_strength.",
         state_variables=("time_of_day_min",),
         parameters=("dawn_start_hour", "dawn_end_hour", "dawn_phenomenon_strength"),
@@ -222,6 +290,12 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         title="Endogenous hypoglycemia rescue multiplier",
         category="physiology",
         canonical_expression="Delta_hypo=max(0,70-G); R_rescue=1+(Delta_hypo/10)*(1-HAAF)",
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\Delta_{\mathrm{hypo}}&=\max(0,70-G)\\"
+            r"R_{\mathrm{rescue}}&=1+\frac{\Delta_{\mathrm{hypo}}}{10}(1-\mathrm{HAAF})"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Computed directly inside ODE RHS before effective EGP is assembled.",
         state_variables=("G", "HAAF"),
         parameters=("hypoglycemia_threshold_mgdl",),
@@ -238,6 +312,13 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         title="Hypoglycemia-associated autonomic failure memory",
         category="physiology",
         canonical_expression="dHAAF/dt = k_build*Delta_hypo*(1-HAAF) - k_decay*HAAF; k_decay=1/(24*60)",
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{d\mathrm{HAAF}}{dt}&=k_{\mathrm{build}}\Delta_{\mathrm{hypo}}"
+            r"(1-\mathrm{HAAF})-k_{\mathrm{decay}}\mathrm{HAAF}\\"
+            r"k_{\mathrm{decay}}&=\frac{1}{24\cdot60}"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Integrated as a bounded state and clipped to [0, 1] after solver steps.",
         state_variables=("HAAF", "G"),
         parameters=("k_build", "k_decay"),
@@ -258,6 +339,14 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "dGamma/dt=(Y2/tmax_G)/V_Gamma-k_eG*Gamma; "
             "dx_gluc/dt=-k_aG*x_gluc+S_G*k_aG*Gamma"
         ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\frac{dY_1}{dt}&=u_G-\frac{Y_1}{t_{\max,G}}\\"
+            r"\frac{dY_2}{dt}&=\frac{Y_1}{t_{\max,G}}-\frac{Y_2}{t_{\max,G}}\\"
+            r"\frac{d\Gamma}{dt}&=\frac{Y_2/t_{\max,G}}{V_\Gamma}-k_{eG}\Gamma\\"
+            r"\frac{dx_{\mathrm{gluc}}}{dt}&=-k_{aG}x_{\mathrm{gluc}}+S_Gk_{aG}\Gamma"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Integrated only from deterministic glucagon requests after safety caps.",
         state_variables=("Y1", "Y2", "Gamma", "x_gluc"),
         parameters=("u_G", "tmax_G", "V_Gamma", "k_eG", "k_aG", "S_G"),
@@ -274,6 +363,13 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         title="Differentiable renal glucose clearance",
         category="physiology",
         canonical_expression="softplus(z)=s*log(1+exp(z/s)); z=G-162; F_R=c*softplus(G-162)",
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\operatorname{softplus}_s(z)&=s\ln\!\left(1+e^{z/s}\right)\\"
+            r"z&=G-162\\"
+            r"F_R&=c\,\operatorname{softplus}_s(G-162)"
+            r"\end{aligned}"
+        ),
         solved_or_runtime_form="Bergman uses concentration loss; Hovorka scales by V_G_dL for mass loss.",
         state_variables=("G",),
         parameters=("threshold_mgdl", "splay", "clearance_coefficient", "V_G_dL"),
@@ -296,6 +392,15 @@ FORMULAS: tuple[FormulaSpec, ...] = (
         canonical_expression=(
             "tau_ISF*dISF/dt = BG_lagged - ISF; "
             "ISF_next = ISF + alpha*(BG_lagged-ISF); CGM = ISF + bias + drift + noise - compression_offset"
+        ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"\tau_{\mathrm{ISF}}\frac{d\mathrm{ISF}}{dt}&="
+            r"\mathrm{BG}_{\mathrm{lagged}}-\mathrm{ISF}\\"
+            r"\mathrm{ISF}_{\mathrm{next}}&=\mathrm{ISF}+\alpha"
+            r"(\mathrm{BG}_{\mathrm{lagged}}-\mathrm{ISF})\\"
+            r"\mathrm{CGM}&=\mathrm{ISF}+b+d+\varepsilon-o_{\mathrm{compression}}"
+            r"\end{aligned}"
         ),
         solved_or_runtime_form="Euler low-pass update with bounded alpha; stochastic noise uses seeded RNG state, not AI.",
         state_variables=("ISF", "BG_lagged", "CGM"),
@@ -344,6 +449,7 @@ def formula_context_for_ai() -> dict[str, object]:
                 "id": formula.formula_id,
                 "title": formula.title,
                 "expression": formula.canonical_expression,
+                "latex_expression": formula.latex_expression,
                 "runtime_form": formula.solved_or_runtime_form,
                 "units": formula.units,
             }
@@ -370,7 +476,16 @@ def formula_registry_markdown() -> str:
                 "",
                 "Canonical expression:",
                 "",
+                "\\[",
+                formula.latex_expression,
+                "\\]",
+                "",
+                "<details>",
+                "<summary>Plain-text runtime notation</summary>",
+                "",
                 f"```text\n{formula.canonical_expression}\n```",
+                "",
+                "</details>",
                 "",
                 f"Runtime/solved form: {formula.solved_or_runtime_form}",
                 "",

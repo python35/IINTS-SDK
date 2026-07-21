@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use IINTS-AF SDK in research, please cite the software and the exact release used."
+title: "IINTS-AF SDK"
+type: software
+authors:
+  - family-names: "Bobbaers"
+    given-names: "Rune"
+    email: "rune.bobbaers@gmail.com"
+version: "1.5.31"
+date-released: "2026-07-21"
+repository-code: "https://github.com/python35/IINTS-SDK"
+url: "https://iints.org"
+license: "Apache-2.0"
+keywords:
+  - diabetes technology
+  - glucose simulation
+  - digital twin
+  - research software
+  - artificial pancreas

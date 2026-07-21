@@ -16,7 +16,7 @@ Research only. Not a medical device.
 From the repository root:
 
 ```bash
-python -m pip install -U -e ".[full,mdmp,research]"
+python -m pip install -U -e ".[desktop-all]"
 cd apps/iints-tauri
 npm install
 npm run check
@@ -51,13 +51,27 @@ npm run build
 - Show persisted run history for the chosen output folder.
 - Open generated folders/reports/certificates through an allowlisted native opener.
 - Create local MDMP certificates for CSV outputs.
+- Create a FAIR-oriented academic package with RO-Crate metadata, checksums, a source snapshot,
+  and a reproducibility audit without uploading data.
 - Start/check local Ollama and list installed models.
 - Ask a local Ollama model to interpret the loaded result CSV.
 - Browse bundled AlphaFold molecule assets and open mmCIF/PAE evidence files.
+- Inspect local SBML safely and optionally run an isolated independent time course through libRoadRunner.
 - Run research-only genomics and tissue-specific resistance stressor plots.
-- Browse official evidence connectors for AlphaFold, Ensembl VEP/AlphaMissense, Open Targets,
+- Browse maturity-labelled evidence connectors for AlphaFold, Ensembl VEP/AlphaMissense, Open Targets,
   Reactome, RCSB PDB, UniProt, Human Protein Atlas, GTEx, ChEMBL, ClinPGx/PharmGKB,
-  BioModels, STRING DB, and ClinVar.
+  BioModels, STRING DB, ClinVar, RO-Crate, FAIR4RS, SED-ML, SBML, PubMed,
+  ClinicalTrials.gov, and Zenodo.
+
+## Optional Mechanistic Engine
+
+SBML structural inspection is included with the normal SDK. Independent equation-model execution uses the optional libRoadRunner backend:
+
+```bash
+python -m pip install -U -e ".[mechanistic]"
+```
+
+The Mechanistic Reference Model Lab records model hash, source, licence, engine version, selected variables, model-time bounds, and generated artifacts. It does not infer unit conversions and never calibrates IINTS patient parameters automatically.
 
 ## Evidence connectors
 
@@ -65,6 +79,9 @@ The evidence connector panel lists official biology, pharmacology, variant, path
 provenance resources that are useful while interpreting SDK experiments. These portals are opened
 outside the app in the system browser through an audited Rust HTTPS host allowlist; the app does not
 embed remote research websites or use them as treatment logic.
+
+Cards explicitly distinguish integrated, partially integrated, planned, and portal-only resources.
+The workbench does not present a portal link as an implemented scientific pipeline.
 
 ## Security Notes
 

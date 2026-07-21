@@ -289,6 +289,27 @@ The ODE structure is inspired by the Bergman minimal-model tradition and meal-co
 
 The experimental Hovorka-style model is intended for research runs that need clearer separation between delivered insulin, subcutaneous insulin absorption, plasma insulin, delayed insulin action, exogenous glucagon, exercise-driven GLUT4/NIMGU, and hypoglycemia-defense assumptions. It is useful for AI and MPC experiments because the controller can inspect internal state variables instead of treating glucose as the only signal.
 
+#### Molecular context, not simulator state
+
+The images below explain which proteins motivate two model abstractions. The ODE state does not contain atomic coordinates, and the AlphaFold models do not calculate glucose transport or hormone response.
+
+<div class="protein-gallery protein-gallery--pair">
+  <figure class="protein-card">
+    <a class="protein-card__media" href="https://alphafold.ebi.ac.uk/entry/P14672">
+      <img src="../assets/alphafold/glut4-p14672.png" alt="AlphaFold monomer prediction of human GLUT4 P14672 coloured by pLDDT confidence" width="1200" height="900" loading="lazy" decoding="async">
+    </a>
+    <figcaption><span class="protein-card__title">GLUT4 · SLC2A4 · P14672</span>Structural context for the bounded exercise-driven muscle-uptake term. The prediction does not model membrane translocation, transport rate, or exercise physiology.</figcaption>
+  </figure>
+  <figure class="protein-card">
+    <a class="protein-card__media" href="https://alphafold.ebi.ac.uk/entry/P47871">
+      <img src="../assets/alphafold/glucagon-receptor-p47871.png" alt="AlphaFold monomer prediction of human glucagon receptor P47871 coloured by pLDDT confidence" width="1200" height="900" loading="lazy" decoding="async">
+    </a>
+    <figcaption><span class="protein-card__title">Glucagon receptor · GCGR · P47871</span>Structural context for glucagon-mediated liver rescue assumptions. The prediction contains no ligand, G protein, membrane, or hepatic glucose-production dynamics.</figcaption>
+  </figure>
+</div>
+
+<p class="figure-note">See <a href="../DIGITAL_TWIN_BIOLOGY/">Digital Twin Biology</a> for the pLDDT key, model provenance, PAE workflow, and interpretation limits.</p>
+
 Current experimental extensions:
 - GLP-1-style gastric-emptying feedback slows meal appearance when intestinal glucose is high.
 - GLUT4/NIMGU exercise state increases non-insulin-mediated muscle glucose uptake during exercise.

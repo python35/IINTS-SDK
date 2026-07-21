@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+## v1.5.31
+
+Release date: 2026-07-21
+
+### Added
+
+- added a reviewable academic run bundle with RO-Crate metadata, checksums, source snapshots, and reproducibility checks
+- added safe SBML inspection plus optional independent libRoadRunner simulation
+- added COPASI task inspection/execution, CellML/OpenCOR validation, FMU/FMPy inspection/execution, and BindingDB affinity evidence workflows
+- added the cross-scale research labs to the Tauri/Rust workbench and documented their scientific interpretation boundaries
+- added bundled AlphaFold documentation assets and clearer cross-scale biology references
+- added the `desktop-all` install profile for the complete supported Python-side desktop research runtime
+- added exact-match ClinVar context lookup through MyVariant.info with classification, review-status, accession, and condition provenance
+
+### Changed
+
+- Windows, macOS, and Linux desktop beta builds now use the same rich Qt workbench
+- packaged app builds explicitly collect lazy Plotly, libRoadRunner, and FMPy runtimes when installed
+- the Python and Rust app updaters now install `iints-sdk-python35[desktop-all]`
+- desktop release notes distinguish bundled Python components from external COPASI, OpenCOR, and Ollama installations
+
+### Safety
+
+- external mechanistic models remain independent references and never silently calibrate the IINTS patient model
+- ClinVar and AlphaFold evidence never become a quantitative mutation-effect scalar; unsupported variants remain blocked
+- FMU native-code execution and COPASI execution retain explicit user-consent gates, bounded timeouts, provenance, and model hashes
+- external evidence remains research context rather than dosing, diagnosis, or treatment logic
+
+### Verified
+
+- full test suite: `754 passed, 2 skipped`
+- mypy: `Success: no issues found in 228 source files`
+- Rust/Tauri tests: `3 passed`; frontend checks passed
+- strict docs, wheel/sdist, frozen Qt `--smoke-full`, and verified macOS DMG passed
+
 ## v1.5.30
 
 Release date: 2026-07-18

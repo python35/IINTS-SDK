@@ -3,7 +3,7 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **210**
+Documented modules: **218**
 
 ## Package Index
 
@@ -26,7 +26,7 @@ Documented modules: **210**
 | `metrics` | 1 |
 | `population` | 3 |
 | `presets` | 1 |
-| `research` | 31 |
+| `research` | 39 |
 | `root` | 1 |
 | `scenarios` | 3 |
 | `templates` | 6 |
@@ -241,16 +241,23 @@ Documented modules: **210**
 ### `research`
 
 - [`iints.research`](#iintsresearch)
+- [`iints.research.academic_bundle`](#iintsresearchacademic_bundle)
 - [`iints.research.alphafold_engine`](#iintsresearchalphafold_engine)
 - [`iints.research.anatomy`](#iintsresearchanatomy)
 - [`iints.research.audit`](#iintsresearchaudit)
+- [`iints.research.binding_evidence`](#iintsresearchbinding_evidence)
 - [`iints.research.calibration_gate`](#iintsresearchcalibration_gate)
+- [`iints.research.cellml_models`](#iintsresearchcellml_models)
+- [`iints.research.clinvar_engine`](#iintsresearchclinvar_engine)
 - [`iints.research.config`](#iintsresearchconfig)
 - [`iints.research.control`](#iintsresearchcontrol)
 - [`iints.research.control_eval`](#iintsresearchcontrol_eval)
+- [`iints.research.copasi_models`](#iintsresearchcopasi_models)
 - [`iints.research.data_blend`](#iintsresearchdata_blend)
 - [`iints.research.dataset`](#iintsresearchdataset)
 - [`iints.research.evaluation`](#iintsresearchevaluation)
+- [`iints.research.external_models_common`](#iintsresearchexternal_models_common)
+- [`iints.research.fmi_models`](#iintsresearchfmi_models)
 - [`iints.research.forecasting`](#iintsresearchforecasting)
 - [`iints.research.genetics`](#iintsresearchgenetics)
 - [`iints.research.genomics_engine`](#iintsresearchgenomics_engine)
@@ -259,6 +266,7 @@ Documented modules: **210**
 - [`iints.research.local_ai`](#iintsresearchlocal_ai)
 - [`iints.research.local_ai_gate`](#iintsresearchlocal_ai_gate)
 - [`iints.research.losses`](#iintsresearchlosses)
+- [`iints.research.mechanistic_models`](#iintsresearchmechanistic_models)
 - [`iints.research.metrics`](#iintsresearchmetrics)
 - [`iints.research.model_registry`](#iintsresearchmodel_registry)
 - [`iints.research.neural_control`](#iintsresearchneural_control)
@@ -1394,6 +1402,19 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `manage_results(root: Annotated[Path, typer.Option('--root', help='Results root to index. Use this when your results folder starts getting too large.')] = Path('results'), output_dir: Annotated[Optional[Path], typer.Option('--output-dir', help='Index output directory. Defaults to <root>/_iints_results_index.')] = None, include_raw: Annotated[bool, typer.Option('--include-raw/--metadata-only', help='Also concatenate every results.csv into all_results_long.csv. This can become large.')] = False) -> None`
 - `research_xai_report(results_csv: Annotated[Path, typer.Argument(help='Path to the simulation results.csv')], hf_model: Annotated[Optional[str], typer.Option('--hf-model', help='Hugging Face medical LLM to use for generation (e.g. devanshamin/PubMedDiabetes-LLM-Predictions)')] = None, output_json: Annotated[Path, typer.Option('--output', help='Path to write the xai_events.json')] = Path('xai_events.json'))`
 - `research_results_index(root: Annotated[Path, typer.Option('--root', help='Results root to index. Defaults to the normal ./results folder.')] = Path('results'), output_dir: Annotated[Optional[Path], typer.Option('--output-dir', help='Index output directory. Defaults to <root>/_iints_results_index.')] = None, include_raw: Annotated[bool, typer.Option('--include-raw/--metadata-only', help='Also concatenate every results.csv into all_results_long.csv. This can become large.')] = False) -> None`
+- `research_academic_bundle(run_dir: Annotated[Path, typer.Argument(help='Completed IINTS run directory to describe as an RO-Crate.')], title: Annotated[Optional[str], typer.Option(help='Human-readable experiment title.')] = None, description: Annotated[Optional[str], typer.Option(help='Short research question or experiment description.')] = None, creator: Annotated[Optional[str], typer.Option(help='Researcher name recorded in the crate.')] = None, orcid: Annotated[Optional[str], typer.Option(help='Canonical ORCID URL, for example https://orcid.org/0000-0002-1825-0097.')] = None, license_id: Annotated[str, typer.Option('--license', help='SPDX license for run artifacts; defaults to NOASSERTION until the researcher chooses one.')] = 'NOASSERTION', source_id: Annotated[List[str], typer.Option('--source-id', help='Repeatable evidence source ID from `iints sources`.')] = []) -> None`
+- `research_mechanistic_inspect(model: Annotated[Path, typer.Argument(help='Local SBML .xml or .sbml model file.')], output_json: Annotated[Optional[Path], typer.Option(help='Optional path for the machine-readable structural inspection.')] = None) -> None`
+- `research_mechanistic_run(model: Annotated[Path, typer.Argument(help='Local SBML .xml or .sbml model file.')], output_dir: Annotated[Path, typer.Option(help='Root directory for the isolated reference-model run.')] = Path('results/mechanistic_reference'), start: Annotated[float, typer.Option(help="Start in the model's declared time units.")] = 0.0, end: Annotated[float, typer.Option(help="End in the model's declared time units.")] = 1440.0, points: Annotated[int, typer.Option(help='Number of sampled points including endpoints.')] = 289, variable: Annotated[List[str], typer.Option('--variable', help='Repeatable species/global parameter ID. Use [X] or concentration:X for concentration and amount:X for amount; defaults follow hasOnlySubstanceUnits.')] = [], source_url: Annotated[Optional[str], typer.Option(help='Optional HTTPS provenance URL for the exact model source.')] = None, model_license: Annotated[str, typer.Option(help='Model-artifact license; use NOASSERTION when it has not been verified.')] = 'NOASSERTION') -> None`
+- `research_copasi_status() -> None`
+- `research_copasi_inspect(model: Annotated[Path, typer.Argument(help='Local COPASI .cps model file.')], output_json: Annotated[Optional[Path], typer.Option(help='Optional structural inspection JSON.')] = None) -> None`
+- `research_copasi_run(model: Annotated[Path, typer.Argument(help='Reviewed local COPASI .cps model file.')], output_dir: Annotated[Path, typer.Option(help='Evidence output root.')] = Path('results/copasi'), task: Annotated[Optional[str], typer.Option(help='Optional exact COPASI task-name override.')] = None, timeout_seconds: Annotated[int, typer.Option(help='CopasiSE wall-time limit in seconds.')] = 900, allow_external_execution: Annotated[bool, typer.Option('--allow-external-execution', help='Confirm that the configured COPASI tasks and external file references were reviewed.')] = False) -> None`
+- `research_cellml_status() -> None`
+- `research_cellml_inspect(model: Annotated[Path, typer.Argument(help='Local .cellml or CellML .xml file.')], output_json: Annotated[Optional[Path], typer.Option(help='Optional structural inspection JSON.')] = None) -> None`
+- `research_cellml_validate(model: Annotated[Path, typer.Argument(help='Local CellML model to validate with OpenCOR.')], output_dir: Annotated[Path, typer.Option(help='Evidence output root.')] = Path('results/cellml'), timeout_seconds: Annotated[int, typer.Option(help='OpenCOR validation timeout.')] = 120) -> None`
+- `research_fmi_status() -> None`
+- `research_fmi_inspect(model: Annotated[Path, typer.Argument(help='Local .fmu archive.')], output_json: Annotated[Optional[Path], typer.Option(help='Optional structural inspection JSON.')] = None) -> None`
+- `research_fmi_run(model: Annotated[Path, typer.Argument(help='Reviewed local .fmu archive.')], output_dir: Annotated[Path, typer.Option(help='Evidence output root.')] = Path('results/fmi'), start: Annotated[float, typer.Option(help='Start in FMU model-time units.')] = 0.0, end: Annotated[float, typer.Option(help='End in FMU model-time units.')] = 60.0, output_interval: Annotated[float, typer.Option(help='Output sampling interval.')] = 0.1, variable: Annotated[List[str], typer.Option('--variable', help='Repeatable declared FMU variable.')] = [], timeout_seconds: Annotated[int, typer.Option(help='Execution timeout in seconds.')] = 300, trust_native_code: Annotated[bool, typer.Option('--trust-native-code', help='Confirm that the FMU publisher, hash, binaries, and license were reviewed.')] = False) -> None`
+- `research_binding_query(uniprot: Annotated[str, typer.Option(help='One reviewed UniProt accession.')] = 'P06213', output_dir: Annotated[Path, typer.Option(help='Evidence output root.')] = Path('results/bindingdb'), cutoff_nm: Annotated[int, typer.Option(help='BindingDB affinity cutoff in nM.')] = 10000, max_records: Annotated[int, typer.Option(help='Maximum records exported locally.')] = 5000, timeout_seconds: Annotated[int, typer.Option(help='Verified-TLS request timeout.')] = 30) -> None`
 - `research_export_onnx(model: Annotated[Path, typer.Option(help='Predictor checkpoint (.pt)')] = Path('models/hupa_finetuned_v2/predictor.pt'), out: Annotated[Path, typer.Option(help='Output ONNX file path')] = Path('models/predictor.onnx'))`
 - `research_audit_split(data: Annotated[Path, typer.Option(help='Prepared dataset path (CSV/Parquet)')], history_steps: Annotated[int, typer.Option(help='History window length')] = 48, horizon_steps: Annotated[int, typer.Option(help='Forecast horizon length')] = 6, feature_columns_csv: Annotated[str, typer.Option(help='Comma-separated feature columns')] = 'glucose_actual_mgdl,patient_iob_units,patient_cob_grams,effective_isf,effective_icr,effective_basal_rate_u_per_hr,glucose_trend_mgdl_min', target_column: Annotated[str, typer.Option(help='Target column')] = 'glucose_actual_mgdl', subject_column: Annotated[str, typer.Option(help='Subject ID column')] = 'subject_id', segment_column: Annotated[Optional[str], typer.Option(help='Segment column (optional)')] = 'segment_id', output_json: Annotated[Optional[Path], typer.Option(help='Write audit report JSON')] = None)`
 - `research_evaluate_forecast(input_csv: Annotated[Path, typer.Option(help='CSV with observed/predicted columns')], observed_column: Annotated[str, typer.Option(help='Observed glucose column')] = 'glucose_actual_mgdl', predicted_column: Annotated[str, typer.Option(help='Predicted glucose column')] = 'predicted_glucose_ai_30min', predicted_std_column: Annotated[Optional[str], typer.Option(help='Optional prediction std column')] = 'predictor_uncertainty_std_mgdl', gate_profile: Annotated[Optional[str], typer.Option(help='Optional calibration gate profile id')] = None, gate_profiles_path: Annotated[Optional[Path], typer.Option(help='Optional calibration gate profiles YAML path')] = None, fail_on_gate: Annotated[bool, typer.Option(help='Exit code 1 when calibration gate fails')] = False, output_json: Annotated[Optional[Path], typer.Option(help='Write metrics JSON')] = None)`
@@ -3584,9 +3605,33 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/research/__init__.py`
 - Summary: No module docstring.
-- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss, BandWeightedPINNLoss, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry, CONTROL_FEATURE_COLUMNS, CONTROL_TARGET_COLUMN, build_control_dataset_from_runs, evaluate_controller_predictions, load_linear_controller, predict_linear_controller, save_linear_controller, summarize_control_dataset, train_linear_imitation_controller, NeuralControllerConfig, instantiate_neural_controller_model, load_neural_controller, predict_neural_controller, save_neural_controller, train_neural_imitation_controller, PREDICTOR_OPTIONAL_COLUMNS, PREDICTOR_REQUIRED_COLUMNS, blend_predictor_datasets, DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories, DEFAULT_LOCAL_AI_SAFETY_PROFILE, LocalAIGateResult, LocalAISafetyProfile, review_closed_loop_evaluation, review_controller_training_artifacts, build_predictor_dataset_from_runs, run_local_ai_lab, DEFAULT_FORECAST_FEATURE_COLUMNS, ForecastConfig, PhysiologyAwareBaseline, assess_forecast_risk, attach_forecasts_to_frame, resolve_forecast_input, summarize_forecast_frame, write_forecast_bundle, ResultsIndexBundle, build_artifact_inventory, discover_result_csvs, index_results, summarize_results_csv, GLUCOSE_MODEL_FEATURE_COLUMNS, GLUCOSE_MODEL_ID, GlucoseModelComparisonBundle, GlucoseModelSpec, GlucoseTrainingPack, build_glucose_training_pack, compare_glucose_models, glucose_model_config_payload, horizon_error_rows, parse_model_specs, physiological_violation_report, public_manifest_from_private, render_hf_comparison_interpretation, standardize_glucose_forecast_frame, write_glucose_model_config, write_huggingface_export_bundle, JetsonHFTrainingResult, jetson_hf_model_score, run_jetson_hf_training`
+- Explicit exports: `PredictorConfig, TrainingConfig, build_sequences, subject_split, FeatureScaler, load_parquet, save_parquet, load_dataset, save_dataset, compute_dataset_lineage, LSTMPredictor, load_predictor, PredictorService, load_predictor_service, QuantileLoss, SafetyWeightedMSE, BandWeightedMSE, PhysiologicalPINNLoss, BandWeightedPINNLoss, regression_metrics, band_regression_metrics, interval_coverage_metrics, forecast_error_report, hypoglycemia_detection_report, uncertainty_reliability_report, subgroup_error_report, feature_drift_report, audit_subject_split_and_leakage, ForecastCalibrationGate, evaluate_calibration_gate, load_calibration_gate_profiles, PromotionResult, append_registry_entry, list_registry, load_registry, promote_registry_run, write_registry, CONTROL_FEATURE_COLUMNS, CONTROL_TARGET_COLUMN, build_control_dataset_from_runs, evaluate_controller_predictions, load_linear_controller, predict_linear_controller, save_linear_controller, summarize_control_dataset, train_linear_imitation_controller, NeuralControllerConfig, instantiate_neural_controller_model, load_neural_controller, predict_neural_controller, save_neural_controller, train_neural_imitation_controller, PREDICTOR_OPTIONAL_COLUMNS, PREDICTOR_REQUIRED_COLUMNS, blend_predictor_datasets, DEFAULT_HELD_OUT_PRESETS, evaluate_controller_factories, DEFAULT_LOCAL_AI_SAFETY_PROFILE, LocalAIGateResult, LocalAISafetyProfile, review_closed_loop_evaluation, review_controller_training_artifacts, build_predictor_dataset_from_runs, run_local_ai_lab, DEFAULT_FORECAST_FEATURE_COLUMNS, ForecastConfig, PhysiologyAwareBaseline, assess_forecast_risk, attach_forecasts_to_frame, resolve_forecast_input, summarize_forecast_frame, write_forecast_bundle, ResultsIndexBundle, build_artifact_inventory, discover_result_csvs, index_results, summarize_results_csv, AcademicBundleResult, build_academic_bundle, MechanisticRunResult, SBMLModelSummary, inspect_sbml_model, roadrunner_status, run_sbml_model, COPASIModelSummary, COPASIRunResult, copasi_status, inspect_copasi_model, run_copasi_model, CellMLModelSummary, CellMLValidationResult, inspect_cellml_model, opencor_status, validate_cellml_model, FMUModelSummary, FMURunResult, fmpy_status, inspect_fmu_model, run_fmu_model, BindingEvidenceResult, query_bindingdb_uniprot, ClinVarEngine, normalize_protein_variant, GLUCOSE_MODEL_FEATURE_COLUMNS, GLUCOSE_MODEL_ID, GlucoseModelComparisonBundle, GlucoseModelSpec, GlucoseTrainingPack, build_glucose_training_pack, compare_glucose_models, glucose_model_config_payload, horizon_error_rows, parse_model_specs, physiological_violation_report, public_manifest_from_private, render_hf_comparison_interpretation, standardize_glucose_forecast_frame, write_glucose_model_config, write_huggingface_export_bundle, JetsonHFTrainingResult, jetson_hf_model_score, run_jetson_hf_training`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
+
+## `iints.research.academic_bundle`
+
+- Source: `src/iints/research/academic_bundle.py`
+- Summary: FAIR, reviewable metadata bundles for completed IINTS research runs.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `AcademicBundleResult` | `AcademicBundleResult` | Artifacts written by :func:`build_academic_bundle`. |
+
+### Public Functions
+
+- `build_academic_bundle(run_dir: Path, *, title: str | None = None, description: str | None = None, creator_name: str | None = None, creator_orcid: str | None = None, license_id: str = 'NOASSERTION', source_ids: Iterable[str] = ()) -> AcademicBundleResult`
+
+### Public Constants
+
+- `ACADEMIC_BUNDLE_FORMAT_VERSION`
+- `LICENSE_URLS`
+- `RO_CRATE_CONTEXT`
+- `RO_CRATE_PROFILE`
+- `RO_CRATE_VERSION`
+- `SENSITIVE_HEADER_TOKENS`
 
 ## `iints.research.alphafold_engine`
 
@@ -3640,6 +3685,29 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `audit_subject_split_and_leakage(df: pd.DataFrame, *, history_steps: int, horizon_steps: int, feature_columns: List[str], target_column: str, subject_column: str = 'subject_id', segment_column: Optional[str] = None, val_fraction: float = 0.15, test_fraction: float = 0.15, seed: int = 42) -> Dict[str, Any]`
 
+## `iints.research.binding_evidence`
+
+- Source: `src/iints/research/binding_evidence.py`
+- Summary: Measured BindingDB affinity evidence for molecular-context research.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `BindingEvidenceResult` | `BindingEvidenceResult` | No module docstring. |
+
+### Public Functions
+
+- `query_bindingdb_uniprot(uniprot_accession: str, output_dir: Path, *, cutoff_nm: int = 10000, max_records: int = 5000, timeout_seconds: int = 30, _fetcher: Callable[[str, int], bytes] | None = None) -> BindingEvidenceResult`
+
+### Public Constants
+
+- `AFFINITY_PATTERN`
+- `BINDINGDB_API_BASE`
+- `BINDING_EVIDENCE_SCHEMA_VERSION`
+- `MAX_BINDINGDB_RESPONSE_BYTES`
+- `UNIPROT_PATTERN`
+
 ## `iints.research.calibration_gate`
 
 - Source: `src/iints/research/calibration_gate.py`
@@ -3655,6 +3723,54 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `load_calibration_gate_profiles(path: Optional[Path] = None) -> Dict[str, ForecastCalibrationGate]`
 - `evaluate_calibration_gate(report: Dict[str, Any], gate: ForecastCalibrationGate) -> Dict[str, Dict[str, Any]]`
+
+## `iints.research.cellml_models`
+
+- Source: `src/iints/research/cellml_models.py`
+- Summary: Static CellML inspection and independent OpenCOR validation.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `CellMLModelSummary` | `CellMLModelSummary` | No module docstring. |
+| `CellMLValidationResult` | `CellMLValidationResult` | No module docstring. |
+
+### Public Functions
+
+- `inspect_cellml_model(model_path: Path) -> CellMLModelSummary`
+- `cellml_summary_payload(summary: CellMLModelSummary, *, include_local_path: bool = True) -> dict[str, Any]`
+- `opencor_status(*, executable: Path | None = None) -> dict[str, Any]`
+- `validate_cellml_model(model_path: Path, output_dir: Path, *, timeout_seconds: int = 120, executable: Path | None = None) -> CellMLValidationResult`
+
+### Public Constants
+
+- `CELLML_VALIDATION_SCHEMA_VERSION`
+- `MAX_CELLML_BYTES`
+- `RECOGNISED_CELLML_NAMESPACES`
+
+## `iints.research.clinvar_engine`
+
+- Source: `src/iints/research/clinvar_engine.py`
+- Summary: No module docstring.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `ClinVarEngine` | `ClinVarEngine` | Read ClinVar classifications through MyVariant.info without effect inference. |
+
+#### `ClinVarEngine` methods
+
+- `lookup_variant(cls, gene: str, variant: str, *, timeout_seconds: float = 10.0) -> dict[str, Any]`
+
+### Public Functions
+
+- `normalize_protein_variant(variant: str) -> str | None`
+
+### Public Constants
+
+- `MYVARIANT_QUERY_URL`
 
 ## `iints.research.config`
 
@@ -3705,6 +3821,30 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Constants
 
 - `DEFAULT_HELD_OUT_PRESETS`
+
+## `iints.research.copasi_models`
+
+- Source: `src/iints/research/copasi_models.py`
+- Summary: Safe COPASI model inspection and explicit configured-task execution.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `COPASIModelSummary` | `COPASIModelSummary` | Static summary of a COPASI-ML document. |
+| `COPASIRunResult` | `COPASIRunResult` | No module docstring. |
+
+### Public Functions
+
+- `inspect_copasi_model(model_path: Path) -> COPASIModelSummary`
+- `copasi_summary_payload(summary: COPASIModelSummary, *, include_local_path: bool = True) -> dict[str, Any]`
+- `copasi_status(*, executable: Path | None = None) -> dict[str, Any]`
+- `run_copasi_model(model_path: Path, output_dir: Path, *, scheduled_task: str | None = None, timeout_seconds: int = 900, allow_external_execution: bool = False, executable: Path | None = None) -> COPASIRunResult`
+
+### Public Constants
+
+- `COPASI_RUN_SCHEMA_VERSION`
+- `MAX_COPASI_BYTES`
 
 ## `iints.research.data_blend`
 
@@ -3764,6 +3904,52 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `uncertainty_reliability_report(observed: np.ndarray, predicted: np.ndarray, predicted_std: np.ndarray, *, bins: int = 5, confidence: float = 0.95) -> Dict[str, Any]`
 - `subgroup_error_report(observed: np.ndarray, predicted: np.ndarray, groups: Sequence[Any] | np.ndarray, *, predicted_std: Optional[np.ndarray] = None) -> Dict[str, Dict[str, Any]]`
 - `feature_drift_report(reference_features: np.ndarray, candidate_features: np.ndarray, *, feature_names: Iterable[str]) -> Dict[str, Any]`
+
+## `iints.research.external_models_common`
+
+- Source: `src/iints/research/external_models_common.py`
+- Summary: Shared safety and provenance helpers for optional external research engines.
+
+### Public Functions
+
+- `utc_now() -> str`
+- `timestamp_token() -> str`
+- `sha256_bytes(payload: bytes) -> str`
+- `local_name(tag: str) -> str`
+- `namespace(tag: str) -> str`
+- `normalised_bool(value: str | None) -> bool | None`
+- `read_local_file(path: Path, *, label: str, suffixes: Iterable[str], max_bytes: int, reject_xml_entities: bool = False) -> tuple[Path, bytes]`
+- `write_json(path: Path, payload: dict[str, Any]) -> None`
+- `safe_stem(value: str, *, fallback: str = 'model') -> str`
+- `find_executable(*, environment_variable: str, names: Iterable[str], common_paths: Iterable[Path] = ()) -> Path | None`
+- `run_external_command(command: list[str], *, cwd: Path | None = None, timeout_seconds: int = 30, environment: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]`
+
+## `iints.research.fmi_models`
+
+- Source: `src/iints/research/fmi_models.py`
+- Summary: FMI archive inspection and explicitly trusted FMPy execution.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `FMUModelSummary` | `FMUModelSummary` | No module docstring. |
+| `FMURunResult` | `FMURunResult` | No module docstring. |
+
+### Public Functions
+
+- `inspect_fmu_model(model_path: Path) -> FMUModelSummary`
+- `fmu_summary_payload(summary: FMUModelSummary, *, include_local_path: bool = True) -> dict[str, Any]`
+- `fmpy_status() -> dict[str, Any]`
+- `run_fmu_model(model_path: Path, output_dir: Path, *, start: float, end: float, output_interval: float, variables: Iterable[str] = (), timeout_seconds: int = 300, allow_native_execution: bool = False, _engine_module: Any | None = None) -> FMURunResult`
+
+### Public Constants
+
+- `FMI_RUN_SCHEMA_VERSION`
+- `MAX_FMU_BYTES`
+- `MAX_FMU_ENTRIES`
+- `MAX_FMU_UNCOMPRESSED_BYTES`
+- `MAX_MODEL_DESCRIPTION_BYTES`
 
 ## `iints.research.forecasting`
 
@@ -3958,6 +4144,31 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - Summary: No module docstring.
 
 No public classes, functions, or all-caps constants are declared directly in this module.
+
+## `iints.research.mechanistic_models`
+
+- Source: `src/iints/research/mechanistic_models.py`
+- Summary: Safe inspection and optional execution of external SBML reference models.
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `SBMLModelSummary` | `SBMLModelSummary` | Static, non-executing summary of one local SBML document. |
+| `MechanisticRunResult` | `MechanisticRunResult` | Files produced by an isolated libRoadRunner SBML simulation. |
+
+### Public Functions
+
+- `inspect_sbml_model(model_path: Path) -> SBMLModelSummary`
+- `sbml_summary_payload(summary: SBMLModelSummary, *, include_local_path: bool = True) -> dict[str, Any]`
+- `roadrunner_status() -> dict[str, Any]`
+- `run_sbml_model(model_path: Path, output_dir: Path, *, start: float = 0.0, end: float = 1440.0, points: int = 289, variables: Iterable[str] = (), source_url: str | None = None, model_license: str = 'NOASSERTION', _engine_module: Any | None = None) -> MechanisticRunResult`
+
+### Public Constants
+
+- `MAX_SBML_BYTES`
+- `MECHANISTIC_RUN_SCHEMA_VERSION`
+- `SUPPORTED_SBML_SUFFIXES`
 
 ## `iints.research.metrics`
 

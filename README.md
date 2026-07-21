@@ -21,7 +21,7 @@ IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dos
 
 ## Desktop App
 
-IINTS-AF also has a native desktop app for running demos and opening generated results without using many terminal commands. Windows and Linux beta builds use the richer Qt interface; the current macOS DMG uses a small native Cocoa fallback so it opens more reliably while the Mac Qt bundle is being hardened.
+IINTS-AF also has a native Qt desktop app for running demos, reviewing results, certifying data, and using the research workbench without memorising terminal commands. The packaged Windows, macOS, and Linux betas include their Python runtime and supported Python-side research engines.
 
 Current beta downloads:
 
@@ -34,7 +34,7 @@ Current beta downloads:
 Python install, including the PySide6 desktop runtime:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"
+python -m pip install -U "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
 

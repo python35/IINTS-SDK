@@ -8670,6 +8670,26 @@ glucose_model_app = typer.Typer(
     help="Dedicated glucose forecasting model workflow for training and Hugging Face export."
 )
 research_app.add_typer(glucose_model_app, name="glucose-model")
+mechanistic_model_app = typer.Typer(
+    help="Inspect and independently execute local SBML reference models."
+)
+research_app.add_typer(mechanistic_model_app, name="mechanistic")
+copasi_model_app = typer.Typer(
+    help="Inspect COPASI tasks and explicitly run configured sensitivity/parameter analyses."
+)
+research_app.add_typer(copasi_model_app, name="copasi")
+cellml_model_app = typer.Typer(
+    help="Inspect local CellML models and validate them independently with OpenCOR."
+)
+research_app.add_typer(cellml_model_app, name="cellml")
+fmi_model_app = typer.Typer(
+    help="Inspect FMUs safely and explicitly execute trusted device-physics models with FMPy."
+)
+research_app.add_typer(fmi_model_app, name="fmi")
+binding_evidence_app = typer.Typer(
+    help="Retrieve measured BindingDB affinity evidence without changing patient parameters."
+)
+research_app.add_typer(binding_evidence_app, name="binding")
 
 
 @research_app.command(name="prepare-azt1d")
@@ -9619,6 +9639,520 @@ def research_results_index(
         console.print(f"[bold red]Results indexing failed:[/bold red] {exc}")
         raise typer.Exit(code=1)
     _print_results_index_bundle(bundle, console)
+
+
+@research_app.command(name="academic-bundle")
+def research_academic_bundle(
+    run_dir: Annotated[
+        Path,
+        typer.Argument(help="Completed IINTS run directory to describe as an RO-Crate."),
+    ],
+    title: Annotated[Optional[str], typer.Option(help="Human-readable experiment title.")] = None,
+    description: Annotated[Optional[str], typer.Option(help="Short research question or experiment description.")] = None,
+    creator: Annotated[Optional[str], typer.Option(help="Researcher name recorded in the crate.")] = None,
+    orcid: Annotated[
+        Optional[str],
+        typer.Option(help="Canonical ORCID URL, for example https://orcid.org/0000-0002-1825-0097."),
+    ] = None,
+    license_id: Annotated[
+        str,
+        typer.Option(
+            "--license",
+            help="SPDX license for run artifacts; defaults to NOASSERTION until the researcher chooses one.",
+        ),
+    ] = "NOASSERTION",
+    source_id: Annotated[
+        List[str],
+        typer.Option("--source-id", help="Repeatable evidence source ID from `iints sources`."),
+    ] = [],
+) -> None:
+    """Add RO-Crate metadata, checksums, sources, and an academic audit to a run."""
+
+    console = Console()
+    from iints.research.academic_bundle import build_academic_bundle
+
+    try:
+        bundle = build_academic_bundle(
+            run_dir,
+            title=title,
+            description=description,
+            creator_name=creator,
+            creator_orcid=orcid,
+            license_id=license_id,
+            source_ids=source_id,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Academic bundle export failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    status_style = "green" if bundle.readiness_status == "ready" else "yellow"
+    table = Table(title="IINTS Academic Research Bundle")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Readiness", f"[{status_style}]{bundle.readiness_status}[/{status_style}]")
+    table.add_row("Audit score", f"{bundle.readiness_score_pct:.2f}%")
+    table.add_row("Artifacts hashed", str(bundle.artifact_count))
+    table.add_row("Sources associated", str(bundle.source_count))
+    table.add_row("RO-Crate", str(bundle.ro_crate_metadata))
+    table.add_row("Academic audit", str(bundle.audit_json))
+    table.add_row("Source snapshot", str(bundle.sources_json))
+    table.add_row("Reviewer guide", str(bundle.readme_md))
+    console.print(table)
+    console.print(
+        "[yellow]Scope:[/yellow] FAIR-oriented metadata and reproducibility checks do not constitute "
+        "peer review, clinical validation, or medical-device certification."
+    )
+
+
+@mechanistic_model_app.command(name="inspect")
+def research_mechanistic_inspect(
+    model: Annotated[Path, typer.Argument(help="Local SBML .xml or .sbml model file.")],
+    output_json: Annotated[
+        Optional[Path],
+        typer.Option(help="Optional path for the machine-readable structural inspection."),
+    ] = None,
+) -> None:
+    """Inspect SBML structure and units without executing model equations."""
+
+    from iints.research.mechanistic_models import inspect_sbml_model, sbml_summary_payload
+
+    console = Console()
+    try:
+        summary = inspect_sbml_model(model)
+    except Exception as exc:
+        console.print(f"[bold red]SBML inspection failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Mechanistic Reference Model")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Model", summary.model_name or summary.model_id or summary.model_path.name)
+    table.add_row("SBML", f"Level {summary.sbml_level}, version {summary.sbml_version}")
+    table.add_row("Readiness", summary.readiness_status)
+    table.add_row("SHA-256", summary.sha256)
+    for key, value in summary.counts.items():
+        table.add_row(key.replace("_", " ").title(), str(value))
+    table.add_row("Declared model units", json.dumps(summary.model_units, sort_keys=True))
+    table.add_row("Warnings", "\n".join(summary.warnings) if summary.warnings else "None")
+    console.print(table)
+
+    if output_json is not None:
+        output_json = output_json.expanduser().resolve()
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(
+            json.dumps(sbml_summary_payload(summary), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        console.print(f"[green]Inspection written to:[/green] {output_json}")
+    console.print(
+        "[yellow]Scope:[/yellow] Structural inspection is not SBML schema validation, biological validation, "
+        "or permission to map model quantities to IINTS units automatically."
+    )
+
+
+@mechanistic_model_app.command(name="run")
+def research_mechanistic_run(
+    model: Annotated[Path, typer.Argument(help="Local SBML .xml or .sbml model file.")],
+    output_dir: Annotated[
+        Path,
+        typer.Option(help="Root directory for the isolated reference-model run."),
+    ] = Path("results/mechanistic_reference"),
+    start: Annotated[float, typer.Option(help="Start in the model's declared time units.")] = 0.0,
+    end: Annotated[float, typer.Option(help="End in the model's declared time units.")] = 1440.0,
+    points: Annotated[int, typer.Option(help="Number of sampled points including endpoints.")] = 289,
+    variable: Annotated[
+        List[str],
+        typer.Option(
+            "--variable",
+            help=(
+                "Repeatable species/global parameter ID. Use [X] or concentration:X for concentration and "
+                "amount:X for amount; defaults follow hasOnlySubstanceUnits."
+            ),
+        ),
+    ] = [],
+    source_url: Annotated[
+        Optional[str],
+        typer.Option(help="Optional HTTPS provenance URL for the exact model source."),
+    ] = None,
+    model_license: Annotated[
+        str,
+        typer.Option(help="Model-artifact license; use NOASSERTION when it has not been verified."),
+    ] = "NOASSERTION",
+) -> None:
+    """Execute a local SBML model independently through libRoadRunner."""
+
+    from iints.research.mechanistic_models import run_sbml_model
+
+    console = Console()
+    try:
+        result = run_sbml_model(
+            model,
+            output_dir,
+            start=start,
+            end=end,
+            points=points,
+            variables=variable,
+            source_url=source_url,
+            model_license=model_license,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Mechanistic reference run failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Mechanistic Reference Run")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Engine", f"{result.engine} {result.engine_version}")
+    table.add_row("Rows", str(result.row_count))
+    table.add_row("Selections", ", ".join(result.selections))
+    table.add_row("Run directory", str(result.run_dir))
+    table.add_row("Results", str(result.results_csv))
+    table.add_row("Manifest", str(result.manifest_json))
+    table.add_row("Review report", str(result.report_md))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] execution success is not biological validation and outputs are not "
+        "converted to glucose or insulin units automatically."
+    )
+
+
+@copasi_model_app.command(name="status")
+def research_copasi_status() -> None:
+    """Show whether the CopasiSE batch engine is available."""
+
+    from iints.research.copasi_models import copasi_status
+
+    console = Console()
+    payload = copasi_status()
+    style = "green" if payload["available"] else "yellow"
+    table = Table(title="IINTS COPASI Engine")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Available", f"[{style}]{payload['available']}[/{style}]")
+    table.add_row("Path", str(payload["path"] or "not found"))
+    table.add_row("Version", str(payload["version_hint"] or "unknown"))
+    table.add_row("Message", str(payload["message"]))
+    console.print(table)
+
+
+@copasi_model_app.command(name="inspect")
+def research_copasi_inspect(
+    model: Annotated[Path, typer.Argument(help="Local COPASI .cps model file.")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional structural inspection JSON.")] = None,
+) -> None:
+    """Inspect configured COPASI tasks without executing them."""
+
+    from iints.research.copasi_models import copasi_summary_payload, inspect_copasi_model
+
+    console = Console()
+    try:
+        summary = inspect_copasi_model(model)
+    except Exception as exc:
+        console.print(f"[bold red]COPASI inspection failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS COPASI Model Inspection")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Model", summary.model_name)
+    table.add_row("Readiness", summary.readiness_status)
+    table.add_row("SHA-256", summary.sha256)
+    table.add_row("Tasks", str(len(summary.tasks)))
+    table.add_row("Scheduled", str(summary.scheduled_task_count))
+    table.add_row("Sensitivity tasks", str(summary.sensitivity_task_count))
+    table.add_row("Parameter estimation", str(summary.parameter_estimation_task_count))
+    table.add_row("Warnings", "\n".join(summary.warnings) if summary.warnings else "None")
+    console.print(table)
+    if output_json is not None:
+        target = output_json.expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(copasi_summary_payload(summary), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        console.print(f"[green]Inspection written to:[/green] {target}")
+    console.print(
+        "[yellow]Scope:[/yellow] task presence is not parameter identifiability, convergence, or validation."
+    )
+
+
+@copasi_model_app.command(name="run")
+def research_copasi_run(
+    model: Annotated[Path, typer.Argument(help="Reviewed local COPASI .cps model file.")],
+    output_dir: Annotated[Path, typer.Option(help="Evidence output root.")] = Path("results/copasi"),
+    task: Annotated[Optional[str], typer.Option(help="Optional exact COPASI task-name override.")] = None,
+    timeout_seconds: Annotated[int, typer.Option(help="CopasiSE wall-time limit in seconds.")] = 900,
+    allow_external_execution: Annotated[
+        bool,
+        typer.Option(
+            "--allow-external-execution",
+            help="Confirm that the configured COPASI tasks and external file references were reviewed.",
+        ),
+    ] = False,
+) -> None:
+    """Run an already configured sensitivity or parameter-analysis task."""
+
+    from iints.research.copasi_models import run_copasi_model
+
+    console = Console()
+    try:
+        result = run_copasi_model(
+            model,
+            output_dir,
+            scheduled_task=task,
+            timeout_seconds=timeout_seconds,
+            allow_external_execution=allow_external_execution,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]COPASI run failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS COPASI Analysis")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Task", result.selected_task or "task scheduled in model")
+    table.add_row("Run directory", str(result.run_dir))
+    table.add_row("Report", str(result.report_txt))
+    table.add_row("Manifest", str(result.manifest_json))
+    table.add_row("Review", str(result.review_md))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] a fitted value is not identifiable or transferable until independently reviewed."
+    )
+
+
+@cellml_model_app.command(name="status")
+def research_cellml_status() -> None:
+    """Show whether OpenCOR is available for CellML validation."""
+
+    from iints.research.cellml_models import opencor_status
+
+    console = Console()
+    payload = opencor_status()
+    style = "green" if payload["available"] else "yellow"
+    table = Table(title="IINTS OpenCOR Engine")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Available", f"[{style}]{payload['available']}[/{style}]")
+    table.add_row("Path", str(payload["path"] or "not found"))
+    table.add_row("Version", str(payload["version"] or "unknown"))
+    table.add_row("Message", str(payload["message"]))
+    console.print(table)
+
+
+@cellml_model_app.command(name="inspect")
+def research_cellml_inspect(
+    model: Annotated[Path, typer.Argument(help="Local .cellml or CellML .xml file.")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional structural inspection JSON.")] = None,
+) -> None:
+    """Inspect CellML metadata without resolving imports or executing equations."""
+
+    from iints.research.cellml_models import cellml_summary_payload, inspect_cellml_model
+
+    console = Console()
+    try:
+        summary = inspect_cellml_model(model)
+    except Exception as exc:
+        console.print(f"[bold red]CellML inspection failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS CellML Model Inspection")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Model", summary.model_name)
+    table.add_row("CellML", summary.cellml_version)
+    table.add_row("Readiness", summary.readiness_status)
+    table.add_row("SHA-256", summary.sha256)
+    table.add_row("Components", str(summary.component_count))
+    table.add_row("Variables", str(summary.variable_count))
+    table.add_row("Imports", str(summary.import_count))
+    table.add_row("Warnings", "\n".join(summary.warnings) if summary.warnings else "None")
+    console.print(table)
+    if output_json is not None:
+        target = output_json.expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(cellml_summary_payload(summary), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        console.print(f"[green]Inspection written to:[/green] {target}")
+
+
+@cellml_model_app.command(name="validate")
+def research_cellml_validate(
+    model: Annotated[Path, typer.Argument(help="Local CellML model to validate with OpenCOR.")],
+    output_dir: Annotated[Path, typer.Option(help="Evidence output root.")] = Path("results/cellml"),
+    timeout_seconds: Annotated[int, typer.Option(help="OpenCOR validation timeout.")] = 120,
+) -> None:
+    """Validate CellML syntax/semantics with OpenCOR's official CLI plugin."""
+
+    from iints.research.cellml_models import validate_cellml_model
+
+    console = Console()
+    try:
+        result = validate_cellml_model(model, output_dir, timeout_seconds=timeout_seconds)
+    except Exception as exc:
+        console.print(f"[bold red]OpenCOR validation failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    style = "green" if result.valid else "red"
+    table = Table(title="IINTS OpenCOR Validation")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Valid", f"[{style}]{result.valid}[/{style}]")
+    table.add_row("Run directory", str(result.run_dir))
+    table.add_row("Validation log", str(result.validation_log))
+    table.add_row("Manifest", str(result.manifest_json))
+    console.print(table)
+    if not result.valid:
+        raise typer.Exit(code=2)
+
+
+@fmi_model_app.command(name="status")
+def research_fmi_status() -> None:
+    """Show FMPy availability; static FMU inspection is always available."""
+
+    from iints.research.fmi_models import fmpy_status
+
+    console = Console()
+    payload = fmpy_status()
+    style = "green" if payload["available"] else "yellow"
+    table = Table(title="IINTS FMI / FMPy Engine")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Static inspection", "[green]available[/green]")
+    table.add_row("FMPy execution", f"[{style}]{payload['available']}[/{style}]")
+    table.add_row("Version", str(payload["version"] or "not installed"))
+    table.add_row("Message", str(payload["message"]))
+    console.print(table)
+
+
+@fmi_model_app.command(name="inspect")
+def research_fmi_inspect(
+    model: Annotated[Path, typer.Argument(help="Local .fmu archive.")],
+    output_json: Annotated[Optional[Path], typer.Option(help="Optional structural inspection JSON.")] = None,
+) -> None:
+    """Inspect FMU metadata without extracting or loading native binaries."""
+
+    from iints.research.fmi_models import fmu_summary_payload, inspect_fmu_model
+
+    console = Console()
+    try:
+        summary = inspect_fmu_model(model)
+    except Exception as exc:
+        console.print(f"[bold red]FMU inspection failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS FMU Static Inspection")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Model", summary.model_name)
+    table.add_row("FMI", summary.fmi_version)
+    table.add_row("Readiness", summary.readiness_status)
+    table.add_row("SHA-256", summary.sha256)
+    table.add_row("Interfaces", ", ".join(row["type"] for row in summary.interfaces) or "none")
+    table.add_row("Variables", str(summary.variable_count))
+    table.add_row("Platforms", ", ".join(summary.platforms) or "none")
+    table.add_row("Native binaries", str(summary.has_native_binaries))
+    table.add_row("Warnings", "\n".join(summary.warnings) if summary.warnings else "None")
+    console.print(table)
+    if output_json is not None:
+        target = output_json.expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(fmu_summary_payload(summary), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        console.print(f"[green]Inspection written to:[/green] {target}")
+    console.print(
+        "[bold yellow]Security:[/bold yellow] static inspection did not load FMU native code."
+    )
+
+
+@fmi_model_app.command(name="run")
+def research_fmi_run(
+    model: Annotated[Path, typer.Argument(help="Reviewed local .fmu archive.")],
+    output_dir: Annotated[Path, typer.Option(help="Evidence output root.")] = Path("results/fmi"),
+    start: Annotated[float, typer.Option(help="Start in FMU model-time units.")] = 0.0,
+    end: Annotated[float, typer.Option(help="End in FMU model-time units.")] = 60.0,
+    output_interval: Annotated[float, typer.Option(help="Output sampling interval.")] = 0.1,
+    variable: Annotated[List[str], typer.Option("--variable", help="Repeatable declared FMU variable.")] = [],
+    timeout_seconds: Annotated[int, typer.Option(help="Execution timeout in seconds.")] = 300,
+    trust_native_code: Annotated[
+        bool,
+        typer.Option(
+            "--trust-native-code",
+            help="Confirm that the FMU publisher, hash, binaries, and license were reviewed.",
+        ),
+    ] = False,
+) -> None:
+    """Execute a trusted device-physics FMU through FMPy."""
+
+    from iints.research.fmi_models import run_fmu_model
+
+    console = Console()
+    try:
+        result = run_fmu_model(
+            model,
+            output_dir,
+            start=start,
+            end=end,
+            output_interval=output_interval,
+            variables=variable,
+            timeout_seconds=timeout_seconds,
+            allow_native_execution=trust_native_code,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]FMI execution failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS FMI Device-Physics Run")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Engine", f"{result.engine} {result.engine_version}")
+    table.add_row("Rows", str(result.row_count))
+    table.add_row("Columns", ", ".join(result.columns))
+    table.add_row("Run directory", str(result.run_dir))
+    table.add_row("Results", str(result.results_csv))
+    table.add_row("Manifest", str(result.manifest_json))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] FMU execution is not bench validation and must not control a real device."
+    )
+
+
+@binding_evidence_app.command(name="query")
+def research_binding_query(
+    uniprot: Annotated[str, typer.Option(help="One reviewed UniProt accession.")] = "P06213",
+    output_dir: Annotated[Path, typer.Option(help="Evidence output root.")] = Path("results/bindingdb"),
+    cutoff_nm: Annotated[int, typer.Option(help="BindingDB affinity cutoff in nM.")] = 10_000,
+    max_records: Annotated[int, typer.Option(help="Maximum records exported locally.")] = 5_000,
+    timeout_seconds: Annotated[int, typer.Option(help="Verified-TLS request timeout.")] = 30,
+) -> None:
+    """Fetch measured affinity records for one UniProt target from BindingDB."""
+
+    from iints.research.binding_evidence import query_bindingdb_uniprot
+
+    console = Console()
+    try:
+        result = query_bindingdb_uniprot(
+            uniprot,
+            output_dir,
+            cutoff_nm=cutoff_nm,
+            max_records=max_records,
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]BindingDB query failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    table = Table(title="IINTS BindingDB Affinity Evidence")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("UniProt", result.uniprot_accession)
+    table.add_row("Cutoff", f"{result.cutoff_nm} nM")
+    table.add_row("Records", str(result.record_count))
+    table.add_row("Truncated", str(result.truncated))
+    table.add_row("CSV", str(result.records_csv))
+    table.add_row("Evidence JSON", str(result.evidence_json))
+    table.add_row("Review", str(result.report_md))
+    console.print(table)
+    console.print(
+        "[yellow]Interpretation:[/yellow] Ki, Kd, IC50, and in-vivo effects are not interchangeable."
+    )
 
 
 @research_app.command(name="export-onnx")

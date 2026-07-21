@@ -10,7 +10,7 @@ if sys.platform == "darwin":
 
 import traceback
 import faulthandler
-from importlib import resources
+from importlib import import_module, resources
 from pathlib import Path
 from typing import Any, cast
 
@@ -28,6 +28,7 @@ from iints_desktop.engine import (
     run_demo_preset,
     run_custom_preset,
 )
+from iints_desktop.evidence_connectors import EvidenceConnector, list_evidence_connectors
 from iints_desktop.local_ai import (
     RECOMMENDED_OLLAMA_MODELS,
     ask_local_ai,
@@ -272,6 +273,42 @@ if _PYSIDE_IMPORT_ERROR is None:
                 self.failed.emit(traceback.format_exc())
 
 
+    class AcademicBundleWorker(QObject):
+        """Background worker for FAIR-oriented metadata and checksum export."""
+
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(
+            self,
+            *,
+            run_dir: Path,
+            creator_name: str,
+            creator_orcid: str,
+            license_id: str,
+        ) -> None:
+            super().__init__()
+            self.run_dir = run_dir
+            self.creator_name = creator_name
+            self.creator_orcid = creator_orcid
+            self.license_id = license_id
+
+        @Slot()
+        def run(self) -> None:
+            try:
+                from iints.research.academic_bundle import build_academic_bundle
+
+                result = build_academic_bundle(
+                    self.run_dir,
+                    creator_name=self.creator_name or None,
+                    creator_orcid=self.creator_orcid or None,
+                    license_id=self.license_id,
+                )
+                self.finished.emit(result)
+            except Exception:  # pragma: no cover - GUI error path
+                self.failed.emit(traceback.format_exc())
+
+
 
 
 
@@ -386,6 +423,7 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.last_result: DesktopRunResult | None = None
             self.loaded_result: ResultPreview | None = None
             self.last_mdmp_certificate_dir: Path | None = None
+            self.last_academic_bundle: object | None = None
             self.history_entries: list[DesktopRunHistoryEntry] = []
             self.current_thread: QThread | None = None
             self.current_worker: RunWorker | None = None
@@ -395,6 +433,8 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.ai_start_worker: LocalAIStartWorker | None = None
             self.mdmp_thread: QThread | None = None
             self.mdmp_worker: MDMPCertifyWorker | None = None
+            self.academic_thread: QThread | None = None
+            self.academic_worker: AcademicBundleWorker | None = None
             self.update_thread: QThread | None = None
             self.update_worker = None
             self.pae_thread: QThread | None = None
@@ -467,6 +507,12 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_status.setWordWrap(True)
             self.biology_action_output = QTextEdit()
             self.biology_action_output.setReadOnly(True)
+            self.evidence_connectors = list_evidence_connectors()
+            self.evidence_connector_selector = QComboBox()
+            self.evidence_connector_details = QLabel()
+            self.evidence_connector_details.setWordWrap(True)
+            self.open_evidence_portal_button = QPushButton("Open Official Portal")
+            self.open_evidence_docs_button = QPushButton("Open API / Specification")
             self.molecule_web_view: Any | None = None
             self.pae_web_view: Any | None = None
 
@@ -491,6 +537,17 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button = QPushButton("Open Graph PNG")
             self.create_mdmp_cert_button = QPushButton("Create MDMP Certificate")
             self.open_mdmp_cert_folder_button = QPushButton("Open Certificate Folder")
+            self.create_academic_bundle_button = QPushButton("Create Academic Package")
+            self.open_academic_metadata_button = QPushButton("Open RO-Crate Metadata")
+            self.open_academic_audit_button = QPushButton("Open Academic Audit")
+            self.academic_creator = QLineEdit(str(self.settings.value("academic_creator", "")))
+            self.academic_creator.setPlaceholderText("Optional researcher name")
+            self.academic_orcid = QLineEdit(str(self.settings.value("academic_orcid", "")))
+            self.academic_orcid.setPlaceholderText("https://orcid.org/0000-0000-0000-0000")
+            self.academic_license = QLineEdit(str(self.settings.value("academic_license", "NOASSERTION")))
+            self.academic_license.setPlaceholderText("For example CC-BY-4.0")
+            self.academic_bundle_status = QLabel("No academic package generated yet.")
+            self.academic_bundle_status.setWordWrap(True)
             self.export_workspace_button = QPushButton("Export Workspace (.zip)")
             self.start_ai_button = QPushButton("Start Local AI")
             self.check_ai_button = QPushButton("Check Ollama")
@@ -881,6 +938,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button.clicked.connect(self._open_loaded_graph)
             self.create_mdmp_cert_button.clicked.connect(self._create_mdmp_certificate)
             self.open_mdmp_cert_folder_button.clicked.connect(self._open_loaded_certificate_folder)
+            self.create_academic_bundle_button.clicked.connect(self._create_academic_bundle)
+            self.open_academic_metadata_button.clicked.connect(self._open_academic_metadata)
+            self.open_academic_audit_button.clicked.connect(self._open_academic_audit)
             self.export_workspace_button.clicked.connect(self._export_workspace)
             csv_row.addWidget(self.result_csv_path, stretch=1)
             csv_row.addWidget(self.browse_result_button)
@@ -900,6 +960,34 @@ if _PYSIDE_IMPORT_ERROR is None:
                 )
             )
             layout.addWidget(csv_box)
+
+            academic_box = QGroupBox("Reproducibility package")
+            academic_layout = QVBoxLayout(academic_box)
+            academic_help = QLabel(
+                "Create RO-Crate 1.2 metadata, SHA-256 checksums, an evidence-source snapshot, "
+                "and a reproducibility audit beside the loaded run. This does not upload data and "
+                "is not peer review, privacy approval, or clinical validation."
+            )
+            academic_help.setWordWrap(True)
+            academic_layout.addWidget(academic_help)
+            academic_form = QFormLayout()
+            academic_form.addRow("Creator:", self.academic_creator)
+            academic_form.addRow("ORCID:", self.academic_orcid)
+            academic_form.addRow("Run-artifact licence:", self.academic_license)
+            academic_layout.addLayout(academic_form)
+            academic_layout.addLayout(
+                self._button_grid(
+                    [
+                        self.create_academic_bundle_button,
+                        self.open_academic_metadata_button,
+                        self.open_academic_audit_button,
+                    ],
+                    columns=3,
+                )
+            )
+            self.academic_bundle_status.setObjectName("academicBundleStatus")
+            academic_layout.addWidget(self.academic_bundle_status)
+            layout.addWidget(academic_box)
 
             workspace = QSplitter(Qt.Orientation.Horizontal)
             self._register_responsive_splitter(workspace)
@@ -1197,8 +1285,9 @@ if _PYSIDE_IMPORT_ERROR is None:
 
             evidence_help = QLabel(
                 "Enter a UniProt ID and variant (e.g. INSR V938M or P06213 V938M). The engine will "
-                "live-query the AlphaFold database, extract the pLDDT folding confidence at the exact "
-                "residue, and mathematically translate it into a metabolic stress factor for the simulation."
+                "inspect residue-level AlphaFold pLDDT as structural-confidence evidence and run a separate, "
+                "explicitly labelled functional-scalar scenario. pLDDT is not pathogenicity or metabolic "
+                "severity and never calibrates physiology automatically."
             )
             evidence_help.setWordWrap(True)
             evidence_layout.addWidget(evidence_help)
@@ -1252,6 +1341,37 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.biology_action_output.setMinimumHeight(95)
             evidence_layout.addWidget(self.biology_action_output)
             context_layout.addWidget(evidence_box)
+
+            connector_box = QGroupBox("Academic evidence and standards catalog")
+            connector_layout = QVBoxLayout(connector_box)
+            connector_intro = QLabel(
+                "Curated resources are labelled as integrated, partial, planned, or portal-only. "
+                "Opening a portal does not import evidence or validate a model."
+            )
+            connector_intro.setWordWrap(True)
+            connector_layout.addWidget(connector_intro)
+            for connector in self.evidence_connectors:
+                connector_label = f"{connector.title} · {connector.integration_level}"
+                self.evidence_connector_selector.addItem(connector_label, connector.key)
+            self.evidence_connector_selector.currentIndexChanged.connect(
+                self._on_evidence_connector_changed
+            )
+            connector_layout.addWidget(self.evidence_connector_selector)
+            connector_layout.addWidget(self.evidence_connector_details)
+            self.open_evidence_portal_button.clicked.connect(
+                lambda: self._open_selected_evidence_url("primary_url")
+            )
+            self.open_evidence_docs_button.clicked.connect(
+                lambda: self._open_selected_evidence_url("docs_url")
+            )
+            connector_layout.addLayout(
+                self._button_grid(
+                    [self.open_evidence_portal_button, self.open_evidence_docs_button],
+                    columns=2,
+                )
+            )
+            context_layout.addWidget(connector_box)
+            self._on_evidence_connector_changed()
 
             usage_hint = QLabel(
                 "Controls: drag to rotate, mouse wheel to zoom, double-click to reset."
@@ -2025,6 +2145,9 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.open_graph_button.setEnabled(enabled and bool(self.loaded_result and self.loaded_result.graph_path))
             self.create_mdmp_cert_button.setEnabled(enabled)
             self.open_mdmp_cert_folder_button.setEnabled(enabled)
+            self.create_academic_bundle_button.setEnabled(enabled)
+            self.open_academic_metadata_button.setEnabled(enabled and self.last_academic_bundle is not None)
+            self.open_academic_audit_button.setEnabled(enabled and self.last_academic_bundle is not None)
             self.export_workspace_button.setEnabled(enabled)
 
         def _open_output_folder(self) -> None:
@@ -2161,6 +2284,89 @@ if _PYSIDE_IMPORT_ERROR is None:
             self.mdmp_thread = None
             self.mdmp_worker = None
 
+        def _set_academic_export_state(self, is_running: bool) -> None:
+            has_result = self.loaded_result is not None
+            has_bundle = self.last_academic_bundle is not None
+            self.create_academic_bundle_button.setEnabled(not is_running and has_result)
+            self.open_academic_metadata_button.setEnabled(not is_running and has_bundle)
+            self.open_academic_audit_button.setEnabled(not is_running and has_bundle)
+
+        def _create_academic_bundle(self) -> None:
+            if not self.loaded_result:
+                QMessageBox.information(self, "IINTS-AF Desktop", "Load a results CSV first.")
+                return
+            creator_name = self.academic_creator.text().strip()
+            creator_orcid = self.academic_orcid.text().strip()
+            license_id = self.academic_license.text().strip() or "NOASSERTION"
+            self.settings.setValue("academic_creator", creator_name)
+            self.settings.setValue("academic_orcid", creator_orcid)
+            self.settings.setValue("academic_license", license_id)
+            self._set_academic_export_state(True)
+            self.academic_bundle_status.setText("Hashing run artifacts and building academic metadata...")
+            self.status.setText("Creating academic reproducibility package")
+            thread = QThread(self)
+            worker = AcademicBundleWorker(
+                run_dir=self.loaded_result.csv_path.parent,
+                creator_name=creator_name,
+                creator_orcid=creator_orcid,
+                license_id=license_id,
+            )
+            worker.moveToThread(thread)
+            thread.started.connect(worker.run)
+            worker.finished.connect(self._handle_academic_bundle_success)
+            worker.finished.connect(thread.quit)
+            worker.finished.connect(worker.deleteLater)
+            worker.failed.connect(self._handle_academic_bundle_error)
+            worker.failed.connect(thread.quit)
+            worker.failed.connect(worker.deleteLater)
+            thread.finished.connect(thread.deleteLater)
+            thread.finished.connect(self._clear_academic_bundle_refs)
+            self.academic_thread = thread
+            self.academic_worker = worker
+            thread.start()
+
+        @Slot(object)
+        def _handle_academic_bundle_success(self, result: object) -> None:
+            self.last_academic_bundle = result
+            self._set_academic_export_state(False)
+            status = str(getattr(result, "readiness_status", "unknown"))
+            score = float(getattr(result, "readiness_score_pct", 0.0))
+            artifacts = int(getattr(result, "artifact_count", 0))
+            sources = int(getattr(result, "source_count", 0))
+            crate_path = Path(str(getattr(result, "ro_crate_metadata", "")))
+            audit_path = Path(str(getattr(result, "audit_json", "")))
+            message = (
+                f"Readiness: {status} · audit score: {score:.2f}% · "
+                f"{artifacts} artifacts · {sources} sources\n"
+                f"RO-Crate: {crate_path}\nAudit: {audit_path}\n"
+                "Review failed checks and inspect privacy before sharing."
+            )
+            self.academic_bundle_status.setText(message)
+            self._write_log(f"Academic reproducibility package created.\n{message}\n")
+            self.status.setText("Academic package ready for review")
+
+        @Slot(str)
+        def _handle_academic_bundle_error(self, details: str) -> None:
+            self._set_academic_export_state(False)
+            self.academic_bundle_status.setText("Academic package failed. See the execution log for details.")
+            self._write_log(details)
+            self.status.setText("Academic package export failed")
+
+        @Slot()
+        def _clear_academic_bundle_refs(self) -> None:
+            self.academic_thread = None
+            self.academic_worker = None
+
+        def _open_academic_metadata(self) -> None:
+            path = getattr(self.last_academic_bundle, "ro_crate_metadata", None)
+            if path:
+                self._open_path(Path(str(path)))
+
+        def _open_academic_audit(self) -> None:
+            path = getattr(self.last_academic_bundle, "audit_json", None)
+            if path:
+                self._open_path(Path(str(path)))
+
         def _load_result_csv(self, path: Path) -> None:
             try:
                 preview = load_results_preview(path)
@@ -2168,6 +2374,8 @@ if _PYSIDE_IMPORT_ERROR is None:
                 QMessageBox.critical(self, "IINTS-AF Desktop", str(exc))
                 return
             self.loaded_result = preview
+            self.last_academic_bundle = None
+            self.academic_bundle_status.setText("No academic package generated for this loaded result yet.")
             self.result_csv_path.setText(str(preview.csv_path))
             self._render_result_preview(preview)
             self.status.setText(f"Loaded results: {preview.csv_path.name}")
@@ -2396,6 +2604,43 @@ if _PYSIDE_IMPORT_ERROR is None:
                 if molecule.key == key:
                     return molecule
             return self.molecules[0]
+
+        def _selected_evidence_connector(self) -> EvidenceConnector | None:
+            key = str(self.evidence_connector_selector.currentData() or "")
+            for connector in self.evidence_connectors:
+                if connector.key == key:
+                    return connector
+            return self.evidence_connectors[0] if self.evidence_connectors else None
+
+        def _on_evidence_connector_changed(self) -> None:
+            connector = self._selected_evidence_connector()
+            if connector is None:
+                self.evidence_connector_details.setText("No evidence connector is available.")
+                self.open_evidence_portal_button.setEnabled(False)
+                self.open_evidence_docs_button.setEnabled(False)
+                return
+            local_artifact = "yes" if connector.writes_local_evidence else "no"
+            self.evidence_connector_details.setText(
+                f"Category: {connector.category}\n"
+                f"Maturity: {connector.integration_level} — {connector.integration_status}\n"
+                f"Access: {connector.access_mode}\n"
+                f"Writes local evidence: {local_artifact}\n\n"
+                f"{connector.why_it_matters}\n\n"
+                f"Workbench use: {connector.app_use}\n"
+                f"Provenance note: {connector.provenance_note}"
+            )
+            self.open_evidence_portal_button.setEnabled(bool(connector.primary_url))
+            self.open_evidence_docs_button.setEnabled(bool(connector.docs_url))
+
+        def _open_selected_evidence_url(self, field_name: str) -> None:
+            connector = self._selected_evidence_connector()
+            if connector is None:
+                return
+            url = str(getattr(connector, field_name, "")).strip()
+            if not url.startswith("https://"):
+                QMessageBox.warning(self, "IINTS-AF Desktop", "Only fixed HTTPS evidence links may be opened.")
+                return
+            QDesktopServices.openUrl(QUrl(url))
 
         def _on_molecule_changed(self) -> None:
             if not self.molecules or self.molecule_viewer is None:
@@ -2995,12 +3240,24 @@ def _apply_application_palette(app: QApplication) -> None:
     app.setPalette(palette)
 
 
+def _verify_full_desktop_runtime() -> dict[str, str]:
+    versions: dict[str, str] = {}
+    for module_name in ("plotly", "roadrunner", "fmpy", "torch"):
+        module = import_module(module_name)
+        versions[module_name] = str(getattr(module, "__version__", "unknown"))
+    sundials = import_module("fmpy.sundials")
+    if getattr(sundials, "CVodeSolver", None) is None:
+        raise RuntimeError("FMPy SUNDIALS CVodeSolver is unavailable in the packaged runtime.")
+    versions["fmpy.sundials"] = "available"
+    return versions
+
+
 def main() -> int:
     if _PYSIDE_IMPORT_ERROR is not None:
         message = (
             "PySide6 is not installed. Install it with: "
-            'python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]" '
-            'or, from a source checkout, python -m pip install -U -e ".[full,desktop,mdmp]"'
+            'python -m pip install -U "iints-sdk-python35[desktop-all]" '
+            'or, from a source checkout, python -m pip install -U -e ".[desktop-all]"'
         )
         _write_startup_log(message)
         raise RuntimeError(message) from _PYSIDE_IMPORT_ERROR
@@ -3009,11 +3266,14 @@ def main() -> int:
         app = QApplication(sys.argv)
         _apply_application_palette(app)
         window = IINTSQtDesktopApp()
-        if "--smoke" in sys.argv:
+        if "--smoke" in sys.argv or "--smoke-full" in sys.argv:
             window.resize(760, 520)
             app.processEvents()
             window.resize(1240, 820)
             app.processEvents()
+            full_runtime = (
+                _verify_full_desktop_runtime() if "--smoke-full" in sys.argv else None
+            )
             print(
                 "Qt desktop smoke OK:",
                 window.windowTitle(),
@@ -3022,6 +3282,12 @@ def main() -> int:
                 f"min={window.minimumWidth()}x{window.minimumHeight()}",
                 file=sys.__stdout__,
             )
+            if full_runtime is not None:
+                print(
+                    "Full desktop runtime OK:",
+                    ", ".join(f"{name}={version}" for name, version in full_runtime.items()),
+                    file=sys.__stdout__,
+                )
             window.close()
             app.quit()
             return 0

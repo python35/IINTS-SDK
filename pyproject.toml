@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.30"
+version = "1.5.31"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -26,6 +26,7 @@ classifiers = [
 dependencies = [
     "certifi>=2024.2.2",
     "cryptography>=48.0.1,<50.0.0",
+    "defusedxml>=0.7.1,<1.0.0",
     "fastapi>=0.115.0,!=0.136.3,<0.139.1",
     "numpy>=1.24.0,<3.0.0",
     "pandas>=2.0.0,<3.0.0",
@@ -84,6 +85,12 @@ research = [
   "onnxscript>=0.1.0,<1.0.0",
   "plotly>=5.18.0,<7.0.0",
 ]
+mechanistic = [
+  "libroadrunner>=2.9.2,<3.0.0",
+]
+fmi = [
+  "FMPy>=0.3.30,<0.4.0",
+]
 mdmp = [
   "cryptography>=48.0.1,<50.0.0",
 ]
@@ -103,6 +110,27 @@ desktop-macos = [
   "pyinstaller>=6.11.0,<7.0.0",
   "setuptools>=83.0.0,<84.0.0",
   "pyobjc-framework-Cocoa>=10.0,<13.0",
+]
+desktop-all = [
+  "FMPy>=0.3.30,<0.4.0",
+  "SciencePlots>=2.1.0,<3.0.0",
+  "fpdf2>=2.8.0,<3.0.0",
+  "h5py>=3.10.0,<4.0.0",
+  "libroadrunner>=2.9.2,<3.0.0",
+  "matplotlib>=3.5.0,<4.0.0",
+  "onnx>=1.22.0,<2.0.0",
+  "onnxscript>=0.1.0,<1.0.0",
+  "openpyxl>=3.0.0,<4.0.0",
+  "pillow>=12.3.0,<13.0.0",
+  "plotly>=5.18.0,<7.0.0",
+  "pyarrow>=12.0.0,<25.0.0",
+  "pyinstaller>=6.11.0,<7.0.0",
+  "pyobjc-framework-Cocoa>=10.0,<13.0; platform_system == 'Darwin'",
+  "pyserial>=3.5,<4.0",
+  "PySide6>=6.7.0,<7.0.0",
+  "seaborn>=0.11.0,<1.0.0",
+  "setuptools>=83.0.0,<84.0.0",
+  "torch>=2.13.0,<3.0.0",
 ]
 
 [project.scripts]
@@ -124,6 +152,9 @@ iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 
 [project.urls]
 "Homepage" = "https://github.com/python35/IINTS-SDK"
+"Documentation" = "https://python35.github.io/IINTS-SDK/"
+"Repository" = "https://github.com/python35/IINTS-SDK"
+"Issues" = "https://github.com/python35/IINTS-SDK/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

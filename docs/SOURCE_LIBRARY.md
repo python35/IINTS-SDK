@@ -48,6 +48,13 @@ These are the machine-readable evidence sources shipped in `src/iints/presets/ev
 | `riddell_2017_exercise_consensus` | consensus | exercise_stress_scenarios | Exercise management in type 1 diabetes: a consensus statement | [DOI 10.1016/S2213-8587(17)30014-1](https://doi.org/10.1016/S2213-8587(17)30014-1) | Reference for exercise stress scenario defaults and safety interpretation. |
 | `marling_2020_ohiot1dm` | dataset | predictor_training_data | OhioT1DM Dataset for Blood Glucose Level Prediction: Update 2020 | [source](http://ceur-ws.org/Vol-2675/paper2.pdf) | Primary public dataset used for subject-level predictor training and evaluation. |
 | `idc_2025_agp_report_overview` | consensus | agp_style_reporting | Guide to Understanding the Ambulatory Glucose Profile (AGP) Report | [source](https://www.healthpartners.com/institute/wp-content/uploads/2025/05/Ambulatory-Glucose-Profile-Report-Overview.pdf) | Reference for AGP-style report layout: time-in-ranges, glucose metrics, modal-day percentile profile, and daily glucose profiles. |
+| `sbml_2019_l3v2_core` | standard | mechanistic_reference_model_interchange | The Systems Biology Markup Language (SBML): Language Specification for Level 3 Version 2 Core Release 2 | [DOI 10.1515/jib-2019-0021](https://doi.org/10.1515/jib-2019-0021) | Machine-readable model-interchange standard used by the local mechanistic reference-model inspector. |
+| `libroadrunner_2015` | software | mechanistic_reference_model_execution | libRoadRunner: a high performance SBML simulation and analysis library | [DOI 10.1093/bioinformatics/btv363](https://doi.org/10.1093/bioinformatics/btv363) | Reference for the optional independent SBML time-course execution engine used by the Mechanistic Reference Model Lab. |
+| `copasi_2006` | software | sensitivity_and_parameter_analysis | COPASI—a COmplex PAthway SImulator | [DOI 10.1093/bioinformatics/btl485](https://doi.org/10.1093/bioinformatics/btl485) | Reference for independent sensitivity, scan, optimisation, and configured parameter-estimation tasks. |
+| `opencor_2015` | software | cellml_reference_validation | OpenCOR: a modular and interoperable approach to computational biology | [DOI 10.3389/fbioe.2014.00079](https://doi.org/10.3389/fbioe.2014.00079) | Reference for independent CellML organisation and OpenCOR validation. |
+| `fmi_3_0_2_standard` | standard | device_physics_model_interchange | Functional Mock-up Interface Specification 3.0.2 | [official specification](https://fmi-standard.org/docs/3.0.2/) | Defines FMU structure and interfaces, including the native-code/OS-access boundary. |
+| `fmpy_0_3` | software | device_physics_execution | FMPy: Simulate Functional Mock-up Units in Python | [official documentation](https://fmpy.readthedocs.io/en/latest/) | Reference for optional execution of explicitly trusted device-physics FMUs. |
+| `bindingdb_2016` | database | measured_binding_affinity_evidence | BindingDB in 2015 | [DOI 10.1093/nar/gkv1072](https://doi.org/10.1093/nar/gkv1072) | Reference for measured affinity evidence kept separate from AlphaFold confidence and patient parameters. |
 
 ## Dataset Sources
 
@@ -79,6 +86,15 @@ These are the dataset references registered in `src/iints/data/datasets.json`. S
 ## Documentation-Only Implementation Sources
 
 These references are used in narrative docs, setup guides, local-AI explanation, and best-effort device-emulation notes. They are intentionally documented separately from the packaged scientific manifest.
+
+### Structural Biology Context
+
+| ID | Source | Link | Used for |
+| --- | --- | --- | --- |
+| `alphafold_db` | AlphaFold Protein Structure Database, Google DeepMind and EMBL-EBI | [alphafold.ebi.ac.uk](https://alphafold.ebi.ac.uk/) | Public mmCIF structure predictions, PAE data, model-entry links, and CC BY 4.0 attribution for the Digital Twin Biology visuals |
+| `alphafold_plddt_training` | EMBL-EBI Training, pLDDT: understanding local confidence | [EMBL-EBI Training](https://www.ebi.ac.uk/training/online/courses/alphafold/inputs-and-outputs/evaluating-alphafolds-predicted-structures-using-confidence-scores/plddt-understanding-local-confidence/) | Interpretation of the blue/cyan/yellow/orange confidence colours and the limits of per-residue pLDDT |
+| `clinvar_classification_representation` | NCBI ClinVar, Representation of classifications | [NCBI ClinVar](https://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/) | Defines ClinVar labels as submitted variant-condition classifications rather than patient-specific interpretations or quantitative effect sizes |
+| `myvariant_query_api` | MyVariant.info v1 query API | [MyVariant.info documentation](https://docs.myvariant.info/en/latest/doc/quick_start.html) | Read-only transport used to retrieve ClinVar annotation context; exact gene and protein-change matching is rechecked locally |
 
 ### Local AI Runtime And Model Setup
 

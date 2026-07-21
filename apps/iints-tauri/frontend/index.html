@@ -116,9 +116,54 @@
         </div>
       </section>
 
-      <section class="panel ai-panel">
+      <section class="panel academic-panel">
         <div class="panel-heading">
           <p class="eyebrow">Step 4</p>
+          <h2>Reproducibility package</h2>
+        </div>
+        <p class="muted">
+          Add a FAIR-oriented RO-Crate metadata file, checksums, selected evidence sources, and a
+          reproducibility audit to a completed run. This does not upload data and is not peer review,
+          privacy approval, or clinical validation.
+        </p>
+        <div class="academic-fields">
+          <label class="academic-run-field">
+            Completed run folder
+            <input id="academic-run-dir" placeholder="Run a workflow or select a results.csv first" spellcheck="false" />
+          </label>
+          <label>
+            Package title
+            <input id="academic-title" placeholder="Optional research-run title" spellcheck="true" />
+          </label>
+          <label>
+            Creator
+            <input id="academic-creator" placeholder="Optional researcher name" spellcheck="true" />
+          </label>
+          <label>
+            ORCID
+            <input id="academic-orcid" placeholder="https://orcid.org/0000-0000-0000-0000" spellcheck="false" />
+          </label>
+          <label>
+            Run-artifact licence
+            <input id="academic-license" value="NOASSERTION" placeholder="For example CC-BY-4.0" spellcheck="false" />
+          </label>
+          <label class="academic-run-field">
+            Evidence source IDs
+            <input id="academic-source-ids" placeholder="Optional comma-separated IDs; leave empty for conservative association" spellcheck="false" />
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="academic-export-btn" class="primary">Create academic package</button>
+          <button id="academic-open-metadata-btn">Open RO-Crate metadata</button>
+          <button id="academic-open-audit-btn">Open audit</button>
+          <button id="academic-open-guide-btn">Open review guide</button>
+        </div>
+        <pre id="academic-status" class="status-box compact">No academic package generated yet.</pre>
+      </section>
+
+      <section class="panel ai-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Step 5</p>
           <h2>Local AI analysis</h2>
         </div>
         <div class="field-grid">
@@ -149,7 +194,7 @@
 
       <section class="panel biology-panel">
         <div class="panel-heading">
-          <p class="eyebrow">Step 5</p>
+          <p class="eyebrow">Step 6</p>
           <h2>Biology & algorithm stressors</h2>
         </div>
         <div class="button-row">
@@ -161,7 +206,10 @@
         <div class="research-tools">
           <article class="tool-card">
             <h3>Genomics multi-scale simulation</h3>
-            <p>Compare a baseline virtual patient with a mutation-scaled insulin receptor scenario.</p>
+            <p>
+              Compare a baseline virtual patient with an explicitly assumed functional-scalar scenario.
+              AlphaFold confidence is structural evidence and is never converted into disease severity.
+            </p>
             <div class="field-grid">
               <label>
                 Gene
@@ -196,18 +244,204 @@
               <button id="tissue-open-btn">Open tissue plot</button>
             </div>
           </article>
+
+          <article class="tool-card mechanistic-card">
+            <h3>Mechanistic Reference Model Lab</h3>
+            <p>
+              Safely inspect a local SBML model, then optionally execute it through libRoadRunner as an
+              independent ODE reference. IINTS never assumes that model time or concentrations equal minutes
+              or mg/dL, and the reference model never calibrates patient parameters automatically.
+            </p>
+            <div class="mechanistic-fields">
+              <label class="mechanistic-model-field">
+                Local SBML file (.xml or .sbml)
+                <input id="mechanistic-model" placeholder="/path/to/reference_model.xml" spellcheck="false" />
+              </label>
+              <label>
+                Variables
+                <input id="mechanistic-variables" placeholder="[G], amount:I, k (blank = model defaults)" spellcheck="false" />
+              </label>
+              <label>
+                Model source URL
+                <input id="mechanistic-source-url" placeholder="Optional exact HTTPS source" spellcheck="false" />
+              </label>
+              <label>
+                Model license
+                <input id="mechanistic-license" value="NOASSERTION" spellcheck="false" />
+              </label>
+              <label>
+                Start (model time units)
+                <input id="mechanistic-start" type="number" value="0" step="any" />
+              </label>
+              <label>
+                End (model time units)
+                <input id="mechanistic-end" type="number" value="1440" step="any" />
+              </label>
+              <label>
+                Sample points
+                <input id="mechanistic-points" type="number" min="2" max="1000001" value="289" />
+              </label>
+            </div>
+            <div class="button-row">
+              <button id="mechanistic-status-btn">Check engine</button>
+              <button id="mechanistic-inspect-btn">Inspect SBML</button>
+              <button id="mechanistic-run-btn" class="primary">Run reference model</button>
+              <button id="mechanistic-open-folder-btn">Open run folder</button>
+              <button id="mechanistic-open-report-btn">Open review report</button>
+              <button id="mechanistic-open-results-btn">Open reference CSV</button>
+            </div>
+            <pre id="mechanistic-status" class="status-box compact">SBML inspection is ready; execution engine not checked yet.</pre>
+          </article>
+
+          <article class="tool-card cross-scale-card">
+            <div class="cross-scale-heading">
+              <div>
+                <h3>Cross-scale Reference Labs</h3>
+                <p>
+                  Keep sensitivity analysis, independent physiology, physical-device simulation, and measured
+                  affinity evidence separate. Results are evidence bundles; none changes IINTS patient parameters
+                  automatically.
+                </p>
+              </div>
+              <button id="cross-scale-status-btn">Check all engines</button>
+            </div>
+            <pre id="cross-scale-status" class="status-box compact">Static model inspection is ready. Optional engines have not been checked.</pre>
+
+            <div class="cross-scale-grid">
+              <details class="reference-lab" open>
+                <summary>COPASI · sensitivity and identifiability review</summary>
+                <p>Inspect a configured .cps file first. CopasiSE runs only after the task list and data paths are reviewed.</p>
+                <div class="reference-fields">
+                  <label class="wide-field">
+                    COPASI model (.cps)
+                    <input id="copasi-model" placeholder="/path/to/analysis.cps" spellcheck="false" />
+                  </label>
+                  <label>
+                    Task override
+                    <input id="copasi-task" placeholder="Optional exact task name" spellcheck="false" />
+                  </label>
+                  <label>
+                    Timeout seconds
+                    <input id="copasi-timeout" type="number" min="1" max="86400" value="900" />
+                  </label>
+                </div>
+                <label class="consent-row">
+                  <input id="copasi-consent" type="checkbox" />
+                  I reviewed scheduled tasks, parameter bounds, reports, and external data-file paths.
+                </label>
+                <div class="button-row">
+                  <button id="copasi-inspect-btn">Inspect tasks</button>
+                  <button id="copasi-run-btn">Run configured analysis</button>
+                  <button id="copasi-open-btn">Open latest bundle</button>
+                </div>
+                <pre id="copasi-status" class="status-box compact">No COPASI model inspected.</pre>
+              </details>
+
+              <details class="reference-lab">
+                <summary>OpenCOR + Physiome · independent CellML validation</summary>
+                <p>Inspect CellML locally, then use OpenCOR's official validator. Imports are listed but never trusted automatically.</p>
+                <div class="reference-fields">
+                  <label class="wide-field">
+                    CellML model (.cellml or .xml)
+                    <input id="cellml-model" placeholder="/path/to/model.cellml" spellcheck="false" />
+                  </label>
+                  <label>
+                    Timeout seconds
+                    <input id="cellml-timeout" type="number" min="1" max="86400" value="120" />
+                  </label>
+                </div>
+                <div class="button-row">
+                  <button id="cellml-inspect-btn">Inspect CellML</button>
+                  <button id="cellml-validate-btn">Validate with OpenCOR</button>
+                  <button id="cellml-open-btn">Open latest bundle</button>
+                </div>
+                <pre id="cellml-status" class="status-box compact">No CellML model inspected.</pre>
+              </details>
+
+              <details class="reference-lab">
+                <summary>FMI + FMPy · pump, motor, flow, occlusion, and sensor physics</summary>
+                <p>
+                  Static FMU inspection never loads binaries. Simulation is disabled until the publisher, hash,
+                  platform binary, and license are explicitly trusted.
+                </p>
+                <div class="reference-fields">
+                  <label class="wide-field">
+                    Functional Mock-up Unit (.fmu)
+                    <input id="fmi-model" placeholder="/path/to/device_model.fmu" spellcheck="false" />
+                  </label>
+                  <label>
+                    Start
+                    <input id="fmi-start" type="number" value="0" step="any" />
+                  </label>
+                  <label>
+                    End
+                    <input id="fmi-end" type="number" value="60" step="any" />
+                  </label>
+                  <label>
+                    Output interval
+                    <input id="fmi-interval" type="number" value="0.1" min="0.000001" step="any" />
+                  </label>
+                  <label>
+                    Variables
+                    <input id="fmi-variables" placeholder="flow, pressure, occlusion" spellcheck="false" />
+                  </label>
+                  <label>
+                    Timeout seconds
+                    <input id="fmi-timeout" type="number" min="1" max="86400" value="300" />
+                  </label>
+                </div>
+                <label class="consent-row danger-consent">
+                  <input id="fmi-consent" type="checkbox" />
+                  I trust this exact FMU and accept that FMI does not sandbox native code or OS access.
+                </label>
+                <div class="button-row">
+                  <button id="fmi-inspect-btn">Inspect FMU safely</button>
+                  <button id="fmi-run-btn">Run trusted FMU</button>
+                  <button id="fmi-open-btn">Open latest bundle</button>
+                  <button id="fmi-results-btn">Open latest CSV</button>
+                </div>
+                <pre id="fmi-status" class="status-box compact">No FMU inspected. Native execution remains disabled.</pre>
+              </details>
+
+              <details class="reference-lab">
+                <summary>BindingDB · measured affinity evidence beside AlphaFold</summary>
+                <p>Retrieve assay records by UniProt. Ki, Kd, IC50, structure confidence, and in-vivo effect remain distinct.</p>
+                <div class="reference-fields">
+                  <label>
+                    UniProt accession
+                    <input id="binding-uniprot" value="P06213" spellcheck="false" />
+                  </label>
+                  <label>
+                    Affinity cutoff (nM)
+                    <input id="binding-cutoff" type="number" min="1" max="1000000000" value="10000" />
+                  </label>
+                  <label>
+                    Maximum records
+                    <input id="binding-max-records" type="number" min="1" max="100000" value="5000" />
+                  </label>
+                </div>
+                <div class="button-row">
+                  <button id="binding-query-btn">Fetch measured affinities</button>
+                  <button id="binding-open-btn">Open latest bundle</button>
+                  <button id="binding-csv-btn">Open affinity CSV</button>
+                </div>
+                <pre id="binding-status" class="status-box compact">No BindingDB query run.</pre>
+              </details>
+            </div>
+          </article>
         </div>
         <pre id="biology-status" class="status-box compact">Biology tools are ready for research-only context and algorithm stress testing.</pre>
       </section>
 
       <section class="panel evidence-panel">
         <div class="panel-heading">
-          <p class="eyebrow">Step 6</p>
+          <p class="eyebrow">Step 7</p>
           <h2>Evidence connectors</h2>
         </div>
         <p class="muted">
-          Official research resources for protein structures, variants, pathways, tissue expression,
-          pharmacology, and model provenance. Links open in your system browser through a Rust allowlist.
+          Curated research resources and standards for structures, variants, pathways, expression,
+          pharmacology, provenance, and reproducibility. Each card states whether it is integrated,
+          partially integrated, planned, or only an official portal link.
         </p>
         <div class="button-row">
           <button id="evidence-refresh-btn">Load evidence connectors</button>

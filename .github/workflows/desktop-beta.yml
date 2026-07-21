@@ -67,11 +67,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel
           python -m pip install "setuptools>=83,<84" pytest
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python -m pip install -U -e ".[full,desktop-macos,mdmp]"
-          else
-            python -m pip install -U -e ".[full,desktop,mdmp]"
-          fi
+          python -m pip install -U -e ".[desktop-all]"
+
+      - name: Verify bundled research runtimes
+        shell: bash
+        run: |
+          python -c "import PySide6, fmpy, plotly, roadrunner; print('desktop-all runtimes OK')"
+
+      - name: Make FMPy libraries relocatable on macOS
+        if: runner.os == 'macOS'
+        run: |
+          python tools/desktop/repair_fmpy_macos_dylibs.py
 
       - name: Run desktop unit tests
         run: |
@@ -81,9 +87,9 @@ jobs:
         shell: bash
         run: |
           if [[ "$RUNNER_OS" == "macOS" ]]; then
-            python tools/desktop/build_qt_desktop_app.py --backend cocoa --onedir --name "${APP_NAME}"
+            python tools/desktop/build_qt_desktop_app.py --backend qt --onedir --name "${APP_NAME}"
           else
-            python tools/desktop/build_qt_desktop_app.py --name "${APP_NAME}"
+            python tools/desktop/build_qt_desktop_app.py --backend qt --name "${APP_NAME}"
           fi
 
       - name: Smoke test bundled app on Linux
@@ -95,7 +101,7 @@ jobs:
           set -euo pipefail
           exe="dist/${APP_NAME}"
           echo "Smoke testing: $exe"
-          "$exe" --smoke
+          "$exe" --smoke-full
 
       - name: Smoke test bundled app on macOS
         if: runner.os == 'macOS'
@@ -105,7 +111,7 @@ jobs:
           exe="dist/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"
           echo "Smoke testing macOS app: $exe"
           set +e
-          "$exe" --smoke 2>&1 | tee macos-smoke.log
+          "$exe" --smoke-full 2>&1 | tee macos-smoke.log
           status=${PIPESTATUS[0]}
           set -e
           if [[ "$status" -ne 0 ]]; then
@@ -121,9 +127,8 @@ jobs:
             exit "$status"
           fi
 
-      - name: Best-effort bundled smoke on Windows
+      - name: Smoke test bundled app on Windows
         if: runner.os == 'Windows'
-        continue-on-error: true
         shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
@@ -131,7 +136,7 @@ jobs:
           set -euo pipefail
           exe="dist/${APP_NAME}.exe"
           echo "Best-effort smoke testing Windows app: $exe"
-          "$exe" --smoke
+          "$exe" --smoke-full
 
       - name: Sign Windows executable when certificate secrets exist
         if: runner.os == 'Windows'
@@ -326,7 +331,9 @@ jobs:
 
           ## Scope
 
-          The desktop app is a thin native shell around the SDK engine. It can run curated simulation workflows and open generated evidence. Windows and Linux beta builds use the richer Qt shell. The macOS DMG currently uses a small native Cocoa shell because it is more reliable for unsigned beta distribution while the Qt app bundle is being hardened.
+          The desktop app is a native Qt workbench around the SDK engine on Windows, macOS, and Linux. The packaged builds include the Python/Qt runtime, reports, MDMP support, research plotting, serial/edge support, libRoadRunner, and FMPy. Users do not install those Python components separately. The macOS build also verifies that bundled FMPy/SUNDIALS libraries use relocatable app-bundle paths.
+
+          COPASI, OpenCOR, and Ollama are external system applications. Their audited connectors and readiness checks are included, but the external binaries and AI model files are not silently installed. The app detects them and explains the remaining setup when a workflow needs one.
 
           ## Safety
 

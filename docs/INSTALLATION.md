@@ -10,6 +10,7 @@ IINTS-AF supports Python 3.10 through 3.14 on Windows, macOS, and Linux. Use a v
 | AI model training and interactive research plots | add `[research]` | research workstations and Jetson |
 | Serial hardware interfaces | add `[edge]` | Raspberry Pi, Pico, UNO Q, FPGA bridges |
 | Python/PySide desktop development | add `[desktop]` | desktop contributors |
+| Complete desktop/research workbench | `[desktop-all]` | app users who want every supported Python-side engine |
 | Latest source code | editable Git clone | contributors only |
 
 The packaged desktop application has its own installer. See [Install The Desktop App](APP_INSTALL.md).

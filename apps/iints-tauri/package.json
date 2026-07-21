@@ -9,7 +9,7 @@
     "dev": "tauri dev",
     "build": "tauri build --no-bundle",
     "bundle": "tauri build",
-    "check": "node ./scripts/check-static.mjs"
+    "check": "node --check ./frontend/main.js && node ./scripts/check-static.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0"

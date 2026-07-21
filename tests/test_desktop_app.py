@@ -338,6 +338,29 @@ def test_qt_app_exposes_biology_evidence_actions() -> None:
     assert "Run Multi-Scale Simulation" in source
     assert "Highlight Mutation in 3D" in source
     assert "Open Genomics Folder" in source
+    assert "pLDDT is not pathogenicity or metabolic" in source
+    assert "mathematically translate it into a metabolic stress factor" not in source
+    assert "Academic evidence and standards catalog" in source
+    assert "list_evidence_connectors" in source
+    assert "Only fixed HTTPS evidence links may be opened" in source
+
+
+def test_qt_app_exposes_academic_reproducibility_package() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    build_source = Path("tools/desktop/build_qt_desktop_app.py").read_text(encoding="utf-8")
+
+    assert "class AcademicBundleWorker" in source
+    assert "Create Academic Package" in source
+    assert "Open RO-Crate Metadata" in source
+    assert "build_academic_bundle" in source
+    assert "not peer review, privacy approval, or clinical validation" in source
+    assert '"iints.research.academic_bundle"' in build_source
+
+
+def test_qt_batch_runner_consumes_one_queue_entry_per_run() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+
+    assert source.count("config = self.batch_queue.pop(0)") == 1
 
 
 def test_qt_app_exposes_mdmp_and_model_selector_actions() -> None:
@@ -361,7 +384,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     assert "Update Python SDK Package" in source
     assert "Developer Settings" in source
     assert "build_python_sdk_update_args()" in source
-    assert "iints-sdk-python35[full,desktop,mdmp,research,edge]" in update_source
+    assert "iints-sdk-python35[desktop-all]" in update_source
 
 
 def test_desktop_extra_installs_pyside6_automatically() -> None:
@@ -369,12 +392,16 @@ def test_desktop_extra_installs_pyside6_automatically() -> None:
     extras = pyproject["project"]["optional-dependencies"]
     desktop_deps = extras["desktop"]
     desktop_qt_deps = extras["desktop-qt"]
+    desktop_all_deps = extras["desktop-all"]
     build_source = Path("tools/desktop/build_qt_desktop_app.py").read_text(encoding="utf-8")
 
     assert any(dep.startswith("PySide6") for dep in desktop_deps)
     assert any(dep.startswith("plotly") for dep in desktop_deps)
     assert any(dep.startswith("PySide6") for dep in desktop_qt_deps)
-    assert 'python -m pip install -U -e ".[desktop]"' in build_source
+    assert any(dep.startswith("PySide6") for dep in desktop_all_deps)
+    assert any(dep.startswith("FMPy") for dep in desktop_all_deps)
+    assert any(dep.startswith("libroadrunner") for dep in desktop_all_deps)
+    assert 'python -m pip install -U -e ".[desktop-all]"' in build_source
     assert 'python -m pip install -U -e ".[desktop-qt]"' not in build_source
 
 
@@ -429,9 +456,9 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert "_install_crash_logging()" in source
     assert "faulthandler.enable" in source
     assert 'if sys.platform != "darwin"' in build_source
-    assert "--collect-all" in build_source
     assert "PySide6" in build_source
-    assert "shiboken6" in build_source
+    assert 'OPTIONAL_BUNDLED_MODULES = ("plotly.graph_objects", "roadrunner", "fmpy")' in build_source
+    assert 'command.extend(["--hidden-import", module_name])' in build_source
     assert "ENTRYPOINTS" in build_source
     assert '"cocoa": REPO_ROOT / "src" / "iints_desktop" / "cocoa_app.py"' in build_source
     assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source
@@ -441,10 +468,12 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert '"--exclude-module",\n        "pytest"' in build_source
     assert '"--exclude-module",\n        "pkg_resources"' in build_source
     assert "--osx-bundle-identifier" in build_source
-    assert '--backend cocoa --onedir --name "${APP_NAME}"' in workflow
-    assert "desktop-macos" in workflow
+    assert '--backend qt --onedir --name "${APP_NAME}"' in workflow
+    assert ".[desktop-all]" in workflow
+    assert "import PySide6, fmpy, plotly, roadrunner" in workflow
     assert '"setuptools>=83,<84" pytest' in workflow
-    assert 'python -m pip install -U -e ".[full,desktop,mdmp]"' in workflow
+    assert 'python -m pip install -U -e ".[desktop-all]"' in workflow
+    assert "repair_fmpy_macos_dylibs.py" in workflow
     assert 'python -m pip install -U -e ".[full,desktop-qt,mdmp]"' not in workflow
     assert "Smoke test bundled app on macOS" in workflow
     assert "continue-on-error: true\n        shell: bash\n        env:" not in workflow.split("Smoke test bundled app on macOS", 1)[1].split("Best-effort bundled smoke on Windows", 1)[0]
@@ -456,6 +485,18 @@ def test_tk_desktop_app_has_packaged_smoke_mode() -> None:
     assert '"--smoke" in sys.argv' in source
     assert "Tk desktop smoke OK" in source
     assert "raise SystemExit(main())" in source
+
+
+def test_qt_desktop_full_smoke_verifies_bundled_research_engines() -> None:
+    source = Path("src/iints_desktop/qt_app.py").read_text(encoding="utf-8")
+    workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
+
+    assert "def _verify_full_desktop_runtime" in source
+    assert 'import_module("fmpy.sundials")' in source
+    assert "CVodeSolver" in source
+    assert "--smoke-full" in source
+    assert workflow.count("--smoke-full") == 3
+    assert "Best-effort bundled smoke on Windows" not in workflow
 
 
 def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
@@ -524,6 +565,42 @@ def test_desktop_packager_creates_direct_windows_and_linux_assets(tmp_path: Path
         assert linux_asset.stat().st_mode & 0o111
 
 
+def test_desktop_packager_builds_and_verifies_dmg_in_local_temp_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "package_desktop_bundle",
+        Path("tools/desktop/package_desktop_bundle.py"),
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    calls: list[list[str]] = []
+
+    def fake_run(command: list[str], *, check: bool) -> None:
+        assert check is True
+        calls.append(command)
+        if command[1] == "create":
+            Path(command[-1]).write_bytes(b"verified-dmg")
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/hdiutil")
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    bundle = tmp_path / "IINTS-AF-Desktop-Beta.app"
+    bundle.mkdir()
+    output = tmp_path / "external-volume" / "IINTS-AF-Desktop-Beta-macos.dmg"
+    output.parent.mkdir()
+
+    module._create_dmg(bundle, output, "IINTS-AF-Desktop-Beta")
+
+    assert output.read_bytes() == b"verified-dmg"
+    assert calls[0][1] == "create"
+    assert calls[1][1] == "verify"
+    assert Path(calls[0][-1]).parent != output.parent
+
+
 def test_desktop_beta_workflow_documents_optional_signing() -> None:
     workflow = Path(".github/workflows/desktop-beta.yml").read_text(encoding="utf-8")
     signing_docs = Path("docs/DESKTOP_SIGNING.md").read_text(encoding="utf-8")
@@ -572,7 +649,7 @@ def test_tauri_app_exposes_sdk_update_actions_safely() -> None:
     assert "async fn desktop_update_info" in rust_source
     assert "async fn open_sdk_update_terminal" in rust_source
     assert "build_sdk_update_command_parts" in rust_source
-    assert "iints-sdk-python35[full,desktop,mdmp,research,edge]" in rust_source
+    assert "iints-sdk-python35[desktop-all]" in rust_source
     assert "github.com" in rust_source
     assert "python35.github.io" in rust_source
     assert "def _update_info" in bridge_source
@@ -625,6 +702,8 @@ def test_tauri_app_exposes_evidence_connectors_safely() -> None:
     assert "Only HTTPS evidence links are allowed" in rust_source
     assert "alphafold.ebi.ac.uk" in rust_source
     assert "platform-docs.opentargets.org" in rust_source
+    assert "www.researchobject.org" in rust_source
+    assert "sed-ml.org" in rust_source
     assert "def _evidence_connectors" in bridge_source
     assert "list_evidence_connectors" in bridge_source
     assert "evidence-refresh-btn" in frontend
@@ -634,3 +713,18 @@ def test_tauri_app_exposes_evidence_connectors_safely() -> None:
     assert "evidence-card" in frontend_css
     assert "Evidence connectors" in readme
     assert "Rust HTTPS host allowlist" in readme
+
+
+def test_tauri_app_exposes_academic_bundle_through_audited_bridge() -> None:
+    rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
+    bridge_source = Path("src/iints_desktop/tauri_bridge.py").read_text(encoding="utf-8")
+    frontend = Path("apps/iints-tauri/frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = Path("apps/iints-tauri/frontend/main.js").read_text(encoding="utf-8")
+
+    assert "async fn export_academic_bundle" in rust_source
+    assert "export_academic_bundle," in rust_source
+    assert "def _academic_bundle" in bridge_source
+    assert 'subcommands.add_parser("academic-bundle")' in bridge_source
+    assert "academic-export-btn" in frontend
+    assert "does not upload data" in frontend
+    assert 'call("export_academic_bundle"' in frontend_js

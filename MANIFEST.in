@@ -1,0 +1,3 @@
+include CITATION.cff
+include README.md
+include docs/*.md

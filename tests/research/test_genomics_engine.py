@@ -46,6 +46,16 @@ def test_genomics_engine_known_mutation_metadata_is_deterministic() -> None:
 
 def test_unknown_mutation_never_infers_function_from_plddt(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
+        "iints.research.clinvar_engine.ClinVarEngine.lookup_variant",
+        lambda *_args: {
+            "found": False,
+            "query_status": "not_found",
+            "aggregate_classification": "not_available",
+            "warning": "No exact ClinVar record.",
+            "supports_quantitative_functional_scalar": False,
+        },
+    )
+    monkeypatch.setattr(
         "iints.research.alphafold_engine.AlphaFoldGenomicsEngine.evaluate_plddt_impact",
         lambda *_args: {
             "plddt": 98.0,
@@ -60,6 +70,39 @@ def test_unknown_mutation_never_infers_function_from_plddt(monkeypatch: pytest.M
     assert data["scalar"] is None
     assert data["supported"] is False
     assert data["evidence_type"] == "structural_context_only"
+    assert data["physiological_simulation_allowed"] is False
+    assert "REJECTED" in data["desc"]
+
+
+def test_pathogenic_clinvar_context_does_not_create_a_scalar(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "iints.research.clinvar_engine.ClinVarEngine.lookup_variant",
+        lambda *_args: {
+            "found": True,
+            "query_status": "matched",
+            "aggregate_classification": "pathogenic",
+            "classifications": ["Pathogenic"],
+            "supports_quantitative_functional_scalar": False,
+        },
+    )
+    monkeypatch.setattr(
+        "iints.research.alphafold_engine.AlphaFoldGenomicsEngine.evaluate_plddt_impact",
+        lambda *_args: {
+            "plddt": 91.0,
+            "confidence_band": "very_high",
+            "supports_functional_inference": False,
+            "conclusion": "Local structure confidence only.",
+        },
+    )
+
+    data = GenomicsEngine.evaluate_mutation("INSR", "A999V")
+
+    assert data["scalar"] is None
+    assert data["supported"] is False
+    assert data["evidence_type"] == "classification_and_structural_context_only"
+    assert data["clinvar_context"]["aggregate_classification"] == "pathogenic"
 
 
 def test_unknown_mutation_is_not_simulated_without_functional_evidence(

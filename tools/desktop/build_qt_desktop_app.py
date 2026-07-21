@@ -20,6 +20,7 @@ ICON_ASSETS = {
     "win32": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.ico",
     "default": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.png",
 }
+OPTIONAL_BUNDLED_MODULES = ("plotly.graph_objects", "roadrunner", "fmpy")
 
 
 def require_module(module_name: str, install_hint: str) -> None:
@@ -57,6 +58,16 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
         "iints_desktop",
         "--hidden-import",
         "iints.core.algorithms.clinical_baseline",
+        "--hidden-import",
+        "iints.research.academic_bundle",
+        "--hidden-import",
+        "iints.research.genomics_engine",
+        "--hidden-import",
+        "iints.research.mechanistic_models",
+        "--hidden-import",
+        "iints.research.structure",
+        "--hidden-import",
+        "iints.research.tissue_stressor",
         # Pandas exposes optional test helpers that can pull pytest and the
         # removed pkg_resources API into an otherwise production-only bundle.
         "--exclude-module",
@@ -64,15 +75,17 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
         "--exclude-module",
         "pkg_resources",
     ]
+    # These engines are imported lazily by the research workbench. Hidden
+    # imports trigger their normal PyInstaller hooks without collecting test,
+    # example, and unrelated GUI modules from the whole distributions.
+    for module_name in OPTIONAL_BUNDLED_MODULES:
+        if importlib.util.find_spec(module_name) is not None:
+            command.extend(["--hidden-import", module_name])
     if icon_path.exists():
         command.extend(["--icon", str(icon_path)])
     if backend == "qt":
         command.extend(
             [
-                "--collect-all",
-                "PySide6",
-                "--collect-all",
-                "shiboken6",
                 "--hidden-import",
                 "PySide6.QtSvg",
                 "--hidden-import",
@@ -127,12 +140,12 @@ def main() -> int:
     if not entrypoint.exists():
         raise SystemExit(f"Desktop entrypoint not found for backend {args.backend!r}: {entrypoint}")
 
-    install_extra = "desktop"
+    install_extra = "desktop-all"
     if args.backend == "cocoa":
         install_extra = "desktop-macos"
     require_module("PyInstaller", f'python -m pip install -U -e ".[{install_extra}]"')
     if args.backend == "qt":
-        require_module("PySide6", 'python -m pip install -U -e ".[desktop]"')
+        require_module("PySide6", 'python -m pip install -U -e ".[desktop-all]"')
     if args.backend == "cocoa":
         require_module("Cocoa", 'python -m pip install -U -e ".[desktop-macos]"')
 

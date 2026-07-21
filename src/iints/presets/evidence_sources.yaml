@@ -1,5 +1,5 @@
 version: 1
-updated_utc: "2026-06-04T00:00:00Z"
+updated_utc: "2026-07-18T00:00:00Z"
 sources:
   - id: ada_2026_glycemic_goals
     category: guideline
@@ -233,3 +233,75 @@ sources:
     doi: "10.1152/ajpregu.1999.277.3.R910"
     url: "https://doi.org/10.1152/ajpregu.1999.277.3.R910"
     rationale: "Reference for GLP-1-associated slowing of gastric emptying used to document nonlinear meal absorption feedback."
+  - id: sbml_2019_l3v2_core
+    category: standard
+    component: mechanistic_reference_model_interchange
+    title: "The Systems Biology Markup Language (SBML): Language Specification for Level 3 Version 2 Core Release 2"
+    citation: "Hucka M, et al. Journal of Integrative Bioinformatics. 2019;16(2):20190021."
+    doi: "10.1515/jib-2019-0021"
+    url: "https://doi.org/10.1515/jib-2019-0021"
+    rationale: "Machine-readable model-interchange standard used by the local mechanistic reference-model inspector."
+  - id: libroadrunner_2015
+    category: software
+    component: mechanistic_reference_model_execution
+    title: "libRoadRunner: a high performance SBML simulation and analysis library"
+    citation: "Somogyi ET, et al. Bioinformatics. 2015;31(20):3315-3321."
+    doi: "10.1093/bioinformatics/btv363"
+    url: "https://doi.org/10.1093/bioinformatics/btv363"
+    rationale: "Reference for the optional independent SBML time-course execution engine used by the Mechanistic Reference Model Lab."
+  - id: copasi_2006
+    category: software
+    component: sensitivity_and_parameter_analysis
+    title: "COPASI—a COmplex PAthway SImulator"
+    citation: "Hoops S, et al. Bioinformatics. 2006;22(24):3067-3074."
+    doi: "10.1093/bioinformatics/btl485"
+    url: "https://doi.org/10.1093/bioinformatics/btl485"
+    rationale: "Reference for the independent COPASI sensitivity, scan, optimisation, and configured parameter-estimation workflow."
+  - id: opencor_2015
+    category: software
+    component: cellml_reference_validation
+    title: "OpenCOR: a modular and interoperable approach to computational biology"
+    citation: "Garny A, Hunter PJ. Front Bioeng Biotechnol. 2015;2:79."
+    doi: "10.3389/fbioe.2014.00079"
+    url: "https://doi.org/10.3389/fbioe.2014.00079"
+    rationale: "Reference for independent CellML organisation, validation, simulation, and analysis with OpenCOR."
+  - id: fmi_3_0_2_standard
+    category: standard
+    component: device_physics_model_interchange
+    title: "Functional Mock-up Interface Specification 3.0.2"
+    citation: "Modelica Association Project FMI. Functional Mock-up Interface Specification 3.0.2. 2024."
+    doi: ""
+    url: "https://fmi-standard.org/docs/3.0.2/"
+    rationale: "Model-interchange and co-simulation standard used for static FMU inspection and the explicit native-code security boundary."
+  - id: fmpy_0_3
+    category: software
+    component: device_physics_execution
+    title: "FMPy: Simulate Functional Mock-up Units in Python"
+    citation: "Sommer T. FMPy documentation and software distribution."
+    doi: ""
+    url: "https://fmpy.readthedocs.io/en/latest/"
+    rationale: "Reference for optional execution of explicitly trusted FMUs and export of device-physics time courses."
+  - id: bindingdb_2016
+    category: database
+    component: measured_binding_affinity_evidence
+    title: "BindingDB in 2015: A public database for medicinal chemistry, computational chemistry and systems pharmacology"
+    citation: "Gilson MK, et al. Nucleic Acids Res. 2016;44(D1):D1045-D1053."
+    doi: "10.1093/nar/gkv1072"
+    url: "https://doi.org/10.1093/nar/gkv1072"
+    rationale: "Reference for measured ligand-target affinity evidence exported beside, but never inferred from, AlphaFold structures."
+  - id: ncbi_clinvar_classification_representation
+    category: database
+    component: genetic_variant_context
+    title: "Representation of classifications in ClinVar"
+    citation: "NCBI ClinVar. Representation of classifications in ClinVar. Accessed 2026-07-21."
+    doi: ""
+    url: "https://www.ncbi.nlm.nih.gov/clinvar/docs/clinsig/"
+    rationale: "Defines ClinVar records as variant-condition classifications and supports keeping classification separate from quantitative physiological effect size."
+  - id: myvariant_query_api
+    category: software
+    component: genetic_variant_context_transport
+    title: "MyVariant.info v1 query API"
+    citation: "MyVariant.info. Variant query web service documentation. Accessed 2026-07-21."
+    doi: ""
+    url: "https://docs.myvariant.info/en/latest/doc/quick_start.html"
+    rationale: "Read-only annotation transport used for bounded ClinVar queries; exact gene and protein-change matches are revalidated by the SDK."

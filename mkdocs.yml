@@ -86,8 +86,11 @@ nav:
           - Booth Demo: BOOTH_DEMO.md
   - Research:
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
+      - Academic Research Workbench: ACADEMIC_RESEARCH_WORKBENCH.md
       - Physiology And Models:
           - Physiology Reference: PHYSIOLOGY_REFERENCE.md
+          - Mechanistic Reference Models: MECHANISTIC_REFERENCE_MODELS.md
+          - Cross-scale Reference Labs: CROSS_SCALE_REFERENCE_LABS.md
           - Formula Registry: FORMULA_REGISTRY.md
           - Numeric Authority: NUMERIC_AUTHORITY.md
           - Hypoglycemia Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
@@ -159,5 +162,5 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.30): releases/v1.5.30.md
+      - Latest (v1.5.31): releases/v1.5.31.md
       - Release Archive: releases/INDEX.md

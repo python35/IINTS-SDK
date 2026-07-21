@@ -30,11 +30,13 @@ For platform-specific startup and security guidance, use [Desktop App Installati
 For a Python installation:
 
 ```bash
-python -m pip install --upgrade "iints-sdk-python35[full,desktop,mdmp]"
+python -m pip install --upgrade "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
 
-The `desktop` extra installs PySide6 and the other Python GUI dependencies. Do not install PySide6 separately into a packaged `.exe`, `.dmg`, or Linux bundle.
+The `desktop-all` extra installs PySide6, reports, MDMP, research/AI libraries, edge/serial support, libRoadRunner, and FMPy. Packaged `.exe`, `.dmg`, and Linux builds contain the supported Python-side runtime already; do not install PySide6 or these libraries into a packaged app.
+
+COPASI, OpenCOR, and Ollama are separate system applications. Their connectors, validation boundaries, and readiness checks ship with the app, but their binaries and model files are not silently downloaded. This keeps licences, native-code trust, model size, and reproducibility decisions visible to the researcher.
 
 ## Workbench Areas
 
@@ -42,10 +44,11 @@ The `desktop` extra installs PySide6 and the other Python GUI dependencies. Do n
 | --- | --- | --- |
 | Simulation | choose a curated protocol, output folder, and seed | normal SDK run bundle |
 | Results | open a run CSV, graph glucose, and inspect a bounded table preview | read-only review of generated artifacts |
+| Reproducibility | create RO-Crate metadata, checksums, a source snapshot, and an academic audit | local FAIR-oriented package beside the run |
 | AI Review | start/check local Ollama and ask about a loaded result | non-authoritative review text |
 | Run Archive | find recent local runs and reopen their artifacts | local history index |
 | Data/MDMP | apply an explicit certification contract to a CSV | certification and validation artifacts |
-| Biology/Research | view structures and open public evidence resources | explanatory research artifacts |
+| Biology/Research | view structures and run independent SBML, COPASI, CellML, FMI, and BindingDB workflows | explanatory, mechanistic, device-physics, and assay-evidence artifacts |
 | Methods/Updates | inspect versions, diagnostics, logs, and update routes | transparent maintenance output |
 
 The exact tab names can differ between the current Qt beta and the newer Tauri prototype. Both must call SDK functions or the fixed bridge rather than reimplementing formulas in the interface.
@@ -90,6 +93,20 @@ A certificate means the recorded checks completed under that contract. It does n
 
 See [Certification Quickstart](MDMP_QUICKSTART.md).
 
+## Academic Reproducibility Package
+
+After loading a completed run CSV, use **Create Academic Package**. The app runs the same exporter as:
+
+```bash
+iints research academic-bundle path/to/completed_run
+```
+
+The output records checksums, run/software metadata, selected references, and unresolved review checks. It stays local and never uploads the run. A `ready` result means the implemented metadata checklist passed; it does not establish scientific validity, privacy clearance, or clinical safety.
+
+The artifact licence starts as `NOASSERTION`. Do not replace it with the SDK's Apache-2.0 code licence unless that licence genuinely applies to every exported artifact.
+
+Read [Academic Research Workbench](ACADEMIC_RESEARCH_WORKBENCH.md) for the artifact definitions and publication workflow.
+
 ## Biology And Evidence Tools
 
 The research area can display or open explanatory evidence such as:
@@ -103,7 +120,28 @@ The research area can display or open explanatory evidence such as:
 
 These resources help investigate biological assumptions. They do not automatically calibrate the virtual patient and never enter dosing or safety logic.
 
+Each evidence card identifies its integration maturity. **Portal** means the app only opens an official site; **planned** means no functioning import exists yet. AlphaFold pLDDT and PAE remain structural-confidence measures and are never translated automatically into mutation severity or physiological parameters.
+
 The Tauri shell opens approved external evidence sites in the system browser through an allowlist. It does not embed arbitrary remote pages.
+
+### Mechanistic Reference Model Lab
+
+The Tauri workbench can safely inspect a local SBML file without executing it. When the optional `mechanistic` extra is installed, the same panel can run that external model independently through libRoadRunner and write a CSV, model summary, provenance manifest, and review report.
+
+This workflow complements AlphaFold: structure is inspected separately from dynamic equations. It does not convert external units to mg/dL or minutes, does not replace the Python patient models, and never tunes patient parameters automatically. Read [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md) before interpreting cross-model plots.
+
+### Cross-scale Reference Labs
+
+The Tauri workbench also exposes four collapsible labs:
+
+- COPASI task inspection and explicitly confirmed CopasiSE execution
+- CellML inspection and OpenCOR standards validation
+- safe FMU archive inspection and explicitly trusted FMPy execution
+- read-only BindingDB affinity evidence by UniProt accession
+
+COPASI and FMI execution require separate review confirmations. Rust validates the request boundary, while the Python SDK remains the source of scientific logic and provenance artifacts. FMI execution can load native code and must be limited to a reviewed model hash from a trusted publisher.
+
+Read [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) before using these workflows.
 
 ## Updates And Logs
 

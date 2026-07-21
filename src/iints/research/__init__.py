@@ -100,6 +100,37 @@ from .results_manager import (
     index_results,
     summarize_results_csv,
 )
+from .academic_bundle import AcademicBundleResult, build_academic_bundle
+from .mechanistic_models import (
+    MechanisticRunResult,
+    SBMLModelSummary,
+    inspect_sbml_model,
+    roadrunner_status,
+    run_sbml_model,
+)
+from .copasi_models import (
+    COPASIModelSummary,
+    COPASIRunResult,
+    copasi_status,
+    inspect_copasi_model,
+    run_copasi_model,
+)
+from .cellml_models import (
+    CellMLModelSummary,
+    CellMLValidationResult,
+    inspect_cellml_model,
+    opencor_status,
+    validate_cellml_model,
+)
+from .fmi_models import (
+    FMUModelSummary,
+    FMURunResult,
+    fmpy_status,
+    inspect_fmu_model,
+    run_fmu_model,
+)
+from .binding_evidence import BindingEvidenceResult, query_bindingdb_uniprot
+from .clinvar_engine import ClinVarEngine, normalize_protein_variant
 from .glucose_model import (
     GLUCOSE_MODEL_FEATURE_COLUMNS,
     GLUCOSE_MODEL_ID,
@@ -197,6 +228,32 @@ __all__ = [
     "discover_result_csvs",
     "index_results",
     "summarize_results_csv",
+    "AcademicBundleResult",
+    "build_academic_bundle",
+    "MechanisticRunResult",
+    "SBMLModelSummary",
+    "inspect_sbml_model",
+    "roadrunner_status",
+    "run_sbml_model",
+    "COPASIModelSummary",
+    "COPASIRunResult",
+    "copasi_status",
+    "inspect_copasi_model",
+    "run_copasi_model",
+    "CellMLModelSummary",
+    "CellMLValidationResult",
+    "inspect_cellml_model",
+    "opencor_status",
+    "validate_cellml_model",
+    "FMUModelSummary",
+    "FMURunResult",
+    "fmpy_status",
+    "inspect_fmu_model",
+    "run_fmu_model",
+    "BindingEvidenceResult",
+    "query_bindingdb_uniprot",
+    "ClinVarEngine",
+    "normalize_protein_variant",
     "GLUCOSE_MODEL_FEATURE_COLUMNS",
     "GLUCOSE_MODEL_ID",
     "GlucoseModelComparisonBundle",

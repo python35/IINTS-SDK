@@ -30,7 +30,7 @@ def main() -> int | None:
 
     print(
         "PySide6 is not installed; falling back to the Tkinter desktop app. "
-        'Install the full desktop app with: python -m pip install -U "iints-sdk-python35[full,desktop,mdmp]"',
+        'Install the full desktop app with: python -m pip install -U "iints-sdk-python35[desktop-all]"',
         file=sys.stderr,
     )
     from iints_desktop.app import main as tk_main

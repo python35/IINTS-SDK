@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import zipfile
 
 import pandas as pd
 import pytest
@@ -12,6 +13,23 @@ from iints.cli.cli import app
 
 
 runner = CliRunner()
+
+
+def _write_minimal_sbml(path: Path) -> None:
+    path.write_text(
+        """<?xml version="1.0"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model id="reference" timeUnits="minute" substanceUnits="mole">
+    <listOfCompartments><compartment id="c" size="1" constant="true" /></listOfCompartments>
+    <listOfSpecies>
+      <species id="G" compartment="c" initialConcentration="1" boundaryCondition="false" constant="false" />
+    </listOfSpecies>
+    <listOfRules><rateRule variable="G"><math xmlns="http://www.w3.org/1998/Math/MathML"><cn>0</cn></math></rateRule></listOfRules>
+  </model>
+</sbml>
+""",
+        encoding="utf-8",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -88,6 +106,64 @@ def test_run_doctor_blocks_aggressive_glucose_decay(tmp_path) -> None:
     assert any(check["name"] == "glucose_decay" and check["status"] == "fail" for check in payload["checks"])
 
 
+def test_research_mechanistic_inspect_writes_machine_readable_summary(tmp_path: Path) -> None:
+    model = tmp_path / "reference.sbml"
+    output = tmp_path / "inspection.json"
+    _write_minimal_sbml(model)
+
+    result = runner.invoke(
+        app,
+        ["research", "mechanistic", "inspect", str(model), "--output-json", str(output)],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["model_id"] == "reference"
+    assert payload["counts"]["species"] == 1
+    assert payload["schema_validation_performed"] is False
+    assert "not SBML schema validation" in result.stdout
+
+
+def test_research_cross_scale_static_cli_workflows(tmp_path: Path) -> None:
+    copasi = tmp_path / "analysis.cps"
+    copasi_json = tmp_path / "copasi.json"
+    copasi.write_text(
+        """<COPASI><Model name="test"/><ListOfTasks>
+<Task name="Sensitivity" type="sensitivities" scheduled="true" updateModel="false" />
+</ListOfTasks></COPASI>""",
+        encoding="utf-8",
+    )
+    cellml = tmp_path / "reference.cellml"
+    cellml_json = tmp_path / "cellml.json"
+    cellml.write_text(
+        """<model xmlns="http://www.cellml.org/cellml/2.0#" name="reference">
+<component name="c"><variable name="x" units="dimensionless" />
+<math xmlns="http://www.w3.org/1998/Math/MathML"><cn>0</cn></math></component></model>""",
+        encoding="utf-8",
+    )
+    fmu = tmp_path / "device.fmu"
+    fmi_json = tmp_path / "fmi.json"
+    with zipfile.ZipFile(fmu, "w") as archive:
+        archive.writestr(
+            "modelDescription.xml",
+            """<fmiModelDescription fmiVersion="2.0" modelName="device" guid="fixture">
+<CoSimulation modelIdentifier="device"/><ModelVariables>
+<ScalarVariable name="flow" valueReference="1" causality="output"><Real unit="mL/min"/></ScalarVariable>
+</ModelVariables></fmiModelDescription>""",
+        )
+
+    results = [
+        runner.invoke(app, ["research", "copasi", "inspect", str(copasi), "--output-json", str(copasi_json)]),
+        runner.invoke(app, ["research", "cellml", "inspect", str(cellml), "--output-json", str(cellml_json)]),
+        runner.invoke(app, ["research", "fmi", "inspect", str(fmu), "--output-json", str(fmi_json)]),
+    ]
+
+    assert all(result.exit_code == 0 for result in results), [result.stdout for result in results]
+    assert json.loads(copasi_json.read_text(encoding="utf-8"))["sensitivity_task_count"] == 1
+    assert json.loads(cellml_json.read_text(encoding="utf-8"))["cellml_version"] == "2.0"
+    assert json.loads(fmi_json.read_text(encoding="utf-8"))["fmi_version"] == "2.0"
+
+
 def test_evidence_build_creates_public_bundle(tmp_path) -> None:
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -121,6 +197,51 @@ def test_evidence_build_creates_public_bundle(tmp_path) -> None:
     assert (output_dir / "MODEL_CARD.md").is_file()
     assert (output_dir / "evidence_summary.json").is_file()
     assert (output_dir / "run_index.csv").is_file()
+
+
+def test_research_academic_bundle_creates_ro_crate(tmp_path) -> None:
+    run_dir = tmp_path / "academic-run"
+    run_dir.mkdir()
+    (run_dir / "results.csv").write_text(
+        "time_minutes,glucose_actual_mgdl\n0,110\n5,120\n",
+        encoding="utf-8",
+    )
+    (run_dir / "run_metadata.json").write_text(
+        json.dumps(
+            {
+                "seed": 42,
+                "git_sha": "0123456789abcdef",
+                "config": {"patient_model_type": "hovorka"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "run_manifest.json").write_text(
+        json.dumps({"files": {"results": {"path": "results.csv"}}}),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "academic-bundle",
+            str(run_dir),
+            "--title",
+            "Academic smoke run",
+            "--creator",
+            "Researcher Example",
+            "--source-id",
+            "hovorka_2004_nmpc_t1d",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "IINTS Academic Research Bundle" in result.stdout
+    assert (run_dir / "ro-crate-metadata.json").is_file()
+    assert (run_dir / "academic_audit.json").is_file()
+    assert (run_dir / "academic_sources.json").is_file()
+    assert (run_dir / "ACADEMIC_BUNDLE.md").is_file()
 
 
 def test_safety_visualize_writes_html_and_json(tmp_path) -> None:

@@ -10,7 +10,7 @@ from importlib import metadata
 
 DESKTOP_RELEASE_URL = "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"
 UPDATE_DOCS_URL = "https://python35.github.io/IINTS-SDK/APP_INSTALL/"
-PYTHON_SDK_UPDATE_PACKAGE = "iints-sdk-python35[full,desktop,mdmp,research,edge]"
+PYTHON_SDK_UPDATE_PACKAGE = "iints-sdk-python35[desktop-all]"
 
 
 @dataclass(frozen=True)

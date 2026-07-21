@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -63,21 +64,29 @@ def _create_dmg(bundle: Path, output_path: Path, app_name: str) -> None:
         raise SystemExit("hdiutil is required to package the macOS desktop app as a .dmg.")
     if output_path.exists():
         output_path.unlink()
-    subprocess.run(
-        [
-            "hdiutil",
-            "create",
-            "-volname",
-            app_name,
-            "-srcfolder",
-            str(bundle),
-            "-ov",
-            "-format",
-            "UDZO",
-            str(output_path),
-        ],
-        check=True,
-    )
+
+    # Building directly on exFAT/external workspaces can yield a truncated image
+    # even when hdiutil exits successfully. Build and verify on macOS' local
+    # temporary volume first, then copy the completed artifact to its destination.
+    with tempfile.TemporaryDirectory(prefix="iints-desktop-dmg-") as temp_dir:
+        temporary_output = Path(temp_dir) / output_path.name
+        subprocess.run(
+            [
+                "hdiutil",
+                "create",
+                "-volname",
+                app_name,
+                "-srcfolder",
+                str(bundle),
+                "-ov",
+                "-format",
+                "UDZO",
+                str(temporary_output),
+            ],
+            check=True,
+        )
+        subprocess.run(["hdiutil", "verify", str(temporary_output)], check=True)
+        shutil.copy2(temporary_output, output_path)
 
 
 def package_release_asset(bundle: Path, app_name: str, platform_label: str, output_dir: Path) -> Path:

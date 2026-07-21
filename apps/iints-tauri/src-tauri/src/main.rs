@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use serde_json::{json, Value};
 use std::env;
 use std::path::{Path, PathBuf};
@@ -7,6 +8,60 @@ use std::process::Command;
 struct PythonCandidate {
     program: String,
     prefix_args: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MechanisticRunRequest {
+    model: String,
+    output_dir: String,
+    start: Option<f64>,
+    end: Option<f64>,
+    points: Option<i64>,
+    variables: Option<Vec<String>>,
+    source_url: Option<String>,
+    model_license: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CopasiRunRequest {
+    model: String,
+    output_dir: String,
+    task: Option<String>,
+    timeout_seconds: Option<i64>,
+    allow_external_execution: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CellmlValidationRequest {
+    model: String,
+    output_dir: String,
+    timeout_seconds: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FmiRunRequest {
+    model: String,
+    output_dir: String,
+    start: Option<f64>,
+    end: Option<f64>,
+    output_interval: Option<f64>,
+    variables: Option<Vec<String>>,
+    timeout_seconds: Option<i64>,
+    trust_native_code: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BindingQueryRequest {
+    uniprot: String,
+    output_dir: String,
+    cutoff_nm: Option<i64>,
+    max_records: Option<i64>,
+    timeout_seconds: Option<i64>,
 }
 
 fn python_candidates() -> Vec<PythonCandidate> {
@@ -184,6 +239,278 @@ async fn run_tissue_stress(
 }
 
 #[tauri::command]
+async fn mechanistic_engine_status() -> Result<Value, String> {
+    run_python_bridge_async(vec!["mechanistic-status".to_string()]).await
+}
+
+#[tauri::command]
+async fn inspect_mechanistic_model(model: String) -> Result<Value, String> {
+    if model.trim().is_empty() {
+        return Err("model path is required".to_string());
+    }
+    run_python_bridge_async(vec![
+        "mechanistic-inspect".to_string(),
+        "--model".to_string(),
+        model,
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn run_mechanistic_model(request: MechanisticRunRequest) -> Result<Value, String> {
+    let MechanisticRunRequest {
+        model,
+        output_dir,
+        start,
+        end,
+        points,
+        variables,
+        source_url,
+        model_license,
+    } = request;
+    if model.trim().is_empty() {
+        return Err("model path is required".to_string());
+    }
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let start_value = start.unwrap_or(0.0);
+    let end_value = end.unwrap_or(1440.0);
+    if !start_value.is_finite() || !end_value.is_finite() || end_value <= start_value {
+        return Err("end must be finite and greater than start".to_string());
+    }
+    let bounded_points = points.unwrap_or(289);
+    if !(2..=1_000_001).contains(&bounded_points) {
+        return Err("points must be between 2 and 1,000,001".to_string());
+    }
+    let mut args = vec![
+        "mechanistic-run".to_string(),
+        "--model".to_string(),
+        model,
+        "--output-dir".to_string(),
+        output_dir,
+        "--start".to_string(),
+        start_value.to_string(),
+        "--end".to_string(),
+        end_value.to_string(),
+        "--points".to_string(),
+        bounded_points.to_string(),
+    ];
+    let requested_variables = variables.unwrap_or_default();
+    if requested_variables.len() > 256 {
+        return Err("at most 256 variables may be selected".to_string());
+    }
+    for variable in requested_variables {
+        if !variable.trim().is_empty() {
+            args.push("--variable".to_string());
+            args.push(variable);
+        }
+    }
+    for (flag, value) in [
+        ("--source-url", source_url),
+        ("--model-license", model_license),
+    ] {
+        if let Some(text) = value {
+            if !text.trim().is_empty() {
+                args.push(flag.to_string());
+                args.push(text);
+            }
+        }
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn cross_scale_engine_status() -> Result<Value, String> {
+    run_python_bridge_async(vec!["cross-scale-status".to_string()]).await
+}
+
+#[tauri::command]
+async fn inspect_copasi_model(model: String) -> Result<Value, String> {
+    if model.trim().is_empty() {
+        return Err("COPASI model path is required".to_string());
+    }
+    run_python_bridge_async(vec![
+        "copasi-inspect".to_string(),
+        "--model".to_string(),
+        model,
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn run_copasi_analysis(request: CopasiRunRequest) -> Result<Value, String> {
+    if request.model.trim().is_empty() || request.output_dir.trim().is_empty() {
+        return Err("COPASI model and output directory are required".to_string());
+    }
+    if request.allow_external_execution != Some(true) {
+        return Err(
+            "Review the COPASI tasks and explicitly allow external execution first".to_string(),
+        );
+    }
+    let timeout = request.timeout_seconds.unwrap_or(900);
+    if !(1..=86_400).contains(&timeout) {
+        return Err("COPASI timeout must be between 1 and 86,400 seconds".to_string());
+    }
+    let mut args = vec![
+        "copasi-run".to_string(),
+        "--model".to_string(),
+        request.model,
+        "--output-dir".to_string(),
+        request.output_dir,
+        "--timeout-seconds".to_string(),
+        timeout.to_string(),
+        "--allow-external-execution".to_string(),
+    ];
+    if let Some(task) = request.task {
+        if !task.trim().is_empty() {
+            args.push("--task".to_string());
+            args.push(task);
+        }
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn inspect_cellml_reference(model: String) -> Result<Value, String> {
+    if model.trim().is_empty() {
+        return Err("CellML model path is required".to_string());
+    }
+    run_python_bridge_async(vec![
+        "cellml-inspect".to_string(),
+        "--model".to_string(),
+        model,
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn validate_cellml_reference(request: CellmlValidationRequest) -> Result<Value, String> {
+    if request.model.trim().is_empty() || request.output_dir.trim().is_empty() {
+        return Err("CellML model and output directory are required".to_string());
+    }
+    let timeout = request.timeout_seconds.unwrap_or(120);
+    if !(1..=86_400).contains(&timeout) {
+        return Err("OpenCOR timeout must be between 1 and 86,400 seconds".to_string());
+    }
+    run_python_bridge_async(vec![
+        "cellml-validate".to_string(),
+        "--model".to_string(),
+        request.model,
+        "--output-dir".to_string(),
+        request.output_dir,
+        "--timeout-seconds".to_string(),
+        timeout.to_string(),
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn inspect_fmu_model(model: String) -> Result<Value, String> {
+    if model.trim().is_empty() {
+        return Err("FMU path is required".to_string());
+    }
+    run_python_bridge_async(vec![
+        "fmi-inspect".to_string(),
+        "--model".to_string(),
+        model,
+    ])
+    .await
+}
+
+#[tauri::command]
+async fn run_fmi_model(request: FmiRunRequest) -> Result<Value, String> {
+    if request.model.trim().is_empty() || request.output_dir.trim().is_empty() {
+        return Err("FMU and output directory are required".to_string());
+    }
+    if request.trust_native_code != Some(true) {
+        return Err(
+            "Review the FMU publisher/hash and explicitly trust native code first".to_string(),
+        );
+    }
+    let start = request.start.unwrap_or(0.0);
+    let end = request.end.unwrap_or(60.0);
+    let interval = request.output_interval.unwrap_or(0.1);
+    if !start.is_finite()
+        || !end.is_finite()
+        || !interval.is_finite()
+        || end <= start
+        || interval <= 0.0
+    {
+        return Err(
+            "FMI timing values must be finite, with end > start and interval > 0".to_string(),
+        );
+    }
+    if (end - start) / interval > 1_000_000.0 {
+        return Err("FMI run exceeds the 1,000,001-row safety limit".to_string());
+    }
+    let timeout = request.timeout_seconds.unwrap_or(300);
+    if !(1..=86_400).contains(&timeout) {
+        return Err("FMI timeout must be between 1 and 86,400 seconds".to_string());
+    }
+    let mut args = vec![
+        "fmi-run".to_string(),
+        "--model".to_string(),
+        request.model,
+        "--output-dir".to_string(),
+        request.output_dir,
+        "--start".to_string(),
+        start.to_string(),
+        "--end".to_string(),
+        end.to_string(),
+        "--output-interval".to_string(),
+        interval.to_string(),
+        "--timeout-seconds".to_string(),
+        timeout.to_string(),
+        "--trust-native-code".to_string(),
+    ];
+    let variables = request.variables.unwrap_or_default();
+    if variables.len() > 256 {
+        return Err("At most 256 FMU variables may be selected".to_string());
+    }
+    for variable in variables {
+        if !variable.trim().is_empty() {
+            args.push("--variable".to_string());
+            args.push(variable);
+        }
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn query_bindingdb_evidence(request: BindingQueryRequest) -> Result<Value, String> {
+    if request.uniprot.trim().is_empty() || request.output_dir.trim().is_empty() {
+        return Err("UniProt accession and output directory are required".to_string());
+    }
+    let cutoff = request.cutoff_nm.unwrap_or(10_000);
+    if !(1..=1_000_000_000).contains(&cutoff) {
+        return Err("BindingDB cutoff must be between 1 and 1,000,000,000 nM".to_string());
+    }
+    let max_records = request.max_records.unwrap_or(5_000);
+    if !(1..=100_000).contains(&max_records) {
+        return Err("BindingDB max records must be between 1 and 100,000".to_string());
+    }
+    let timeout = request.timeout_seconds.unwrap_or(30);
+    if !(1..=300).contains(&timeout) {
+        return Err("BindingDB timeout must be between 1 and 300 seconds".to_string());
+    }
+    run_python_bridge_async(vec![
+        "binding-query".to_string(),
+        "--uniprot".to_string(),
+        request.uniprot,
+        "--output-dir".to_string(),
+        request.output_dir,
+        "--cutoff-nm".to_string(),
+        cutoff.to_string(),
+        "--max-records".to_string(),
+        max_records.to_string(),
+        "--timeout-seconds".to_string(),
+        timeout.to_string(),
+    ])
+    .await
+}
+
+#[tauri::command]
 async fn run_workflow(
     workflow_key: String,
     output_dir: String,
@@ -258,6 +585,47 @@ async fn certify_mdmp(
     ];
     if full.unwrap_or(false) {
         args.push("--full".to_string());
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn export_academic_bundle(
+    run_dir: String,
+    title: Option<String>,
+    description: Option<String>,
+    creator: Option<String>,
+    orcid: Option<String>,
+    license_id: Option<String>,
+    source_ids: Option<Vec<String>>,
+) -> Result<Value, String> {
+    if run_dir.trim().is_empty() {
+        return Err("run_dir is required".to_string());
+    }
+    let mut args = vec![
+        "academic-bundle".to_string(),
+        "--run-dir".to_string(),
+        run_dir,
+    ];
+    for (flag, value) in [
+        ("--title", title),
+        ("--description", description),
+        ("--creator", creator),
+        ("--orcid", orcid),
+        ("--license", license_id),
+    ] {
+        if let Some(text) = value {
+            if !text.trim().is_empty() {
+                args.push(flag.to_string());
+                args.push(text);
+            }
+        }
+    }
+    for source_id in source_ids.unwrap_or_default() {
+        if !source_id.trim().is_empty() {
+            args.push("--source-id".to_string());
+            args.push(source_id);
+        }
     }
     run_python_bridge_async(args).await
 }
@@ -451,11 +819,27 @@ fn validate_external_url(raw: &str) -> Result<(), String> {
         "www.proteinatlas.org",
         "gtexportal.org",
         "www.ebi.ac.uk",
+        "www.biomodels.org",
         "chembl.gitbook.io",
         "api.pharmgkb.org",
         "string-db.org",
         "clinicaltables.nlm.nih.gov",
         "www.ncbi.nlm.nih.gov",
+        "pubmed.ncbi.nlm.nih.gov",
+        "www.researchobject.org",
+        "www.nature.com",
+        "sed-ml.org",
+        "sbml.org",
+        "libroadrunner.readthedocs.io",
+        "copasi.org",
+        "opencor.ws",
+        "models.physiomeproject.org",
+        "fmi-standard.org",
+        "fmpy.readthedocs.io",
+        "www.bindingdb.org",
+        "clinicaltrials.gov",
+        "zenodo.org",
+        "developers.zenodo.org",
         "github.com",
         "python35.github.io",
     ];
@@ -540,7 +924,7 @@ fn build_sdk_update_command_parts() -> Result<Vec<String>, String> {
         "pip".to_string(),
         "install".to_string(),
         "-U".to_string(),
-        "iints-sdk-python35[full,desktop,mdmp,research,edge]".to_string(),
+        "iints-sdk-python35[desktop-all]".to_string(),
     ]);
     Ok(parts)
 }
@@ -739,10 +1123,22 @@ fn main() {
             list_evidence_connectors,
             run_genomics_simulation,
             run_tissue_stress,
+            mechanistic_engine_status,
+            inspect_mechanistic_model,
+            run_mechanistic_model,
+            cross_scale_engine_status,
+            inspect_copasi_model,
+            run_copasi_analysis,
+            inspect_cellml_reference,
+            validate_cellml_reference,
+            inspect_fmu_model,
+            run_fmi_model,
+            query_bindingdb_evidence,
             run_workflow,
             preview_results,
             run_history,
             certify_mdmp,
+            export_academic_bundle,
             check_local_ai,
             list_local_ai_models,
             start_local_ai,
@@ -762,6 +1158,11 @@ mod tests {
     #[test]
     fn evidence_urls_require_an_exact_allowlisted_https_host() {
         assert!(validate_external_url("https://alphafold.ebi.ac.uk/entry/P01308").is_ok());
+        assert!(validate_external_url("https://libroadrunner.readthedocs.io/en/latest/").is_ok());
+        assert!(validate_external_url("https://models.physiomeproject.org/cellml").is_ok());
+        assert!(validate_external_url("https://www.bindingdb.org/rwd/bind/index.jsp").is_ok());
+        assert!(validate_external_url("https://www.researchobject.org/ro-crate/").is_ok());
+        assert!(validate_external_url("https://sed-ml.org/").is_ok());
         assert!(validate_external_url("http://alphafold.ebi.ac.uk/entry/P01308").is_err());
         assert!(validate_external_url("https://alphafold.ebi.ac.uk.example.com/").is_err());
         assert!(validate_external_url("https://user@alphafold.ebi.ac.uk/").is_err());

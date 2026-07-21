@@ -297,6 +297,113 @@ body,
   background: #fafbfc;
 }
 
+.protein-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.9rem;
+  margin: 1.1rem 0 1.4rem;
+}
+
+.protein-gallery--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.protein-card {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid #d7dee5;
+  border-radius: 3px;
+  background: #ffffff;
+}
+
+.protein-card__media {
+  display: flex;
+  aspect-ratio: 4 / 3;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #e2e7eb;
+  background: #ffffff;
+}
+
+.md-typeset .protein-card__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: contain;
+}
+
+.protein-card figcaption {
+  padding: 0.7rem 0.78rem 0.78rem;
+  color: #425466;
+  font-size: 0.72rem;
+  font-style: normal;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.protein-card__title {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: #17202a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.alphafold-confidence {
+  display: flex;
+  gap: 0.45rem 0.8rem;
+  margin: 0.8rem 0 1.2rem;
+  padding: 0.65rem 0.75rem;
+  flex-wrap: wrap;
+  border: 1px solid #d7dee5;
+  border-radius: 3px;
+  background: #f7f9fa;
+  color: #425466;
+  font-size: 0.7rem;
+}
+
+.alphafold-confidence__item {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.alphafold-confidence__swatch {
+  display: inline-block;
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-right: 0.28rem;
+  border: 1px solid rgb(23 32 42 / 20%);
+  border-radius: 1px;
+}
+
+.alphafold-confidence__swatch--very-high {
+  background: #0053d6;
+}
+
+.alphafold-confidence__swatch--confident {
+  background: #65cbf3;
+}
+
+.alphafold-confidence__swatch--low {
+  background: #ffdb13;
+}
+
+.alphafold-confidence__swatch--very-low {
+  background: #ff7d45;
+}
+
+.figure-note {
+  margin: -0.45rem 0 1.35rem;
+  color: #5b6875;
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
 .md-typeset .mermaid {
   max-width: 48rem;
   margin: 1.25rem auto 1.75rem;
@@ -311,6 +418,21 @@ body,
   max-width: 100%;
   height: auto;
   margin: 0 auto;
+}
+
+/* Keep long ODE systems readable on phones without shrinking the notation. */
+.md-typeset div.arithmatex {
+  margin: 1rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--md-default-bg-color) 94%, #0b6b61 6%);
+}
+
+.md-typeset div.arithmatex > mjx-container {
+  min-width: max-content;
 }
 
 @media screen and (min-width: 76.25em) {
@@ -345,5 +467,9 @@ body,
   .support-table th,
   .support-table td {
     min-width: 9rem;
+  }
+
+  .protein-gallery--pair {
+    grid-template-columns: 1fr;
   }
 }

@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.31](v1.5.31.md) - complete desktop beta runtime and cross-scale academic reference labs
 - [v1.5.30](v1.5.30.md) - scientific integrity, desktop reliability, Tauri update flow, and clearer documentation
 - [v1.5.29](v1.5.29.md) - OhioT1DM physiology calibration profile retune
 - [v1.5.28](v1.5.28.md) - Hovorka molecular-affinity coupling fix

@@ -6,11 +6,17 @@ let workflows = [];
 let lastPreview = null;
 let lastRun = null;
 let lastMdmp = null;
+let lastAcademicBundle = null;
 let molecules = [];
 let evidenceConnectors = [];
 let updateInfo = null;
 let lastGenomics = null;
 let lastTissue = null;
+let lastMechanistic = null;
+let lastCopasi = null;
+let lastCellml = null;
+let lastFmi = null;
+let lastBinding = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -186,9 +192,11 @@ async function loadEvidenceConnectors() {
     const payload = await call("list_evidence_connectors");
     evidenceConnectors = payload.connectors || [];
     renderEvidenceConnectors(evidenceConnectors);
+    const integrated = evidenceConnectors.filter((item) => item.integration_level === "integrated").length;
+    const partial = evidenceConnectors.filter((item) => item.integration_level === "partial").length;
     setText(
       "evidence-status",
-      `Loaded ${evidenceConnectors.length} allowlisted evidence connectors. External portals open in your browser; the SDK does not embed remote web content.`
+      `Loaded ${evidenceConnectors.length} curated resources: ${integrated} integrated and ${partial} partially integrated. Portal-only and planned resources are labelled explicitly; remote pages open in your browser.`
     );
   } catch (error) {
     list.replaceChildren(statusPill("bad", errorMessage(error)));
@@ -209,11 +217,14 @@ function renderEvidenceConnectors(items) {
     card.innerHTML = `
       <div class="connector-meta">
         <span>${escapeHtml(connector.category || "Evidence")}</span>
-        <span class="connector-status">${escapeHtml(connector.integration_status || "Connector")}</span>
+        <span class="connector-status ${escapeHtml(connector.integration_level || "portal")}">${escapeHtml(connector.integration_status || "Connector")}</span>
       </div>
       <h3>${escapeHtml(connector.title || connector.key || "Evidence connector")}</h3>
       <p>${escapeHtml(connector.why_it_matters || "")}</p>
       <p><strong>Workbench use:</strong> ${escapeHtml(connector.app_use || "")}</p>
+      <p><strong>Access:</strong> ${escapeHtml(connector.access_mode || "Official portal")}</p>
+      <p><strong>Local evidence:</strong> ${connector.writes_local_evidence ? "writes a reviewable artifact" : "no automatic local evidence artifact"}</p>
+      <p class="muted">${escapeHtml(connector.provenance_note || "External evidence must be reviewed before it supports a scientific claim.")}</p>
       <p class="muted"><strong>Typical query:</strong> ${escapeHtml(connector.default_query || "")}</p>
     `;
 
@@ -335,6 +346,9 @@ async function runSelectedWorkflow() {
       seed
     });
     lastRun = result;
+    if (result.output_dir) {
+      $("academic-run-dir").value = result.output_dir;
+    }
     setText("run-status", result.summary || pretty(result));
     if (result.results_csv) {
       $("csv-path").value = result.results_csv;
@@ -357,6 +371,9 @@ async function previewCsv() {
   try {
     const preview = await call("preview_results", { csv, maxRows: 80 });
     lastPreview = preview;
+    if (!$("academic-run-dir").value.trim()) {
+      $("academic-run-dir").value = parentPath(preview.csv_path || csv);
+    }
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
@@ -411,6 +428,7 @@ function renderHistory(entries) {
           results_csv: entry.results_csv,
           report_pdf: entry.report_pdf || null
         };
+        $("academic-run-dir").value = entry.output_dir || parentPath(entry.results_csv);
         await previewCsv();
       });
       item.appendChild(button);
@@ -443,6 +461,65 @@ async function certifyMdmp() {
   } catch (error) {
     setText("mdmp-status", errorMessage(error));
   }
+}
+
+async function exportAcademicBundle() {
+  const runDir = $("academic-run-dir").value.trim()
+    || lastRun?.output_dir
+    || parentPath(lastPreview?.csv_path || $("csv-path").value.trim());
+  if (!runDir) {
+    setText("academic-status", "Run a workflow or provide a completed run folder first.");
+    return;
+  }
+  $("academic-run-dir").value = runDir;
+  const sourceIds = $("academic-source-ids").value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  setText("academic-status", "Hashing run artifacts and building the reproducibility package...");
+  $("academic-export-btn").disabled = true;
+  try {
+    const payload = await call("export_academic_bundle", {
+      runDir,
+      title: $("academic-title").value.trim() || null,
+      description: null,
+      creator: $("academic-creator").value.trim() || null,
+      orcid: $("academic-orcid").value.trim() || null,
+      licenseId: $("academic-license").value.trim() || "NOASSERTION",
+      sourceIds
+    });
+    lastAcademicBundle = payload;
+    setText(
+      "academic-status",
+      [
+        `Readiness: ${payload.readiness_status}`,
+        `Audit score: ${payload.readiness_score_pct}%`,
+        `Artifacts inventoried: ${payload.artifact_count}`,
+        `Evidence sources associated: ${payload.source_count}`,
+        `RO-Crate: ${payload.ro_crate_metadata}`,
+        `Audit: ${payload.audit_json}`,
+        `Review guide: ${payload.readme_md}`,
+        "",
+        "This package supports review and reuse; it is not peer review, privacy approval, or clinical validation."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("academic-status", errorMessage(error));
+  } finally {
+    $("academic-export-btn").disabled = false;
+  }
+}
+
+async function openAcademicMetadata() {
+  await openPath(lastAcademicBundle?.ro_crate_metadata, "academic-status");
+}
+
+async function openAcademicAudit() {
+  await openPath(lastAcademicBundle?.audit_json, "academic-status");
+}
+
+async function openAcademicGuide() {
+  await openPath(lastAcademicBundle?.readme_md, "academic-status");
 }
 
 function renderMetrics(metrics) {
@@ -679,7 +756,8 @@ async function runGenomicsSimulation() {
         `Genomics simulation completed: ${gene} ${variant}`,
         `Plot: ${payload.html_path}`,
         `Description: ${payload.metadata?.desc || "n/a"}`,
-        `Affinity scalar: ${payload.metadata?.scalar ?? "n/a"}`,
+        `Scenario functional scalar: ${payload.metadata?.scalar ?? "n/a"}`,
+        "The scalar is an explicit research assumption; AlphaFold pLDDT is not pathogenicity or metabolic severity.",
         "Research only: not a medical device."
       ].join("\n")
     );
@@ -728,6 +806,432 @@ async function openTissuePlot() {
   await openPath(lastTissue?.html_path, "biology-status");
 }
 
+async function loadMechanisticStatus() {
+  try {
+    const payload = await call("mechanistic_engine_status");
+    const lines = [
+      `SBML inspection: ${payload.inspection_available ? "available" : "unavailable"}`,
+      `Execution engine: ${payload.engine} ${payload.version || "not installed"}`,
+      payload.message,
+      "Execution is independent reference-model evidence, not biological validation."
+    ];
+    setText("mechanistic-status", lines.join("\n"));
+  } catch (error) {
+    setText("mechanistic-status", errorMessage(error));
+  }
+}
+
+async function inspectMechanisticModel() {
+  const model = $("mechanistic-model").value.trim();
+  if (!model) {
+    setText("mechanistic-status", "Select or paste a local .xml/.sbml model path first.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("mechanistic-status", "Inspecting SBML structure without executing equations...");
+  try {
+    const payload = await call("inspect_mechanistic_model", { model });
+    const summary = payload.summary || {};
+    const counts = summary.counts || {};
+    const warnings = Array.isArray(summary.warnings) && summary.warnings.length
+      ? summary.warnings.map((warning) => `- ${warning}`).join("\n")
+      : "- No structural inspection warnings.";
+    setText(
+      "mechanistic-status",
+      [
+        `Model: ${summary.model_name || summary.model_id || model}`,
+        `SBML: Level ${summary.sbml_level ?? "?"}, version ${summary.sbml_version ?? "?"}`,
+        `Readiness: ${summary.readiness_status}`,
+        `Species: ${counts.species ?? 0}; reactions: ${counts.reactions ?? 0}; parameters: ${counts.parameters ?? 0}`,
+        `Model units: ${pretty(summary.model_units || {})}`,
+        `SHA-256: ${summary.sha256 || "n/a"}`,
+        `Warnings:\n${warnings}`,
+        "This is safe structural inspection, not full SBML schema or biological validation."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("mechanistic-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function runMechanisticModel() {
+  const model = $("mechanistic-model").value.trim();
+  if (!model) {
+    setText("mechanistic-status", "Select or paste a local .xml/.sbml model path first.");
+    return;
+  }
+  const outputDir = joinPath($("output-dir").value.trim(), "mechanistic_reference");
+  const variables = $("mechanistic-variables").value
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const sourceUrl = $("mechanistic-source-url").value.trim();
+  const modelLicense = $("mechanistic-license").value.trim() || "NOASSERTION";
+  const start = Number.parseFloat($("mechanistic-start").value || "0");
+  const end = Number.parseFloat($("mechanistic-end").value || "1440");
+  const points = Number.parseInt($("mechanistic-points").value || "289", 10);
+  setResearchBusy(true);
+  setText("mechanistic-status", "Executing independent SBML reference model through libRoadRunner...");
+  try {
+    const payload = await call("run_mechanistic_model", {
+      request: {
+        model,
+        outputDir,
+        start,
+        end,
+        points,
+        variables,
+        sourceUrl: sourceUrl || null,
+        modelLicense
+      }
+    });
+    lastMechanistic = payload;
+    setText(
+      "mechanistic-status",
+      [
+        `Reference run completed with ${payload.engine} ${payload.engine_version}.`,
+        `Rows: ${payload.row_count}`,
+        `Selections: ${(payload.selections || []).join(", ")}`,
+        `Run folder: ${payload.run_dir}`,
+        `Results: ${payload.results_csv}`,
+        `Manifest: ${payload.manifest_json}`,
+        "No unit conversion or automatic IINTS calibration was performed."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("mechanistic-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function openMechanisticFolder() {
+  await openPath(lastMechanistic?.run_dir, "mechanistic-status");
+}
+
+async function openMechanisticReport() {
+  await openPath(lastMechanistic?.report_md, "mechanistic-status");
+}
+
+async function openMechanisticResults() {
+  await openPath(lastMechanistic?.results_csv, "mechanistic-status");
+}
+
+function warningLines(warnings) {
+  return Array.isArray(warnings) && warnings.length
+    ? warnings.map((warning) => `- ${warning}`).join("\n")
+    : "- None reported by static inspection.";
+}
+
+async function loadCrossScaleStatus() {
+  setText("cross-scale-status", "Checking optional academic engines...");
+  try {
+    const payload = await call("cross_scale_engine_status");
+    const copasi = payload.copasi || {};
+    const opencor = payload.opencor || {};
+    const fmpy = payload.fmpy || {};
+    setText(
+      "cross-scale-status",
+      [
+        "Static inspection: COPASI, CellML, and FMU available without optional engines.",
+        `CopasiSE: ${copasi.available ? "available" : "not found"}${copasi.path ? ` · ${copasi.path}` : ""}`,
+        `OpenCOR: ${opencor.available ? "available" : "not found"}${opencor.version ? ` · ${opencor.version}` : ""}`,
+        `FMPy: ${fmpy.available ? `available · ${fmpy.version || "unknown version"}` : "not installed"}`,
+        "BindingDB: read-only HTTPS evidence connector; network required.",
+        "No external result is coupled to patient parameters automatically."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("cross-scale-status", errorMessage(error));
+  }
+}
+
+async function inspectCopasiModel() {
+  const model = $("copasi-model").value.trim();
+  if (!model) {
+    setText("copasi-status", "Select or paste a local .cps model path first.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("copasi-status", "Inspecting COPASI tasks without executing them...");
+  try {
+    const payload = await call("inspect_copasi_model", { model });
+    const summary = payload.summary || {};
+    const tasks = Array.isArray(summary.tasks) ? summary.tasks : [];
+    const taskLines = tasks.length
+      ? tasks.map((task) => `- ${task.name || task.raw_type}: ${task.kind}; scheduled=${task.scheduled}; method=${task.method_name || "n/a"}`).join("\n")
+      : "- No tasks found.";
+    setText(
+      "copasi-status",
+      [
+        `Model: ${summary.model_name || model}`,
+        `Readiness: ${summary.readiness_status}`,
+        `Sensitivity tasks: ${summary.sensitivity_task_count ?? 0}`,
+        `Parameter-estimation tasks: ${summary.parameter_estimation_task_count ?? 0}`,
+        `Scheduled tasks: ${summary.scheduled_task_count ?? 0}`,
+        `SHA-256: ${summary.sha256 || "n/a"}`,
+        `Tasks:\n${taskLines}`,
+        `Warnings:\n${warningLines(summary.warnings)}`,
+        "Task presence does not prove identifiability or convergence."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("copasi-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function runCopasiAnalysis() {
+  const model = $("copasi-model").value.trim();
+  if (!model) {
+    setText("copasi-status", "Select or paste a local .cps model path first.");
+    return;
+  }
+  if (!$("copasi-consent").checked) {
+    setText("copasi-status", "Review the configured tasks/data paths and tick the execution confirmation first.");
+    return;
+  }
+  const outputDir = joinPath($("output-dir").value.trim(), "copasi");
+  const task = $("copasi-task").value.trim();
+  const timeoutSeconds = Number.parseInt($("copasi-timeout").value || "900", 10);
+  setResearchBusy(true);
+  setText("copasi-status", "Running the reviewed COPASI task in an evidence directory...");
+  try {
+    const payload = await call("run_copasi_analysis", {
+      request: {
+        model,
+        outputDir,
+        task: task || null,
+        timeoutSeconds,
+        allowExternalExecution: true
+      }
+    });
+    lastCopasi = payload;
+    setText(
+      "copasi-status",
+      [
+        "COPASI analysis completed.",
+        `Task: ${payload.selected_task || "task scheduled in model"}`,
+        `Run folder: ${payload.run_dir}`,
+        `Report: ${payload.report_txt}`,
+        `Manifest: ${payload.manifest_json}`,
+        "Review residuals, units, bounds, convergence, and profile-likelihood evidence before interpretation."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("copasi-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function inspectCellmlModel() {
+  const model = $("cellml-model").value.trim();
+  if (!model) {
+    setText("cellml-status", "Select or paste a local .cellml/.xml model path first.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("cellml-status", "Inspecting CellML metadata without resolving imports...");
+  try {
+    const payload = await call("inspect_cellml_reference", { model });
+    const summary = payload.summary || {};
+    setText(
+      "cellml-status",
+      [
+        `Model: ${summary.model_name || model}`,
+        `CellML: ${summary.cellml_version || "unknown"}`,
+        `Readiness: ${summary.readiness_status}`,
+        `Components: ${summary.component_count ?? 0}; variables: ${summary.variable_count ?? 0}; MathML blocks: ${summary.math_block_count ?? 0}`,
+        `Imports: ${(summary.imports || []).join(", ") || "none"}`,
+        `SHA-256: ${summary.sha256 || "n/a"}`,
+        `Warnings:\n${warningLines(summary.warnings)}`,
+        "Static inspection does not execute equations or trust imported files."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("cellml-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function validateCellmlModel() {
+  const model = $("cellml-model").value.trim();
+  if (!model) {
+    setText("cellml-status", "Select or paste a local .cellml/.xml model path first.");
+    return;
+  }
+  const outputDir = joinPath($("output-dir").value.trim(), "cellml");
+  const timeoutSeconds = Number.parseInt($("cellml-timeout").value || "120", 10);
+  setResearchBusy(true);
+  setText("cellml-status", "Validating CellML through OpenCOR CellMLTools...");
+  try {
+    const payload = await call("validate_cellml_reference", {
+      request: { model, outputDir, timeoutSeconds }
+    });
+    lastCellml = payload;
+    setText(
+      "cellml-status",
+      [
+        `OpenCOR validation result: ${payload.valid ? "valid" : "invalid or errors reported"}`,
+        `Return code: ${payload.return_code}`,
+        `Run folder: ${payload.run_dir}`,
+        `Validation log: ${payload.validation_log}`,
+        `Manifest: ${payload.manifest_json}`,
+        "CellML validation does not establish biological or clinical validity."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("cellml-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function inspectFmiModel() {
+  const model = $("fmi-model").value.trim();
+  if (!model) {
+    setText("fmi-status", "Select or paste a local .fmu path first.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("fmi-status", "Reading FMU archive metadata only; native code is not being loaded...");
+  try {
+    const payload = await call("inspect_fmu_model", { model });
+    const summary = payload.summary || {};
+    setText(
+      "fmi-status",
+      [
+        `Model: ${summary.model_name || model}`,
+        `FMI: ${summary.fmi_version || "unknown"}`,
+        `Interfaces: ${(summary.interfaces || []).map((item) => item.type).join(", ") || "none"}`,
+        `Variables: ${summary.variable_count ?? 0}`,
+        `Platforms: ${(summary.platforms || []).join(", ") || "none"}`,
+        `Native binaries: ${Boolean(summary.has_native_binaries)}`,
+        `SHA-256: ${summary.sha256 || "n/a"}`,
+        `Warnings:\n${warningLines(summary.warnings)}`,
+        "Static inspection completed without loading FMU binaries."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("fmi-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function runFmiModel() {
+  const model = $("fmi-model").value.trim();
+  if (!model) {
+    setText("fmi-status", "Select or paste a local .fmu path first.");
+    return;
+  }
+  if (!$("fmi-consent").checked) {
+    setText("fmi-status", "Inspect the FMU and explicitly accept the native-code boundary before execution.");
+    return;
+  }
+  const outputDir = joinPath($("output-dir").value.trim(), "fmi");
+  const start = Number.parseFloat($("fmi-start").value || "0");
+  const end = Number.parseFloat($("fmi-end").value || "60");
+  const outputInterval = Number.parseFloat($("fmi-interval").value || "0.1");
+  const timeoutSeconds = Number.parseInt($("fmi-timeout").value || "300", 10);
+  const variables = $("fmi-variables").value.split(",").map((value) => value.trim()).filter(Boolean);
+  setResearchBusy(true);
+  setText("fmi-status", "Executing the explicitly trusted FMU through FMPy...");
+  try {
+    const payload = await call("run_fmi_model", {
+      request: {
+        model,
+        outputDir,
+        start,
+        end,
+        outputInterval,
+        variables,
+        timeoutSeconds,
+        trustNativeCode: true
+      }
+    });
+    lastFmi = payload;
+    setText(
+      "fmi-status",
+      [
+        `Trusted FMU run completed with ${payload.engine} ${payload.engine_version}.`,
+        `Rows: ${payload.row_count}; columns: ${(payload.columns || []).join(", ")}`,
+        `Run folder: ${payload.run_dir}`,
+        `Results: ${payload.results_csv}`,
+        `Manifest: ${payload.manifest_json}`,
+        "Execution success is not bench validation and no result controls a real device."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("fmi-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function queryBindingEvidence() {
+  const uniprot = $("binding-uniprot").value.trim().toUpperCase();
+  const outputDir = joinPath($("output-dir").value.trim(), "bindingdb");
+  const cutoffNm = Number.parseInt($("binding-cutoff").value || "10000", 10);
+  const maxRecords = Number.parseInt($("binding-max-records").value || "5000", 10);
+  if (!uniprot) {
+    setText("binding-status", "Enter one UniProt accession first.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("binding-status", `Fetching measured BindingDB records for ${uniprot} over verified HTTPS...`);
+  try {
+    const payload = await call("query_bindingdb_evidence", {
+      request: { uniprot, outputDir, cutoffNm, maxRecords, timeoutSeconds: 30 }
+    });
+    lastBinding = payload;
+    setText(
+      "binding-status",
+      [
+        `BindingDB query completed for ${payload.uniprot_accession}.`,
+        `Cutoff: ${payload.cutoff_nm} nM; exported records: ${payload.record_count}`,
+        `Truncated by local limit: ${payload.truncated}`,
+        `CSV: ${payload.records_csv}`,
+        `Evidence JSON: ${payload.evidence_json}`,
+        "Ki, Kd, IC50, AlphaFold confidence, and in-vivo effects remain separate evidence types."
+      ].join("\n")
+    );
+  } catch (error) {
+    setText("binding-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
+  }
+}
+
+async function openCopasiBundle() {
+  await openPath(lastCopasi?.run_dir, "copasi-status");
+}
+
+async function openCellmlBundle() {
+  await openPath(lastCellml?.run_dir, "cellml-status");
+}
+
+async function openFmiBundle() {
+  await openPath(lastFmi?.run_dir, "fmi-status");
+}
+
+async function openFmiResults() {
+  await openPath(lastFmi?.results_csv, "fmi-status");
+}
+
+async function openBindingBundle() {
+  await openPath(lastBinding?.output_dir, "binding-status");
+}
+
+async function openBindingCsv() {
+  await openPath(lastBinding?.records_csv, "binding-status");
+}
+
 function setBusy(isBusy) {
   $("run-btn").disabled = isBusy;
   $("refresh-btn").disabled = isBusy;
@@ -736,12 +1240,24 @@ function setBusy(isBusy) {
   $("mdmp-btn").disabled = isBusy;
   $("open-run-folder-btn").disabled = isBusy;
   $("open-report-btn").disabled = isBusy;
+  $("academic-export-btn").disabled = isBusy;
 }
 
 function setResearchBusy(isBusy) {
   $("genomics-run-btn").disabled = isBusy;
   $("tissue-run-btn").disabled = isBusy;
   $("molecule-refresh-btn").disabled = isBusy;
+  $("mechanistic-status-btn").disabled = isBusy;
+  $("mechanistic-inspect-btn").disabled = isBusy;
+  $("mechanistic-run-btn").disabled = isBusy;
+  $("cross-scale-status-btn").disabled = isBusy;
+  $("copasi-inspect-btn").disabled = isBusy;
+  $("copasi-run-btn").disabled = isBusy;
+  $("cellml-inspect-btn").disabled = isBusy;
+  $("cellml-validate-btn").disabled = isBusy;
+  $("fmi-inspect-btn").disabled = isBusy;
+  $("fmi-run-btn").disabled = isBusy;
+  $("binding-query-btn").disabled = isBusy;
 }
 
 function firstIndex(columns, candidates) {
@@ -751,6 +1267,22 @@ function firstIndex(columns, candidates) {
     if (index >= 0) return index;
   }
   return -1;
+}
+
+function parentPath(path) {
+  const value = String(path || "").trim().replace(/[\\/]+$/, "");
+  if (!value) return "";
+  const separatorIndex = Math.max(value.lastIndexOf("/"), value.lastIndexOf("\\"));
+  if (separatorIndex === 0) return value[0];
+  if (separatorIndex === 2 && value[1] === ":") return value.slice(0, 3);
+  return separatorIndex > 0 ? value.slice(0, separatorIndex) : "";
+}
+
+function joinPath(base, child) {
+  const root = String(base || "").trim().replace(/[\\/]+$/, "");
+  if (!root) return child;
+  const separator = root.includes("\\") && !root.includes("/") ? "\\" : "/";
+  return `${root}${separator}${child}`;
 }
 
 function escapeHtml(value) {
@@ -811,6 +1343,10 @@ $("preview-btn").addEventListener("click", previewCsv);
 $("mdmp-btn").addEventListener("click", certifyMdmp);
 $("open-csv-btn").addEventListener("click", openLoadedCsv);
 $("open-certificate-btn").addEventListener("click", openLatestCertificate);
+$("academic-export-btn").addEventListener("click", exportAcademicBundle);
+$("academic-open-metadata-btn").addEventListener("click", openAcademicMetadata);
+$("academic-open-audit-btn").addEventListener("click", openAcademicAudit);
+$("academic-open-guide-btn").addEventListener("click", openAcademicGuide);
 $("ai-start-btn").addEventListener("click", startAi);
 $("ai-check-btn").addEventListener("click", checkAi);
 $("ai-models-btn").addEventListener("click", listAiModels);
@@ -821,6 +1357,26 @@ $("genomics-run-btn").addEventListener("click", runGenomicsSimulation);
 $("genomics-open-btn").addEventListener("click", openGenomicsPlot);
 $("tissue-run-btn").addEventListener("click", runTissueStressTest);
 $("tissue-open-btn").addEventListener("click", openTissuePlot);
+$("mechanistic-status-btn").addEventListener("click", loadMechanisticStatus);
+$("mechanistic-inspect-btn").addEventListener("click", inspectMechanisticModel);
+$("mechanistic-run-btn").addEventListener("click", runMechanisticModel);
+$("mechanistic-open-folder-btn").addEventListener("click", openMechanisticFolder);
+$("mechanistic-open-report-btn").addEventListener("click", openMechanisticReport);
+$("mechanistic-open-results-btn").addEventListener("click", openMechanisticResults);
+$("cross-scale-status-btn").addEventListener("click", loadCrossScaleStatus);
+$("copasi-inspect-btn").addEventListener("click", inspectCopasiModel);
+$("copasi-run-btn").addEventListener("click", runCopasiAnalysis);
+$("copasi-open-btn").addEventListener("click", openCopasiBundle);
+$("cellml-inspect-btn").addEventListener("click", inspectCellmlModel);
+$("cellml-validate-btn").addEventListener("click", validateCellmlModel);
+$("cellml-open-btn").addEventListener("click", openCellmlBundle);
+$("fmi-inspect-btn").addEventListener("click", inspectFmiModel);
+$("fmi-run-btn").addEventListener("click", runFmiModel);
+$("fmi-open-btn").addEventListener("click", openFmiBundle);
+$("fmi-results-btn").addEventListener("click", openFmiResults);
+$("binding-query-btn").addEventListener("click", queryBindingEvidence);
+$("binding-open-btn").addEventListener("click", openBindingBundle);
+$("binding-csv-btn").addEventListener("click", openBindingCsv);
 $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
 await loadStatus();
@@ -829,4 +1385,6 @@ await loadUpdateInfo();
 await loadWorkflows();
 await loadHistory();
 await loadMolecules();
+await loadMechanisticStatus();
+await loadCrossScaleStatus();
 await loadEvidenceConnectors();

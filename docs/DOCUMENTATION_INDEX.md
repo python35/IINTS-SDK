@@ -15,8 +15,10 @@ The main navigation follows a learning sequence. This page gives an alternative 
 1. [Complete First Workflow](GETTING_STARTED.md)
 2. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 3. [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
-4. [Study Analysis](STUDY_ANALYSIS.md)
-5. [Evidence Bundle](EVIDENCE_BUNDLE.md)
+4. [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md) for independent equation-model checks
+5. [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) for sensitivity, CellML, FMI, and affinity evidence
+6. [Study Analysis](STUDY_ANALYSIS.md)
+7. [Evidence Bundle](EVIDENCE_BUNDLE.md)
 
 ## Data Reviewer
 
@@ -55,6 +57,16 @@ The main navigation follows a learning sequence. This page gives an alternative 
 3. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 4. [Evidence Base](EVIDENCE_BASE.md)
 5. [Intended Use And Claims](governance/INTENDED_USE_AND_CLAIMS.md)
+
+## Reproducibility Reviewer
+
+1. [Academic Research Workbench](ACADEMIC_RESEARCH_WORKBENCH.md)
+2. [Understand A Run](RUN_OUTPUTS.md)
+3. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
+4. [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md)
+5. [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md)
+6. [Complete Source Library](SOURCE_LIBRARY.md)
+7. [Research Evidence Bundle](EVIDENCE_BUNDLE.md)
 
 ## Fast Lookup
 
