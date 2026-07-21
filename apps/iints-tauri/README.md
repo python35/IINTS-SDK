@@ -1,13 +1,17 @@
-# IINTS-AF Tauri Desktop Prototype
+# IINTS-AF Research Workbench
 
-Experimental next-generation desktop shell for IINTS-AF.
+Native Tauri desktop application for the IINTS-AF research SDK. The workbench provides a
+structured interface for running simulation protocols, reviewing outputs, creating reproducibility
+packages, and opening cross-scale research tools.
 
-This app is intentionally small:
+The application has three explicit architectural boundaries:
 
-- Tauri/Rust owns the native desktop boundary.
-- The frontend is static HTML/CSS/JS.
-- The Python SDK remains the scientific engine.
-- Communication happens through `python -m iints_desktop.tauri_bridge`.
+- **Rust/Tauri** owns native process, URL, file-opening, and application-security boundaries.
+- **Python SDK** remains the only scientific computation and report-generation engine.
+- **Static frontend** presents inputs and outputs; it does not reimplement physiological equations.
+
+Communication uses the narrow, audited `python -m iints_desktop.tauri_bridge` command surface.
+Local AI output is advisory and cannot replace deterministic SDK results.
 
 Research only. Not a medical device.
 
@@ -39,8 +43,22 @@ npm run build
 `npm run build` compiles the native executable without creating an installer. Use
 `npm run bundle` when you explicitly need platform installer artifacts such as a DMG.
 
+## Brand Assets
+
+The native `.icns`, `.ico`, and PNG bundle icons are generated from the official
+`img/iints_logo.png` artwork. Regenerate every desktop size after changing that source:
+
+```bash
+python scripts/build-brand-icons.py
+```
+
+The complete logo is used for the native application icon. The compact sidebar mark is a crop from
+the same source artwork; it is not a separate or AI-generated logo.
+
 ## Current Scope
 
+- Navigate between compact Overview, Runs, Results, Reproducibility, Local AI, Research Labs,
+  and Evidence workspaces.
 - Load SDK version/status.
 - Show SDK/app update information, copy the fixed SDK update command, open app downloads/docs,
   and launch a fixed update terminal.

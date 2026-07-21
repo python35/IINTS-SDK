@@ -18,7 +18,25 @@ The current PySide app is useful, but it places a lot of UI, process, update, an
 
 This keeps the medical/research math in Python where the SDK already lives, while moving desktop authority and packaging into Rust.
 
-## Current Scaffold
+## Download
+
+The stable beta tag always points to the current platform installers:
+
+| Platform | Download |
+| --- | --- |
+| Windows | [`.exe` installer](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-windows-x64-setup.exe) |
+| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
+| Linux | [`.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
+
+The native shell delegates scientific operations to the Python SDK. Install or update the engine once before using research workflows:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
+```
+
+COPASI, OpenCOR, Ollama, and model files remain optional external research tools. They are detected explicitly rather than installed silently.
+
+## Workbench Components
 
 Files:
 
@@ -99,7 +117,7 @@ Generated binaries and bundles are created under `apps/iints-tauri/src-tauri/tar
 
 ## Security Direction
 
-This scaffold intentionally avoids:
+The workbench intentionally avoids:
 
 - shell command plugins
 - broad filesystem plugins
@@ -107,7 +125,7 @@ This scaffold intentionally avoids:
 - automatic self-update logic
 - arbitrary Python execution from the UI
 
-Future hardening checklist:
+Hardening roadmap:
 
 - Add signed Tauri updater after release signing is stable.
 - Use a dedicated app data directory for outputs.
@@ -117,10 +135,16 @@ Future hardening checklist:
 - Sign and notarize macOS builds; sign Windows builds with timestamping.
 - Keep the Python bridge command list small and audited.
 
+## Release Validation
+
+The cross-platform beta workflow runs frontend static checks, Rust formatting, unit tests, strict Clippy checks, a native executable smoke test, installer packaging, and SHA-256 generation. Signing and macOS notarization run when the repository certificate secrets are configured.
+
+The release workflow is `.github/workflows/tauri-desktop-beta.yml`, and its stable release tag is `tauri-beta-latest`.
+
 ## Migration Plan
 
 1. Keep PySide as the rich beta app while Tauri matures.
 2. Use Tauri first for the core workflow: run preset, preview CSV, certify MDMP, ask local AI.
 3. Stream run progress through Tauri events so long simulations feel live.
 4. Move biology/AlphaFold viewers into Tauri only after file/plugin scopes are locked down.
-5. Make Tauri the default downloadable app once CI builds and signing are stable.
+5. Make Tauri the default bundled app once the Python scientific engine can be distributed as an audited sidecar and signing is stable.

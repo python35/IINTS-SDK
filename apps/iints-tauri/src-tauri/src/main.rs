@@ -1113,6 +1113,10 @@ fn open_with_platform(path: &Path) -> Result<(), String> {
 }
 
 fn main() {
+    if env::args().any(|argument| argument == "--smoke") {
+        println!("IINTS-AF Research Workbench smoke check passed");
+        return;
+    }
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             desktop_status,

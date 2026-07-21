@@ -17,9 +17,30 @@ IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dos
 
 - Website: [iints.org](https://iints.org)
 - Documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
-- Desktop app downloads: [latest beta](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest)
+- Rust research workbench: [latest beta](https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest)
+- Classic desktop app: [latest Qt beta](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest)
 
-## Desktop App
+## Rust Research Workbench
+
+The new native research workbench uses a Rust/Tauri security boundary around the Python scientific engine. It provides guided simulation workflows, result inspection, reproducibility records, local Ollama review, MDMP evidence tools, and audited research connectors.
+
+Current Rust/Tauri beta downloads:
+
+| Platform | Download |
+| --- | --- |
+| Windows | [`.exe` installer](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-windows-x64-setup.exe) |
+| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
+| Linux | [`.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
+
+The beta delegates scientific operations to the installed IINTS-AF SDK. Install or update that engine once with:
+
+```bash
+python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
+```
+
+See the [Tauri workbench documentation](https://python35.github.io/IINTS-SDK/TAURI_DESKTOP/) for architecture, security boundaries, and development instructions.
+
+## Classic Desktop App
 
 IINTS-AF also has a native Qt desktop app for running demos, reviewing results, certifying data, and using the research workbench without memorising terminal commands. The packaged Windows, macOS, and Linux betas include their Python runtime and supported Python-side research engines.
 
@@ -37,8 +58,6 @@ Python install, including the PySide6 desktop runtime:
 python -m pip install -U "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
-
-Experimental next-generation shell: a Tauri + Rust desktop prototype lives in `apps/iints-tauri`. It keeps the Python SDK as the scientific engine while moving the native app boundary into Rust. See `docs/TAURI_DESKTOP.md`.
 
 ## License
 

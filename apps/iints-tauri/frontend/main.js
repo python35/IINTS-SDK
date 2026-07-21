@@ -20,6 +20,92 @@ let lastBinding = null;
 
 const $ = (id) => document.getElementById(id);
 
+const VIEW_METADATA = {
+  overview: {
+    eyebrow: "Workspace",
+    title: "System overview",
+    description: "Check the local SDK, output location, and update state before starting an experiment."
+  },
+  run: {
+    eyebrow: "Experiment",
+    title: "Protocols and runs",
+    description: "Choose a curated protocol, fix the random seed, and execute it through the Python SDK."
+  },
+  results: {
+    eyebrow: "Analysis",
+    title: "Results review",
+    description: "Inspect generated metrics, glucose trajectories, tabular output, and MDMP evidence."
+  },
+  reproducibility: {
+    eyebrow: "Research record",
+    title: "Reproducibility package",
+    description: "Create reviewable metadata, checksums, evidence references, and a conservative audit trail."
+  },
+  ai: {
+    eyebrow: "Local assistant",
+    title: "AI-supported interpretation",
+    description: "Use a local Ollama model to summarize outputs; deterministic SDK results remain authoritative."
+  },
+  research: {
+    eyebrow: "Methods",
+    title: "Cross-scale research labs",
+    description: "Inspect biological, mechanistic, and physical evidence without silently changing patient parameters."
+  },
+  evidence: {
+    eyebrow: "Provenance",
+    title: "Evidence connectors",
+    description: "Review official scientific resources, integration boundaries, and locally generated evidence artifacts."
+  }
+};
+
+const loadedViews = new Set(["overview"]);
+
+async function loadViewData(view) {
+  if (loadedViews.has(view)) return;
+  loadedViews.add(view);
+  if (view === "run") {
+    await Promise.allSettled([loadWorkflows(), loadHistory()]);
+  } else if (view === "research") {
+    await Promise.allSettled([loadMolecules(), loadMechanisticStatus(), loadCrossScaleStatus()]);
+  } else if (view === "evidence") {
+    await loadEvidenceConnectors();
+  }
+}
+
+function setActiveView(view, focusHeading = true) {
+  const metadata = VIEW_METADATA[view];
+  if (!metadata) return;
+
+  document.querySelectorAll("[data-view-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.viewPanel !== view;
+  });
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    const active = button.dataset.view === view;
+    button.classList.toggle("is-active", active);
+    if (active) {
+      button.setAttribute("aria-current", "page");
+    } else {
+      button.removeAttribute("aria-current");
+    }
+  });
+
+  setText("view-eyebrow", metadata.eyebrow);
+  setText("view-title", metadata.title);
+  setText("view-description", metadata.description);
+  document.title = `${metadata.title} | IINTS-AF`;
+  if (focusHeading) {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  void loadViewData(view);
+}
+
+function initializeNavigation() {
+  document.querySelectorAll("[data-view]").forEach((button) => {
+    button.addEventListener("click", () => setActiveView(button.dataset.view));
+  });
+  setActiveView("overview", false);
+}
+
 function setText(id, value) {
   $(id).textContent = value;
 }
@@ -378,6 +464,7 @@ async function previewCsv() {
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
+    setActiveView("results", false);
   } catch (error) {
     setText("run-status", errorMessage(error));
   }
@@ -1379,12 +1466,5 @@ $("binding-open-btn").addEventListener("click", openBindingBundle);
 $("binding-csv-btn").addEventListener("click", openBindingCsv);
 $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
-await loadStatus();
-await runDiagnostics();
-await loadUpdateInfo();
-await loadWorkflows();
-await loadHistory();
-await loadMolecules();
-await loadMechanisticStatus();
-await loadCrossScaleStatus();
-await loadEvidenceConnectors();
+initializeNavigation();
+await Promise.allSettled([loadStatus(), runDiagnostics(), loadUpdateInfo()]);

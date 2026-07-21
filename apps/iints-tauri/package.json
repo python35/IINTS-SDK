@@ -1,8 +1,8 @@
 {
   "name": "iints-af-tauri-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Experimental secure Tauri shell for the IINTS-AF Python SDK.",
+  "description": "Native Rust/Tauri research workbench for the IINTS-AF Python SDK.",
   "type": "module",
   "scripts": {
     "tauri": "tauri",

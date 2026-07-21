@@ -652,6 +652,48 @@ def test_tauri_app_exposes_diagnostics_and_safe_open_actions() -> None:
     assert "allowlisted native opener" in readme
 
 
+def test_tauri_app_has_academic_navigation_and_platform_icons() -> None:
+    app_root = Path("apps/iints-tauri")
+    frontend = (app_root / "frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = (app_root / "frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = (app_root / "frontend/styles.css").read_text(encoding="utf-8")
+    config = json.loads((app_root / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+
+    views = {"overview", "run", "results", "reproducibility", "ai", "research", "evidence"}
+    assert all(f'data-view="{view}"' in frontend for view in views)
+    assert all(f'data-view-panel="{view}"' in frontend for view in views)
+    assert "VIEW_METADATA" in frontend_js
+    assert "Promise.allSettled" in frontend_js
+    assert ".app-sidebar" in frontend_css
+    assert "prefers-reduced-motion" in frontend_css
+
+    configured_icons = set(config["bundle"]["icon"])
+    assert {"icons/icon.icns", "icons/icon.ico", "icons/icon.png"}.issubset(configured_icons)
+    assert all((app_root / "src-tauri" / icon).is_file() for icon in configured_icons)
+    assert (app_root / "src-tauri/icons/icon-source.png").is_file()
+    assert (app_root / "frontend/app-mark.png").is_file()
+    assert (app_root / "frontend/iints-logo.png").is_file()
+
+
+def test_tauri_beta_workflow_builds_native_installers_with_stable_links() -> None:
+    workflow_path = Path(".github/workflows/tauri-desktop-beta.yml")
+    workflow = workflow_path.read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+    docs = Path("docs/TAURI_DESKTOP.md").read_text(encoding="utf-8")
+    packager = Path("tools/desktop/package_tauri_bundle.py").read_text(encoding="utf-8")
+
+    assert "tauri-beta-latest" in workflow
+    assert "npm run tauri -- build --bundles" in workflow
+    assert '"$executable" --smoke' in workflow
+    assert "cargo clippy" in workflow
+    assert "package_tauri_bundle.py" in workflow
+    assert "IINTS-AF-Research-Workbench-windows-x64-setup.exe" in packager
+    assert "IINTS-AF-Research-Workbench-macos.dmg" in packager
+    assert "IINTS-AF-Research-Workbench-linux-x64.AppImage" in packager
+    assert "tauri-beta-latest" in readme
+    assert "tauri-beta-latest" in docs
+
+
 def test_tauri_app_exposes_sdk_update_actions_safely() -> None:
     rust_source = Path("apps/iints-tauri/src-tauri/src/main.rs").read_text(encoding="utf-8")
     bridge_source = Path("src/iints_desktop/tauri_bridge.py").read_text(encoding="utf-8")

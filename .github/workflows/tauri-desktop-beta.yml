@@ -1,0 +1,285 @@
+name: Rust Desktop Beta Builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Stable GitHub prerelease tag to create/update"
+        required: true
+        default: "tauri-beta-latest"
+      draft:
+        description: "Create the GitHub release as a draft"
+        type: boolean
+        required: true
+        default: false
+      upload_release:
+        description: "Upload platform installers to the GitHub prerelease"
+        type: boolean
+        required: true
+        default: true
+  push:
+    tags:
+      - "tauri-beta-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tauri-desktop-beta-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform_label }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            platform_label: windows-x64
+            bundle_target: nsis
+          - runner: macos-latest
+            platform_label: macos
+            bundle_target: dmg
+          - runner: ubuntu-22.04
+            platform_label: linux-x64
+            bundle_target: appimage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/iints-tauri/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
+
+      - name: Install Linux Tauri libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libwebkit2gtk-4.1-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        working-directory: apps/iints-tauri
+        run: npm ci
+
+      - name: Validate frontend and Rust boundary
+        shell: bash
+        run: |
+          npm --prefix apps/iints-tauri run check
+          cargo fmt --manifest-path apps/iints-tauri/src-tauri/Cargo.toml --check
+          cargo test --manifest-path apps/iints-tauri/src-tauri/Cargo.toml
+          cargo clippy --manifest-path apps/iints-tauri/src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Import macOS signing certificate when configured
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_KEYCHAIN_PASSWORD: ${{ secrets.MACOS_KEYCHAIN_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$MACOS_CERTIFICATE_P12_BASE64" ]]; then
+            echo "Signing certificate not configured; producing an unsigned macOS beta."
+            exit 0
+          fi
+          if [[ -z "$MACOS_CERTIFICATE_PASSWORD" || -z "$MACOS_KEYCHAIN_PASSWORD" || -z "$MACOS_SIGNING_IDENTITY" ]]; then
+            echo "All macOS certificate secrets are required when signing is enabled."
+            exit 1
+          fi
+
+          keychain_path="$RUNNER_TEMP/iints-tauri-signing.keychain-db"
+          certificate_path="$RUNNER_TEMP/iints-tauri-developer-id.p12"
+          echo "$MACOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$certificate_path"
+          security create-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
+          security import "$certificate_path" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychains -d user -s "$keychain_path" $(security list-keychains -d user | sed 's/"//g')
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PASSWORD" "$keychain_path"
+
+      - name: Build native Tauri installer
+        shell: bash
+        working-directory: apps/iints-tauri
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: npm run tauri -- build --bundles "${{ matrix.bundle_target }}"
+
+      - name: Smoke test native executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            executable="apps/iints-tauri/src-tauri/target/release/iints-af-tauri.exe"
+          else
+            executable="apps/iints-tauri/src-tauri/target/release/iints-af-tauri"
+          fi
+          "$executable" --smoke
+
+      - name: Sign Windows installer when configured
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_SIGNING_PFX_BASE64) {
+            Write-Host "Signing certificate not configured; producing an unsigned Windows beta."
+            exit 0
+          }
+          if (-not $env:WINDOWS_SIGNING_PFX_PASSWORD) {
+            throw "WINDOWS_SIGNING_PFX_PASSWORD is required when Windows signing is enabled."
+          }
+
+          $installer = Get-ChildItem "apps/iints-tauri/src-tauri/target/release/bundle/nsis" -Filter "*.exe" | Select-Object -First 1
+          if (-not $installer) {
+            throw "Tauri NSIS installer not found."
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP "iints-tauri-codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64))
+          $kitsRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"
+          $signtool = Get-ChildItem $kitsRoot -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\signtool.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) {
+            throw "signtool.exe not found."
+          }
+          & $signtool.FullName sign /f $pfxPath /p $env:WINDOWS_SIGNING_PFX_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /d "IINTS-AF Research Workbench" $installer.FullName
+          & $signtool.FullName verify /pa /v $installer.FullName
+          Remove-Item $pfxPath -Force
+
+      - name: Notarize macOS installer when configured
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+            echo "Notary credentials not configured; skipping notarization."
+            exit 0
+          fi
+          dmg_path="$(find apps/iints-tauri/src-tauri/target/release/bundle/dmg -type f -name '*.dmg' -print -quit)"
+          if [[ -z "$dmg_path" ]]; then
+            echo "Tauri DMG not found."
+            exit 1
+          fi
+          xcrun notarytool submit "$dmg_path" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --wait
+          xcrun stapler staple "$dmg_path"
+          xcrun stapler validate "$dmg_path"
+
+      - name: Package stable release asset
+        shell: bash
+        run: |
+          python tools/desktop/package_tauri_bundle.py \
+            --bundle-root apps/iints-tauri/src-tauri/target/release/bundle \
+            --output-dir tauri-dist \
+            --platform-label "${{ matrix.platform_label }}"
+
+      - name: Upload native installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-${{ matrix.platform_label }}
+          path: tauri-dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish Rust desktop prerelease
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
+    steps:
+      - name: Download platform installers
+        uses: actions/download-artifact@v8
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Resolve release settings
+        id: release
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+            echo "draft=${{ inputs.draft }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "draft=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write release notes
+        shell: bash
+        run: |
+          cat > tauri-beta-release-notes.md <<'EOF'
+          # IINTS-AF Research Workbench — Rust/Tauri Beta
+
+          This prerelease contains the native Rust/Tauri research workbench with the official IINTS-SDK identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
+
+          ## Downloads
+
+          - `IINTS-AF-Research-Workbench-windows-x64-setup.exe`
+          - `IINTS-AF-Research-Workbench-macos.dmg`
+          - `IINTS-AF-Research-Workbench-linux-x64.AppImage`
+
+          Matching `.sha256` files are included for integrity verification. Builds are signed and the macOS build is notarized when repository signing credentials are configured.
+
+          ## Required scientific engine
+
+          This beta is a secure native shell around the Python SDK. Install or update the engine once before using research workflows:
+
+          ```bash
+          python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
+          ```
+
+          The app never silently installs COPASI, OpenCOR, Ollama, or model files. It detects optional external tools and reports what is available.
+
+          ## Safety
+
+          Research and education only. This is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
+          EOF
+
+      - name: Create or update GitHub prerelease
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: IINTS-AF Rust Research Workbench Beta
+          body_path: tauri-beta-release-notes.md
+          files: release-assets/*
+          overwrite_files: true
+          draft: ${{ steps.release.outputs.draft }}
+          prerelease: true
+          make_latest: false

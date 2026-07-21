@@ -4,22 +4,67 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
+    <link rel="icon" type="image/png" href="./app-mark.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div>
-        <p class="eyebrow">IINTS-AF SDK</p>
-        <h1>Research Workbench</h1>
-        <p class="subtitle">
-          Native Tauri shell around the Python SDK engine. Research only. Not a medical device.
-        </p>
-      </div>
-      <div class="badge">Not for treatment decisions</div>
-    </header>
+    <div class="app-shell">
+      <aside class="app-sidebar">
+        <div class="brand-block">
+          <img class="brand-mark" src="./app-mark.png" alt="" width="48" height="48" />
+          <div>
+            <p class="brand-kicker">IINTS-AF</p>
+            <p class="brand-name">Research Workbench</p>
+          </div>
+        </div>
 
-    <main class="layout">
-      <section class="panel diagnostics-panel">
+        <nav class="workspace-nav" aria-label="Research workbench modules">
+          <button class="nav-item is-active" data-view="overview" aria-current="page">
+            <span class="nav-index">01</span><span>Overview</span>
+          </button>
+          <button class="nav-item" data-view="run">
+            <span class="nav-index">02</span><span>Protocols &amp; runs</span>
+          </button>
+          <button class="nav-item" data-view="results">
+            <span class="nav-index">03</span><span>Results</span>
+          </button>
+          <button class="nav-item" data-view="reproducibility">
+            <span class="nav-index">04</span><span>Reproducibility</span>
+          </button>
+          <button class="nav-item" data-view="ai">
+            <span class="nav-index">05</span><span>Local AI</span>
+          </button>
+          <button class="nav-item" data-view="research">
+            <span class="nav-index">06</span><span>Research labs</span>
+          </button>
+          <button class="nav-item" data-view="evidence">
+            <span class="nav-index">07</span><span>Evidence</span>
+          </button>
+        </nav>
+
+        <div class="scope-note">
+          <strong>Research only</strong>
+          <span>Not a medical device. Not for diagnosis, dosing, or treatment decisions.</span>
+        </div>
+      </aside>
+
+      <div class="workspace-shell">
+        <header class="workspace-header">
+          <div class="view-heading">
+            <p class="eyebrow" id="view-eyebrow">Workspace</p>
+            <h1 id="view-title">System overview</h1>
+            <p class="subtitle" id="view-description">
+              Check the local SDK, output location, and update state before starting an experiment.
+            </p>
+          </div>
+          <div class="header-status" aria-live="polite">
+            <span class="status-chip">Local research environment</span>
+            <span id="sdk-status">Python bridge not checked yet.</span>
+          </div>
+        </header>
+
+    <main class="layout" id="workspace-content">
+      <section class="panel diagnostics-panel" data-view-panel="overview">
         <div class="panel-heading">
           <p class="eyebrow">System</p>
           <h2>Workbench readiness</h2>
@@ -31,7 +76,7 @@
         <div id="diagnostics-grid" class="diagnostics-grid" aria-live="polite"></div>
       </section>
 
-      <section class="panel update-panel">
+      <section class="panel update-panel" data-view-panel="overview">
         <div class="panel-heading">
           <p class="eyebrow">Maintenance</p>
           <h2>Updates</h2>
@@ -50,7 +95,7 @@
         <pre id="update-status" class="status-box compact">Update info not checked yet.</pre>
       </section>
 
-      <section class="panel protocol-panel">
+      <section class="panel protocol-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 1</p>
           <h2>Choose protocol</h2>
@@ -58,7 +103,7 @@
         <div id="workflow-list" class="workflow-list" aria-live="polite"></div>
       </section>
 
-      <section class="panel run-panel">
+      <section class="panel run-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 2</p>
           <h2>Run through Python SDK</h2>
@@ -83,7 +128,7 @@
         <pre id="run-status" class="status-box">Workbench loading...</pre>
       </section>
 
-      <section class="panel history-panel">
+      <section class="panel history-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Evidence</p>
           <h2>Run history</h2>
@@ -91,7 +136,7 @@
         <div id="history-list" class="history-list" aria-live="polite"></div>
       </section>
 
-      <section class="panel results-panel">
+      <section class="panel results-panel" data-view-panel="results" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 3</p>
           <h2>Results preview</h2>
@@ -116,7 +161,7 @@
         </div>
       </section>
 
-      <section class="panel academic-panel">
+      <section class="panel academic-panel" data-view-panel="reproducibility" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 4</p>
           <h2>Reproducibility package</h2>
@@ -161,7 +206,7 @@
         <pre id="academic-status" class="status-box compact">No academic package generated yet.</pre>
       </section>
 
-      <section class="panel ai-panel">
+      <section class="panel ai-panel" data-view-panel="ai" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 5</p>
           <h2>Local AI analysis</h2>
@@ -192,7 +237,7 @@
         <pre id="ai-answer" class="status-box ai-answer">AI answer will appear here after analysis.</pre>
       </section>
 
-      <section class="panel biology-panel">
+      <section class="panel biology-panel" data-view-panel="research" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 6</p>
           <h2>Biology & algorithm stressors</h2>
@@ -433,7 +478,7 @@
         <pre id="biology-status" class="status-box compact">Biology tools are ready for research-only context and algorithm stress testing.</pre>
       </section>
 
-      <section class="panel evidence-panel">
+      <section class="panel evidence-panel" data-view-panel="evidence" hidden>
         <div class="panel-heading">
           <p class="eyebrow">Step 7</p>
           <h2>Evidence connectors</h2>
@@ -451,10 +496,12 @@
       </section>
     </main>
 
-    <footer>
-      <span id="sdk-status">Python bridge not checked yet.</span>
-      <span>Deterministic SDK outputs remain the source of truth.</span>
-    </footer>
+        <footer>
+          <span>IINTS-AF Research Workbench</span>
+          <span>Deterministic SDK outputs remain the source of truth.</span>
+        </footer>
+      </div>
+    </div>
 
     <script type="module" src="./main.js"></script>
   </body>
