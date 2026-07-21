@@ -107,7 +107,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$MACOS_CERTIFICATE_P12_BASE64" ]]; then
-            echo "Signing certificate not configured; producing an unsigned macOS beta."
+            # Apple Silicon requires a coherent signature over the complete
+            # bundle. Ad-hoc signing prevents Gatekeeper from interpreting an
+            # otherwise valid downloaded app as a damaged partial bundle.
+            echo "Developer ID not configured; sealing the complete app bundle with an ad-hoc signature."
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
             exit 0
           fi
           if [[ -z "$MACOS_CERTIFICATE_PASSWORD" || -z "$MACOS_KEYCHAIN_PASSWORD" || -z "$MACOS_SIGNING_IDENTITY" ]]; then
@@ -130,6 +134,30 @@ jobs:
         shell: bash
         working-directory: apps/iints-tauri
         run: npm run tauri -- build --bundles "${{ matrix.bundle_target }}"
+
+      - name: Verify sealed macOS app inside DMG
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dmg_path="$(find apps/iints-tauri/src-tauri/target/release/bundle/dmg -type f -name '*.dmg' -print -quit)"
+          if [[ -z "$dmg_path" ]]; then
+            echo "Tauri DMG not found."
+            exit 1
+          fi
+
+          attach_plist="$RUNNER_TEMP/iints-tauri-dmg-attach.plist"
+          hdiutil attach -nobrowse -readonly -plist "$dmg_path" > "$attach_plist"
+          mount_point="$(python -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); print(next(item["mount-point"] for item in data["system-entities"] if "mount-point" in item))' "$attach_plist")"
+          trap 'hdiutil detach "$mount_point" >/dev/null || true' EXIT
+
+          app_path="$mount_point/IINTS-AF Research Workbench.app"
+          codesign --verify --deep --strict --verbose=4 "$app_path"
+          codesign -dvvv "$app_path" 2>&1 | tee macos-codesign-details.log
+          if ! grep -Eq 'Identifier=org\.iints\.research-workbench' macos-codesign-details.log; then
+            echo "Unexpected macOS bundle identifier."
+            exit 1
+          fi
 
       - name: Smoke test native executable
         shell: bash
@@ -254,7 +282,7 @@ jobs:
           - `IINTS-AF-Research-Workbench-macos.dmg`
           - `IINTS-AF-Research-Workbench-linux-x64.AppImage`
 
-          Matching `.sha256` files are included for integrity verification. Builds are signed and the macOS build is notarized when repository signing credentials are configured.
+          Matching `.sha256` files are included for integrity verification. The complete macOS app bundle is always sealed and strictly verified. It uses a Developer ID signature and notarization when repository credentials are configured; otherwise the beta uses a coherent ad-hoc signature.
 
           ## Required scientific engine
 

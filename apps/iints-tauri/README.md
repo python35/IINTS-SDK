@@ -103,6 +103,11 @@ The workbench does not present a portal link as an implemented scientific pipeli
 
 ## Security Notes
 
+- The macOS release pipeline signs the complete `.app` bundle, including its `Info.plist` and icon
+  resources. Without a configured Developer ID it uses a coherent ad-hoc signature and validates it
+  with `codesign --verify --deep --strict` from inside the generated DMG.
+- A Developer ID certificate and Apple notarization credentials are still required to eliminate the
+  normal "unidentified developer" warning for public macOS downloads.
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.

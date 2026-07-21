@@ -36,6 +36,12 @@ python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
 
 COPASI, OpenCOR, Ollama, and model files remain optional external research tools. They are detected explicitly rather than installed silently.
 
+### macOS integrity and Gatekeeper
+
+Every macOS beta is signed as one complete app bundle and then checked from inside the generated DMG with Apple's strict `codesign` verifier. When no Apple Developer ID is configured, CI uses an ad-hoc signature. This fixes the invalid partial-bundle state that macOS reports as **"the app is damaged"**.
+
+Ad-hoc signing is not Apple notarization. Until a Developer ID certificate and notary credentials are configured, macOS may still show the normal **unidentified developer** warning. Use Finder's **Open** context-menu action for a beta you downloaded from this official repository; do not disable Gatekeeper system-wide.
+
 ## Workbench Components
 
 Files:
@@ -137,7 +143,7 @@ Hardening roadmap:
 
 ## Release Validation
 
-The cross-platform beta workflow runs frontend static checks, Rust formatting, unit tests, strict Clippy checks, a native executable smoke test, installer packaging, and SHA-256 generation. Signing and macOS notarization run when the repository certificate secrets are configured.
+The cross-platform beta workflow runs frontend static checks, Rust formatting, unit tests, strict Clippy checks, a native executable smoke test, installer packaging, SHA-256 generation, and strict verification of the app mounted from the finished DMG. Developer ID signing and macOS notarization run when the repository certificate secrets are configured; otherwise CI applies and verifies a complete ad-hoc bundle signature.
 
 The release workflow is `.github/workflows/tauri-desktop-beta.yml`, and its stable release tag is `tauri-beta-latest`.
 
