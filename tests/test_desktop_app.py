@@ -461,6 +461,10 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert 'BINARY_BUNDLED_MODULES = ("fmpy", "roadrunner")' in build_source
     assert 'command.extend(["--hidden-import", module_name])' in build_source
     assert 'command.extend(["--collect-binaries", module_name])' in build_source
+    assert "def add_fmpy_sundials_binaries" in build_source
+    assert 'destination = f"fmpy/sundials/{platform_tuple}"' in build_source
+    assert 'command.extend(["--add-binary", f"{binary}{os.pathsep}{destination}"])' in build_source
+    assert "add_fmpy_sundials_binaries(command)" in build_source
     assert "ENTRYPOINTS" in build_source
     assert '"cocoa": REPO_ROOT / "src" / "iints_desktop" / "cocoa_app.py"' in build_source
     assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source

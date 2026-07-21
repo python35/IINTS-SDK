@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import os
 import subprocess
@@ -38,6 +39,29 @@ def build_environment() -> dict[str, str]:
     env.setdefault("PYINSTALLER_CONFIG_DIR", str(pyinstaller_cache))
     env.setdefault("MPLCONFIGDIR", str(matplotlib_cache))
     return env
+
+
+def add_fmpy_sundials_binaries(command: list[str]) -> None:
+    """Add the active-platform SUNDIALS binaries at FMPy's expected paths."""
+
+    spec = importlib.util.find_spec("fmpy")
+    if spec is None or not spec.submodule_search_locations:
+        return
+    fmpy_module = importlib.import_module("fmpy")
+    platform_tuple = str(getattr(fmpy_module, "platform_tuple", ""))
+    extension = str(getattr(fmpy_module, "sharedLibraryExtension", ""))
+    if not platform_tuple or not extension:
+        raise RuntimeError("FMPy does not expose its platform tuple or library extension.")
+
+    package_dir = Path(next(iter(spec.submodule_search_locations)))
+    source_dir = package_dir / "sundials" / platform_tuple
+    binaries = sorted(source_dir.glob(f"*{extension}"))
+    if not binaries:
+        raise RuntimeError(f"No FMPy SUNDIALS binaries found in {source_dir}.")
+
+    destination = f"fmpy/sundials/{platform_tuple}"
+    for binary in binaries:
+        command.extend(["--add-binary", f"{binary}{os.pathsep}{destination}"])
 
 
 def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> list[str]:
@@ -89,6 +113,7 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
     for module_name in BINARY_BUNDLED_MODULES:
         if importlib.util.find_spec(module_name) is not None:
             command.extend(["--collect-binaries", module_name])
+    add_fmpy_sundials_binaries(command)
     if icon_path.exists():
         command.extend(["--icon", str(icon_path)])
     if backend == "qt":
