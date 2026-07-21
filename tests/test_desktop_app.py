@@ -509,6 +509,8 @@ def test_qt_desktop_full_smoke_verifies_bundled_research_engines() -> None:
     assert 'cat "$HOME/.local/state/iints-af-desktop/desktop.log"' in workflow
     assert "libxkbcommon-x11-0" in workflow
     assert '--backend qt --console --name "${APP_NAME}"' in workflow
+    assert "https://download.pytorch.org/whl/cpu" in workflow
+    assert "torch.version.cuda is None" in workflow
 
 
 def test_cocoa_desktop_app_is_macos_packaging_backend() -> None:
