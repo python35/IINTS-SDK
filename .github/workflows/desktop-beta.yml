@@ -60,7 +60,32 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0
+          sudo apt-get install -y \
+            libdbus-1-3 \
+            libegl1 \
+            libfontconfig1 \
+            libfreetype6 \
+            libglib2.0-0 \
+            libnss3 \
+            libopengl0 \
+            libx11-xcb1 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxdamage1 \
+            libxi6 \
+            libxkbcommon0 \
+            libxkbcommon-x11-0 \
+            libxrandr2 \
+            libxrender1 \
+            libxtst6 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-xfixes0 \
+            libxcb-xinerama0
 
       - name: Install desktop dependencies
         shell: bash
@@ -101,7 +126,19 @@ jobs:
           set -euo pipefail
           exe="dist/${APP_NAME}"
           echo "Smoke testing: $exe"
-          "$exe" --smoke-full
+          set +e
+          "$exe" --smoke-full 2>&1 | tee linux-smoke.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$status" -ne 0 ]]; then
+            echo "---- Linux smoke output ----"
+            cat linux-smoke.log || true
+            echo "---- IINTS desktop startup log ----"
+            cat "$HOME/.local/state/iints-af-desktop/desktop.log" || true
+            summary="$(tail -c 3500 linux-smoke.log | tr '\n' ' ' | sed 's/%/%25/g; s/\r/%0D/g; s/\n/%0A/g')"
+            echo "::error title=Linux desktop smoke failed::${summary:-No console traceback was captured; inspect the uploaded debug artifact.}"
+            exit "$status"
+          fi
 
       - name: Smoke test bundled app on macOS
         if: runner.os == 'macOS'
@@ -272,6 +309,12 @@ jobs:
             echo
             echo "macos smoke log:"
             cat macos-smoke.log 2>/dev/null || true
+            echo
+            echo "linux smoke log:"
+            cat linux-smoke.log 2>/dev/null || true
+            echo
+            echo "linux desktop startup log:"
+            cat "$HOME/.local/state/iints-af-desktop/desktop.log" 2>/dev/null || true
           } > "desktop-debug/desktop-build-debug-${{ matrix.platform_label }}.txt"
 
       - name: Upload desktop artifact
