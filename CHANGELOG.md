@@ -32,8 +32,8 @@ Release date: 2026-07-21
 
 ### Verified
 
-- full test suite: `754 passed, 2 skipped`
-- mypy: `Success: no issues found in 228 source files`
+- full test suite: `763 passed, 2 skipped`
+- mypy: `Success: no issues found in 229 source files`
 - Rust/Tauri tests: `3 passed`; frontend checks passed
 - strict docs, wheel/sdist, frozen Qt `--smoke-full`, and verified macOS DMG passed
 
