@@ -458,7 +458,9 @@ def test_qt_app_avoids_embedded_webengine_on_macos_and_logs_startup() -> None:
     assert 'if sys.platform != "darwin"' in build_source
     assert "PySide6" in build_source
     assert 'OPTIONAL_BUNDLED_MODULES = ("plotly.graph_objects", "roadrunner", "fmpy")' in build_source
+    assert 'BINARY_BUNDLED_MODULES = ("fmpy", "roadrunner")' in build_source
     assert 'command.extend(["--hidden-import", module_name])' in build_source
+    assert 'command.extend(["--collect-binaries", module_name])' in build_source
     assert "ENTRYPOINTS" in build_source
     assert '"cocoa": REPO_ROOT / "src" / "iints_desktop" / "cocoa_app.py"' in build_source
     assert '"tk": REPO_ROOT / "src" / "iints_desktop" / "app.py"' in build_source

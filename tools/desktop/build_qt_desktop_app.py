@@ -21,6 +21,7 @@ ICON_ASSETS = {
     "default": REPO_ROOT / "src" / "iints_desktop" / "assets" / "app_icon.png",
 }
 OPTIONAL_BUNDLED_MODULES = ("plotly.graph_objects", "roadrunner", "fmpy")
+BINARY_BUNDLED_MODULES = ("fmpy", "roadrunner")
 
 
 def require_module(module_name: str, install_hint: str) -> None:
@@ -81,6 +82,13 @@ def build_command(*, backend: str, onefile: bool, windowed: bool, name: str) -> 
     for module_name in OPTIONAL_BUNDLED_MODULES:
         if importlib.util.find_spec(module_name) is not None:
             command.extend(["--hidden-import", module_name])
+    # FMPy and libRoadRunner load nested native libraries at runtime. Their
+    # Linux shared objects are not always discovered from Python imports, so
+    # preserve the package-relative binary paths explicitly. This is also
+    # harmless on Windows and macOS and keeps all platform bundles symmetric.
+    for module_name in BINARY_BUNDLED_MODULES:
+        if importlib.util.find_spec(module_name) is not None:
+            command.extend(["--collect-binaries", module_name])
     if icon_path.exists():
         command.extend(["--icon", str(icon_path)])
     if backend == "qt":
