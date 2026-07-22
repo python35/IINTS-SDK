@@ -15,6 +15,8 @@ Local AI output is advisory and cannot replace deterministic SDK results.
 
 Research only. Not a medical device.
 
+User documentation: [Research Workbench User Guide](../../docs/RESEARCH_WORKBENCH_GUIDE.md)
+
 ## Run Locally
 
 From the repository root:
@@ -52,16 +54,18 @@ The native `.icns`, `.ico`, and PNG bundle icons are generated from the official
 python scripts/build-brand-icons.py
 ```
 
-The complete logo is used for the native application icon. The compact sidebar mark is a crop from
-the same source artwork; it is not a separate or AI-generated logo.
+The complete logo is used for the native application icon. Inside the workbench, the sidebar uses
+the text-only `IINTS-AF` name so the application identity stays legible at every window size.
 
 ## Current Scope
 
 - Navigate between compact Overview, Runs, Results, Reproducibility, Local AI, Research Labs,
-  and Evidence workspaces.
+  Evidence, and Settings workspaces.
+- Save non-sensitive local defaults for output location, deterministic seed, Ollama model/host,
+  and startup diagnostics.
 - Load SDK version/status.
-- Show SDK/app update information, copy the fixed SDK update command, open app downloads/docs,
-  and launch a fixed update terminal.
+- Show SDK/app update information, copy the fixed SDK update command, open the stable Tauri app
+  release and documentation, and launch a fixed update terminal.
 - Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.

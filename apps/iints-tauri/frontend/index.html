@@ -5,40 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-5" />
   </head>
   <body>
+    <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
     <div class="app-shell">
       <aside class="app-sidebar">
         <div class="brand-block">
-          <img class="brand-mark" src="./app-mark.png" alt="" width="48" height="48" />
-          <div>
-            <p class="brand-kicker">IINTS-AF</p>
-            <p class="brand-name">Research Workbench</p>
-          </div>
+          <span class="brand-wordmark">IINTS-AF</span>
         </div>
 
         <nav class="workspace-nav" aria-label="Research workbench modules">
+          <p class="nav-section-label">Core workflow</p>
           <button class="nav-item is-active" data-view="overview" aria-current="page">
-            <span class="nav-index">01</span><span>Overview</span>
+            <span>Overview</span>
           </button>
           <button class="nav-item" data-view="run">
-            <span class="nav-index">02</span><span>Protocols &amp; runs</span>
+            <span>Run protocols</span>
           </button>
           <button class="nav-item" data-view="results">
-            <span class="nav-index">03</span><span>Results</span>
+            <span>Inspect results</span>
           </button>
           <button class="nav-item" data-view="reproducibility">
-            <span class="nav-index">04</span><span>Reproducibility</span>
+            <span>Reproducibility</span>
           </button>
+          <p class="nav-section-label nav-section-secondary">Interpretation</p>
           <button class="nav-item" data-view="ai">
-            <span class="nav-index">05</span><span>Local AI</span>
+            <span>Local AI review</span>
           </button>
           <button class="nav-item" data-view="research">
-            <span class="nav-index">06</span><span>Research labs</span>
+            <span>Research tools</span>
           </button>
           <button class="nav-item" data-view="evidence">
-            <span class="nav-index">07</span><span>Evidence</span>
+            <span>Evidence sources</span>
+          </button>
+          <p class="nav-section-label nav-section-secondary">Application</p>
+          <button class="nav-item" data-view="settings">
+            <span>Settings</span>
           </button>
         </nav>
 
@@ -54,59 +57,159 @@
             <p class="eyebrow" id="view-eyebrow">Workspace</p>
             <h1 id="view-title">System overview</h1>
             <p class="subtitle" id="view-description">
-              Check the local SDK, output location, and update state before starting an experiment.
+              Check the local research engine and optional tooling before starting an experiment.
             </p>
           </div>
           <div class="header-status" aria-live="polite">
-            <span class="status-chip">Local research environment</span>
-            <span id="sdk-status">Python bridge not checked yet.</span>
+            <span class="status-label">Python research engine</span>
+            <span class="status-line"><span class="status-dot" id="sdk-status-dot" aria-hidden="true"></span><span id="sdk-status">Not checked yet</span></span>
+            <button id="guide-btn" class="text-button">User guide</button>
           </div>
         </header>
 
     <main class="layout" id="workspace-content">
       <section class="panel diagnostics-panel" data-view-panel="overview">
         <div class="panel-heading">
-          <p class="eyebrow">System</p>
-          <h2>Workbench readiness</h2>
+          <div>
+            <h2>Environment readiness</h2>
+          </div>
+          <p>Verify the scientific engine before running work.</p>
         </div>
         <div class="button-row">
-          <button id="diagnostics-btn">Run diagnostics</button>
-          <button id="open-output-btn">Open output folder</button>
+          <button id="diagnostics-btn" class="primary">Run diagnostics</button>
+          <button id="open-output-btn">Open default output folder</button>
         </div>
         <div id="diagnostics-grid" class="diagnostics-grid" aria-live="polite"></div>
       </section>
 
-      <section class="panel update-panel" data-view-panel="overview">
+      <section class="panel settings-general-panel" data-view-panel="settings" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Maintenance</p>
-          <h2>Updates</h2>
+          <div>
+            <h2>Workbench preferences</h2>
+          </div>
+          <p>Saved locally on this device. No credentials or patient data are stored.</p>
         </div>
-        <p class="muted">
-          Keep the Python SDK and desktop app current. The app can show the exact SDK update command,
-          copy it, or open a fixed update terminal; app bundle updates still come from GitHub releases.
-        </p>
+        <div class="settings-fields">
+          <label class="wide-field">
+            Default output folder
+            <input id="settings-output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" />
+          </label>
+          <label>
+            Default deterministic seed
+            <input id="settings-seed" type="number" min="0" max="2147483647" value="42" />
+          </label>
+          <label>
+            Default Ollama model
+            <input id="settings-ai-model" value="ministral-3:8b" spellcheck="false" />
+          </label>
+          <label class="wide-field">
+            Local Ollama host
+            <input id="settings-ai-host" value="http://127.0.0.1:11434" spellcheck="false" />
+          </label>
+        </div>
+        <label class="checkbox-field">
+          <input id="settings-auto-diagnostics" type="checkbox" checked />
+          <span>Run environment diagnostics when the application starts.</span>
+        </label>
         <div class="button-row">
-          <button id="update-refresh-btn">Check update info</button>
-          <button id="update-download-btn">Open app downloads</button>
-          <button id="update-docs-btn">Open update docs</button>
-          <button id="update-copy-btn">Copy SDK update command</button>
-          <button id="update-terminal-btn" class="primary">Open SDK update terminal</button>
+          <button id="settings-save-btn" class="primary">Save settings</button>
+          <button id="settings-reset-btn">Restore defaults</button>
         </div>
-        <pre id="update-status" class="status-box compact">Update info not checked yet.</pre>
+        <pre id="settings-status" class="status-box compact" aria-live="polite">Settings have not been changed.</pre>
+      </section>
+
+      <section class="panel update-panel" data-view-panel="settings" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2>Software maintenance</h2>
+          </div>
+          <p>The native app and Python research engine are updated separately.</p>
+        </div>
+        <div class="version-summary" aria-live="polite">
+          <div>
+            <span>Desktop application</span>
+            <strong id="settings-app-version">Checking...</strong>
+            <small id="settings-app-platform">Native Rust/Tauri shell</small>
+          </div>
+          <div>
+            <span>Python research engine</span>
+            <strong id="settings-sdk-version">Checking...</strong>
+            <small id="settings-python-path">Python path not checked</small>
+          </div>
+        </div>
+        <div class="update-actions">
+          <div class="action-cluster">
+            <span class="action-label">Installed software</span>
+            <div class="button-row">
+              <button id="update-refresh-btn">Refresh versions</button>
+              <button id="update-terminal-btn" class="primary">Update Python SDK</button>
+            </div>
+          </div>
+          <div class="action-cluster action-cluster-resources">
+            <span class="action-label">Desktop application</span>
+            <div class="button-row">
+              <button id="update-download-btn" class="quiet">Download latest app update</button>
+              <button id="update-docs-btn" class="quiet">Read update instructions</button>
+            </div>
+          </div>
+        </div>
+        <div class="code-panel">
+          <div class="code-panel-header">
+            <span>Installed environment and update command</span>
+            <button id="update-copy-btn" class="copy-action" title="Copy SDK update command" aria-label="Copy SDK update command">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 2.5h7.5v9H11v2H3.5v-9H5v-2Zm1.5 2h4.5V4H6.5v.5ZM5 6H5v6h4.5v-.5H5V6Zm1.5 0v4h4.5V6H6.5Z"/></svg>
+              <span>Copy</span>
+            </button>
+          </div>
+          <pre id="update-status" class="status-box compact">Update info not checked yet.</pre>
+        </div>
+      </section>
+
+      <section class="panel settings-help-panel" data-view-panel="settings" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2>Help and documentation</h2>
+          </div>
+          <p>Open maintained documentation in your default browser.</p>
+        </div>
+        <div class="help-link-grid">
+          <button id="settings-guide-btn">
+            <strong>User guide</strong>
+            <span>Step-by-step workbench instructions with screenshots.</span>
+          </button>
+          <button id="settings-install-guide-btn">
+            <strong>Installation guide</strong>
+            <span>Platform installers, signing information, and troubleshooting.</span>
+          </button>
+          <button id="settings-docs-btn">
+            <strong>SDK documentation</strong>
+            <span>Commands, scientific methods, reports, and research workflows.</span>
+          </button>
+          <button id="settings-website-btn">
+            <strong>IINTS website</strong>
+            <span>Project overview and public information.</span>
+          </button>
+        </div>
       </section>
 
       <section class="panel protocol-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 1</p>
-          <h2>Choose protocol</h2>
+          <div>
+            <h2>Select a protocol</h2>
+          </div>
+          <p>Protocols fix the scenario and expected output type.</p>
         </div>
-        <div id="workflow-list" class="workflow-list" aria-live="polite"></div>
+        <div id="workflow-list" class="workflow-list" aria-live="polite">
+          <p class="empty-state">Loading available protocols...</p>
+        </div>
       </section>
 
       <section class="panel run-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 2</p>
-          <h2>Run through Python SDK</h2>
+          <div>
+            <h2>Configure and run</h2>
+          </div>
+          <p>The seed makes repeated runs deterministic.</p>
         </div>
         <div class="field-grid">
           <label>
@@ -119,43 +222,62 @@
           </label>
         </div>
         <div class="button-row">
-          <button id="run-btn" class="primary">Run selected workflow</button>
+          <button id="run-btn" class="primary">Run selected protocol</button>
           <button id="refresh-btn">Refresh protocols</button>
           <button id="history-btn">Load run history</button>
-          <button id="open-run-folder-btn">Open latest run folder</button>
-          <button id="open-report-btn">Open latest report</button>
+          <button id="open-run-folder-btn">Open run folder</button>
+          <button id="open-report-btn">Open report</button>
         </div>
-        <pre id="run-status" class="status-box">Workbench loading...</pre>
+        <pre id="run-status" class="status-box" aria-live="polite">Workbench loading...</pre>
       </section>
 
       <section class="panel history-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Evidence</p>
-          <h2>Run history</h2>
+          <div>
+            <h2>Run history</h2>
+          </div>
+          <p>Recent runs in the selected output folder.</p>
         </div>
         <div id="history-list" class="history-list" aria-live="polite"></div>
       </section>
 
       <section class="panel results-panel" data-view-panel="results" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 3</p>
-          <h2>Results preview</h2>
+          <div>
+            <h2>Load a result file</h2>
+          </div>
+          <p>Preview is read-only and does not change the CSV.</p>
         </div>
-        <div class="field-grid">
+        <div class="path-action-row">
           <label>
             Results CSV
             <input id="csv-path" placeholder="Run a workflow or paste a results.csv path" spellcheck="false" />
           </label>
-          <button id="preview-btn">Preview CSV</button>
+          <button id="preview-btn" class="primary">Load preview</button>
         </div>
         <div class="button-row">
-          <button id="mdmp-btn">Create MDMP certificate</button>
           <button id="open-csv-btn">Open CSV</button>
+          <button id="mdmp-btn">Create MDMP certificate</button>
           <button id="open-certificate-btn">Open certificate</button>
         </div>
+        <pre id="results-status" class="status-box compact" aria-live="polite">No result file loaded.</pre>
         <pre id="mdmp-status" class="status-box compact">No MDMP certificate generated yet.</pre>
+        <div class="subsection-heading">
+          <h3>Summary metrics</h3>
+          <span>Calculated from the loaded preview</span>
+        </div>
         <div id="metrics" class="metrics"></div>
-        <svg id="glucose-chart" viewBox="0 0 700 260" role="img" aria-label="Glucose chart"></svg>
+        <div class="subsection-heading">
+          <h3>Glucose trajectory</h3>
+          <span>Research preview, mg/dL</span>
+        </div>
+        <svg id="glucose-chart" viewBox="0 0 700 260" role="img" aria-label="Glucose chart">
+          <text x="24" y="40">Load a results CSV to display the glucose trajectory.</text>
+        </svg>
+        <div class="subsection-heading">
+          <h3>Tabular preview</h3>
+          <span>First bounded rows only</span>
+        </div>
         <div class="table-wrap">
           <table id="preview-table"></table>
         </div>
@@ -163,8 +285,10 @@
 
       <section class="panel academic-panel" data-view-panel="reproducibility" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 4</p>
-          <h2>Reproducibility package</h2>
+          <div>
+            <h2>Reproducibility package</h2>
+          </div>
+          <p>Checksums, provenance, selected sources, and review notes.</p>
         </div>
         <p class="muted">
           Add a FAIR-oriented RO-Crate metadata file, checksums, selected evidence sources, and a
@@ -208,13 +332,16 @@
 
       <section class="panel ai-panel" data-view-panel="ai" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 5</p>
-          <h2>Local AI analysis</h2>
+          <div>
+            <h2>Local AI interpretation</h2>
+          </div>
+          <p>AI may summarize results; deterministic metrics remain authoritative.</p>
         </div>
         <div class="field-grid">
           <label>
             Ollama model
-            <input id="ai-model" value="ministral-3:8b" spellcheck="false" />
+            <input id="ai-model" list="ai-model-options" value="ministral-3:8b" spellcheck="false" />
+            <datalist id="ai-model-options"></datalist>
           </label>
           <label>
             Host
@@ -222,25 +349,28 @@
           </label>
         </div>
         <div class="button-row">
-          <button id="ai-start-btn" class="primary">Start Local AI</button>
-          <button id="ai-check-btn">Check local AI</button>
-          <button id="ai-models-btn">List installed models</button>
+          <button id="ai-start-btn" class="primary">Start local AI</button>
+          <button id="ai-check-btn">Check connection</button>
+          <button id="ai-models-btn">Refresh model list</button>
         </div>
-        <pre id="ai-status" class="status-box">Local AI not checked yet.</pre>
+        <pre id="ai-status" class="status-box compact" aria-live="polite">Local AI not checked yet.</pre>
         <label class="wide-field">
-          Ask about the loaded result
+          Research question
           <textarea id="ai-question" rows="4" spellcheck="true">Summarize the run quality, physiological realism, safety concerns, and what should be checked next.</textarea>
         </label>
+        <p id="ai-context" class="context-line">No result CSV is currently attached to the question.</p>
         <div class="button-row">
-          <button id="ai-ask-btn">Analyze current CSV</button>
+          <button id="ai-ask-btn" class="primary">Analyze loaded result</button>
         </div>
-        <pre id="ai-answer" class="status-box ai-answer">AI answer will appear here after analysis.</pre>
+        <div id="ai-answer" class="ai-answer" aria-live="polite">AI answer will appear here after analysis.</div>
       </section>
 
       <section class="panel biology-panel" data-view-panel="research" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 6</p>
-          <h2>Biology & algorithm stressors</h2>
+          <div>
+            <h2>Biology and algorithm stressors</h2>
+          </div>
+          <p>Evidence layers stay separate from physiological calibration.</p>
         </div>
         <div class="button-row">
           <button id="molecule-refresh-btn">Load molecule assets</button>
@@ -480,8 +610,10 @@
 
       <section class="panel evidence-panel" data-view-panel="evidence" hidden>
         <div class="panel-heading">
-          <p class="eyebrow">Step 7</p>
-          <h2>Evidence connectors</h2>
+          <div>
+            <h2>Evidence connectors</h2>
+          </div>
+          <p>Official resources with explicit integration status.</p>
         </div>
         <p class="muted">
           Curated research resources and standards for structures, variants, pathways, expression,
@@ -503,6 +635,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js"></script>
+    <script type="module" src="./main.js?v=workbench-5"></script>
   </body>
 </html>

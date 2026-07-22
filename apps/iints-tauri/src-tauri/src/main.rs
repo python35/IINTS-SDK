@@ -159,6 +159,18 @@ async fn desktop_status() -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn desktop_app_info() -> Value {
+    json!({
+        "app_version": env!("CARGO_PKG_VERSION"),
+        "product_name": "IINTS-AF Research Workbench",
+        "platform": env::consts::OS,
+        "architecture": env::consts::ARCH,
+        "release_url": "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest",
+        "guide_url": "https://python35.github.io/IINTS-SDK/RESEARCH_WORKBENCH_GUIDE/"
+    })
+}
+
+#[tauri::command]
 async fn list_workflows() -> Result<Value, String> {
     run_python_bridge_async(vec!["workflows".to_string()]).await
 }
@@ -842,6 +854,8 @@ fn validate_external_url(raw: &str) -> Result<(), String> {
         "developers.zenodo.org",
         "github.com",
         "python35.github.io",
+        "iints.org",
+        "www.iints.org",
     ];
     if ALLOWED_EXTERNAL_HOSTS.contains(&host.as_str()) {
         Ok(())
@@ -1120,6 +1134,7 @@ fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             desktop_status,
+            desktop_app_info,
             list_workflows,
             desktop_diagnostics,
             desktop_update_info,
@@ -1167,9 +1182,20 @@ mod tests {
         assert!(validate_external_url("https://www.bindingdb.org/rwd/bind/index.jsp").is_ok());
         assert!(validate_external_url("https://www.researchobject.org/ro-crate/").is_ok());
         assert!(validate_external_url("https://sed-ml.org/").is_ok());
+        assert!(validate_external_url("https://iints.org/").is_ok());
         assert!(validate_external_url("http://alphafold.ebi.ac.uk/entry/P01308").is_err());
         assert!(validate_external_url("https://alphafold.ebi.ac.uk.example.com/").is_err());
         assert!(validate_external_url("https://user@alphafold.ebi.ac.uk/").is_err());
+    }
+
+    #[test]
+    fn desktop_app_info_uses_the_stable_tauri_release_channel() {
+        let info = desktop_app_info();
+        assert_eq!(info["app_version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            info["release_url"],
+            "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest"
+        );
     }
 
     #[test]

@@ -36,6 +36,11 @@ python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
 
 COPASI, OpenCOR, Ollama, and model files remain optional external research tools. They are detected explicitly rather than installed silently.
 
+The **Settings** workspace keeps maintenance separate from experiments. It stores only local,
+non-sensitive defaults, reports the native app and Python SDK versions independently, opens a
+fixed SDK update command in a visible terminal, and links to the stable desktop installer release.
+It does not store credentials or silently replace the running executable.
+
 ### macOS integrity and Gatekeeper
 
 Every macOS beta is signed as one complete app bundle and then checked from inside the generated DMG with Apple's strict `codesign` verifier. When no Apple Developer ID is configured, CI uses an ad-hoc signature. This fixes the invalid partial-bundle state that macOS reports as **"the app is damaged"**.
@@ -131,7 +136,8 @@ The workbench intentionally avoids:
 - automatic self-update logic
 - arbitrary Python execution from the UI
 
-Hardening roadmap:
+The current Settings panel opens the signed stable release for explicit installation rather than
+using an automatic self-updater. Hardening roadmap:
 
 - Add signed Tauri updater after release signing is stable.
 - Use a dedicated app data directory for outputs.

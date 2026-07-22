@@ -274,7 +274,9 @@ jobs:
           cat > tauri-beta-release-notes.md <<'EOF'
           # IINTS-AF Research Workbench — Rust/Tauri Beta
 
-          This prerelease contains the native Rust/Tauri research workbench with the official IINTS-SDK identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
+          This prerelease contains the native Rust/Tauri research workbench with a restrained text-only IINTS-AF identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
+
+          The new Settings workspace stores non-sensitive local defaults, reports app and Python SDK versions independently, opens a fixed SDK update command in a visible terminal, links to the stable app installers, and provides direct access to the maintained user and installation guides.
 
           ## Downloads
 

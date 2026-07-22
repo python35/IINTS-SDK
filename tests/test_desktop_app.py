@@ -659,7 +659,7 @@ def test_tauri_app_has_academic_navigation_and_platform_icons() -> None:
     frontend_css = (app_root / "frontend/styles.css").read_text(encoding="utf-8")
     config = json.loads((app_root / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
 
-    views = {"overview", "run", "results", "reproducibility", "ai", "research", "evidence"}
+    views = {"overview", "run", "results", "reproducibility", "ai", "research", "evidence", "settings"}
     assert all(f'data-view="{view}"' in frontend for view in views)
     assert all(f'data-view-panel="{view}"' in frontend for view in views)
     assert "VIEW_METADATA" in frontend_js
@@ -673,6 +673,59 @@ def test_tauri_app_has_academic_navigation_and_platform_icons() -> None:
     assert (app_root / "src-tauri/icons/icon-source.png").is_file()
     assert (app_root / "frontend/app-mark.png").is_file()
     assert (app_root / "frontend/iints-logo.png").is_file()
+
+
+def test_tauri_workbench_is_sober_responsive_and_documented() -> None:
+    app_root = Path("apps/iints-tauri")
+    frontend = (app_root / "frontend/index.html").read_text(encoding="utf-8")
+    frontend_js = (app_root / "frontend/main.js").read_text(encoding="utf-8")
+    frontend_css = (app_root / "frontend/styles.css").read_text(encoding="utf-8")
+    tauri_config = json.loads((app_root / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
+    guide = Path("docs/RESEARCH_WORKBENCH_GUIDE.md").read_text(encoding="utf-8")
+
+    assert "skip-link" in frontend
+    assert "guide-btn" in frontend
+    assert "results-status" in frontend
+    assert "ai-model-options" in frontend
+    assert "renderAiAnswer" in frontend_js
+    assert "appendReadableText" in frontend_js
+    assert "initializeNativeInteractionPolicy" in frontend_js
+    assert '"contextmenu"' in frontend_js
+    assert 'renderMode = "immediate"' in frontend_js
+    assert 'behavior: "smooth"' not in frontend_js
+    assert "section-number" not in frontend
+    assert '<span class="brand-wordmark">IINTS-AF</span>' in frontend
+    assert "workbench-mark.svg" not in frontend
+    assert not (app_root / "frontend/workbench-mark.svg").exists()
+    assert "settings-save-btn" in frontend
+    assert "settings-guide-btn" in frontend
+    assert "SETTINGS_STORAGE_KEY" in frontend_js
+    assert "isAllowedLocalAiHost" in frontend_js
+    assert "desktop_app_info" in frontend_js
+    assert "tauri-beta-latest" in frontend_js
+    assert "fn desktop_app_info" in (app_root / "src-tauri/src/main.rs").read_text(encoding="utf-8")
+    assert "code-panel-header" in frontend
+    assert "diagnostic-state::before" in frontend_css
+    assert "user-select: none" in frontend_css
+    assert "user-select: text" in frontend_css
+    assert "linear-gradient" not in frontend_css
+    assert "box-shadow: var(--shadow)" not in frontend_css
+    assert "@media (max-width: 1040px)" in frontend_css
+    assert "@media (max-width: 520px)" in frontend_css
+    assert "overflow-x: auto" in frontend_css
+    assert all(window.get("devtools") is False for window in tauri_config["app"]["windows"])
+    assert "documentation fixture" in guide
+
+    screenshots = [
+        "01-overview.png",
+        "02-run-protocol.png",
+        "03-results.png",
+        "04-local-ai.png",
+        "05-reproducibility.png",
+        "06-research-tools.png",
+        "07-settings.png",
+    ]
+    assert all((Path("docs/assets/workbench") / name).is_file() for name in screenshots)
 
 
 def test_tauri_beta_workflow_builds_native_installers_with_stable_links() -> None:

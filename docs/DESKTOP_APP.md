@@ -4,6 +4,8 @@ The IINTS-AF desktop app is a graphical workbench for the same Python SDK used b
 
 The app does not contain a second physiology or safety engine.
 
+For a visual, step-by-step walkthrough, start with the [Research Workbench User Guide](RESEARCH_WORKBENCH_GUIDE.md).
+
 ```mermaid
 flowchart LR
     A["Desktop interface"] --> B["Audited app bridge"]

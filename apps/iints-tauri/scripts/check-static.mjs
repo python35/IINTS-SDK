@@ -29,6 +29,8 @@ for (const file of required) {
 
 const html = readFileSync(join(appRoot, "frontend/index.html"), "utf8");
 const script = readFileSync(join(appRoot, "frontend/main.js"), "utf8");
+const styles = readFileSync(join(appRoot, "frontend/styles.css"), "utf8");
+const tauriConfig = JSON.parse(readFileSync(join(appRoot, "src-tauri/tauri.conf.json"), "utf8"));
 if (!html.includes("Research only") || !html.includes("Not a medical device")) {
   console.error("frontend/index.html must contain the research-only disclaimer.");
   process.exit(1);
@@ -36,6 +38,65 @@ if (!html.includes("Research only") || !html.includes("Not a medical device")) {
 
 if (!html.includes("Reproducibility package") || !html.includes("academic-export-btn")) {
   console.error("frontend/index.html must expose the academic reproducibility package.");
+  process.exit(1);
+}
+
+if (!html.includes("skip-link") || !html.includes("guide-btn") || !html.includes("results-status")) {
+  console.error("frontend/index.html must expose accessible navigation, the user guide, and visible result status.");
+  process.exit(1);
+}
+
+if (!html.includes("ai-model-options") || !script.includes("renderAiAnswer")) {
+  console.error("The local AI workspace must expose model choices and readable structured output.");
+  process.exit(1);
+}
+
+if (styles.includes("linear-gradient") || styles.includes("box-shadow: var(--shadow)")) {
+  console.error("The academic workbench must avoid decorative gradients and card shadows.");
+  process.exit(1);
+}
+
+if (
+  html.includes("section-number")
+  || html.includes("workbench-mark.svg")
+  || !html.includes('<span class="brand-wordmark">IINTS-AF</span>')
+  || !html.includes("code-panel-header")
+) {
+  console.error("The workbench must use text-only IINTS-AF branding and structured code panels without decorative numbering.");
+  process.exit(1);
+}
+
+if (
+  !html.includes('data-view="settings"')
+  || !html.includes('data-view-panel="settings"')
+  || !html.includes("settings-save-btn")
+  || !html.includes("settings-guide-btn")
+  || !script.includes("SETTINGS_STORAGE_KEY")
+  || !script.includes("isAllowedLocalAiHost")
+  || !script.includes("desktop_app_info")
+  || !script.includes("tauri-beta-latest")
+) {
+  console.error("The workbench must expose persistent local settings, documentation, and safe app/SDK maintenance actions.");
+  process.exit(1);
+}
+
+if (!styles.includes("user-select: none") || !styles.includes("user-select: text")) {
+  console.error("The native shell must disable accidental selection while keeping research output copyable.");
+  process.exit(1);
+}
+
+if (!script.includes("initializeNativeInteractionPolicy") || !script.includes('"contextmenu"')) {
+  console.error("The native shell must suppress the browser context menu outside copyable research output.");
+  process.exit(1);
+}
+
+if (!script.includes('renderMode = "immediate"') || script.includes('behavior: "smooth"')) {
+  console.error("Scientific plots and navigation must render immediately without decorative motion.");
+  process.exit(1);
+}
+
+if (tauriConfig.app?.windows?.some((window) => window.devtools !== false)) {
+  console.error("Production desktop windows must not expose embedded browser developer tools.");
   process.exit(1);
 }
 
@@ -64,7 +125,7 @@ if (!html.includes("FMI does not sandbox native code or OS access")) {
   process.exit(1);
 }
 
-for (const view of ["overview", "run", "results", "reproducibility", "ai", "research", "evidence"]) {
+for (const view of ["overview", "run", "results", "reproducibility", "ai", "research", "evidence", "settings"]) {
   if (!html.includes(`data-view="${view}"`) || !html.includes(`data-view-panel="${view}"`)) {
     console.error(`Missing navigation or panel mapping for ${view}.`);
     process.exit(1);

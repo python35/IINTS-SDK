@@ -1,5 +1,17 @@
 const tauriCore = window.__TAURI__?.core;
 const invoke = tauriCore?.invoke;
+const isNativeDesktop = typeof invoke === "function";
+const COPYABLE_CONTEXT_SELECTOR = [
+  "input",
+  "textarea",
+  "pre",
+  "code",
+  "table",
+  ".metric strong",
+  ".status-box",
+  ".ai-answer",
+  "[data-copyable]"
+].join(", ");
 
 let selectedWorkflow = null;
 let workflows = [];
@@ -17,6 +29,17 @@ let lastCopasi = null;
 let lastCellml = null;
 let lastFmi = null;
 let lastBinding = null;
+let appInfo = null;
+
+const SETTINGS_STORAGE_KEY = "iints-af.workbench.settings.v1";
+const DEFAULT_SETTINGS = Object.freeze({
+  outputDir: "~/IINTS-Tauri-Runs",
+  seed: 42,
+  aiModel: "ministral-3:8b",
+  aiHost: "http://127.0.0.1:11434",
+  autoDiagnostics: true
+});
+let workbenchSettings = { ...DEFAULT_SETTINGS };
 
 const $ = (id) => document.getElementById(id);
 
@@ -24,7 +47,12 @@ const VIEW_METADATA = {
   overview: {
     eyebrow: "Workspace",
     title: "System overview",
-    description: "Check the local SDK, output location, and update state before starting an experiment."
+    description: "Check the local research engine and optional tooling before starting an experiment."
+  },
+  settings: {
+    eyebrow: "Application",
+    title: "Settings",
+    description: "Configure local defaults, maintain the SDK and desktop app, and open documentation."
   },
   run: {
     eyebrow: "Experiment",
@@ -65,10 +93,14 @@ async function loadViewData(view) {
   loadedViews.add(view);
   if (view === "run") {
     await Promise.allSettled([loadWorkflows(), loadHistory()]);
+  } else if (view === "ai") {
+    await listAiModels();
   } else if (view === "research") {
     await Promise.allSettled([loadMolecules(), loadMechanisticStatus(), loadCrossScaleStatus()]);
   } else if (view === "evidence") {
     await loadEvidenceConnectors();
+  } else if (view === "settings") {
+    await Promise.allSettled([loadUpdateInfo(), loadAppInfo()]);
   }
 }
 
@@ -94,7 +126,7 @@ function setActiveView(view, focusHeading = true) {
   setText("view-description", metadata.description);
   document.title = `${metadata.title} | IINTS-AF`;
   if (focusHeading) {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: "auto" });
   }
   void loadViewData(view);
 }
@@ -104,6 +136,24 @@ function initializeNavigation() {
     button.addEventListener("click", () => setActiveView(button.dataset.view));
   });
   setActiveView("overview", false);
+}
+
+function initializeNativeInteractionPolicy() {
+  document.documentElement.classList.toggle("native-desktop", isNativeDesktop);
+  if (!isNativeDesktop) return;
+
+  document.addEventListener("contextmenu", (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest(COPYABLE_CONTEXT_SELECTOR)) return;
+    event.preventDefault();
+  });
+
+  document.addEventListener("dragstart", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLImageElement || target instanceof HTMLButtonElement) {
+      event.preventDefault();
+    }
+  });
 }
 
 function setText(id, value) {
@@ -118,9 +168,111 @@ function errorMessage(error) {
   return String(error).replace(/^Error:\s*/i, "").trim();
 }
 
+function readStoredSettings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) || "{}");
+    return {
+      outputDir: typeof stored.outputDir === "string" && stored.outputDir.trim()
+        ? stored.outputDir.trim()
+        : DEFAULT_SETTINGS.outputDir,
+      seed: Number.isInteger(stored.seed) && stored.seed >= 0 && stored.seed <= 2147483647
+        ? stored.seed
+        : DEFAULT_SETTINGS.seed,
+      aiModel: typeof stored.aiModel === "string" && stored.aiModel.trim()
+        ? stored.aiModel.trim()
+        : DEFAULT_SETTINGS.aiModel,
+      aiHost: isAllowedLocalAiHost(stored.aiHost) ? stored.aiHost : DEFAULT_SETTINGS.aiHost,
+      autoDiagnostics: typeof stored.autoDiagnostics === "boolean"
+        ? stored.autoDiagnostics
+        : DEFAULT_SETTINGS.autoDiagnostics
+    };
+  } catch (_error) {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
+function isAllowedLocalAiHost(value) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    const localHosts = new Set(["127.0.0.1", "localhost", "[::1]"]);
+    return ["http:", "https:"].includes(url.protocol)
+      && localHosts.has(url.hostname)
+      && !url.username
+      && !url.password
+      && (url.pathname === "" || url.pathname === "/")
+      && !url.search
+      && !url.hash;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function applyWorkbenchSettings(settings) {
+  workbenchSettings = { ...settings };
+  $("output-dir").value = settings.outputDir;
+  $("seed").value = String(settings.seed);
+  $("ai-model").value = settings.aiModel;
+  $("ai-host").value = settings.aiHost;
+  $("settings-output-dir").value = settings.outputDir;
+  $("settings-seed").value = String(settings.seed);
+  $("settings-ai-model").value = settings.aiModel;
+  $("settings-ai-host").value = settings.aiHost;
+  $("settings-auto-diagnostics").checked = settings.autoDiagnostics;
+}
+
+function collectSettingsForm() {
+  const outputDir = $("settings-output-dir").value.trim();
+  const seed = Number.parseInt($("settings-seed").value, 10);
+  const aiModel = $("settings-ai-model").value.trim();
+  const aiHost = $("settings-ai-host").value.trim();
+  if (!outputDir) throw new Error("Default output folder is required.");
+  if (!Number.isInteger(seed) || seed < 0 || seed > 2147483647) {
+    throw new Error("Seed must be an integer between 0 and 2147483647.");
+  }
+  if (!aiModel) throw new Error("Default Ollama model is required.");
+  if (!isAllowedLocalAiHost(aiHost)) {
+    throw new Error("Ollama host must be a local http(s) URL using localhost, 127.0.0.1, or ::1.");
+  }
+  return {
+    outputDir,
+    seed,
+    aiModel,
+    aiHost,
+    autoDiagnostics: $("settings-auto-diagnostics").checked
+  };
+}
+
+function saveWorkbenchSettings() {
+  try {
+    const settings = collectSettingsForm();
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    applyWorkbenchSettings(settings);
+    setText("settings-status", "Settings saved locally and applied to this workbench session.");
+  } catch (error) {
+    setText("settings-status", errorMessage(error));
+  }
+}
+
+function resetWorkbenchSettings() {
+  try {
+    localStorage.removeItem(SETTINGS_STORAGE_KEY);
+  } catch (_error) {
+    // The defaults still apply when browser storage is unavailable.
+  }
+  applyWorkbenchSettings({ ...DEFAULT_SETTINGS });
+  setText("settings-status", "Default settings restored and applied.");
+}
+
+function initializeSettings() {
+  const settings = readStoredSettings();
+  applyWorkbenchSettings(settings);
+  return settings;
+}
+
 async function call(command, args = {}) {
   if (!invoke) {
-    throw new Error("Tauri invoke API is not available. Run this through `npm run tauri dev`.");
+    throw new Error("The native desktop bridge is unavailable. Open the installed IINTS-AF app instead of this browser preview.");
   }
   return await invoke(command, args);
 }
@@ -129,10 +281,12 @@ function workflowCard(workflow) {
   const card = document.createElement("article");
   card.className = "workflow-card";
   card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-pressed", "false");
   card.dataset.key = workflow.key;
   card.innerHTML = `
     <h3>${escapeHtml(workflow.title)}</h3>
-    <p><strong>${escapeHtml(workflow.audience)}</strong> · ${escapeHtml(workflow.preset_name)}</p>
+    <p class="workflow-meta">${escapeHtml(workflow.audience)} · ${escapeHtml(workflow.preset_name)}</p>
     <p>${escapeHtml(workflow.description)}</p>
   `;
   card.addEventListener("click", () => selectWorkflow(workflow.key));
@@ -160,7 +314,9 @@ function renderWorkflows() {
 
 function markSelectedWorkflow() {
   document.querySelectorAll(".workflow-card").forEach((card) => {
-    card.classList.toggle("selected", card.dataset.key === selectedWorkflow);
+    const selected = card.dataset.key === selectedWorkflow;
+    card.classList.toggle("selected", selected);
+    card.setAttribute("aria-pressed", selected ? "true" : "false");
   });
 }
 
@@ -173,21 +329,27 @@ async function loadStatus() {
   try {
     const status = await call("desktop_status");
     $("sdk-status").textContent = `SDK ${status.sdk_version} via ${status.python_executable}`;
+    $("sdk-status-dot").className = "status-dot ok";
+    setText("settings-sdk-version", status.sdk_version || "Unknown");
+    setText("settings-python-path", status.python_executable || "Python path unavailable");
     setText("run-status", "Python SDK bridge ready.\nSelect a workflow and run it.");
   } catch (error) {
     $("sdk-status").textContent = "Python bridge unavailable";
+    $("sdk-status-dot").className = "status-dot error";
+    setText("settings-sdk-version", "Unavailable");
+    setText("settings-python-path", errorMessage(error));
     setText("run-status", errorMessage(error));
   }
 }
 
 async function runDiagnostics() {
   const grid = $("diagnostics-grid");
-  grid.replaceChildren(statusPill("loading", "Running diagnostics..."));
+  grid.replaceChildren(diagnosticRow("Diagnostics", "Running...", "info"));
   try {
     const payload = await call("desktop_diagnostics");
     renderDiagnostics(payload);
   } catch (error) {
-    grid.replaceChildren(statusPill("bad", errorMessage(error)));
+    grid.replaceChildren(diagnosticRow("Diagnostics", errorMessage(error), "bad"));
   }
 }
 
@@ -195,6 +357,8 @@ async function loadUpdateInfo() {
   setText("update-status", "Checking SDK/app update information...");
   try {
     updateInfo = await call("desktop_update_info");
+    setText("settings-sdk-version", updateInfo.current_version || "Unknown");
+    setText("settings-python-path", updateInfo.python_executable || "Python path unavailable");
     setText(
       "update-status",
       [
@@ -213,14 +377,47 @@ async function loadUpdateInfo() {
   }
 }
 
+async function loadAppInfo() {
+  try {
+    appInfo = await call("desktop_app_info");
+    setText("settings-app-version", appInfo.app_version || "Unknown");
+    setText(
+      "settings-app-platform",
+      `${appInfo.platform || "native"} · ${appInfo.architecture || "unknown architecture"}`
+    );
+  } catch (error) {
+    setText("settings-app-version", "Unavailable");
+    setText("settings-app-platform", errorMessage(error));
+  }
+}
+
 async function openAppDownloads() {
-  const url = updateInfo?.app_download_url || "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest";
+  const url = appInfo?.release_url || "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest";
   await openExternalUrl(url, "update-status");
 }
 
 async function openUpdateDocs() {
   const url = updateInfo?.update_docs_url || "https://python35.github.io/IINTS-SDK/APP_INSTALL/";
   await openExternalUrl(url, "update-status");
+}
+
+async function openUserGuide() {
+  await openExternalUrl(
+    "https://python35.github.io/IINTS-SDK/RESEARCH_WORKBENCH_GUIDE/",
+    "sdk-status"
+  );
+}
+
+async function openInstallGuide() {
+  await openExternalUrl("https://python35.github.io/IINTS-SDK/APP_INSTALL/", "settings-status");
+}
+
+async function openDocsHome() {
+  await openExternalUrl("https://python35.github.io/IINTS-SDK/", "settings-status");
+}
+
+async function openProjectWebsite() {
+  await openExternalUrl("https://iints.org/", "settings-status");
 }
 
 async function copyUpdateCommand() {
@@ -379,12 +576,12 @@ function actionButton(label, handler, disabled = false) {
 function renderDiagnostics(payload) {
   const grid = $("diagnostics-grid");
   grid.replaceChildren();
-  grid.appendChild(statusPill("good", `SDK ${payload.sdk_version}`));
-  grid.appendChild(statusPill("good", `Python ${payload.python_version}`));
-  grid.appendChild(statusPill(payload.ollama_on_path ? "good" : "warn", payload.ollama_on_path ? "Ollama found" : "Ollama not on PATH"));
+  grid.appendChild(diagnosticRow("IINTS-AF SDK", payload.sdk_version, "good"));
+  grid.appendChild(diagnosticRow("Python", payload.python_version, "good"));
+  grid.appendChild(diagnosticRow("Ollama", payload.ollama_on_path ? "Available on PATH" : "Not found on PATH", payload.ollama_on_path ? "good" : "warn"));
   const modules = payload.optional_modules || {};
   for (const [name, available] of Object.entries(modules)) {
-    grid.appendChild(statusPill(available ? "good" : "warn", `${name}: ${available ? "ready" : "missing"}`));
+    grid.appendChild(diagnosticRow(name, available ? "Ready" : "Optional dependency missing", available ? "good" : "warn"));
   }
   if ((payload.recommended_checks || []).length) {
     const note = document.createElement("div");
@@ -395,6 +592,18 @@ function renderDiagnostics(payload) {
     `;
     grid.appendChild(note);
   }
+}
+
+function diagnosticRow(label, state, kind = "info") {
+  const row = document.createElement("div");
+  row.className = "diagnostic-row";
+  const name = document.createElement("strong");
+  name.textContent = label;
+  const value = document.createElement("span");
+  value.className = `diagnostic-state ${kind}`;
+  value.textContent = state;
+  row.append(name, value);
+  return row;
 }
 
 function statusPill(kind, text) {
@@ -451,9 +660,10 @@ async function runSelectedWorkflow() {
 async function previewCsv() {
   const csv = $("csv-path").value.trim();
   if (!csv) {
+    setText("results-status", "Choose a results CSV before loading a preview.");
     return;
   }
-  setText("run-status", `Loading preview: ${csv}`);
+  setText("results-status", `Loading preview:\n${csv}`);
   try {
     const preview = await call("preview_results", { csv, maxRows: 80 });
     lastPreview = preview;
@@ -463,10 +673,12 @@ async function previewCsv() {
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
+    setText("results-status", `Loaded ${preview.row_count} rows.\n${csv}`);
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
+    setText("ai-context", `Attached result CSV: ${csv}`);
     setActiveView("results", false);
   } catch (error) {
-    setText("run-status", errorMessage(error));
+    setText("results-status", errorMessage(error));
   }
 }
 
@@ -652,6 +864,7 @@ function renderTable(columns, rows) {
 function drawGlucoseChart(preview) {
   const svg = $("glucose-chart");
   svg.replaceChildren();
+  svg.dataset.renderMode = "immediate";
   const rows = preview.rows || [];
   const columns = preview.columns || [];
   const glucoseIndex = firstIndex(columns, [
@@ -708,7 +921,14 @@ async function checkAi() {
       model: $("ai-model").value.trim(),
       host: $("ai-host").value.trim()
     });
-    setText("ai-status", pretty(payload));
+    setText(
+      "ai-status",
+      [
+        `Connection: ${payload.available ? "ready" : "not ready"}`,
+        `Model: ${payload.resolved_model || $("ai-model").value.trim() || "not resolved"}`,
+        payload.message || "No additional status returned."
+      ].join("\n")
+    );
   } catch (error) {
     setText("ai-status", errorMessage(error));
   }
@@ -722,7 +942,16 @@ async function startAi() {
       host: $("ai-host").value.trim(),
       noPull: false
     });
-    setText("ai-status", pretty(payload));
+    setText(
+      "ai-status",
+      [
+        `Connection: ${payload.available ? "ready" : "not ready"}`,
+        `Model: ${payload.resolved_model || $("ai-model").value.trim() || "not resolved"}`,
+        `Ollama started by app: ${payload.started_process ? "yes" : "no"}`,
+        `Model downloaded: ${payload.pulled_model ? "yes" : "no"}`,
+        payload.message || ""
+      ].filter(Boolean).join("\n")
+    );
   } catch (error) {
     setText("ai-status", errorMessage(error));
   }
@@ -732,7 +961,20 @@ async function listAiModels() {
   setText("ai-status", "Listing local Ollama models...");
   try {
     const payload = await call("list_local_ai_models", { host: $("ai-host").value.trim() });
-    setText("ai-status", pretty(payload));
+    const models = Array.isArray(payload.models) ? payload.models.filter(Boolean) : [];
+    const options = $("ai-model-options");
+    options.replaceChildren();
+    for (const model of models) {
+      const option = document.createElement("option");
+      option.value = model;
+      options.appendChild(option);
+    }
+    setText(
+      "ai-status",
+      models.length
+        ? `Available and recommended models (${models.length}):\n${models.map((model) => `- ${model}`).join("\n")}`
+        : "No local or recommended models were returned."
+    );
   } catch (error) {
     setText("ai-status", errorMessage(error));
   }
@@ -753,20 +995,82 @@ async function askAi() {
       host: $("ai-host").value.trim(),
       csv: csv || null
     });
-    setText(
-      "ai-answer",
-      [
-        `Model: ${payload.model}`,
-        `CSV context used: ${payload.context_used ? "yes" : "no"}`,
-        `Policy guard: ${payload.policy_action || ((payload.policy_violations || []).length ? "blocked" : "clear")}`,
-        ...(payload.policy_violations || []).map((violation) => `- ${violation}`),
-        ...(payload.policy_warnings || []).map((warning) => `- warning: ${warning}`),
-        "",
-        payload.answer
-      ].join("\n")
-    );
+    renderAiAnswer(payload);
   } catch (error) {
     setText("ai-answer", errorMessage(error));
+  }
+}
+
+function renderAiAnswer(payload) {
+  const container = $("ai-answer");
+  container.replaceChildren();
+
+  const metadata = document.createElement("dl");
+  metadata.className = "ai-metadata";
+  const guard = payload.policy_action || ((payload.policy_violations || []).length ? "blocked" : "clear");
+  for (const [label, value] of [
+    ["Model", payload.model || "unknown"],
+    ["CSV context", payload.context_used ? "used" : "not used"],
+    ["Policy guard", guard]
+  ]) {
+    const item = document.createElement("div");
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = value;
+    item.append(term, description);
+    metadata.appendChild(item);
+  }
+  container.appendChild(metadata);
+
+  const alerts = [
+    ...(payload.policy_violations || []).map((text) => `Policy violation: ${text}`),
+    ...(payload.policy_warnings || []).map((text) => `Policy warning: ${text}`)
+  ];
+  if (alerts.length) {
+    const list = document.createElement("ul");
+    list.className = "ai-alert-list";
+    for (const alert of alerts) {
+      const item = document.createElement("li");
+      item.textContent = alert;
+      list.appendChild(item);
+    }
+    container.appendChild(list);
+  }
+
+  appendReadableText(container, payload.answer || "No answer returned.");
+}
+
+function appendReadableText(container, text) {
+  let activeList = null;
+  for (const rawLine of String(text).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      activeList = null;
+      continue;
+    }
+    const normalized = line.replace(/^#{1,6}\s*/, "").replaceAll("**", "").trim();
+    if (["Clinical Overview", "Biomathematical Observations", "Algorithmic Behavior", "Conclusions"].includes(normalized)) {
+      activeList = null;
+      const heading = document.createElement("h3");
+      heading.textContent = normalized;
+      container.appendChild(heading);
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      if (!activeList) {
+        activeList = document.createElement("ul");
+        container.appendChild(activeList);
+      }
+      const item = document.createElement("li");
+      item.textContent = normalized.replace(/^[-*]\s+/, "");
+      activeList.appendChild(item);
+      continue;
+    }
+    activeList = null;
+    const paragraph = document.createElement("p");
+    paragraph.textContent = normalized;
+    container.appendChild(paragraph);
   }
 }
 
@@ -808,7 +1112,7 @@ async function openLatestReport() {
 }
 
 async function openLoadedCsv() {
-  await openPath($("csv-path").value.trim(), "run-status");
+  await openPath($("csv-path").value.trim(), "results-status");
 }
 
 async function openLatestCertificate() {
@@ -1415,6 +1719,13 @@ function svgRect(x, y, width, height, fill, opacity) {
 }
 
 $("run-btn").addEventListener("click", runSelectedWorkflow);
+$("guide-btn").addEventListener("click", openUserGuide);
+$("settings-save-btn").addEventListener("click", saveWorkbenchSettings);
+$("settings-reset-btn").addEventListener("click", resetWorkbenchSettings);
+$("settings-guide-btn").addEventListener("click", openUserGuide);
+$("settings-install-guide-btn").addEventListener("click", openInstallGuide);
+$("settings-docs-btn").addEventListener("click", openDocsHome);
+$("settings-website-btn").addEventListener("click", openProjectWebsite);
 $("refresh-btn").addEventListener("click", loadWorkflows);
 $("history-btn").addEventListener("click", loadHistory);
 $("diagnostics-btn").addEventListener("click", runDiagnostics);
@@ -1466,5 +1777,15 @@ $("binding-open-btn").addEventListener("click", openBindingBundle);
 $("binding-csv-btn").addEventListener("click", openBindingCsv);
 $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
+initializeNativeInteractionPolicy();
+const initialSettings = initializeSettings();
 initializeNavigation();
-await Promise.allSettled([loadStatus(), runDiagnostics(), loadUpdateInfo()]);
+const startupTasks = [loadStatus()];
+if (initialSettings.autoDiagnostics) {
+  startupTasks.push(runDiagnostics());
+} else {
+  $("diagnostics-grid").replaceChildren(
+    diagnosticRow("Diagnostics", "Automatic startup check disabled in Settings.", "info")
+  );
+}
+await Promise.allSettled(startupTasks);
