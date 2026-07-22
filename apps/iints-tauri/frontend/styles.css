@@ -418,10 +418,9 @@ h3 {
 
 .update-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
   align-items: end;
-  justify-content: space-between;
-  gap: 22px;
+  gap: 12px;
   margin-top: 14px;
 }
 
@@ -430,13 +429,13 @@ h3 {
 }
 
 .action-cluster-resources {
-  text-align: right;
+  text-align: left;
 }
 
 .action-cluster-resources .button-row {
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 7px;
 }
 
 .action-label {
@@ -449,7 +448,7 @@ h3 {
 }
 
 .update-actions .button-row {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   margin: 6px 0 0;
 }
 
@@ -524,6 +523,37 @@ label {
   font-weight: 650;
 }
 
+.field-control {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.field-control > label {
+  display: block;
+}
+
+.path-picker {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.path-picker button {
+  min-width: 104px;
+  white-space: nowrap;
+}
+
+.field-help {
+  color: var(--ink-muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 input,
 textarea {
   width: 100%;
@@ -554,6 +584,24 @@ textarea:hover {
 input:focus,
 textarea:focus {
   border-color: var(--blue);
+}
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"] {
+  background: #fff8f7;
+  border-color: var(--danger);
+}
+
+#settings-output-dir,
+#output-dir,
+#csv-path,
+#academic-run-dir,
+#mechanistic-model,
+#copasi-model,
+#cellml-model,
+#fmi-model {
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 0.73rem;
 }
 
 .field-grid,
@@ -842,6 +890,11 @@ textarea:focus {
   padding: 9px 1px;
   border-bottom: 1px solid var(--line);
   font-size: 0.75rem;
+}
+
+.diagnostic-row:only-child {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(120px, 0.55fr) minmax(0, 1.45fr);
 }
 
 .diagnostic-row strong {
@@ -1313,6 +1366,25 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .app-sidebar {
+    position: static;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    overflow: visible;
+  }
+
+  .workspace-nav {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .nav-item {
+    width: 100%;
+    text-align: center;
+  }
+
   .workspace-header {
     position: static;
     min-height: 0;
@@ -1417,6 +1489,20 @@ footer {
 }
 
 @media (max-width: 520px) {
+  .app-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .brand-block {
+    padding: 0 0 8px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .workspace-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .workspace-header {
     display: block;
   }
@@ -1437,6 +1523,14 @@ footer {
   }
 
   .button-row button {
+    width: 100%;
+  }
+
+  .path-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .path-picker button {
     width: 100%;
   }
 

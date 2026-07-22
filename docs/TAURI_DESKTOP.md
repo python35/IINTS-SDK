@@ -147,7 +147,8 @@ shell input. Hardening roadmap:
 
 - Add signed Tauri updater after release signing is stable.
 - Use a dedicated app data directory for outputs.
-- Add a file-picker plugin with strict scopes instead of free path text fields.
+- Keep native file/folder selection limited to user-mediated open dialogs; do not grant broad
+  frontend filesystem permissions.
 - Stream run progress through Tauri events instead of waiting for a long command.
 - Add per-command input validation in Rust before calling Python.
 - Sign and notarize macOS builds; sign Windows builds with timestamping.

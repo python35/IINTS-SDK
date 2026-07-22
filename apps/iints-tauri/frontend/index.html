@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-6" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-7" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -91,10 +91,14 @@
           <p>Saved locally on this device. No credentials or patient data are stored.</p>
         </div>
         <div class="settings-fields">
-          <label class="wide-field">
-            Default output folder
-            <input id="settings-output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" />
-          </label>
+          <div class="field-control wide-field">
+            <label for="settings-output-dir">Default output folder</label>
+            <div class="path-picker">
+              <input id="settings-output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" aria-describedby="settings-output-dir-help" />
+              <button id="settings-output-browse-btn" type="button">Choose folder...</button>
+            </div>
+            <small id="settings-output-dir-help" class="field-help">New runs are stored here. You can still edit the path directly.</small>
+          </div>
           <label>
             Default deterministic seed
             <input id="settings-seed" type="number" min="0" max="2147483647" value="42" />
@@ -213,13 +217,17 @@
           <p>The seed makes repeated runs deterministic.</p>
         </div>
         <div class="field-grid">
-          <label>
-            Output folder
-            <input id="output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" />
-          </label>
+          <div class="field-control wide-field">
+            <label for="output-dir">Output folder</label>
+            <div class="path-picker">
+              <input id="output-dir" value="~/IINTS-Tauri-Runs" spellcheck="false" aria-describedby="output-dir-help" />
+              <button id="output-browse-btn" type="button">Choose folder...</button>
+            </div>
+            <small id="output-dir-help" class="field-help">The selected protocol creates a new run folder inside this location.</small>
+          </div>
           <label>
             Seed
-            <input id="seed" type="number" min="0" value="42" />
+            <input id="seed" type="number" min="0" max="2147483647" value="42" />
           </label>
         </div>
         <div class="button-row">
@@ -250,10 +258,14 @@
           <p>Preview is read-only and does not change the CSV.</p>
         </div>
         <div class="path-action-row">
-          <label>
-            Results CSV
-            <input id="csv-path" placeholder="Run a workflow or paste a results.csv path" spellcheck="false" />
-          </label>
+          <div class="field-control">
+            <label for="csv-path">Results CSV</label>
+            <div class="path-picker">
+              <input id="csv-path" placeholder="Choose a results.csv file" spellcheck="false" aria-describedby="csv-path-help" />
+              <button id="csv-browse-btn" type="button">Choose CSV...</button>
+            </div>
+            <small id="csv-path-help" class="field-help">Only the selected local CSV is previewed; it is not modified or uploaded.</small>
+          </div>
           <button id="preview-btn" class="primary">Load preview</button>
         </div>
         <div class="button-row">
@@ -297,10 +309,14 @@
           privacy approval, or clinical validation.
         </p>
         <div class="academic-fields">
-          <label class="academic-run-field">
-            Completed run folder
-            <input id="academic-run-dir" placeholder="Run a workflow or select a results.csv first" spellcheck="false" />
-          </label>
+          <div class="field-control academic-run-field">
+            <label for="academic-run-dir">Completed run folder</label>
+            <div class="path-picker">
+              <input id="academic-run-dir" placeholder="Choose a completed run folder" spellcheck="false" aria-describedby="academic-run-dir-help" />
+              <button id="academic-run-browse-btn" type="button">Choose folder...</button>
+            </div>
+            <small id="academic-run-dir-help" class="field-help">Select the folder that contains the run artifacts to package.</small>
+          </div>
           <label>
             Package title
             <input id="academic-title" placeholder="Optional research-run title" spellcheck="true" />
@@ -429,10 +445,14 @@
               or mg/dL, and the reference model never calibrates patient parameters automatically.
             </p>
             <div class="mechanistic-fields">
-              <label class="mechanistic-model-field">
-                Local SBML file (.xml or .sbml)
-                <input id="mechanistic-model" placeholder="/path/to/reference_model.xml" spellcheck="false" />
-              </label>
+              <div class="field-control mechanistic-model-field">
+                <label for="mechanistic-model">Local SBML file (.xml or .sbml)</label>
+                <div class="path-picker">
+                  <input id="mechanistic-model" placeholder="Choose an SBML model" spellcheck="false" aria-describedby="mechanistic-model-help" />
+                  <button id="mechanistic-model-browse-btn" type="button">Choose file...</button>
+                </div>
+                <small id="mechanistic-model-help" class="field-help">Selection does not execute the model. Inspect it before running.</small>
+              </div>
               <label>
                 Variables
                 <input id="mechanistic-variables" placeholder="[G], amount:I, k (blank = model defaults)" spellcheck="false" />
@@ -488,10 +508,14 @@
                 <summary>COPASI · sensitivity and identifiability review</summary>
                 <p>Inspect a configured .cps file first. CopasiSE runs only after the task list and data paths are reviewed.</p>
                 <div class="reference-fields">
-                  <label class="wide-field">
-                    COPASI model (.cps)
-                    <input id="copasi-model" placeholder="/path/to/analysis.cps" spellcheck="false" />
-                  </label>
+                  <div class="field-control wide-field">
+                    <label for="copasi-model">COPASI model (.cps)</label>
+                    <div class="path-picker">
+                      <input id="copasi-model" placeholder="Choose a COPASI model" spellcheck="false" aria-describedby="copasi-model-help" />
+                      <button id="copasi-model-browse-btn" type="button">Choose file...</button>
+                    </div>
+                    <small id="copasi-model-help" class="field-help">Inspect scheduled tasks and external paths before allowing execution.</small>
+                  </div>
                   <label>
                     Task override
                     <input id="copasi-task" placeholder="Optional exact task name" spellcheck="false" />
@@ -517,10 +541,14 @@
                 <summary>OpenCOR + Physiome · independent CellML validation</summary>
                 <p>Inspect CellML locally, then use OpenCOR's official validator. Imports are listed but never trusted automatically.</p>
                 <div class="reference-fields">
-                  <label class="wide-field">
-                    CellML model (.cellml or .xml)
-                    <input id="cellml-model" placeholder="/path/to/model.cellml" spellcheck="false" />
-                  </label>
+                  <div class="field-control wide-field">
+                    <label for="cellml-model">CellML model (.cellml or .xml)</label>
+                    <div class="path-picker">
+                      <input id="cellml-model" placeholder="Choose a CellML model" spellcheck="false" aria-describedby="cellml-model-help" />
+                      <button id="cellml-model-browse-btn" type="button">Choose file...</button>
+                    </div>
+                    <small id="cellml-model-help" class="field-help">Local static inspection is available before optional OpenCOR validation.</small>
+                  </div>
                   <label>
                     Timeout seconds
                     <input id="cellml-timeout" type="number" min="1" max="86400" value="120" />
@@ -541,10 +569,14 @@
                   platform binary, and license are explicitly trusted.
                 </p>
                 <div class="reference-fields">
-                  <label class="wide-field">
-                    Functional Mock-up Unit (.fmu)
-                    <input id="fmi-model" placeholder="/path/to/device_model.fmu" spellcheck="false" />
-                  </label>
+                  <div class="field-control wide-field">
+                    <label for="fmi-model">Functional Mock-up Unit (.fmu)</label>
+                    <div class="path-picker">
+                      <input id="fmi-model" placeholder="Choose an FMU" spellcheck="false" aria-describedby="fmi-model-help" />
+                      <button id="fmi-model-browse-btn" type="button">Choose file...</button>
+                    </div>
+                    <small id="fmi-model-help" class="field-help">Choosing or inspecting an FMU does not load its native binaries.</small>
+                  </div>
                   <label>
                     Start
                     <input id="fmi-start" type="number" value="0" step="any" />
@@ -636,6 +668,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js?v=workbench-6"></script>
+    <script type="module" src="./main.js?v=workbench-7"></script>
   </body>
 </html>

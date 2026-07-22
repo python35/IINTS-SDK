@@ -699,6 +699,29 @@ def test_tauri_workbench_is_sober_responsive_and_documented() -> None:
     assert not (app_root / "frontend/workbench-mark.svg").exists()
     assert "settings-save-btn" in frontend
     assert "settings-guide-btn" in frontend
+    for picker_id in [
+        "settings-output-browse-btn",
+        "output-browse-btn",
+        "csv-browse-btn",
+        "academic-run-browse-btn",
+        "mechanistic-model-browse-btn",
+        "copasi-model-browse-btn",
+        "cellml-model-browse-btn",
+        "fmi-model-browse-btn",
+    ]:
+        assert picker_id in frontend
+    assert "nativeOpenDialog" in frontend_js
+    assert "chooseLocalPath" in frontend_js
+    assert "refreshActionAvailability" in frontend_js
+    assert ".path-picker" in frontend_css
+    capabilities = json.loads(
+        (app_root / "src-tauri/capabilities/main.json").read_text(encoding="utf-8")
+    )
+    assert "dialog:allow-open" in capabilities["permissions"]
+    assert not any(
+        permission.startswith(("fs:", "shell:", "http:", "updater:", "process:"))
+        for permission in capabilities["permissions"]
+    )
     assert "SETTINGS_STORAGE_KEY" in frontend_js
     assert "isAllowedLocalAiHost" in frontend_js
     assert "desktop_app_info" in frontend_js

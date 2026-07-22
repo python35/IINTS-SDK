@@ -33,6 +33,11 @@ The installed app deliberately behaves like a desktop workbench rather than a we
 - the browser context menu is suppressed outside those copyable data areas
 - scientific charts appear immediately without decorative drawing animations
 - embedded browser developer tools are disabled in the packaged application
+- folder and model/result locations use native macOS, Windows, or Linux selectors; paths remain
+  editable for advanced reproducibility workflows
+
+Use <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>O</kbd> to open the result-file selector and
+<kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>,</kbd> to open Settings.
 
 These interface rules do not restrict access to generated artifacts; files remain available in the selected output folder.
 
@@ -74,7 +79,7 @@ python -c "import iints; print(iints.__version__)"
 ![Protocol selection, deterministic seed, output folder, and run history](assets/workbench/02-run-protocol.png)
 
 1. Select one protocol in the left panel.
-2. Choose an output folder you can archive later.
+2. Select **Choose folder...** and choose an output location you can archive later.
 3. Record the seed. The default `42` is suitable for a reproducible first run.
 4. Select **Run selected protocol**.
 5. Wait until the status field reports completion or a recorded error.
@@ -97,7 +102,9 @@ The exact equivalent command can differ by curated desktop protocol. Treat the g
 
 ![Results workspace with summary metrics and a glucose trajectory](assets/workbench/03-results.png)
 
-After a desktop protocol completes, the app loads its `results.csv` automatically. You can also paste an existing CSV path and select **Load preview**.
+After a desktop protocol completes, the app loads its `results.csv` automatically. To inspect an
+existing run, select **Choose CSV...**, choose the local file, and then select **Load preview**.
+Advanced users may still edit the displayed path directly.
 
 Review these parts together:
 
@@ -124,7 +131,7 @@ Read [Understand A Run](RUN_OUTPUTS.md) before using a preview as evidence in a 
 
 Open **Reproducibility** after loading a completed run.
 
-1. Confirm the completed run folder.
+1. Confirm the completed run folder or select **Choose folder...** to locate one.
 2. Add a descriptive package title.
 3. Add the researcher name and ORCID when appropriate.
 4. Leave the run-artifact licence as `NOASSERTION` unless you know which licence applies to every exported artifact.
@@ -188,6 +195,11 @@ The **Research tools** workspace contains independent evidence and stress-test l
 
 Start with **Check all engines**. Open only the lab you need, and preserve the generated evidence bundle with the study record.
 
+Use **Choose file...** beside SBML, COPASI, CellML, or FMI inputs. The native selector filters the
+visible files by the expected extension. Selecting a file never executes it: static inspection and
+explicit execution remain separate actions, and COPASI/FMI execution still requires the relevant
+confirmation checkbox.
+
 ## 7. Evidence Sources
 
 The **Evidence sources** workspace describes whether a connector is:
@@ -209,7 +221,7 @@ Open **Settings** to maintain the workbench without mixing application controls 
 
 You can set:
 
-- the default output folder
+- the default output folder, selected with **Choose folder...**
 - the default deterministic seed
 - the default local Ollama model
 - the local Ollama host
@@ -238,7 +250,8 @@ The same workspace links to this user guide, installation troubleshooting, the c
 | Python bridge unavailable | select **Install Python engine**, wait for completion, then select **Refresh versions** |
 | `No module named iints_desktop` | repair the private engine with **Install or update Python SDK**; the discovered Python does not contain the SDK bridge |
 | Protocol list is empty | run diagnostics, verify the SDK installation, then select Refresh protocols |
-| CSV preview fails | confirm the path exists and points to a supported results CSV |
+| Native selector does not open | confirm you are using the installed app rather than a browser preview |
+| CSV preview fails | select the file again with **Choose CSV...** and confirm it is a supported results CSV |
 | Ollama not found | install Ollama once, then select Start local AI |
 | Model is missing | choose Refresh model list or allow Start local AI to pull the selected model |
 | Optional research engine missing | install or configure only the engine required for that lab |

@@ -68,6 +68,8 @@ the text-only `IINTS-AF` name so the application identity stays legible at every
   Evidence, and Settings workspaces.
 - Save non-sensitive local defaults for output location, deterministic seed, Ollama model/host,
   and startup diagnostics.
+- Select output folders, completed runs, result CSVs, SBML, COPASI, CellML, and FMU files through
+  native macOS, Windows, and Linux dialogs while retaining editable paths for advanced workflows.
 - Load SDK version/status.
 - Show SDK/app update information, bootstrap or repair a private Python engine, open the stable
   Tauri app release and documentation, and launch a fixed maintenance terminal.
@@ -120,6 +122,8 @@ The workbench does not present a portal link as an implemented scientific pipeli
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
+- Native selectors use only Tauri's user-mediated open-dialog permission; they do not grant the
+  frontend general filesystem read or write access.
 - The SDK maintenance terminal is a fixed Rust-owned command, not user-provided shell text. It may
   create `~/.iints-af/python-engine` and installs only the allowlisted `iints-sdk-python35[desktop-all]`
   package specification.

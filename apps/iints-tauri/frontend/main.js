@@ -1,5 +1,6 @@
 const tauriCore = window.__TAURI__?.core;
 const invoke = tauriCore?.invoke;
+const nativeOpenDialog = window.__TAURI__?.dialog?.open;
 const isNativeDesktop = typeof invoke === "function";
 const COPYABLE_CONTEXT_SELECTOR = [
   "input",
@@ -30,6 +31,8 @@ let lastCellml = null;
 let lastFmi = null;
 let lastBinding = null;
 let appInfo = null;
+let runBusy = false;
+let researchBusy = false;
 
 const SETTINGS_STORAGE_KEY = "iints-af.workbench.settings.v1";
 const DEFAULT_SETTINGS = Object.freeze({
@@ -246,8 +249,11 @@ function collectSettingsForm() {
 function saveWorkbenchSettings() {
   try {
     const settings = collectSettingsForm();
+    const outputChanged = settings.outputDir !== workbenchSettings.outputDir;
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     applyWorkbenchSettings(settings);
+    if (outputChanged) lastRun = null;
+    refreshActionAvailability();
     setText("settings-status", "Settings saved locally and applied to this workbench session.");
   } catch (error) {
     setText("settings-status", errorMessage(error));
@@ -261,6 +267,8 @@ function resetWorkbenchSettings() {
     // The defaults still apply when browser storage is unavailable.
   }
   applyWorkbenchSettings({ ...DEFAULT_SETTINGS });
+  lastRun = null;
+  refreshActionAvailability();
   setText("settings-status", "Default settings restored and applied.");
 }
 
@@ -275,6 +283,126 @@ async function call(command, args = {}) {
     throw new Error("The native desktop bridge is unavailable. Open the installed IINTS-AF app instead of this browser preview.");
   }
   return await invoke(command, args);
+}
+
+function dialogDefaultPath(value) {
+  const candidate = String(value || "").trim();
+  if (/^(?:\/|[A-Za-z]:[\\/]|\\\\)/.test(candidate)) return candidate;
+  return undefined;
+}
+
+async function chooseLocalPath({
+  inputId,
+  buttonId,
+  statusId,
+  title,
+  directory = false,
+  filters = [],
+  selectedLabel
+}) {
+  if (typeof nativeOpenDialog !== "function") {
+    setText(
+      statusId,
+      "The native file chooser is unavailable in this preview. Open the installed desktop application."
+    );
+    return;
+  }
+
+  const input = $(inputId);
+  const button = $(buttonId);
+  button.disabled = true;
+  try {
+    const options = {
+      title,
+      directory,
+      multiple: false
+    };
+    const defaultPath = dialogDefaultPath(input.value);
+    if (defaultPath) options.defaultPath = defaultPath;
+    if (!directory && filters.length) options.filters = filters;
+
+    const selected = await nativeOpenDialog(options);
+    const path = Array.isArray(selected) ? selected[0] : selected;
+    if (typeof path !== "string" || !path.trim()) return;
+    const allowedExtensions = filters
+      .flatMap((filter) => filter.extensions || [])
+      .map((extension) => String(extension).toLowerCase());
+    const selectedExtension = path.includes(".") ? path.split(".").pop().toLowerCase() : "";
+    if (!directory && allowedExtensions.length && !allowedExtensions.includes(selectedExtension)) {
+      input.setAttribute("aria-invalid", "true");
+      setText(
+        statusId,
+        `Unsupported file type. Choose one of: ${allowedExtensions.map((extension) => `.${extension}`).join(", ")}.`
+      );
+      return;
+    }
+
+    input.value = path;
+    input.title = path;
+    input.setAttribute("aria-invalid", "false");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    setText(statusId, `${selectedLabel}:\n${path}`);
+  } catch (error) {
+    setText(statusId, `Could not open the native selector.\n${errorMessage(error)}`);
+  } finally {
+    refreshActionAvailability();
+  }
+}
+
+async function chooseSettingsOutputFolder() {
+  await chooseLocalPath({
+    inputId: "settings-output-dir",
+    buttonId: "settings-output-browse-btn",
+    statusId: "settings-status",
+    title: "Choose the default IINTS-AF output folder",
+    directory: true,
+    selectedLabel: "Default output folder selected"
+  });
+}
+
+async function chooseRunOutputFolder() {
+  await chooseLocalPath({
+    inputId: "output-dir",
+    buttonId: "output-browse-btn",
+    statusId: "run-status",
+    title: "Choose an IINTS-AF output folder",
+    directory: true,
+    selectedLabel: "Run output folder selected"
+  });
+}
+
+async function chooseResultsCsv() {
+  await chooseLocalPath({
+    inputId: "csv-path",
+    buttonId: "csv-browse-btn",
+    statusId: "results-status",
+    title: "Choose an IINTS-AF results CSV",
+    filters: [{ name: "CSV results", extensions: ["csv"] }],
+    selectedLabel: "Results CSV selected"
+  });
+}
+
+async function chooseAcademicRunFolder() {
+  await chooseLocalPath({
+    inputId: "academic-run-dir",
+    buttonId: "academic-run-browse-btn",
+    statusId: "academic-status",
+    title: "Choose a completed IINTS-AF run folder",
+    directory: true,
+    selectedLabel: "Completed run folder selected"
+  });
+}
+
+async function chooseResearchModel(inputId, buttonId, statusId, title, name, extensions) {
+  await chooseLocalPath({
+    inputId,
+    buttonId,
+    statusId,
+    title,
+    filters: [{ name, extensions }],
+    selectedLabel: `${name} selected`
+  });
 }
 
 function workflowCard(workflow) {
@@ -323,6 +451,7 @@ function markSelectedWorkflow() {
 function selectWorkflow(key) {
   selectedWorkflow = key;
   markSelectedWorkflow();
+  refreshActionAvailability();
 }
 
 async function loadStatus() {
@@ -639,6 +768,16 @@ async function runSelectedWorkflow() {
   }
   const outputDir = $("output-dir").value.trim();
   const seed = Number.parseInt($("seed").value || "42", 10);
+  if (!outputDir) {
+    $("output-dir").setAttribute("aria-invalid", "true");
+    setText("run-status", "Choose an output folder before starting the protocol.");
+    return;
+  }
+  if (!Number.isInteger(seed) || seed < 0 || seed > 2147483647) {
+    $("seed").setAttribute("aria-invalid", "true");
+    setText("run-status", "Seed must be an integer between 0 and 2147483647.");
+    return;
+  }
   setBusy(true);
   setText("run-status", `Running ${selectedWorkflow} through the Python SDK...\nThis may take a minute.`);
   try {
@@ -648,6 +787,7 @@ async function runSelectedWorkflow() {
       seed
     });
     lastRun = result;
+    lastAcademicBundle = null;
     if (result.output_dir) {
       $("academic-run-dir").value = result.output_dir;
     }
@@ -674,9 +814,9 @@ async function previewCsv() {
   try {
     const preview = await call("preview_results", { csv, maxRows: 80 });
     lastPreview = preview;
-    if (!$("academic-run-dir").value.trim()) {
-      $("academic-run-dir").value = parentPath(preview.csv_path || csv);
-    }
+    lastMdmp = null;
+    lastAcademicBundle = null;
+    $("academic-run-dir").value = parentPath(preview.csv_path || csv);
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
@@ -684,8 +824,11 @@ async function previewCsv() {
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
     setText("ai-context", `Attached result CSV: ${csv}`);
     setActiveView("results", false);
+    refreshActionAvailability();
   } catch (error) {
+    lastPreview = null;
     setText("results-status", errorMessage(error));
+    refreshActionAvailability();
   }
 }
 
@@ -734,6 +877,7 @@ function renderHistory(entries) {
           results_csv: entry.results_csv,
           report_pdf: entry.report_pdf || null
         };
+        lastAcademicBundle = null;
         $("academic-run-dir").value = entry.output_dir || parentPath(entry.results_csv);
         await previewCsv();
       });
@@ -764,6 +908,7 @@ async function certifyMdmp() {
         `Public key: ${payload.public_key_path}`
       ].join("\n")
     );
+    refreshActionAvailability();
   } catch (error) {
     setText("mdmp-status", errorMessage(error));
   }
@@ -774,7 +919,7 @@ async function exportAcademicBundle() {
     || lastRun?.output_dir
     || parentPath(lastPreview?.csv_path || $("csv-path").value.trim());
   if (!runDir) {
-    setText("academic-status", "Run a workflow or provide a completed run folder first.");
+    setText("academic-status", "Run a workflow or choose a completed run folder first.");
     return;
   }
   $("academic-run-dir").value = runDir;
@@ -809,10 +954,11 @@ async function exportAcademicBundle() {
         "This package supports review and reuse; it is not peer review, privacy approval, or clinical validation."
       ].join("\n")
     );
+    refreshActionAvailability();
   } catch (error) {
     setText("academic-status", errorMessage(error));
   } finally {
-    $("academic-export-btn").disabled = false;
+    refreshActionAvailability();
   }
 }
 
@@ -1222,7 +1368,7 @@ async function loadMechanisticStatus() {
 async function inspectMechanisticModel() {
   const model = $("mechanistic-model").value.trim();
   if (!model) {
-    setText("mechanistic-status", "Select or paste a local .xml/.sbml model path first.");
+    setText("mechanistic-status", "Choose a local .xml or .sbml model first.");
     return;
   }
   setResearchBusy(true);
@@ -1257,7 +1403,7 @@ async function inspectMechanisticModel() {
 async function runMechanisticModel() {
   const model = $("mechanistic-model").value.trim();
   if (!model) {
-    setText("mechanistic-status", "Select or paste a local .xml/.sbml model path first.");
+    setText("mechanistic-status", "Choose a local .xml or .sbml model first.");
     return;
   }
   const outputDir = joinPath($("output-dir").value.trim(), "mechanistic_reference");
@@ -1349,7 +1495,7 @@ async function loadCrossScaleStatus() {
 async function inspectCopasiModel() {
   const model = $("copasi-model").value.trim();
   if (!model) {
-    setText("copasi-status", "Select or paste a local .cps model path first.");
+    setText("copasi-status", "Choose a local .cps model first.");
     return;
   }
   setResearchBusy(true);
@@ -1385,7 +1531,7 @@ async function inspectCopasiModel() {
 async function runCopasiAnalysis() {
   const model = $("copasi-model").value.trim();
   if (!model) {
-    setText("copasi-status", "Select or paste a local .cps model path first.");
+    setText("copasi-status", "Choose a local .cps model first.");
     return;
   }
   if (!$("copasi-consent").checked) {
@@ -1429,7 +1575,7 @@ async function runCopasiAnalysis() {
 async function inspectCellmlModel() {
   const model = $("cellml-model").value.trim();
   if (!model) {
-    setText("cellml-status", "Select or paste a local .cellml/.xml model path first.");
+    setText("cellml-status", "Choose a local .cellml or .xml model first.");
     return;
   }
   setResearchBusy(true);
@@ -1460,7 +1606,7 @@ async function inspectCellmlModel() {
 async function validateCellmlModel() {
   const model = $("cellml-model").value.trim();
   if (!model) {
-    setText("cellml-status", "Select or paste a local .cellml/.xml model path first.");
+    setText("cellml-status", "Choose a local .cellml or .xml model first.");
     return;
   }
   const outputDir = joinPath($("output-dir").value.trim(), "cellml");
@@ -1493,7 +1639,7 @@ async function validateCellmlModel() {
 async function inspectFmiModel() {
   const model = $("fmi-model").value.trim();
   if (!model) {
-    setText("fmi-status", "Select or paste a local .fmu path first.");
+    setText("fmi-status", "Choose a local .fmu first.");
     return;
   }
   setResearchBusy(true);
@@ -1525,7 +1671,7 @@ async function inspectFmiModel() {
 async function runFmiModel() {
   const model = $("fmi-model").value.trim();
   if (!model) {
-    setText("fmi-status", "Select or paste a local .fmu path first.");
+    setText("fmi-status", "Choose a local .fmu first.");
     return;
   }
   if (!$("fmi-consent").checked) {
@@ -1630,32 +1776,176 @@ async function openBindingCsv() {
   await openPath(lastBinding?.records_csv, "binding-status");
 }
 
+function setDisabled(id, disabled) {
+  const element = $(id);
+  if (element) element.disabled = Boolean(disabled);
+}
+
+function pathHasExtension(path, extensions) {
+  const value = String(path || "").trim().toLowerCase();
+  return extensions.some((extension) => value.endsWith(`.${extension.toLowerCase()}`));
+}
+
+function refreshActionAvailability() {
+  const outputDir = $("output-dir").value.trim();
+  const seed = Number.parseInt($("seed").value, 10);
+  const seedValid = Number.isInteger(seed) && seed >= 0 && seed <= 2147483647;
+  const csv = $("csv-path").value.trim();
+  const csvValid = pathHasExtension(csv, ["csv"]);
+  const academicRun = $("academic-run-dir").value.trim()
+    || lastRun?.output_dir
+    || parentPath(lastPreview?.csv_path || csv);
+  const mechanisticModel = $("mechanistic-model").value.trim();
+  const copasiModel = $("copasi-model").value.trim();
+  const cellmlModel = $("cellml-model").value.trim();
+  const fmiModel = $("fmi-model").value.trim();
+  const mechanisticValid = pathHasExtension(mechanisticModel, ["xml", "sbml"]);
+  const copasiValid = pathHasExtension(copasiModel, ["cps"]);
+  const cellmlValid = pathHasExtension(cellmlModel, ["cellml", "xml"]);
+  const fmiValid = pathHasExtension(fmiModel, ["fmu"]);
+
+  setDisabled("run-btn", runBusy || !selectedWorkflow || !outputDir || !seedValid);
+  setDisabled("refresh-btn", runBusy);
+  setDisabled("history-btn", runBusy || !outputDir);
+  setDisabled("output-browse-btn", runBusy);
+  setDisabled("preview-btn", runBusy || !csvValid);
+  setDisabled("csv-browse-btn", runBusy);
+  setDisabled("open-csv-btn", runBusy || !csvValid);
+  setDisabled("mdmp-btn", runBusy || !csvValid);
+  setDisabled("open-run-folder-btn", runBusy || !lastRun?.output_dir);
+  setDisabled("open-report-btn", runBusy || !lastRun?.report_pdf);
+  setDisabled("open-certificate-btn", runBusy || !lastMdmp?.certificate_path);
+  setDisabled("academic-export-btn", runBusy || !academicRun);
+  setDisabled("academic-run-browse-btn", runBusy);
+  setDisabled("academic-open-metadata-btn", !lastAcademicBundle?.ro_crate_metadata);
+  setDisabled("academic-open-audit-btn", !lastAcademicBundle?.audit_json);
+  setDisabled("academic-open-guide-btn", !lastAcademicBundle?.readme_md);
+
+  for (const id of [
+    "mechanistic-model-browse-btn",
+    "copasi-model-browse-btn",
+    "cellml-model-browse-btn",
+    "fmi-model-browse-btn"
+  ]) {
+    setDisabled(id, researchBusy);
+  }
+  setDisabled("molecule-refresh-btn", researchBusy);
+  setDisabled("genomics-run-btn", researchBusy);
+  setDisabled("genomics-open-btn", researchBusy || !lastGenomics?.html_path);
+  setDisabled("tissue-run-btn", researchBusy);
+  setDisabled("tissue-open-btn", researchBusy || !lastTissue?.html_path);
+  setDisabled("mechanistic-status-btn", researchBusy);
+  setDisabled("mechanistic-inspect-btn", researchBusy || !mechanisticValid);
+  setDisabled("mechanistic-run-btn", researchBusy || !mechanisticValid || !outputDir);
+  setDisabled("mechanistic-open-folder-btn", researchBusy || !lastMechanistic?.run_dir);
+  setDisabled("mechanistic-open-report-btn", researchBusy || !lastMechanistic?.report_md);
+  setDisabled("mechanistic-open-results-btn", researchBusy || !lastMechanistic?.results_csv);
+  setDisabled("cross-scale-status-btn", researchBusy);
+  setDisabled("copasi-inspect-btn", researchBusy || !copasiValid);
+  setDisabled("copasi-run-btn", researchBusy || !copasiValid || !outputDir || !$("copasi-consent").checked);
+  setDisabled("copasi-open-btn", researchBusy || !lastCopasi?.run_dir);
+  setDisabled("cellml-inspect-btn", researchBusy || !cellmlValid);
+  setDisabled("cellml-validate-btn", researchBusy || !cellmlValid || !outputDir);
+  setDisabled("cellml-open-btn", researchBusy || !lastCellml?.run_dir);
+  setDisabled("fmi-inspect-btn", researchBusy || !fmiValid);
+  setDisabled("fmi-run-btn", researchBusy || !fmiValid || !outputDir || !$("fmi-consent").checked);
+  setDisabled("fmi-open-btn", researchBusy || !lastFmi?.run_dir);
+  setDisabled("fmi-results-btn", researchBusy || !lastFmi?.results_csv);
+  setDisabled("binding-query-btn", researchBusy || !$("binding-uniprot").value.trim() || !outputDir);
+  setDisabled("binding-open-btn", researchBusy || !lastBinding?.output_dir);
+  setDisabled("binding-csv-btn", researchBusy || !lastBinding?.records_csv);
+}
+
 function setBusy(isBusy) {
-  $("run-btn").disabled = isBusy;
-  $("refresh-btn").disabled = isBusy;
-  $("preview-btn").disabled = isBusy;
-  $("history-btn").disabled = isBusy;
-  $("mdmp-btn").disabled = isBusy;
-  $("open-run-folder-btn").disabled = isBusy;
-  $("open-report-btn").disabled = isBusy;
-  $("academic-export-btn").disabled = isBusy;
+  runBusy = Boolean(isBusy);
+  refreshActionAvailability();
 }
 
 function setResearchBusy(isBusy) {
-  $("genomics-run-btn").disabled = isBusy;
-  $("tissue-run-btn").disabled = isBusy;
-  $("molecule-refresh-btn").disabled = isBusy;
-  $("mechanistic-status-btn").disabled = isBusy;
-  $("mechanistic-inspect-btn").disabled = isBusy;
-  $("mechanistic-run-btn").disabled = isBusy;
-  $("cross-scale-status-btn").disabled = isBusy;
-  $("copasi-inspect-btn").disabled = isBusy;
-  $("copasi-run-btn").disabled = isBusy;
-  $("cellml-inspect-btn").disabled = isBusy;
-  $("cellml-validate-btn").disabled = isBusy;
-  $("fmi-inspect-btn").disabled = isBusy;
-  $("fmi-run-btn").disabled = isBusy;
-  $("binding-query-btn").disabled = isBusy;
+  researchBusy = Boolean(isBusy);
+  refreshActionAvailability();
+}
+
+function initializeFormState() {
+  $("output-dir").addEventListener("input", () => {
+    $("output-dir").setAttribute("aria-invalid", String(!$("output-dir").value.trim()));
+    lastRun = null;
+    refreshActionAvailability();
+  });
+  $("seed").addEventListener("input", () => {
+    const seed = Number.parseInt($("seed").value, 10);
+    $("seed").setAttribute(
+      "aria-invalid",
+      String(!Number.isInteger(seed) || seed < 0 || seed > 2147483647)
+    );
+    refreshActionAvailability();
+  });
+  $("csv-path").addEventListener("input", () => {
+    const value = $("csv-path").value.trim();
+    $("csv-path").setAttribute("aria-invalid", String(Boolean(value) && !pathHasExtension(value, ["csv"])));
+    lastPreview = null;
+    lastMdmp = null;
+    refreshActionAvailability();
+  });
+  $("academic-run-dir").addEventListener("input", () => {
+    lastAcademicBundle = null;
+    refreshActionAvailability();
+  });
+  $("mechanistic-model").addEventListener("input", () => {
+    const value = $("mechanistic-model").value.trim();
+    $("mechanistic-model").setAttribute(
+      "aria-invalid",
+      String(Boolean(value) && !pathHasExtension(value, ["xml", "sbml"]))
+    );
+    lastMechanistic = null;
+    refreshActionAvailability();
+  });
+  $("copasi-model").addEventListener("input", () => {
+    const value = $("copasi-model").value.trim();
+    $("copasi-model").setAttribute(
+      "aria-invalid",
+      String(Boolean(value) && !pathHasExtension(value, ["cps"]))
+    );
+    lastCopasi = null;
+    refreshActionAvailability();
+  });
+  $("cellml-model").addEventListener("input", () => {
+    const value = $("cellml-model").value.trim();
+    $("cellml-model").setAttribute(
+      "aria-invalid",
+      String(Boolean(value) && !pathHasExtension(value, ["cellml", "xml"]))
+    );
+    lastCellml = null;
+    refreshActionAvailability();
+  });
+  $("fmi-model").addEventListener("input", () => {
+    const value = $("fmi-model").value.trim();
+    $("fmi-model").setAttribute(
+      "aria-invalid",
+      String(Boolean(value) && !pathHasExtension(value, ["fmu"]))
+    );
+    lastFmi = null;
+    refreshActionAvailability();
+  });
+  for (const id of ["copasi-consent", "fmi-consent", "binding-uniprot"]) {
+    $(id).addEventListener("input", refreshActionAvailability);
+    $(id).addEventListener("change", refreshActionAvailability);
+  }
+}
+
+function initializeKeyboardShortcuts() {
+  document.addEventListener("keydown", (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+    if (event.key === ",") {
+      event.preventDefault();
+      setActiveView("settings");
+      $("settings-output-dir").focus();
+    } else if (event.key.toLowerCase() === "o") {
+      event.preventDefault();
+      setActiveView("results");
+      void chooseResultsCsv();
+    }
+  });
 }
 
 function firstIndex(columns, candidates) {
@@ -1729,6 +2019,7 @@ $("run-btn").addEventListener("click", runSelectedWorkflow);
 $("guide-btn").addEventListener("click", openUserGuide);
 $("settings-save-btn").addEventListener("click", saveWorkbenchSettings);
 $("settings-reset-btn").addEventListener("click", resetWorkbenchSettings);
+$("settings-output-browse-btn").addEventListener("click", chooseSettingsOutputFolder);
 $("settings-guide-btn").addEventListener("click", openUserGuide);
 $("settings-install-guide-btn").addEventListener("click", openInstallGuide);
 $("settings-docs-btn").addEventListener("click", openDocsHome);
@@ -1745,11 +2036,14 @@ $("update-copy-btn").addEventListener("click", copyUpdateCommand);
 $("update-terminal-btn").addEventListener("click", openSdkUpdateTerminal);
 $("open-run-folder-btn").addEventListener("click", openLatestRunFolder);
 $("open-report-btn").addEventListener("click", openLatestReport);
+$("output-browse-btn").addEventListener("click", chooseRunOutputFolder);
 $("preview-btn").addEventListener("click", previewCsv);
+$("csv-browse-btn").addEventListener("click", chooseResultsCsv);
 $("mdmp-btn").addEventListener("click", certifyMdmp);
 $("open-csv-btn").addEventListener("click", openLoadedCsv);
 $("open-certificate-btn").addEventListener("click", openLatestCertificate);
 $("academic-export-btn").addEventListener("click", exportAcademicBundle);
+$("academic-run-browse-btn").addEventListener("click", chooseAcademicRunFolder);
 $("academic-open-metadata-btn").addEventListener("click", openAcademicMetadata);
 $("academic-open-audit-btn").addEventListener("click", openAcademicAudit);
 $("academic-open-guide-btn").addEventListener("click", openAcademicGuide);
@@ -1764,18 +2058,50 @@ $("genomics-open-btn").addEventListener("click", openGenomicsPlot);
 $("tissue-run-btn").addEventListener("click", runTissueStressTest);
 $("tissue-open-btn").addEventListener("click", openTissuePlot);
 $("mechanistic-status-btn").addEventListener("click", loadMechanisticStatus);
+$("mechanistic-model-browse-btn").addEventListener("click", () => chooseResearchModel(
+  "mechanistic-model",
+  "mechanistic-model-browse-btn",
+  "mechanistic-status",
+  "Choose an SBML reference model",
+  "SBML model",
+  ["xml", "sbml"]
+));
 $("mechanistic-inspect-btn").addEventListener("click", inspectMechanisticModel);
 $("mechanistic-run-btn").addEventListener("click", runMechanisticModel);
 $("mechanistic-open-folder-btn").addEventListener("click", openMechanisticFolder);
 $("mechanistic-open-report-btn").addEventListener("click", openMechanisticReport);
 $("mechanistic-open-results-btn").addEventListener("click", openMechanisticResults);
 $("cross-scale-status-btn").addEventListener("click", loadCrossScaleStatus);
+$("copasi-model-browse-btn").addEventListener("click", () => chooseResearchModel(
+  "copasi-model",
+  "copasi-model-browse-btn",
+  "copasi-status",
+  "Choose a COPASI model",
+  "COPASI model",
+  ["cps"]
+));
 $("copasi-inspect-btn").addEventListener("click", inspectCopasiModel);
 $("copasi-run-btn").addEventListener("click", runCopasiAnalysis);
 $("copasi-open-btn").addEventListener("click", openCopasiBundle);
+$("cellml-model-browse-btn").addEventListener("click", () => chooseResearchModel(
+  "cellml-model",
+  "cellml-model-browse-btn",
+  "cellml-status",
+  "Choose a CellML model",
+  "CellML model",
+  ["cellml", "xml"]
+));
 $("cellml-inspect-btn").addEventListener("click", inspectCellmlModel);
 $("cellml-validate-btn").addEventListener("click", validateCellmlModel);
 $("cellml-open-btn").addEventListener("click", openCellmlBundle);
+$("fmi-model-browse-btn").addEventListener("click", () => chooseResearchModel(
+  "fmi-model",
+  "fmi-model-browse-btn",
+  "fmi-status",
+  "Choose a Functional Mock-up Unit",
+  "FMI model",
+  ["fmu"]
+));
 $("fmi-inspect-btn").addEventListener("click", inspectFmiModel);
 $("fmi-run-btn").addEventListener("click", runFmiModel);
 $("fmi-open-btn").addEventListener("click", openFmiBundle);
@@ -1786,8 +2112,11 @@ $("binding-csv-btn").addEventListener("click", openBindingCsv);
 $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
 initializeNativeInteractionPolicy();
+initializeFormState();
+initializeKeyboardShortcuts();
 const initialSettings = initializeSettings();
 initializeNavigation();
+refreshActionAvailability();
 const startupTasks = [loadStatus()];
 if (initialSettings.autoDiagnostics) {
   startupTasks.push(runDiagnostics());

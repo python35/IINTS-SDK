@@ -12,6 +12,7 @@ const required = [
   "frontend/main.js",
   "scripts/build-brand-icons.py",
   "src-tauri/tauri.conf.json",
+  "src-tauri/capabilities/main.json",
   "src-tauri/icons/icon.icns",
   "src-tauri/icons/icon.ico",
   "src-tauri/icons/icon.png",
@@ -31,6 +32,7 @@ const html = readFileSync(join(appRoot, "frontend/index.html"), "utf8");
 const script = readFileSync(join(appRoot, "frontend/main.js"), "utf8");
 const styles = readFileSync(join(appRoot, "frontend/styles.css"), "utf8");
 const tauriConfig = JSON.parse(readFileSync(join(appRoot, "src-tauri/tauri.conf.json"), "utf8"));
+const capabilities = JSON.parse(readFileSync(join(appRoot, "src-tauri/capabilities/main.json"), "utf8"));
 if (!html.includes("Research only") || !html.includes("Not a medical device")) {
   console.error("frontend/index.html must contain the research-only disclaimer.");
   process.exit(1);
@@ -89,6 +91,36 @@ if (!styles.includes("user-select: none") || !styles.includes("user-select: text
 
 if (!script.includes("initializeNativeInteractionPolicy") || !script.includes('"contextmenu"')) {
   console.error("The native shell must suppress the browser context menu outside copyable research output.");
+  process.exit(1);
+}
+
+const pickerIds = [
+  "settings-output-browse-btn",
+  "output-browse-btn",
+  "csv-browse-btn",
+  "academic-run-browse-btn",
+  "mechanistic-model-browse-btn",
+  "copasi-model-browse-btn",
+  "cellml-model-browse-btn",
+  "fmi-model-browse-btn"
+];
+if (
+  pickerIds.some((id) => !html.includes(`id="${id}"`))
+  || !script.includes("nativeOpenDialog")
+  || !script.includes("chooseLocalPath")
+  || !styles.includes(".path-picker")
+) {
+  console.error("Every path-based workflow must expose the shared native file/folder selector.");
+  process.exit(1);
+}
+
+const permissions = capabilities.permissions || [];
+if (!permissions.includes("dialog:allow-open")) {
+  console.error("The native selectors require only the user-mediated dialog:allow-open permission.");
+  process.exit(1);
+}
+if (permissions.some((permission) => /^(?:fs|shell|http|updater|process):/.test(permission))) {
+  console.error("Native selectors must not introduce broad filesystem, shell, network, or updater permissions.");
   process.exit(1);
 }
 

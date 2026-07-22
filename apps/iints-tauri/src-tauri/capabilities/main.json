@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main IINTS-AF research workbench window. No shell, filesystem, updater, or HTTP plugin permissions are granted.",
+  "description": "Main IINTS-AF research workbench window. Native user-mediated open dialogs are allowed; no shell, filesystem, updater, or HTTP plugin permissions are granted.",
   "windows": ["main"],
   "permissions": [
     "core:app:default",
     "core:event:default",
     "core:path:default",
     "core:resources:default",
-    "core:window:default"
+    "core:window:default",
+    "dialog:allow-open"
   ]
 }
