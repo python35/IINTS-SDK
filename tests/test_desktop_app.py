@@ -736,6 +736,8 @@ def test_tauri_beta_workflow_builds_native_installers_with_stable_links() -> Non
     packager = Path("tools/desktop/package_tauri_bundle.py").read_text(encoding="utf-8")
 
     assert "tauri-beta-latest" in workflow
+    assert 'git tag -f tauri-beta-latest "$GITHUB_SHA"' in workflow
+    assert "Refresh stable desktop prerelease" in workflow
     assert "npm run tauri -- build --bundles" in workflow
     assert '"$executable" --smoke' in workflow
     assert "cargo clippy" in workflow

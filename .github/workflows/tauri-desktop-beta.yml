@@ -250,6 +250,11 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
     steps:
+      - name: Checkout release source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Download platform installers
         uses: actions/download-artifact@v8
         with:
@@ -297,7 +302,7 @@ jobs:
           Research and education only. This is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
           EOF
 
-      - name: Create or update GitHub prerelease
+      - name: Create or update requested GitHub prerelease
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.release.outputs.tag }}
@@ -306,5 +311,25 @@ jobs:
           files: release-assets/*
           overwrite_files: true
           draft: ${{ steps.release.outputs.draft }}
+          prerelease: true
+          make_latest: false
+
+      - name: Move stable desktop tag to this tested build
+        if: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') }}
+        shell: bash
+        run: |
+          git tag -f tauri-beta-latest "$GITHUB_SHA"
+          git push origin refs/tags/tauri-beta-latest --force
+
+      - name: Refresh stable desktop prerelease
+        if: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: tauri-beta-latest
+          name: IINTS-AF Rust Research Workbench Beta
+          body_path: tauri-beta-release-notes.md
+          files: release-assets/*
+          overwrite_files: true
+          draft: false
           prerelease: true
           make_latest: false
