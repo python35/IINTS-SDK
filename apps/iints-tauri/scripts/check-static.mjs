@@ -71,6 +71,8 @@ if (
   || !html.includes('data-view-panel="settings"')
   || !html.includes("settings-save-btn")
   || !html.includes("settings-guide-btn")
+  || !html.includes("install-engine-btn")
+  || !html.includes("Install or update Python SDK")
   || !script.includes("SETTINGS_STORAGE_KEY")
   || !script.includes("isAllowedLocalAiHost")
   || !script.includes("desktop_app_info")

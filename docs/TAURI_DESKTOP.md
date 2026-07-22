@@ -28,17 +28,20 @@ The stable beta tag always points to the current platform installers:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
 | Linux | [`.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
 
-The native shell delegates scientific operations to the Python SDK. Install or update the engine once before using research workflows:
+The native shell delegates scientific operations to the Python SDK. On first launch, select
+**Install Python engine** if Overview reports that the bridge is unavailable. The app opens a
+visible terminal, creates `~/.iints-af/python-engine`, and installs the supported SDK package.
+Return to the app and select **Refresh versions** when the terminal completes.
 
-```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
-```
+This bootstrap needs Python `3.10` through `3.14`. The app checks common macOS Python.org,
+Homebrew, and MacPorts locations in addition to the application `PATH`. Advanced users can still
+set `IINTS_PYTHON` explicitly. See [Desktop App Installation](APP_INSTALL.md) for manual recovery.
 
 COPASI, OpenCOR, Ollama, and model files remain optional external research tools. They are detected explicitly rather than installed silently.
 
 The **Settings** workspace keeps maintenance separate from experiments. It stores only local,
 non-sensitive defaults, reports the native app and Python SDK versions independently, opens a
-fixed SDK update command in a visible terminal, and links to the stable desktop installer release.
+fixed SDK install/update command in a visible terminal, and links to the stable desktop installer release.
 It does not store credentials or silently replace the running executable.
 
 ### macOS integrity and Gatekeeper
@@ -81,8 +84,10 @@ python -m iints_desktop.tauri_bridge <fixed-command>
 The Python executable is resolved in this order:
 
 1. `IINTS_PYTHON`
-2. `python3` / `python`
-3. Windows fallback: `py -3`
+2. the private app engine at `~/.iints-af/python-engine`
+3. common absolute Python locations on macOS
+4. `python3` / `python`
+5. Windows fallback: `py -3`
 
 ## Development
 
@@ -133,11 +138,12 @@ The workbench intentionally avoids:
 - shell command plugins
 - broad filesystem plugins
 - remote web content
-- automatic self-update logic
+- silent executable self-update logic
 - arbitrary Python execution from the UI
 
-The current Settings panel opens the signed stable release for explicit installation rather than
-using an automatic self-updater. Hardening roadmap:
+The current Settings panel opens the signed stable release for explicit app installation. Its
+Python-engine bootstrap is a fixed, visible maintenance command rather than arbitrary frontend
+shell input. Hardening roadmap:
 
 - Add signed Tauri updater after release signing is stable.
 - Use a dedicated app data directory for outputs.

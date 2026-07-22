@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::process::Stdio;
 
 #[derive(Debug, Clone)]
 struct PythonCandidate {
@@ -74,6 +75,14 @@ fn python_candidates() -> Vec<PythonCandidate> {
             });
         }
     }
+    if let Some(path) = managed_python_engine_path() {
+        if path.is_file() {
+            candidates.push(PythonCandidate {
+                program: path.to_string_lossy().into_owned(),
+                prefix_args: Vec::new(),
+            });
+        }
+    }
     if cfg!(windows) {
         candidates.push(PythonCandidate {
             program: "py".to_string(),
@@ -84,6 +93,26 @@ fn python_candidates() -> Vec<PythonCandidate> {
             prefix_args: Vec::new(),
         });
     } else {
+        if cfg!(target_os = "macos") {
+            for path in [
+                "/opt/homebrew/bin/python3",
+                "/usr/local/bin/python3",
+                "/opt/local/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/Current/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.13/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.12/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.11/bin/python3",
+                "/Library/Frameworks/Python.framework/Versions/3.10/bin/python3",
+            ] {
+                if Path::new(path).is_file() {
+                    candidates.push(PythonCandidate {
+                        program: path.to_string(),
+                        prefix_args: Vec::new(),
+                    });
+                }
+            }
+        }
         candidates.push(PythonCandidate {
             program: "python3".to_string(),
             prefix_args: Vec::new(),
@@ -142,7 +171,7 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
         }
     }
     Err(format!(
-        "Could not start Python for the IINTS SDK bridge. Set IINTS_PYTHON to the Python executable that has iints-sdk-python35 installed.\nAttempts:\n{}",
+        "The IINTS Python research engine is not installed or could not be found. Open Settings and choose 'Install or update Python SDK'. The app will create a private engine under ~/.iints-af when Python 3.10-3.14 is available. Advanced users may instead set IINTS_PYTHON.\nAttempts:\n{}",
         attempts.join("\n")
     ))
 }
@@ -773,7 +802,7 @@ async fn open_external_url_allowlisted(url: String) -> Result<(), String> {
 
 async fn open_sdk_update_terminal_allowlisted() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let command = build_sdk_update_command_text()?;
+        let command = build_sdk_maintenance_command_text()?;
         open_terminal_with_command(&command)
     })
     .await
@@ -808,6 +837,26 @@ fn home_dir() -> Option<PathBuf> {
         env::var_os("USERPROFILE").map(PathBuf::from)
     } else {
         env::var_os("HOME").map(PathBuf::from)
+    }
+}
+
+fn managed_python_engine_root() -> Option<PathBuf> {
+    home_dir().map(|home| managed_python_engine_root_for(&home))
+}
+
+fn managed_python_engine_path() -> Option<PathBuf> {
+    managed_python_engine_root().map(|root| managed_python_engine_path_for(&root))
+}
+
+fn managed_python_engine_root_for(home: &Path) -> PathBuf {
+    home.join(".iints-af").join("python-engine")
+}
+
+fn managed_python_engine_path_for(root: &Path) -> PathBuf {
+    if cfg!(windows) {
+        root.join("Scripts").join("python.exe")
+    } else {
+        root.join("bin").join("python")
     }
 }
 
@@ -948,9 +997,24 @@ fn python_candidate_has_iints_sdk(candidate: &PythonCandidate) -> bool {
     command.args(&candidate.prefix_args);
     command.args([
         "-c",
-        "import importlib.metadata; importlib.metadata.version('iints-sdk-python35')",
+        "import importlib.metadata; importlib.metadata.version('iints-sdk-python35'); import iints_desktop.tauri_bridge",
     ]);
     command.env("PYTHONUTF8", "1");
+    command.stdout(Stdio::null()).stderr(Stdio::null());
+    command
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn python_candidate_is_supported(candidate: &PythonCandidate) -> bool {
+    let mut command = Command::new(&candidate.program);
+    command.args(&candidate.prefix_args);
+    command.args([
+        "-c",
+        "import sys; raise SystemExit(0 if (3, 10) <= sys.version_info[:2] < (3, 15) else 1)",
+    ]);
+    command.stdout(Stdio::null()).stderr(Stdio::null());
     command
         .status()
         .map(|status| status.success())
@@ -1016,6 +1080,74 @@ fn build_sdk_update_command_text() -> Result<String, String> {
     }
 }
 
+fn build_sdk_install_command_text() -> Result<String, String> {
+    let engine_root = managed_python_engine_root().ok_or_else(|| {
+        "Could not resolve the home directory for the private Python engine.".to_string()
+    })?;
+    let engine_python = managed_python_engine_path()
+        .ok_or_else(|| "Could not resolve the private Python engine executable.".to_string())?;
+    let engine_candidate = PythonCandidate {
+        program: engine_python.to_string_lossy().into_owned(),
+        prefix_args: Vec::new(),
+    };
+    let engine_is_usable =
+        engine_python.is_file() && python_candidate_is_supported(&engine_candidate);
+    let install_parts = [
+        engine_python.to_string_lossy().into_owned(),
+        "-m".to_string(),
+        "pip".to_string(),
+        "install".to_string(),
+        "--upgrade".to_string(),
+        "pip".to_string(),
+        "iints-sdk-python35[desktop-all]".to_string(),
+    ];
+    let quote = |value: &str| {
+        if cfg!(windows) {
+            quote_cmd_arg(value)
+        } else {
+            quote_posix_arg(value)
+        }
+    };
+
+    let install_command = install_parts
+        .iter()
+        .map(|part| quote(part))
+        .collect::<Vec<_>>()
+        .join(" ");
+    if engine_is_usable {
+        return Ok(install_command);
+    }
+
+    let candidate = python_candidates()
+        .into_iter()
+        .filter(|item| item.program != engine_candidate.program)
+        .find(python_candidate_is_supported)
+        .ok_or_else(|| {
+            "Python 3.10-3.14 was not found. Install a current Python from https://www.python.org/downloads/ and then use this button again.".to_string()
+        })?;
+    let mut create_parts = vec![candidate.program];
+    create_parts.extend(candidate.prefix_args);
+    create_parts.extend([
+        "-m".to_string(),
+        "venv".to_string(),
+        "--clear".to_string(),
+        engine_root.to_string_lossy().into_owned(),
+    ]);
+    let create_command = create_parts
+        .iter()
+        .map(|part| quote(part))
+        .collect::<Vec<_>>()
+        .join(" ");
+    Ok(format!("{create_command} && {install_command}"))
+}
+
+fn build_sdk_maintenance_command_text() -> Result<String, String> {
+    match build_sdk_update_command_text() {
+        Ok(command) => Ok(command),
+        Err(_) => build_sdk_install_command_text(),
+    }
+}
+
 fn escape_applescript_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
@@ -1023,7 +1155,7 @@ fn escape_applescript_string(value: &str) -> String {
 fn open_terminal_with_command(command_text: &str) -> Result<(), String> {
     if cfg!(target_os = "macos") {
         let held_command = format!(
-            "{}; echo; echo 'IINTS update finished. You may close this terminal.'; exec zsh",
+            "{}; echo; echo 'IINTS Python engine maintenance finished. Return to the app and choose Refresh versions.'; exec zsh",
             command_text
         );
         let script = format!(
@@ -1196,6 +1328,18 @@ mod tests {
             info["release_url"],
             "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest"
         );
+    }
+
+    #[test]
+    fn managed_python_engine_stays_inside_the_user_home() {
+        let root = managed_python_engine_root_for(Path::new("/home/researcher"));
+        assert_eq!(root, Path::new("/home/researcher/.iints-af/python-engine"));
+        let executable = managed_python_engine_path_for(&root);
+        if cfg!(windows) {
+            assert!(executable.ends_with(Path::new("Scripts/python.exe")));
+        } else {
+            assert!(executable.ends_with(Path::new("bin/python")));
+        }
     }
 
     #[test]

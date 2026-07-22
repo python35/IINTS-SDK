@@ -763,15 +763,23 @@ def test_tauri_app_exposes_sdk_update_actions_safely() -> None:
     assert "async fn desktop_update_info" in rust_source
     assert "async fn open_sdk_update_terminal" in rust_source
     assert "build_sdk_update_command_parts" in rust_source
+    assert "build_sdk_install_command_text" in rust_source
+    assert "build_sdk_maintenance_command_text" in rust_source
+    assert "managed_python_engine_path" in rust_source
+    assert "Python 3.10-3.14" in rust_source
+    assert "import iints_desktop.tauri_bridge" in rust_source
     assert "iints-sdk-python35[desktop-all]" in rust_source
     assert "github.com" in rust_source
     assert "python35.github.io" in rust_source
     assert "def _update_info" in bridge_source
     assert "update-info" in bridge_source
     assert "update-terminal-btn" in frontend
+    assert "install-engine-btn" in frontend
+    assert "Install or update Python SDK" in frontend
     assert "update-status" in frontend
     assert "desktop_update_info" in frontend_js
     assert "open_sdk_update_terminal" in frontend_js
+    assert "~/.iints-af/python-engine" in frontend_js
     assert "update-panel" in frontend_css
     assert "fixed Rust-owned command" in readme
 

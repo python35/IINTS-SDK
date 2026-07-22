@@ -32,11 +32,9 @@ Current Rust/Tauri beta downloads:
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
 | Linux | [`.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
 
-The beta delegates scientific operations to the installed IINTS-AF SDK. Install or update that engine once with:
-
-```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
-```
+The beta delegates scientific operations to the IINTS-AF Python engine. On first launch, choose
+**Install Python engine** if the bridge is unavailable; the app creates a private engine and keeps
+its setup visible in a terminal.
 
 See the [Tauri workbench documentation](https://python35.github.io/IINTS-SDK/TAURI_DESKTOP/) for architecture, security boundaries, and development instructions.
 

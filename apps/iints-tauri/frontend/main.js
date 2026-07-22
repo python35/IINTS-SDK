@@ -330,12 +330,14 @@ async function loadStatus() {
     const status = await call("desktop_status");
     $("sdk-status").textContent = `SDK ${status.sdk_version} via ${status.python_executable}`;
     $("sdk-status-dot").className = "status-dot ok";
+    $("install-engine-btn").hidden = true;
     setText("settings-sdk-version", status.sdk_version || "Unknown");
     setText("settings-python-path", status.python_executable || "Python path unavailable");
     setText("run-status", "Python SDK bridge ready.\nSelect a workflow and run it.");
   } catch (error) {
     $("sdk-status").textContent = "Python bridge unavailable";
     $("sdk-status-dot").className = "status-dot error";
+    $("install-engine-btn").hidden = false;
     setText("settings-sdk-version", "Unavailable");
     setText("settings-python-path", errorMessage(error));
     setText("run-status", errorMessage(error));
@@ -373,7 +375,10 @@ async function loadUpdateInfo() {
       ].join("\n")
     );
   } catch (error) {
-    setText("update-status", errorMessage(error));
+    setText(
+      "update-status",
+      `${errorMessage(error)}\n\nUse 'Install or update Python SDK' to create or repair the private app engine.`
+    );
   }
 }
 
@@ -438,16 +443,18 @@ async function copyUpdateCommand() {
 }
 
 async function openSdkUpdateTerminal() {
-  setText("update-status", "Opening a terminal with the fixed SDK update command...");
+  setText("update-status", "Opening a terminal to install or update the private Python SDK engine...");
   try {
     await call("open_sdk_update_terminal");
     setText(
       "update-status",
       [
-        "SDK update terminal launched.",
-        "The command is fixed by the Rust layer and updates the Python SDK package with desktop/research extras.",
+        "Python engine maintenance terminal launched.",
+        "If no engine exists, the app creates ~/.iints-af/python-engine and installs the SDK there.",
+        "If an engine already exists, the fixed Rust-owned command updates it.",
+        "When the terminal reports completion, choose Refresh versions. Restarting the app is not normally required.",
         "",
-        updateInfo?.pip_command || "Run Check update info to see the exact command."
+        updateInfo?.pip_command || "The installed SDK version will appear after maintenance completes."
       ].join("\n")
     );
   } catch (error) {
@@ -1730,6 +1737,7 @@ $("refresh-btn").addEventListener("click", loadWorkflows);
 $("history-btn").addEventListener("click", loadHistory);
 $("diagnostics-btn").addEventListener("click", runDiagnostics);
 $("open-output-btn").addEventListener("click", openOutputFolder);
+$("install-engine-btn").addEventListener("click", openSdkUpdateTerminal);
 $("update-refresh-btn").addEventListener("click", loadUpdateInfo);
 $("update-download-btn").addEventListener("click", openAppDownloads);
 $("update-docs-btn").addEventListener("click", openUpdateDocs);

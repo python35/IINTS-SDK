@@ -276,7 +276,7 @@ jobs:
 
           This prerelease contains the native Rust/Tauri research workbench with a restrained text-only IINTS-AF identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
 
-          The new Settings workspace stores non-sensitive local defaults, reports app and Python SDK versions independently, opens a fixed SDK update command in a visible terminal, links to the stable app installers, and provides direct access to the maintained user and installation guides.
+          The Settings workspace stores non-sensitive local defaults, reports app and Python SDK versions independently, creates or repairs a private Python engine through a fixed visible command, links to the stable app installers, and provides direct access to the maintained user and installation guides.
 
           ## Downloads
 
@@ -288,11 +288,7 @@ jobs:
 
           ## Required scientific engine
 
-          This beta is a secure native shell around the Python SDK. Install or update the engine once before using research workflows:
-
-          ```bash
-          python -m pip install -U "iints-sdk-python35[full,mdmp,research]"
-          ```
+          This beta is a secure native shell around the Python SDK. If Overview reports that the bridge is unavailable, select **Install Python engine**. The app creates a private engine under `~/.iints-af/python-engine` through a fixed Rust-owned command. Return to the app and select **Refresh versions** when the visible terminal completes. Python 3.10-3.14 must be available on the computer.
 
           The app never silently installs COPASI, OpenCOR, Ollama, or model files. It detects optional external tools and reports what is available.
 

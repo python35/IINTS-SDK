@@ -36,6 +36,11 @@ export IINTS_PYTHON=/absolute/path/to/python
 npm run tauri dev
 ```
 
+Packaged builds provide a safer first-launch route: **Install Python engine** creates a private
+`~/.iints-af/python-engine` environment through a fixed Rust-owned command. macOS discovery also
+checks common Homebrew, MacPorts, and Python.org framework locations because Finder applications
+do not inherit the user's full shell `PATH`.
+
 ## Build
 
 ```bash
@@ -64,8 +69,8 @@ the text-only `IINTS-AF` name so the application identity stays legible at every
 - Save non-sensitive local defaults for output location, deterministic seed, Ollama model/host,
   and startup diagnostics.
 - Load SDK version/status.
-- Show SDK/app update information, copy the fixed SDK update command, open the stable Tauri app
-  release and documentation, and launch a fixed update terminal.
+- Show SDK/app update information, bootstrap or repair a private Python engine, open the stable
+  Tauri app release and documentation, and launch a fixed maintenance terminal.
 - Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.
@@ -115,7 +120,9 @@ The workbench does not present a portal link as an implemented scientific pipeli
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
-- The SDK update terminal is a fixed Rust-owned command, not user-provided shell text.
+- The SDK maintenance terminal is a fixed Rust-owned command, not user-provided shell text. It may
+  create `~/.iints-af/python-engine` and installs only the allowlisted `iints-sdk-python35[desktop-all]`
+  package specification.
 - Native file opening is limited to existing folders and safe evidence/report file types.
 - Structural evidence opening is limited to bundled/report artifacts such as PNG, HTML, and mmCIF.
 - Official evidence resources open only in the system browser through a Rust HTTPS host allowlist.

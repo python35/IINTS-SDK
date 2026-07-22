@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-5" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-6" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -78,6 +78,7 @@
         <div class="button-row">
           <button id="diagnostics-btn" class="primary">Run diagnostics</button>
           <button id="open-output-btn">Open default output folder</button>
+          <button id="install-engine-btn" hidden>Install Python engine</button>
         </div>
         <div id="diagnostics-grid" class="diagnostics-grid" aria-live="polite"></div>
       </section>
@@ -142,7 +143,7 @@
             <span class="action-label">Installed software</span>
             <div class="button-row">
               <button id="update-refresh-btn">Refresh versions</button>
-              <button id="update-terminal-btn" class="primary">Update Python SDK</button>
+              <button id="update-terminal-btn" class="primary">Install or update Python SDK</button>
             </div>
           </div>
           <div class="action-cluster action-cluster-resources">
@@ -635,6 +636,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js?v=workbench-5"></script>
+    <script type="module" src="./main.js?v=workbench-6"></script>
   </body>
 </html>

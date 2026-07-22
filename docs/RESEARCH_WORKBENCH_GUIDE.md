@@ -18,13 +18,11 @@ Use the current native beta installer for your platform:
 | macOS | [Download `.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
 | Linux | [Download `.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
 
-The native app delegates calculations to the Python SDK. If the overview reports that the Python engine is unavailable, install or update it once:
+The native app delegates calculations to the Python SDK. If Overview reports that the Python engine is unavailable, select **Install Python engine**. The same action is available under **Settings → Install or update Python SDK**.
 
-```bash
-python -m pip install --upgrade "iints-sdk-python35[desktop-all]"
-```
+The app opens a terminal with a fixed Rust-owned command, creates a private engine at `~/.iints-af/python-engine`, and installs the supported SDK dependencies there. After completion, return to the app and select **Refresh versions**. This avoids relying on the limited `PATH` inherited by a macOS Finder launch and does not modify an unrelated project environment.
 
-You can also use **Settings → Update Python SDK**. The app opens a terminal with a fixed update command so the operation remains visible.
+Python `3.10` through `3.14` must be available on the computer. The [installation guide](APP_INSTALL.md) includes a manual fallback when automatic discovery cannot find it.
 
 ### Native interaction
 
@@ -223,7 +221,7 @@ Select **Save settings** to apply these values to the Run and Local AI workspace
 
 The desktop app and Python SDK have separate version records:
 
-- **Update Python SDK** opens a terminal and runs a fixed, Rust-owned package update command. The app does not accept arbitrary shell text.
+- **Install or update Python SDK** creates, repairs, or updates the private app engine through a fixed, Rust-owned command. The app does not accept arbitrary shell text.
 - **Download latest app update** opens the stable `tauri-beta-latest` GitHub release. Install the new signed installer for your platform after closing the current app.
 - **Refresh versions** checks the native app and the Python engine independently.
 
@@ -237,7 +235,8 @@ The same workspace links to this user guide, installation troubleshooting, the c
 
 | Message or symptom | What to do |
 | --- | --- |
-| Python bridge unavailable | update the Python engine from Settings, then restart the app |
+| Python bridge unavailable | select **Install Python engine**, wait for completion, then select **Refresh versions** |
+| `No module named iints_desktop` | repair the private engine with **Install or update Python SDK**; the discovered Python does not contain the SDK bridge |
 | Protocol list is empty | run diagnostics, verify the SDK installation, then select Refresh protocols |
 | CSV preview fails | confirm the path exists and points to a supported results CSV |
 | Ollama not found | install Ollama once, then select Start local AI |

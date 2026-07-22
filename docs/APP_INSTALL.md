@@ -1,129 +1,104 @@
-# Desktop App Install
+# Desktop App Installation
 
-IINTS-AF has two ways to use the same SDK engine:
+The IINTS-AF Research Workbench is the recommended desktop interface for the Python research SDK. It uses a native Rust/Tauri shell and keeps simulation, validation, reporting, and research calculations inside the Python SDK.
 
-- the normal `iints` command-line SDK
-- the native desktop app through `iints-desktop`
+!!! warning "Research scope"
+    IINTS-AF is research and education software. It is not a medical device and must not be used for diagnosis, dosing, treatment decisions, or real-time patient care.
 
-The desktop app is meant for users who want to run demos, load results, view graphs, ask local AI questions, and open reports without memorizing many terminal commands.
+## Download The Current Beta
 
-It is still research software. It is not a medical device and must not be used for treatment decisions.
+The stable links below always point to the newest tested Tauri beta:
 
-## Download Beta App
-
-The current desktop beta release is available on GitHub:
-
-[Open the desktop beta release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest)
-
-The links below use the stable `desktop-beta-latest` release tag, so the README and docs keep pointing to the newest desktop beta after each refreshed app build.
-
-| Platform | Download | Start |
+| Platform | Installer | Start |
 | --- | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-windows-x64.exe) | download and open the `.exe` |
-| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) | open the `.dmg`, then open the app |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) | mark executable if needed, then run it |
+| Windows | [Download `.exe`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-windows-x64-setup.exe) | run the setup file, then open **IINTS-AF Research Workbench** |
+| macOS | [Download `.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) | open the DMG, drag the app to Applications, then open it |
+| Linux | [Download `.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) | mark it executable, then run it |
 
-Windows, macOS, and Linux use the same rich Qt research workbench. Each packaged build contains its own Python/Qt runtime plus the supported report, MDMP, plotting, serial, SBML/libRoadRunner, and FMI/FMPy dependencies.
+Matching `.sha256` files are published beside each installer. See [Desktop App Signing](DESKTOP_SIGNING.md) for signature and notarization details.
 
-These beta builds are unsigned unless release signing secrets are configured. Windows or macOS may show a security warning until the project has code-signing certificates. See [Desktop App Signing](DESKTOP_SIGNING.md).
+## First Launch
 
-The app also includes an update panel that links back to the latest app release and can copy/update the Python SDK package command for Python-based installs.
+The native app needs the IINTS-AF Python engine for scientific calculations. The app now handles this setup through a visible, fixed maintenance command:
 
-## Install From PyPI
+1. Open the workbench.
+2. If **Python bridge unavailable** appears, select **Install Python engine** on Overview, or open **Settings** and select **Install or update Python SDK**.
+3. Keep the terminal open while the installation completes.
+4. Return to the app and select **Refresh versions**.
+5. Run **Run diagnostics** before the first experiment.
 
-This is the easiest path for most users:
+The app creates a private environment at `~/.iints-af/python-engine`. It does not modify an unrelated project virtual environment. On later runs, the same action updates or repairs that private engine.
+
+The bootstrap requires Python `3.10` through `3.14`. On macOS, the app checks common Homebrew, MacPorts, and Python.org framework locations before the limited Finder application `PATH`. Advanced users can override discovery with `IINTS_PYTHON`.
+
+### Manual Fallback
+
+If Python is not installed, install a current release from [python.org](https://www.python.org/downloads/), reopen the app, and use **Install or update Python SDK** again.
+
+Advanced users may prepare the engine manually:
+
+=== "macOS or Linux"
+
+    ```bash
+    python3 -m venv "$HOME/.iints-af/python-engine"
+    "$HOME/.iints-af/python-engine/bin/python" -m pip install --upgrade pip "iints-sdk-python35[desktop-all]"
+    ```
+
+=== "Windows PowerShell"
+
+    ```powershell
+    py -3 -m venv "$HOME\.iints-af\python-engine"
+    & "$HOME\.iints-af\python-engine\Scripts\python.exe" -m pip install --upgrade pip "iints-sdk-python35[desktop-all]"
+    ```
+
+## macOS Security Messages
+
+The CI pipeline verifies the complete app bundle inside the finished DMG. Public downloads still require Apple Developer ID signing and notarization to avoid all Gatekeeper warnings.
+
+If an official beta is ad-hoc signed, macOS may report an unidentified developer. Use Finder's **Open** context-menu action once. Do not disable Gatekeeper system-wide. If macOS reports that the app is damaged, download the newest DMG again and verify its SHA-256 value; do not bypass a failed integrity check.
+
+## Linux AppImage
+
+If the file is not executable:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[desktop-all]"
+chmod +x IINTS-AF-Research-Workbench-linux-x64.AppImage
+./IINTS-AF-Research-Workbench-linux-x64.AppImage
+```
+
+The private Python engine still needs a system Python with `venv` support. On Debian or Ubuntu, a missing `venv` module is normally supplied by the distribution's `python3-venv` package.
+
+## Optional External Tools
+
+The SDK package installs supported Python libraries. Large or independently licensed external applications remain explicit:
+
+- Ollama and local model files
+- COPASI
+- OpenCOR
+- trusted FMUs or external model files
+
+The workbench detects these tools and explains which feature needs them. It does not silently download executables, model weights, or native-code FMUs.
+
+## Python And Classic Qt App
+
+Researchers who prefer a Python-managed desktop environment can still install the classic Qt interface:
+
+```bash
+python -m pip install --upgrade "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
 
-If the Qt app cannot start, the launcher can fall back to the simpler Tkinter app:
-
-```bash
-iints-desktop-tk
-```
-
-To force the Qt app:
-
-```bash
-iints-desktop-qt
-```
-
-## Install From GitHub Main
-
-Use this when you want the newest SDK code:
-
-```bash
-git clone https://github.com/python35/IINTS-SDK.git
-cd IINTS-SDK
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -U pip
-python -m pip install -U -e ".[desktop-all]"
-iints-desktop
-```
-
-On Windows PowerShell:
-
-```powershell
-git clone https://github.com/python35/IINTS-SDK.git
-cd IINTS-SDK
-py -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-python -m pip install -U -e ".[desktop-all]"
-iints-desktop
-```
-
-## What The App Can Do
-
-- Run curated SDK demo workflows.
-- Load generated `results.csv` files.
-- Preview glucose graphs and metrics.
-- Open PDF reports and output folders.
-- Ask local Ollama/Mistral questions about a loaded run.
-- View bundled AlphaFold insulin/glucagon structures.
-- Generate local PAE heatmap HTML files when Plotly and internet access are available.
-- Run biology evidence actions for GTEx expression, ChEMBL insulin context, ClinVar mutation stressors, and STRING pathway images.
-
-## What The App Does Not Do
-
-- It does not replace the SDK engine.
-- It does not contain separate medical formulas.
-- It does not make treatment decisions.
-- It does not silently install external applications or AI model files.
-- It does not connect to a real patient or real pump.
-
-## Local AI Setup
-
-Install Ollama once from the official Ollama website, then open the app and click `Start Local AI`.
-
-The app can start the local Ollama server and prepare the selected model when the Ollama binary is available on your system.
+The classic packaged beta remains available from the [`desktop-beta-latest` release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest), but the Rust/Tauri workbench is the recommended desktop route.
 
 ## Troubleshooting
 
-If the app command is missing, reinstall with the desktop extra:
+| Message or symptom | Action |
+| --- | --- |
+| Python bridge unavailable | select **Install Python engine**, wait for the terminal, then select **Refresh versions** |
+| Python 3.10-3.14 was not found | install Python from python.org and repeat the maintenance action |
+| `No module named iints_desktop` | update or repair the private engine from Settings; the selected Python does not contain the SDK bridge |
+| protocol list is empty | refresh versions, run diagnostics, then refresh protocols |
+| optional research engine unavailable | install only the external engine required by that lab |
+| app update available | close the app and install the newest file from the stable beta release |
 
-```bash
-python -m pip install -U "iints-sdk-python35[desktop-all]"
-```
-
-If the Qt app fails because PySide6 is missing, reinstall the SDK with the desktop extra. The desktop extra installs PySide6 automatically:
-
-```bash
-python -m pip install -U "iints-sdk-python35[desktop-all]"
-```
-
-If you want to verify the SDK first:
-
-```bash
-iints doctor --smoke-run
-```
-
-## Related Docs
-
-- [Desktop App](DESKTOP_APP.md)
-- [Quickstart](QUICKSTART.md)
-- [Command Cheatsheet](CLI_CHEATSHEET.md)
-- [Updating The SDK](UPDATING.md)
+For the complete illustrated workflow, continue with the [Research Workbench User Guide](RESEARCH_WORKBENCH_GUIDE.md).
