@@ -162,7 +162,10 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
                     .get("details")
                     .and_then(Value::as_str)
                     .unwrap_or("");
-                return Err(format!("{message}\n{details}").trim().to_string());
+                if !details.is_empty() {
+                    eprintln!("IINTS Python bridge diagnostic:\n{details}");
+                }
+                return Err(message.to_string());
             }
             Err(error) => attempts.push(format!(
                 "{} {:?}: {error}",
@@ -215,8 +218,40 @@ async fn desktop_update_info() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn list_molecule_assets() -> Result<Value, String> {
-    run_python_bridge_async(vec!["molecules".to_string()]).await
+async fn list_molecule_assets(output_dir: Option<String>) -> Result<Value, String> {
+    let mut args = vec!["molecules".to_string()];
+    if let Some(output) = output_dir {
+        if !output.trim().is_empty() {
+            args.push("--output-dir".to_string());
+            args.push(output);
+        }
+    }
+    run_python_bridge_async(args).await
+}
+
+fn is_allowed_molecule_target(target: &str) -> bool {
+    matches!(
+        target,
+        "insulin-mutation" | "glucagon" | "glut4" | "insulin-receptor" | "glucagon-receptor"
+    )
+}
+
+#[tauri::command]
+async fn generate_molecule_pae(target: String, output_dir: String) -> Result<Value, String> {
+    if !is_allowed_molecule_target(target.trim()) {
+        return Err("Unsupported AlphaFold PAE target.".to_string());
+    }
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    run_python_bridge_async(vec![
+        "molecule-pae".to_string(),
+        "--target".to_string(),
+        target,
+        "--output-dir".to_string(),
+        output_dir,
+    ])
+    .await
 }
 
 #[tauri::command]
@@ -772,6 +807,11 @@ async fn open_path(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn reveal_path(path: String) -> Result<(), String> {
+    reveal_path_allowlisted(path).await
+}
+
+#[tauri::command]
 async fn open_external_url(url: String) -> Result<(), String> {
     open_external_url_allowlisted(url).await
 }
@@ -789,6 +829,16 @@ async fn open_path_allowlisted(path: String) -> Result<(), String> {
     })
     .await
     .map_err(|error| format!("Open-path task failed: {error}"))?
+}
+
+async fn reveal_path_allowlisted(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let resolved = resolve_user_path(&path)?;
+        validate_open_target(&resolved)?;
+        reveal_with_platform(&resolved)
+    })
+    .await
+    .map_err(|error| format!("Reveal-path task failed: {error}"))?
 }
 
 async fn open_external_url_allowlisted(url: String) -> Result<(), String> {
@@ -1258,6 +1308,27 @@ fn open_with_platform(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("Could not open {}: {error}", path.display()))
 }
 
+fn reveal_with_platform(path: &Path) -> Result<(), String> {
+    let mut command = if cfg!(target_os = "macos") {
+        let mut command = Command::new("open");
+        command.args(["-R"]);
+        command.arg(path);
+        command
+    } else if cfg!(target_os = "windows") {
+        let mut command = Command::new("explorer");
+        command.arg(format!("/select,{}", path.display()));
+        command
+    } else {
+        let mut command = Command::new("xdg-open");
+        command.arg(path.parent().unwrap_or(path));
+        command
+    };
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Could not reveal {}: {error}", path.display()))
+}
+
 fn main() {
     if env::args().any(|argument| argument == "--smoke") {
         println!("IINTS-AF Research Workbench smoke check passed");
@@ -1272,6 +1343,7 @@ fn main() {
             desktop_diagnostics,
             desktop_update_info,
             list_molecule_assets,
+            generate_molecule_pae,
             list_evidence_connectors,
             run_genomics_simulation,
             run_tissue_stress,
@@ -1296,6 +1368,7 @@ fn main() {
             start_local_ai,
             ask_local_ai,
             open_path,
+            reveal_path,
             open_external_url,
             open_sdk_update_terminal
         ])
@@ -1319,6 +1392,14 @@ mod tests {
         assert!(validate_external_url("http://alphafold.ebi.ac.uk/entry/P01308").is_err());
         assert!(validate_external_url("https://alphafold.ebi.ac.uk.example.com/").is_err());
         assert!(validate_external_url("https://user@alphafold.ebi.ac.uk/").is_err());
+    }
+
+    #[test]
+    fn molecule_pae_targets_are_explicitly_allowlisted() {
+        assert!(is_allowed_molecule_target("insulin-mutation"));
+        assert!(is_allowed_molecule_target("glucagon-receptor"));
+        assert!(!is_allowed_molecule_target("all"));
+        assert!(!is_allowed_molecule_target("../private"));
     }
 
     #[test]

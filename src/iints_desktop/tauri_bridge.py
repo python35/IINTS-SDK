@@ -153,12 +153,49 @@ def _image_data_url(path: Path) -> str | None:
     return f"data:image/png;base64,{payload}"
 
 
-def _molecules(_args: argparse.Namespace) -> int:
-    from iints_desktop.molecules import list_molecule_assets, pae_html_path
+def _molecules(args: argparse.Namespace) -> int:
+    from iints_desktop.molecules import (
+        MoleculeStructureError,
+        list_molecule_assets,
+        load_molecule_backbone,
+        pae_html_path,
+    )
 
+    structural_output = (
+        Path(args.output_dir).expanduser().resolve() / "structural"
+        if args.output_dir
+        else Path("results") / "structural"
+    )
     molecules = []
     for molecule in list_molecule_assets():
-        pae_path = pae_html_path(molecule.pae_target) if molecule.pae_target else None
+        pae_path = (
+            pae_html_path(molecule.pae_target, structural_output)
+            if molecule.pae_target
+            else None
+        )
+        backbone_payload: dict[str, Any] | None = None
+        structure_error: str | None = None
+        try:
+            backbone = load_molecule_backbone(molecule.structure_path)
+            backbone_payload = {
+                "center": backbone.center,
+                "radius": backbone.radius,
+                "chain_count": backbone.chain_count,
+                "atoms": [
+                    {
+                        "chain_id": atom.chain_id,
+                        "residue_index": atom.residue_index,
+                        "residue_name": atom.residue_name,
+                        "x": atom.x,
+                        "y": atom.y,
+                        "z": atom.z,
+                        "confidence": atom.confidence,
+                    }
+                    for atom in backbone.atoms
+                ],
+            }
+        except MoleculeStructureError as exc:
+            structure_error = str(exc)
         molecules.append(
             {
                 "key": molecule.key,
@@ -173,9 +210,35 @@ def _molecules(_args: argparse.Namespace) -> int:
                 "pae_note": molecule.pae_note,
                 "pae_path": pae_path,
                 "pae_exists": bool(pae_path and pae_path.exists()),
+                "image_exists": molecule.image_path.is_file(),
+                "structure_exists": molecule.structure_path.is_file(),
+                "structure_error": structure_error,
+                "backbone": backbone_payload,
+                "alphafold_url": f"https://alphafold.ebi.ac.uk/entry/{molecule.uniprot_id}",
             }
         )
     return _ok({"molecules": molecules})
+
+
+def _molecule_pae(args: argparse.Namespace) -> int:
+    from iints.research.structure import render_pae
+
+    output_dir = Path(args.output_dir).expanduser().resolve() / "structural"
+    # render_pae uses Rich for CLI progress. The desktop bridge must keep
+    # stdout as one machine-readable JSON object.
+    with contextlib.redirect_stdout(io.StringIO()):
+        results = render_pae(args.target, output_dir=output_dir)
+    if len(results) != 1:
+        raise RuntimeError(f"Expected one PAE artifact for {args.target}, received {len(results)}.")
+    result = results[0]
+    return _ok(
+        {
+            **asdict(result),
+            "output_dir": output_dir,
+            "research_only": True,
+            "medical_device": False,
+        }
+    )
 
 
 def _evidence_connectors(_args: argparse.Namespace) -> int:
@@ -527,7 +590,23 @@ def build_parser() -> argparse.ArgumentParser:
     update_info.set_defaults(func=_update_info)
 
     molecules = subcommands.add_parser("molecules")
+    molecules.add_argument("--output-dir", default=None)
     molecules.set_defaults(func=_molecules)
+
+    molecule_pae = subcommands.add_parser("molecule-pae")
+    molecule_pae.add_argument(
+        "--target",
+        required=True,
+        choices=(
+            "insulin-mutation",
+            "glucagon",
+            "glut4",
+            "insulin-receptor",
+            "glucagon-receptor",
+        ),
+    )
+    molecule_pae.add_argument("--output-dir", required=True)
+    molecule_pae.set_defaults(func=_molecule_pae)
 
     evidence = subcommands.add_parser("evidence-connectors")
     evidence.set_defaults(func=_evidence_connectors)

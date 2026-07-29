@@ -31,6 +31,7 @@ TARGETS: Final[dict[str, str]] = {
     "glucagon": "P01275",
     "glut4": "P14672",
     "insulin-receptor": "P06213",
+    "glucagon-receptor": "P47871",
 }
 
 

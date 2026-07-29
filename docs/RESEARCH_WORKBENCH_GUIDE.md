@@ -200,6 +200,23 @@ visible files by the expected extension. Selecting a file never executes it: sta
 explicit execution remain separate actions, and COPASI/FMI execution still requires the relevant
 confirmation checkbox.
 
+### Inspect an AlphaFold structure
+
+Each bundled protein card provides separate actions with different evidence meanings:
+
+1. **View 3D** opens a local, interactive C-alpha backbone in the app. Drag to rotate, scroll to
+   zoom, or use the arrow keys. Colours represent AlphaFold pLDDT confidence.
+2. **Open PNG** opens the bundled static render.
+3. **Reveal mmCIF** shows the exact local coordinate file in Finder, Explorer, or the Linux file
+   manager rather than relying on an operating-system association for `.cif`.
+4. **Generate PAE** retrieves the official AlphaFold Predicted Aligned Error data over verified
+   HTTPS and writes an interactive HTML artifact below the selected output folder.
+5. **AlphaFold entry** opens the matching official database page in the system browser.
+
+pLDDT describes local structure-prediction confidence and PAE describes confidence in relative
+residue placement. Neither value is converted into pathogenicity, insulin sensitivity, disease
+severity, or treatment logic.
+
 ## 7. Evidence Sources
 
 The **Evidence sources** workspace describes whether a connector is:

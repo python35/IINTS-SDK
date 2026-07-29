@@ -94,6 +94,18 @@ if (!script.includes("initializeNativeInteractionPolicy") || !script.includes('"
   process.exit(1);
 }
 
+if (
+  !html.includes("molecule-viewer-canvas")
+  || !html.includes("molecule-viewer-rotate-btn")
+  || !script.includes("openMoleculeViewer")
+  || !script.includes("generate_molecule_pae")
+  || !script.includes("reveal_path")
+  || !styles.includes(".molecule-viewer-panel")
+) {
+  console.error("Bundled AlphaFold assets must expose local 3D inspection, PAE generation, and safe artifact reveal actions.");
+  process.exit(1);
+}
+
 const pickerIds = [
   "settings-output-browse-btn",
   "output-browse-btn",

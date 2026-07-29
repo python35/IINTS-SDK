@@ -40,6 +40,7 @@ from iints_desktop.molecules import (
 )
 from iints_desktop.results import build_ai_result_context, load_results_preview
 from iints_desktop.update import format_shell_command
+from iints.research.structure import TARGETS
 
 
 def _load_pyproject() -> dict[str, Any]:
@@ -254,6 +255,7 @@ def test_molecule_assets_are_bundled_for_desktop_deep_dive() -> None:
     assert all(molecule.structure_path.exists() for molecule in molecules)
     assert all("Connects to:" in molecule.sdk_link for molecule in molecules)
     assert {molecule.pae_target for molecule in molecules} == {"insulin-mutation", "glucagon", "insulin-receptor", "glut4", "glucagon-receptor"}
+    assert TARGETS["glucagon-receptor"] == "P47871"
     assert pae_html_path("glucagon").as_posix().endswith("results/structural/glucagon_pae.html")
 
 
@@ -818,20 +820,28 @@ def test_tauri_app_exposes_biology_and_stressor_actions() -> None:
     readme = Path("apps/iints-tauri/README.md").read_text(encoding="utf-8")
 
     assert "async fn list_molecule_assets" in rust_source
+    assert "async fn generate_molecule_pae" in rust_source
+    assert "async fn reveal_path" in rust_source
     assert "async fn run_genomics_simulation" in rust_source
     assert "async fn run_tissue_stress" in rust_source
     assert '"cif", "mmcif"' in rust_source
     assert "def _molecules" in bridge_source
+    assert "def _molecule_pae" in bridge_source
     assert "def _genomics_sim" in bridge_source
     assert "def _tissue_stress" in bridge_source
     assert "contextlib.redirect_stdout" in bridge_source
     assert "molecule-list" in frontend
+    assert "molecule-viewer-canvas" in frontend
     assert "genomics-run-btn" in frontend
     assert "tissue-run-btn" in frontend
     assert "list_molecule_assets" in frontend_js
+    assert "generate_molecule_pae" in frontend_js
+    assert "openMoleculeViewer" in frontend_js
+    assert "reveal_path" in frontend_js
     assert "run_genomics_simulation" in frontend_js
     assert "run_tissue_stress" in frontend_js
     assert "molecule-card" in frontend_css
+    assert "molecule-viewer-panel" in frontend_css
     assert "genomics and tissue-specific resistance stressor plots" in readme
 
 

@@ -84,7 +84,8 @@ the text-only `IINTS-AF` name so the application identity stays legible at every
   and a reproducibility audit without uploading data.
 - Start/check local Ollama and list installed models.
 - Ask a local Ollama model to interpret the loaded result CSV.
-- Browse bundled AlphaFold molecule assets and open mmCIF/PAE evidence files.
+- Browse bundled AlphaFold molecule assets in a local interactive C-alpha viewer, reveal their
+  mmCIF source files, open static renders, and generate reviewable PAE heatmaps on demand.
 - Inspect local SBML safely and optionally run an isolated independent time course through libRoadRunner.
 - Run research-only genomics and tissue-specific resistance stressor plots.
 - Browse maturity-labelled evidence connectors for AlphaFold, Ensembl VEP/AlphaMissense, Open Targets,

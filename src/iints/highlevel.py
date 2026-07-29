@@ -166,13 +166,14 @@ def run_simulation(
     if compare_baselines:
         comparison = run_baseline_comparison(
             patient_params=patient_params,
+            patient_model_type=patient_model_type,
             stress_event_payloads=stress_event_payloads,
             duration=duration_minutes,
             time_step=time_step,
             primary_label=algorithm_instance.get_algorithm_metadata().name,
             primary_results=results_df,
             primary_safety=safety_report,
-            seed=seed,
+            seed=resolved_seed,
         )
         safety_report["baseline_comparison"] = comparison
         outputs["baseline_comparison"] = comparison
@@ -353,13 +354,14 @@ def run_full(
 
     comparison = run_baseline_comparison(
         patient_params=patient_params,
+        patient_model_type=patient_model_type,
         stress_event_payloads=stress_event_payloads,
         duration=duration_minutes,
         time_step=time_step,
         primary_label=algorithm_instance.get_algorithm_metadata().name,
         primary_results=results_df,
         primary_safety=safety_report,
-        seed=seed,
+        seed=resolved_seed,
     )
     safety_report["baseline_comparison"] = comparison
     outputs["baseline_comparison"] = comparison

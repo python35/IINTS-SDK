@@ -33,6 +33,17 @@ let lastBinding = null;
 let appInfo = null;
 let runBusy = false;
 let researchBusy = false;
+const moleculeViewer = {
+  molecule: null,
+  rotationX: -0.35,
+  rotationY: 0.55,
+  zoom: 1,
+  dragging: false,
+  pointerX: 0,
+  pointerY: 0,
+  autoRotate: false,
+  animationFrame: null
+};
 
 const SETTINGS_STORAGE_KEY = "iints-af.workbench.settings.v1";
 const DEFAULT_SETTINGS = Object.freeze({
@@ -595,11 +606,18 @@ async function loadMolecules() {
   const list = $("molecule-list");
   list.replaceChildren(statusPill("loading", "Loading molecule assets..."));
   try {
-    const payload = await call("list_molecule_assets");
+    const payload = await call("list_molecule_assets", {
+      outputDir: $("output-dir").value.trim()
+    });
     molecules = payload.molecules || [];
     renderMolecules(molecules);
+    setText(
+      "biology-status",
+      `Loaded ${molecules.length} bundled structures. Select View 3D for local inspection or generate a PAE artifact from AlphaFold evidence.`
+    );
   } catch (error) {
     list.replaceChildren(statusPill("bad", errorMessage(error)));
+    setText("biology-status", errorMessage(error));
   }
 }
 
@@ -687,16 +705,258 @@ function renderMolecules(items) {
 
     const actions = document.createElement("div");
     actions.className = "button-row";
-    actions.appendChild(actionButton("Open PNG", () => openPath(molecule.image_path, "biology-status")));
-    actions.appendChild(actionButton("Open mmCIF", () => openPath(molecule.structure_path, "biology-status")));
+    actions.appendChild(
+      moleculeActionButton(
+        "View 3D",
+        () => openMoleculeViewer(molecule),
+        !molecule.backbone?.atoms?.length
+      )
+    );
+    actions.appendChild(
+      moleculeActionButton(
+        "Open PNG",
+        () => openPath(molecule.image_path, "biology-status"),
+        !molecule.image_exists
+      )
+    );
+    actions.appendChild(
+      moleculeActionButton(
+        "Reveal mmCIF",
+        () => revealPath(molecule.structure_path, "biology-status"),
+        !molecule.structure_exists
+      )
+    );
     if (molecule.pae_path) {
       actions.appendChild(
-        actionButton(molecule.pae_exists ? "Open PAE" : "PAE not generated", () => openPath(molecule.pae_path, "biology-status"), !molecule.pae_exists)
+        moleculeActionButton(
+          molecule.pae_exists ? "Open PAE" : "Generate PAE",
+          () => molecule.pae_exists
+            ? openPath(molecule.pae_path, "biology-status")
+            : generateMoleculePae(molecule),
+          !molecule.pae_target
+        )
       );
+    }
+    actions.appendChild(
+      moleculeActionButton(
+        "AlphaFold entry",
+        () => openExternalUrl(molecule.alphafold_url, "biology-status"),
+        !molecule.alphafold_url
+      )
+    );
+    if (molecule.structure_error) {
+      const warning = document.createElement("p");
+      warning.className = "inline-warning";
+      warning.textContent = `3D viewer unavailable: ${molecule.structure_error}`;
+      body.appendChild(warning);
     }
     body.appendChild(actions);
     card.appendChild(body);
     list.appendChild(card);
+  }
+}
+
+function confidenceColor(confidence) {
+  if (confidence === null || confidence === undefined || confidence === "") {
+    return "#687780";
+  }
+  const value = Number(confidence);
+  if (!Number.isFinite(value)) return "#687780";
+  if (value >= 90) return "#1f3b8f";
+  if (value >= 70) return "#41b6c4";
+  if (value >= 50) return "#f0c94d";
+  return "#d96b31";
+}
+
+function resetMoleculeViewer() {
+  moleculeViewer.rotationX = -0.35;
+  moleculeViewer.rotationY = 0.55;
+  moleculeViewer.zoom = 1;
+  drawMoleculeViewer();
+}
+
+function openMoleculeViewer(molecule) {
+  if (!molecule.backbone?.atoms?.length) {
+    setText(
+      "biology-status",
+      molecule.structure_error || `No readable C-alpha backbone is available for ${molecule.title}.`
+    );
+    return;
+  }
+  moleculeViewer.molecule = molecule;
+  const panel = $("molecule-viewer-panel");
+  panel.hidden = false;
+  setText("molecule-viewer-title", molecule.title);
+  setText(
+    "molecule-viewer-meta",
+    `UniProt ${molecule.uniprot_id} · ${molecule.backbone.atoms.length} C-alpha atoms · ${molecule.backbone.chain_count} chain(s)`
+  );
+  resetMoleculeViewer();
+  $("molecule-viewer-canvas").focus({ preventScroll: true });
+  panel.scrollIntoView({ block: "start", behavior: "auto" });
+  setText(
+    "biology-status",
+    `Inspecting ${molecule.title} locally. AlphaFold confidence is structural evidence only and is not converted into a physiological effect.`
+  );
+  refreshActionAvailability();
+}
+
+function closeMoleculeViewer() {
+  setMoleculeAutoRotate(false);
+  moleculeViewer.molecule = null;
+  $("molecule-viewer-panel").hidden = true;
+  refreshActionAvailability();
+}
+
+function setMoleculeAutoRotate(enabled) {
+  moleculeViewer.autoRotate = Boolean(enabled);
+  const button = $("molecule-viewer-rotate-btn");
+  button.setAttribute("aria-pressed", String(moleculeViewer.autoRotate));
+  button.textContent = `Auto-rotate: ${moleculeViewer.autoRotate ? "on" : "off"}`;
+  if (moleculeViewer.autoRotate && moleculeViewer.animationFrame === null) {
+    moleculeViewer.animationFrame = requestAnimationFrame(animateMoleculeViewer);
+  } else if (!moleculeViewer.autoRotate && moleculeViewer.animationFrame !== null) {
+    cancelAnimationFrame(moleculeViewer.animationFrame);
+    moleculeViewer.animationFrame = null;
+  }
+}
+
+function animateMoleculeViewer() {
+  moleculeViewer.animationFrame = null;
+  if (!moleculeViewer.autoRotate || !moleculeViewer.molecule) return;
+  moleculeViewer.rotationY += 0.008;
+  drawMoleculeViewer();
+  moleculeViewer.animationFrame = requestAnimationFrame(animateMoleculeViewer);
+}
+
+function projectedBackbone(canvas) {
+  const backbone = moleculeViewer.molecule?.backbone;
+  if (!backbone?.atoms?.length) return [];
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(320, rect.width);
+  const height = Math.max(260, rect.height);
+  const center = backbone.center || [0, 0, 0];
+  const radius = Math.max(1, Number(backbone.radius) || 1);
+  const cosY = Math.cos(moleculeViewer.rotationY);
+  const sinY = Math.sin(moleculeViewer.rotationY);
+  const cosX = Math.cos(moleculeViewer.rotationX);
+  const sinX = Math.sin(moleculeViewer.rotationX);
+  const scale = Math.min(width, height) * 0.4 * moleculeViewer.zoom / radius;
+
+  return backbone.atoms.map((atom) => {
+    const x = Number(atom.x) - Number(center[0]);
+    const y = Number(atom.y) - Number(center[1]);
+    const z = Number(atom.z) - Number(center[2]);
+    const rotatedX = x * cosY - z * sinY;
+    const firstZ = x * sinY + z * cosY;
+    const rotatedY = y * cosX - firstZ * sinX;
+    const rotatedZ = y * sinX + firstZ * cosX;
+    const perspective = 1 / Math.max(0.55, 1 + rotatedZ / (radius * 6));
+    return {
+      ...atom,
+      screenX: width / 2 + rotatedX * scale * perspective,
+      screenY: height / 2 - rotatedY * scale * perspective,
+      depth: rotatedZ,
+      pointRadius: Math.max(1.8, 2.7 * perspective)
+    };
+  });
+}
+
+function drawMoleculeViewer() {
+  const canvas = $("molecule-viewer-canvas");
+  if (!canvas || $("molecule-viewer-panel").hidden) return;
+  const rect = canvas.getBoundingClientRect();
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  const width = Math.max(320, Math.round(rect.width));
+  const height = Math.max(260, Math.round(rect.height));
+  if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+  }
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
+  context.clearRect(0, 0, width, height);
+  context.fillStyle = "#f7f9f9";
+  context.fillRect(0, 0, width, height);
+
+  const points = projectedBackbone(canvas);
+  if (!points.length) {
+    context.fillStyle = "#53636d";
+    context.font = '14px "Avenir Next", "Segoe UI", sans-serif';
+    context.fillText("No readable backbone data.", 18, 28);
+    return;
+  }
+
+  context.lineWidth = 2;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  for (let index = 1; index < points.length; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    if (
+      previous.chain_id !== current.chain_id
+      || Math.abs(Number(current.residue_index) - Number(previous.residue_index)) > 2
+    ) {
+      continue;
+    }
+    context.beginPath();
+    context.moveTo(previous.screenX, previous.screenY);
+    context.lineTo(current.screenX, current.screenY);
+    const averageConfidence = previous.confidence !== null
+      && previous.confidence !== undefined
+      && current.confidence !== null
+      && current.confidence !== undefined
+      && Number.isFinite(Number(previous.confidence))
+      && Number.isFinite(Number(current.confidence))
+      ? (Number(previous.confidence) + Number(current.confidence)) / 2
+      : null;
+    context.strokeStyle = confidenceColor(averageConfidence);
+    context.stroke();
+  }
+
+  const sortedPoints = [...points].sort((left, right) => left.depth - right.depth);
+  for (const point of sortedPoints) {
+    context.beginPath();
+    context.arc(point.screenX, point.screenY, point.pointRadius, 0, Math.PI * 2);
+    context.fillStyle = confidenceColor(point.confidence);
+    context.fill();
+  }
+
+  context.fillStyle = "#53636d";
+  context.font = '12px "SFMono-Regular", "Cascadia Code", monospace';
+  context.fillText("C-alpha backbone · colour = pLDDT", 14, height - 14);
+}
+
+async function generateMoleculePae(molecule) {
+  const outputDir = $("output-dir").value.trim();
+  if (!outputDir) {
+    setText("biology-status", "Choose an output folder before generating a PAE heatmap.");
+    return;
+  }
+  setResearchBusy(true);
+  setText("biology-status", `Downloading AlphaFold PAE evidence for ${molecule.title}...`);
+  try {
+    const payload = await call("generate_molecule_pae", {
+      target: molecule.pae_target,
+      outputDir
+    });
+    molecule.pae_path = payload.html_path;
+    molecule.pae_exists = true;
+    renderMolecules(molecules);
+    setText(
+      "biology-status",
+      [
+        `PAE heatmap generated for ${molecule.title}.`,
+        `Artifact: ${payload.html_path}`,
+        `Residues: ${payload.residue_count}; maximum reported PAE: ${payload.max_predicted_aligned_error}`,
+        "This is structural prediction evidence only; it is not a dosing or physiological-severity metric."
+      ].join("\n")
+    );
+    await openPath(payload.html_path, "biology-status");
+  } catch (error) {
+    setText("biology-status", errorMessage(error));
+  } finally {
+    setResearchBusy(false);
   }
 }
 
@@ -706,6 +966,12 @@ function actionButton(label, handler, disabled = false) {
   button.textContent = label;
   button.disabled = disabled;
   button.addEventListener("click", handler);
+  return button;
+}
+
+function moleculeActionButton(label, handler, unavailable = false) {
+  const button = actionButton(label, handler, unavailable || researchBusy);
+  button.dataset.unavailable = String(Boolean(unavailable));
   return button;
 }
 
@@ -1234,6 +1500,19 @@ async function openPath(path, statusId = "run-status") {
   }
   try {
     await call("open_path", { path });
+  } catch (error) {
+    setText(statusId, errorMessage(error));
+  }
+}
+
+async function revealPath(path, statusId = "run-status") {
+  if (!path) {
+    setText(statusId, "Nothing to reveal yet.");
+    return;
+  }
+  try {
+    await call("reveal_path", { path });
+    setText(statusId, `Revealed local artifact:\n${path}`);
   } catch (error) {
     setText(statusId, errorMessage(error));
   }
@@ -1830,6 +2109,12 @@ function refreshActionAvailability() {
     setDisabled(id, researchBusy);
   }
   setDisabled("molecule-refresh-btn", researchBusy);
+  setDisabled("open-structural-folder-btn", researchBusy || !outputDir);
+  setDisabled("molecule-viewer-reset-btn", !moleculeViewer.molecule);
+  setDisabled("molecule-viewer-rotate-btn", !moleculeViewer.molecule);
+  document.querySelectorAll("#molecule-list button[data-unavailable]").forEach((button) => {
+    button.disabled = researchBusy || button.dataset.unavailable === "true";
+  });
   setDisabled("genomics-run-btn", researchBusy);
   setDisabled("genomics-open-btn", researchBusy || !lastGenomics?.html_path);
   setDisabled("tissue-run-btn", researchBusy);
@@ -1930,6 +2215,80 @@ function initializeFormState() {
   for (const id of ["copasi-consent", "fmi-consent", "binding-uniprot"]) {
     $(id).addEventListener("input", refreshActionAvailability);
     $(id).addEventListener("change", refreshActionAvailability);
+  }
+}
+
+function initializeMoleculeViewer() {
+  const canvas = $("molecule-viewer-canvas");
+  canvas.addEventListener("pointerdown", (event) => {
+    if (!moleculeViewer.molecule) return;
+    moleculeViewer.dragging = true;
+    moleculeViewer.pointerX = event.clientX;
+    moleculeViewer.pointerY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+    canvas.classList.add("is-dragging");
+    setMoleculeAutoRotate(false);
+  });
+  canvas.addEventListener("pointermove", (event) => {
+    if (!moleculeViewer.dragging) return;
+    const deltaX = event.clientX - moleculeViewer.pointerX;
+    const deltaY = event.clientY - moleculeViewer.pointerY;
+    moleculeViewer.pointerX = event.clientX;
+    moleculeViewer.pointerY = event.clientY;
+    moleculeViewer.rotationY += deltaX * 0.01;
+    moleculeViewer.rotationX = Math.max(
+      -Math.PI / 2,
+      Math.min(Math.PI / 2, moleculeViewer.rotationX + deltaY * 0.01)
+    );
+    drawMoleculeViewer();
+  });
+  const stopDragging = (event) => {
+    moleculeViewer.dragging = false;
+    canvas.classList.remove("is-dragging");
+    if (canvas.hasPointerCapture(event.pointerId)) {
+      canvas.releasePointerCapture(event.pointerId);
+    }
+  };
+  canvas.addEventListener("pointerup", stopDragging);
+  canvas.addEventListener("pointercancel", stopDragging);
+  canvas.addEventListener("wheel", (event) => {
+    if (!moleculeViewer.molecule) return;
+    event.preventDefault();
+    const factor = event.deltaY > 0 ? 0.9 : 1.1;
+    moleculeViewer.zoom = Math.max(0.45, Math.min(3.5, moleculeViewer.zoom * factor));
+    drawMoleculeViewer();
+  }, { passive: false });
+  canvas.addEventListener("keydown", (event) => {
+    if (!moleculeViewer.molecule) return;
+    const rotationStep = 0.08;
+    if (event.key === "ArrowLeft") moleculeViewer.rotationY -= rotationStep;
+    else if (event.key === "ArrowRight") moleculeViewer.rotationY += rotationStep;
+    else if (event.key === "ArrowUp") moleculeViewer.rotationX -= rotationStep;
+    else if (event.key === "ArrowDown") moleculeViewer.rotationX += rotationStep;
+    else if (event.key === "+" || event.key === "=") {
+      moleculeViewer.zoom = Math.min(3.5, moleculeViewer.zoom * 1.1);
+    } else if (event.key === "-" || event.key === "_") {
+      moleculeViewer.zoom = Math.max(0.45, moleculeViewer.zoom * 0.9);
+    } else if (event.key === "0") {
+      resetMoleculeViewer();
+      event.preventDefault();
+      return;
+    } else if (event.key === "Escape") {
+      closeMoleculeViewer();
+      event.preventDefault();
+      return;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    drawMoleculeViewer();
+  });
+
+  if (typeof ResizeObserver === "function") {
+    const observer = new ResizeObserver(() => drawMoleculeViewer());
+    observer.observe(canvas);
+  } else {
+    window.addEventListener("resize", drawMoleculeViewer);
   }
 }
 
@@ -2053,6 +2412,11 @@ $("ai-models-btn").addEventListener("click", listAiModels);
 $("ai-ask-btn").addEventListener("click", askAi);
 $("molecule-refresh-btn").addEventListener("click", loadMolecules);
 $("open-structural-folder-btn").addEventListener("click", openStructuralFolder);
+$("molecule-viewer-reset-btn").addEventListener("click", resetMoleculeViewer);
+$("molecule-viewer-rotate-btn").addEventListener("click", () => {
+  setMoleculeAutoRotate(!moleculeViewer.autoRotate);
+});
+$("molecule-viewer-close-btn").addEventListener("click", closeMoleculeViewer);
 $("genomics-run-btn").addEventListener("click", runGenomicsSimulation);
 $("genomics-open-btn").addEventListener("click", openGenomicsPlot);
 $("tissue-run-btn").addEventListener("click", runTissueStressTest);
@@ -2113,6 +2477,7 @@ $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
 
 initializeNativeInteractionPolicy();
 initializeFormState();
+initializeMoleculeViewer();
 initializeKeyboardShortcuts();
 const initialSettings = initializeSettings();
 initializeNavigation();

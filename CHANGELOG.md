@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+## v1.5.32
+
+Release date: 2026-07-23
+
+### Fixed
+
+- baseline comparisons now use the same patient-model family as the primary run instead of always
+  constructing the legacy custom model
+- model-specific stem-cell research parameters no longer crash desktop presets during baseline
+  comparison
+- the glucagon-receptor AlphaFold target is now available consistently to both molecule and PAE
+  workflows
+
+### Added
+
+- added a local interactive C-alpha backbone viewer to the Rust/Tauri workbench
+- added in-app AlphaFold PAE generation, static-render opening, official-entry links, and safe
+  Finder/Explorer reveal actions for bundled mmCIF files
+
+### Safety
+
+- AlphaFold pLDDT and PAE remain structural-confidence evidence only and never become a
+  physiological scalar, pathogenicity conclusion, or treatment input
+- local AI and structural viewers remain outside deterministic simulation and safety logic
+
+### Verified
+
+- full test suite: `769 passed, 2 skipped`
+- mypy: `Success: no issues found in 212 source files`
+- Rust/Tauri tests: `6 passed`; Clippy and frontend static checks passed
+- strict docs, wheel/sdist, release-mode Tauri build, and native `--smoke` passed
+
 ## v1.5.31
 
 Release date: 2026-07-21

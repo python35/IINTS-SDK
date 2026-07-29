@@ -168,8 +168,8 @@ def test_tauri_bridge_reports_update_info() -> None:
     assert data["medical_device"] is False  # type: ignore[index]
 
 
-def test_tauri_bridge_lists_molecule_assets() -> None:
-    payload = _bridge("molecules")
+def test_tauri_bridge_lists_renderable_molecule_assets(tmp_path: Path) -> None:
+    payload = _bridge("molecules", "--output-dir", str(tmp_path))
 
     assert payload["ok"] is True
     molecules = payload["data"]["molecules"]  # type: ignore[index]
@@ -180,6 +180,56 @@ def test_tauri_bridge_lists_molecule_assets() -> None:
     assert str(first["image_data_url"]).startswith("data:image/png;base64,")
     assert first["structure_path"]
     assert first["sdk_link"].startswith("Connects to:")
+    assert first["image_exists"] is True
+    assert first["structure_exists"] is True
+    assert first["structure_error"] is None
+    assert first["alphafold_url"] == "https://alphafold.ebi.ac.uk/entry/P01308"
+    assert first["pae_path"] == str(tmp_path / "structural" / "insulin-mutation_pae.html")
+    backbone = first["backbone"]
+    assert backbone["chain_count"] >= 1
+    assert backbone["radius"] > 1.0
+    assert len(backbone["atoms"]) >= 100
+
+
+def test_tauri_bridge_generates_one_pae_artifact_without_mixing_progress_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from argparse import Namespace
+
+    from iints.research.structure import PAEHeatmapResult
+    from iints_desktop import tauri_bridge
+
+    html_path = tmp_path / "structural" / "glucagon-receptor_pae.html"
+
+    def fake_render_pae(target: str, *, output_dir: Path) -> list[PAEHeatmapResult]:
+        assert target == "glucagon-receptor"
+        assert output_dir == tmp_path / "structural"
+        output_dir.mkdir(parents=True)
+        html_path.write_text("<html>PAE</html>", encoding="utf-8")
+        return [
+            PAEHeatmapResult(
+                target=target,
+                uniprot_id="P47871",
+                pae_url="https://alphafold.ebi.ac.uk/files/example.json",
+                html_path=html_path,
+                residue_count=477,
+                max_predicted_aligned_error=31.2,
+            )
+        ]
+
+    monkeypatch.setattr("iints.research.structure.render_pae", fake_render_pae)
+
+    exit_code = tauri_bridge._molecule_pae(  # noqa: SLF001 - bridge contract unit test
+        Namespace(target="glucagon-receptor", output_dir=str(tmp_path))
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["ok"] is True
+    assert payload["data"]["html_path"] == str(html_path)
+    assert payload["data"]["medical_device"] is False
 
 
 def test_tauri_bridge_lists_evidence_connectors() -> None:

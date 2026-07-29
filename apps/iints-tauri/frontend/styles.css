@@ -1061,6 +1061,91 @@ textarea[aria-invalid="true"] {
   min-width: 0;
 }
 
+.inline-warning {
+  margin: 8px 0 0;
+  padding: 7px 9px;
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-left: 3px solid var(--warning);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+.molecule-viewer-panel {
+  scroll-margin-top: 122px;
+  margin-top: 14px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+}
+
+.molecule-viewer-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 11px;
+}
+
+.molecule-viewer-heading .button-row {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+#molecule-viewer-canvas {
+  width: 100%;
+  height: clamp(300px, 44vw, 520px);
+  display: block;
+  background: #f7f9f9;
+  border: 1px solid var(--line);
+  cursor: grab;
+  touch-action: none;
+}
+
+#molecule-viewer-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.molecule-viewer-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 10px 0 7px;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+}
+
+.molecule-viewer-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.molecule-viewer-legend i {
+  width: 12px;
+  height: 12px;
+  display: inline-block;
+  border: 1px solid rgba(23, 35, 43, 0.24);
+}
+
+.confidence-very-high {
+  background: #1f3b8f;
+}
+
+.confidence-high {
+  background: #41b6c4;
+}
+
+.confidence-low {
+  background: #f0c94d;
+}
+
+.confidence-very-low {
+  background: #d96b31;
+}
+
 .tool-card {
   background: #ffffff;
 }
@@ -1366,6 +1451,10 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .molecule-viewer-panel {
+    scroll-margin-top: 12px;
+  }
+
   .app-sidebar {
     position: static;
     display: grid;
@@ -1468,9 +1557,14 @@ footer {
 
   .panel-heading,
   .cross-scale-heading,
+  .molecule-viewer-heading,
   footer {
     align-items: start;
     flex-direction: column;
+  }
+
+  .molecule-viewer-heading .button-row {
+    justify-content: flex-start;
   }
 
   .panel-heading > p {
@@ -1547,6 +1641,10 @@ footer {
   .molecule-card img {
     width: 64px;
     height: 64px;
+  }
+
+  #molecule-viewer-canvas {
+    height: 300px;
   }
 
   .subsection-heading {

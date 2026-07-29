@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-7" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-8" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -394,6 +394,37 @@
           <button id="open-structural-folder-btn">Open structural folder</button>
         </div>
         <div id="molecule-list" class="molecule-list" aria-live="polite"></div>
+        <section id="molecule-viewer-panel" class="molecule-viewer-panel" hidden>
+          <div class="molecule-viewer-heading">
+            <div>
+              <p class="eyebrow">Local structure inspection</p>
+              <h3 id="molecule-viewer-title">Protein backbone</h3>
+              <p id="molecule-viewer-meta" class="muted"></p>
+            </div>
+            <div class="button-row">
+              <button id="molecule-viewer-reset-btn" type="button">Reset view</button>
+              <button id="molecule-viewer-rotate-btn" type="button" aria-pressed="false">Auto-rotate: off</button>
+              <button id="molecule-viewer-close-btn" type="button">Close viewer</button>
+            </div>
+          </div>
+          <canvas
+            id="molecule-viewer-canvas"
+            width="960"
+            height="540"
+            tabindex="0"
+            aria-label="Interactive three-dimensional protein backbone viewer"
+          ></canvas>
+          <div class="molecule-viewer-legend" aria-label="AlphaFold confidence legend">
+            <span><i class="confidence-very-high"></i>pLDDT 90-100</span>
+            <span><i class="confidence-high"></i>70-89</span>
+            <span><i class="confidence-low"></i>50-69</span>
+            <span><i class="confidence-very-low"></i>below 50</span>
+          </div>
+          <p class="field-help">
+            Drag to rotate, use the mouse wheel to zoom, and use arrow keys when the viewer is focused.
+            This C-alpha backbone is for structural inspection only and does not affect simulation parameters.
+          </p>
+        </section>
 
         <div class="research-tools">
           <article class="tool-card">
@@ -668,6 +699,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js?v=workbench-7"></script>
+    <script type="module" src="./main.js?v=workbench-8"></script>
   </body>
 </html>

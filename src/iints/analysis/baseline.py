@@ -11,7 +11,7 @@ from iints.api.base_algorithm import InsulinAlgorithm
 from iints.core.algorithms.clinical_baseline import ClinicalBaselineAlgorithm
 from iints.core.algorithms.pid_controller import PIDController
 from iints.core.algorithms.standard_pump_algo import StandardPumpAlgorithm
-from iints.core.patient.models import PatientModel
+from iints.core.patient.patient_factory import PatientFactory
 from iints.core.simulator import Simulator
 from iints.utils.csv_safety import sanitize_csv_dataframe
 from iints.validation import build_stress_events
@@ -63,6 +63,7 @@ def run_baseline_comparison(
     primary_safety: Dict[str, Any],
     compare_standard_pump: bool = True,
     seed: Optional[int] = None,
+    patient_model_type: str = "auto",
 ) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
 
@@ -90,7 +91,14 @@ def run_baseline_comparison(
         baselines.append(("Standard Pump", StandardPumpAlgorithm()))
 
     for label, algo in baselines:
-        patient_model = PatientModel(**patient_params)
+        # Baseline algorithms must run against the same physiological model as
+        # the primary algorithm.  Constructing the legacy CustomPatientModel
+        # directly both made comparisons scientifically inconsistent and
+        # crashed when validated configs contained model-specific parameters.
+        patient_model = PatientFactory.create_patient(
+            patient_type=patient_model_type,
+            **patient_params,
+        )
         simulator = Simulator(
             patient_model=patient_model,
             algorithm=algo,

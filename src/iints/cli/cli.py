@@ -4786,6 +4786,7 @@ def presets_run(
     if compare_baselines:
         comparison = run_baseline_comparison(
             patient_params=validated_patient_params,
+            patient_model_type=patient_model_type,
             stress_event_payloads=stress_event_payloads,
             duration=duration,
             time_step=time_step,
@@ -5519,6 +5520,7 @@ def run(
             progress.update(task, description="Running baseline comparison")
             comparison = run_baseline_comparison(
                 patient_params=validated_patient_params,
+                patient_model_type=patient_model_type,
                 stress_event_payloads=stress_event_payloads,
                 duration=duration,
                 time_step=time_step,

@@ -207,15 +207,20 @@ def list_molecule_assets() -> list[MoleculeAsset]:
             image_path=base / "insr_3D.png",
             structure_path=base / "AF-P06213-F1-model_v6.cif",
             explanation=(
-                "The Insulin Receptor (INSR) is the massive transmembrane complex that binds insulin. "
-                "In the SDK, genetic defects in this receptor are directly modeled by severely "
-                "reducing the insulin sensitivity parameter (S_I), simulating Donohue Syndrome."
+                "The insulin receptor is a receptor tyrosine kinase that initiates intracellular "
+                "signalling after insulin binding. In IINTS-AF, explicitly documented functional "
+                "assumptions can be explored as insulin-sensitivity stressors; AlphaFold confidence "
+                "alone is never converted into disease severity."
             ),
-            sdk_link="Connects to: S_I parameter, ClinVar mutation simulations, severe insulin resistance.",
+            sdk_link=(
+                "Connects to: sensitivity stress tests, ClinVar evidence review, "
+                "and genomics experiments."
+            ),
             pae_target="insulin-receptor",
             pae_note=(
-                "PAE heatmap for UniProt P06213. Demonstrates the structural confidence "
-                "of the extracellular alpha-subunits where insulin docks."
+                "PAE heatmap for UniProt P06213. PAE describes confidence in relative residue "
+                "placement within the prediction; it does not measure receptor function "
+                "or clinical severity."
             ),
         ),
         MoleculeAsset(
@@ -226,14 +231,17 @@ def list_molecule_assets() -> list[MoleculeAsset]:
             structure_path=base / "AF-P14672-F1-model_v6.cif",
             explanation=(
                 "GLUT4 (SLC2A4) is the insulin-regulated glucose transporter. When insulin binds INSR, "
-                "GLUT4 translocates to the cell membrane to absorb glucose from the blood. "
-                "This transporter is highly expressed in skeletal muscle, proving our compartment sizing."
+                "signalling promotes GLUT4 translocation toward the cell membrane, increasing cellular "
+                "glucose uptake. Tissue-expression evidence can contextualize model assumptions, "
+                "but does not by itself validate compartment sizes."
             ),
-            sdk_link="Connects to: GTEx tissue expression mapping, muscle compartment glucose uptake.",
+            sdk_link=(
+                "Connects to: tissue-expression evidence and peripheral glucose-uptake stress tests."
+            ),
             pae_target="glut4",
             pae_note=(
-                "PAE heatmap for UniProt P14672. Shows the structural confidence of the 12 "
-                "transmembrane helices that form the glucose channel."
+                "PAE heatmap for UniProt P14672. Interpret it together with per-residue pLDDT; "
+                "neither metric establishes transport activity."
             ),
         ),
         MoleculeAsset(
@@ -243,15 +251,19 @@ def list_molecule_assets() -> list[MoleculeAsset]:
             image_path=base / "gcgr_3D.png",
             structure_path=base / "AF-P47871-F1-model_v6.cif",
             explanation=(
-                "The Glucagon Receptor (GCGR) is a G-protein coupled receptor primarily located in "
-                "the liver. When activated, it stimulates Endogenous Glucose Production (EGP). "
-                "This provides the physiological basis for the SDK's rescue-carb mathematics."
+                "The glucagon receptor is a class B G-protein-coupled receptor with an important "
+                "hepatic role. Its signalling can increase hepatic glucose output. IINTS-AF "
+                "represents that physiology through documented model assumptions rather than "
+                "deriving parameters from a structure prediction."
             ),
-            sdk_link="Connects to: EGP mathematics, hypoglycemia counter-regulation, GTEx liver mapping.",
+            sdk_link=(
+                "Connects to: hepatic glucose-output assumptions, counter-regulation, "
+                "and tissue evidence."
+            ),
             pae_target="glucagon-receptor",
             pae_note=(
-                "PAE heatmap for UniProt P47871. Illustrates AlphaFold's confidence in predicting "
-                "the 7-transmembrane bundle geometry."
+                "PAE heatmap for UniProt P47871. It reports predicted relative-position uncertainty "
+                "and is not a receptor-activity or treatment metric."
             ),
         ),
     ]
