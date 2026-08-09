@@ -1,0 +1,11 @@
+flowchart TD
+    R["Recorded run artifacts"] --> D["Deterministic parser and metrics"]
+    D --> A["Local AI explanation"]
+    D --> F["Numeric glucose predictor"]
+    F --> G["Forecast evaluation gates"]
+    A --> N["Narrative review note"]
+    G --> C["Optional controller candidate"]
+    C --> S["Deterministic safety supervisor"]
+    S --> O["Simulated delivered action"]
+    A -. cannot change .-> O
+    N -. must cite artifacts .-> R

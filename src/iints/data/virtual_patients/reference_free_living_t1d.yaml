@@ -6,10 +6,10 @@ initial_glucose: 151.733
 glucose_absorption_rate: 0.05267
 insulin_action_duration: 300.0
 insulin_peak_time: 75.0
-meal_mismatch_epsilon: 0.83
+meal_mismatch_epsilon: 0.75
 dawn_phenomenon_strength: 0.0
 dawn_start_hour: 4.0
 dawn_end_hour: 8.0
-basal_glucose_target: 147.0
+basal_glucose_target: 140.0
 carb_absorption_duration_minutes: 270.0
 max_glucose_rate_mgdl_per_min: 4.0

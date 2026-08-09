@@ -81,3 +81,23 @@ def test_eu_ai_pact_cli_writes_review_json(tmp_path: Path) -> None:
     assert result.exit_code == 0
     payload = json.loads(output_path.read_text())
     assert payload["status"] == "research_ready"
+
+
+def test_eu_ai_pact_normalizes_percentage_scores() -> None:
+    controls = {
+        control: True
+        for control in (*CORE_AI_PACT_CONTROLS, *HIGH_RISK_READINESS_CONTROLS)
+    }
+    result = review_eu_ai_pact_readiness(
+        {
+            "mdmp_grade": "research_grade",
+            "compliance_score": 80.0,
+            "dataset_fingerprint_sha256": "abc",
+            "contract_fingerprint_sha256": "def",
+            "row_count": 288,
+            "governance": controls,
+        }
+    )
+
+    assert result.status == "needs_review"
+    assert any("0.800" in warning for warning in result.warnings)

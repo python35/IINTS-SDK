@@ -16,28 +16,20 @@ from iints.core.simulator import Simulator
         (75.0, 75.0),
     ],
 )
-def test_custom_patient_model_handles_invalid_insulin_curve_parameters(
+def test_custom_patient_model_rejects_invalid_insulin_curve_parameters(
     insulin_action_duration: float,
     insulin_peak_time: float,
 ) -> None:
-    patient = CustomPatientModel(
-        insulin_action_duration=insulin_action_duration,
-        insulin_peak_time=insulin_peak_time,
-    )
-
-    glucose = patient.update(time_step=1.0, delivered_insulin=1.0)
-
-    assert math.isfinite(glucose)
-    assert math.isfinite(patient.insulin_on_board)
+    with pytest.raises(ValueError):
+        CustomPatientModel(
+            insulin_action_duration=insulin_action_duration,
+            insulin_peak_time=insulin_peak_time,
+        )
 
 
-def test_custom_patient_model_handles_zero_carb_absorption_duration() -> None:
-    patient = CustomPatientModel(carb_absorption_duration_minutes=0.0)
-
-    glucose = patient.update(time_step=5.0, delivered_insulin=0.0, carb_intake=45.0)
-
-    assert math.isfinite(glucose)
-    assert math.isfinite(patient.carbs_on_board)
+def test_custom_patient_model_rejects_zero_carb_absorption_duration() -> None:
+    with pytest.raises(ValueError):
+        CustomPatientModel(carb_absorption_duration_minutes=0.0)
 
 
 def test_predict_glucose_handles_zero_carb_absorption_minutes() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from iints.research.physiology_calibration import (
     physiology_calibration_report,
@@ -54,6 +55,9 @@ def test_physiology_calibration_report_generates_conservative_hints() -> None:
     assert 120.0 <= hints["carb_absorption_duration_minutes"] <= 420.0
     assert 1.0 <= hints["max_glucose_rate_mgdl_per_min"] <= 4.0
     assert report["purpose"].startswith("research physiology calibration")
+    assert "raw_empirical_estimates_before_bounds" in report["calibration"]
+    assert "bound_hits" in report["calibration"]
+    assert report["real_dataset"]["data_quality"]["retained_rows"] == len(raw)
 
 
 def test_calibration_standardizer_resolves_ohio_style_columns() -> None:
@@ -66,3 +70,36 @@ def test_calibration_standardizer_resolves_ohio_style_columns() -> None:
         standardized.columns
     )
     assert standardized["glucose_mgdl"].between(20, 600).all()
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("glucose_actual_mgdl", "not-a-number", "glucose"),
+        ("carb_grams", "unknown meal", "carbs"),
+        ("insulin_units", -1.0, "insulin"),
+        ("exercise_flag", 2.0, "exercise_flag"),
+    ],
+)
+def test_calibration_standardizer_rejects_corrupt_scientific_inputs(
+    column: str,
+    value,
+    message: str,
+) -> None:
+    raw = _synthetic_real_dataset()
+    if isinstance(value, str):
+        raw[column] = raw[column].astype(object)
+    raw.loc[0, column] = value
+
+    with pytest.raises(ValueError, match=message):
+        standardize_calibration_dataframe(raw)
+
+
+def test_calibration_reports_missing_glucose_instead_of_silently_hiding_it() -> None:
+    raw = _synthetic_real_dataset()
+    raw.loc[0, "glucose_actual_mgdl"] = None
+
+    standardized = standardize_calibration_dataframe(raw)
+
+    assert standardized.attrs["missing_glucose_rows_dropped"] == 1
+    assert standardized.attrs["retained_rows"] == len(raw) - 1

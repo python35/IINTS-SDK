@@ -87,6 +87,50 @@ class StemCellTransplantParameters:
     glucose_slope_mgdl: float = 25.0
     max_secretion_units_per_min: float = 0.006
 
+    def __post_init__(self) -> None:
+        if self.placement not in PLACEMENT_PRESETS:
+            raise ValueError(f"Unknown transplant placement: {self.placement}")
+        numeric = {
+            name: float(value)
+            for name, value in asdict(self).items()
+            if name != "placement"
+        }
+        if not all(np.isfinite(value) for value in numeric.values()):
+            raise ValueError("transplant parameters must all be finite")
+        if numeric["initial_cell_mass"] < 0.0:
+            raise ValueError("initial_cell_mass must be non-negative")
+        for name in (
+            "initial_maturation_fraction",
+            "immunosuppression_effect",
+            "encapsulation_effect",
+        ):
+            if not 0.0 <= numeric[name] <= 1.0:
+                raise ValueError(f"{name} must be between 0 and 1")
+        non_negative = (
+            "maturation_rate_per_min",
+            "vascularization_rate_per_min",
+            "innate_decay_per_min",
+            "adaptive_activation_rate_per_min",
+            "adaptive_decay_per_min",
+            "fibrosis_rate_per_min",
+            "fibrosis_resolution_per_min",
+            "hypoxia_death_rate_per_min",
+            "inflammatory_death_rate_per_min",
+            "adaptive_death_rate_per_min",
+            "dedifferentiation_rate_per_min",
+            "max_secretion_units_per_min",
+        )
+        for name in non_negative:
+            if numeric[name] < 0.0:
+                raise ValueError(f"{name} must be non-negative")
+        for name in (
+            "oxygen_time_constant_minutes",
+            "glucose_threshold_mgdl",
+            "glucose_slope_mgdl",
+        ):
+            if numeric[name] <= 0.0:
+                raise ValueError(f"{name} must be positive")
+
     def with_placement_defaults(self) -> "StemCellTransplantParameters":
         if self.placement == "encapsulated" and self.encapsulation_effect == 0.0:
             return replace(self, encapsulation_effect=0.80)
@@ -104,6 +148,28 @@ class StemCellTransplantState:
     fibrosis: float
     insulin_delay_pool_units: float
     time_minutes: float = 0.0
+
+    def __post_init__(self) -> None:
+        numeric = {name: float(value) for name, value in asdict(self).items()}
+        if not all(np.isfinite(value) for value in numeric.values()):
+            raise ValueError("transplant state must contain only finite values")
+        for name in (
+            "immature_mass",
+            "functional_mass",
+            "insulin_delay_pool_units",
+            "time_minutes",
+        ):
+            if numeric[name] < 0.0:
+                raise ValueError(f"transplant state {name} must be non-negative")
+        for name in (
+            "vascularization",
+            "oxygenation",
+            "innate_inflammation",
+            "adaptive_immunity",
+            "fibrosis",
+        ):
+            if not 0.0 <= numeric[name] <= 1.0:
+                raise ValueError(f"transplant state {name} must be between 0 and 1")
 
     def to_dict(self) -> dict[str, float]:
         return {key: float(value) for key, value in asdict(self).items()}
@@ -140,6 +206,28 @@ def _clip01(value: float) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
+def _validated_fraction_step(value: float, *, name: str) -> float:
+    """Project solver-scale roundoff only; reject material state overshoot."""
+
+    numeric = float(value)
+    if not np.isfinite(numeric):
+        raise RuntimeError(f"transplant step produced non-finite {name}")
+    if numeric < -1e-9 or numeric > 1.0 + 1e-9:
+        raise RuntimeError(
+            f"transplant step moved {name} outside [0, 1]: {numeric}"
+        )
+    return _clip01(numeric)
+
+
+def _validated_nonnegative_step(value: float, *, name: str) -> float:
+    numeric = float(value)
+    if not np.isfinite(numeric):
+        raise RuntimeError(f"transplant step produced non-finite {name}")
+    if numeric < -1e-9:
+        raise RuntimeError(f"transplant step produced negative {name}: {numeric}")
+    return max(0.0, numeric)
+
+
 def _sigmoid(value: float) -> float:
     if value >= 0:
         z = float(np.exp(-value))
@@ -164,8 +252,8 @@ class StemCellTransplantModel:
     def initial_state(parameters: StemCellTransplantParameters) -> StemCellTransplantState:
         params = parameters.with_placement_defaults()
         preset = PLACEMENT_PRESETS[params.placement]
-        initial_mass = max(0.0, float(params.initial_cell_mass))
-        maturation = _clip01(float(params.initial_maturation_fraction))
+        initial_mass = float(params.initial_cell_mass)
+        maturation = float(params.initial_maturation_fraction)
         return StemCellTransplantState(
             immature_mass=initial_mass * (1.0 - maturation),
             functional_mass=initial_mass * maturation,
@@ -182,10 +270,15 @@ class StemCellTransplantModel:
         params = self.parameters
         preset = self.placement
         state = self.state
-        dt = max(0.0, float(dt_minutes))
+        glucose = float(glucose_mgdl)
+        dt = float(dt_minutes)
+        if not np.isfinite(glucose) or not 20.0 <= glucose <= 600.0:
+            raise ValueError("glucose_mgdl must be finite and inside [20, 600]")
+        if not np.isfinite(dt) or not 0.0 < dt <= 60.0:
+            raise ValueError("dt_minutes must be finite and inside (0, 60]")
 
-        immunosuppression = _clip01(params.immunosuppression_effect)
-        encapsulation = _clip01(params.encapsulation_effect)
+        immunosuppression = params.immunosuppression_effect
+        encapsulation = params.encapsulation_effect
         immune_visibility = preset.immune_visibility * (1.0 - 0.75 * encapsulation)
 
         inflammation = state.innate_inflammation
@@ -202,7 +295,10 @@ class StemCellTransplantModel:
             * (1.0 - 0.75 * fibrosis)
             * (1.0 - 0.35 * inflammation)
         )
-        vascularization_next = _clip01(vascularization + dt * d_vascularization)
+        vascularization_next = _validated_fraction_step(
+            vascularization + dt * d_vascularization,
+            name="vascularization",
+        )
 
         oxygen_target = _clip01(
             0.10
@@ -210,15 +306,17 @@ class StemCellTransplantModel:
             - 0.35 * fibrosis
             - 0.10 * max(0.0, immature + functional - 1.0)
         )
-        oxygenation_next = _clip01(
+        oxygenation_next = _validated_fraction_step(
             oxygenation
-            + dt * (oxygen_target - oxygenation) / max(params.oxygen_time_constant_minutes, 1.0)
+            + dt * (oxygen_target - oxygenation)
+            / params.oxygen_time_constant_minutes,
+            name="oxygenation",
         )
         oxygen_stress = max(0.0, 0.45 - oxygenation_next)
 
-        inflammation_next = _clip01(
-            inflammation
-            - dt * params.innate_decay_per_min * inflammation
+        inflammation_next = _validated_fraction_step(
+            inflammation - dt * params.innate_decay_per_min * inflammation,
+            name="innate_inflammation",
         )
         adaptive_drive = (
             params.adaptive_activation_rate_per_min
@@ -227,7 +325,10 @@ class StemCellTransplantModel:
             * (1.0 - immunosuppression)
         )
         adaptive_decay = params.adaptive_decay_per_min * adaptive * (0.3 + immunosuppression)
-        adaptive_next = _clip01(adaptive + dt * (adaptive_drive - adaptive_decay))
+        adaptive_next = _validated_fraction_step(
+            adaptive + dt * (adaptive_drive - adaptive_decay),
+            name="adaptive_immunity",
+        )
 
         fibrosis_drive = (
             params.fibrosis_rate_per_min
@@ -235,8 +336,11 @@ class StemCellTransplantModel:
             * (inflammation_next + adaptive_next)
             * (0.35 + encapsulation)
         )
-        fibrosis_next = _clip01(
-            fibrosis + dt * (fibrosis_drive - params.fibrosis_resolution_per_min * fibrosis)
+        fibrosis_next = _validated_fraction_step(
+            fibrosis
+            + dt
+            * (fibrosis_drive - params.fibrosis_resolution_per_min * fibrosis),
+            name="fibrosis",
         )
 
         death_rate = (
@@ -247,28 +351,40 @@ class StemCellTransplantModel:
         maturation_rate = params.maturation_rate_per_min * oxygenation_next * (1.0 - 0.50 * inflammation_next)
         dediff_rate = params.dedifferentiation_rate_per_min * oxygen_stress
 
-        matured = min(immature, max(0.0, maturation_rate * immature * dt))
-        immature_next = max(0.0, immature - matured - death_rate * immature * dt)
-        functional_next = max(
-            0.0,
+        matured = min(immature, maturation_rate * immature * dt)
+        immature_next = _validated_nonnegative_step(
+            immature - matured - death_rate * immature * dt,
+            name="immature_mass",
+        )
+        functional_next = _validated_nonnegative_step(
             functional + matured - death_rate * functional * dt - dediff_rate * functional * dt,
+            name="functional_mass",
         )
 
         glucose_stimulus = _sigmoid(
-            (float(glucose_mgdl) - params.glucose_threshold_mgdl)
-            / max(params.glucose_slope_mgdl, 1.0)
+            (glucose - params.glucose_threshold_mgdl)
+            / params.glucose_slope_mgdl
         )
         function_factor = oxygenation_next * (1.0 - 0.55 * fibrosis_next)
-        effective_beta_mass = max(0.0, functional_next * function_factor)
-        secreted_units = max(
-            0.0,
-            params.max_secretion_units_per_min * effective_beta_mass * glucose_stimulus * dt,
+        effective_beta_mass = _validated_nonnegative_step(
+            functional_next * function_factor,
+            name="effective_beta_mass",
+        )
+        secreted_units = _validated_nonnegative_step(
+            params.max_secretion_units_per_min
+            * effective_beta_mass
+            * glucose_stimulus
+            * dt,
+            name="secreted_insulin_units",
         )
 
-        pool = max(0.0, state.insulin_delay_pool_units + secreted_units)
-        release_fraction = dt / (dt + max(preset.insulin_release_delay_minutes, 0.0))
-        released_units = pool * _clip01(release_fraction)
-        pool_next = max(0.0, pool - released_units)
+        pool = state.insulin_delay_pool_units + secreted_units
+        release_fraction = dt / (dt + preset.insulin_release_delay_minutes)
+        released_units = pool * release_fraction
+        pool_next = _validated_nonnegative_step(
+            pool - released_units,
+            name="insulin_delay_pool_units",
+        )
 
         direct_units = released_units * preset.direct_plasma_fraction
         subq_units = released_units * (1.0 - preset.direct_plasma_fraction)
@@ -332,22 +448,33 @@ def run_stem_cell_transplant_simulation(
     normal two-depot insulin absorption pathway.
     """
     dt = int(time_step_minutes)
-    if dt <= 0:
-        raise ValueError("time_step_minutes must be positive.")
+    duration = int(duration_minutes)
+    if dt <= 0 or dt > 60 or dt != time_step_minutes:
+        raise ValueError("time_step_minutes must be an integer inside [1, 60]")
+    if duration < 0 or duration != duration_minutes:
+        raise ValueError("duration_minutes must be a non-negative integer")
+    initial = float(initial_glucose)
+    basal_rate = float(basal_insulin_units_per_hour)
+    if not np.isfinite(initial) or not 20.0 <= initial <= 600.0:
+        raise ValueError("initial_glucose must be finite and inside [20, 600]")
+    if not np.isfinite(basal_rate) or basal_rate < 0.0:
+        raise ValueError(
+            "basal_insulin_units_per_hour must be finite and non-negative"
+        )
 
     patient = BergmanPatientModel(
-        initial_glucose=float(initial_glucose),
-        basal_insulin_rate=float(basal_insulin_units_per_hour),
+        initial_glucose=initial,
+        basal_insulin_rate=basal_rate,
     )
     graft = StemCellTransplantModel(parameters=parameters)
     meals = _normalize_meal_schedule(meal_schedule)
     records: list[dict[str, float | str]] = []
 
-    for minute in range(0, int(duration_minutes) + 1, dt):
+    for minute in range(0, duration + 1, dt):
         carb_intake = meals.get(minute, 0.0)
         graft_step = graft.step(patient.current_glucose, dt)
         _add_direct_plasma_insulin(patient, graft_step.direct_plasma_units)
-        basal_units = max(0.0, float(basal_insulin_units_per_hour)) * dt / 60.0
+        basal_units = basal_rate * dt / 60.0
         delivered_subq = basal_units + graft_step.subcutaneous_units
         glucose = patient.update(
             time_step=float(dt),

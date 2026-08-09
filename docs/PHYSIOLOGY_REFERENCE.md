@@ -40,7 +40,7 @@ Keeping those four ideas separate is important. A glucose target, a sensor plaus
 | Stress / illness physiology | stress events, stress hormones/pseudo-hormones in supported models | Lets glucose rise without a meal because of stress-mediated insulin resistance and increased endogenous glucose production |
 | Hypoglycemia defense systems | experimental counterregulation, HAAF, glucagon, and renal-clearance layer | Makes explicit which rescue mechanisms are implemented experimentally and which assumptions still need calibration |
 | Stem-cell / islet graft research | optional Bergman-mode graft mass state `M_graft` with glucose-responsive insulin secretion | Lets researchers explore simplified engraftment, placement-delay, and rejection hypotheses without claiming clinical transplant prediction |
-| Meal mismatch | `meal_mismatch_epsilon` | Distinguishes announced carbohydrate from true carbohydrate exposure |
+| Effective meal appearance | legacy `meal_mismatch_epsilon` | Scales the physical meal input in simplified/adapted models; announced-versus-actual carbohydrate is carried separately by scenario `reported_value` |
 | Measurement imperfections | CGM lag, bias, random noise, drift, dropout, compression lows | Lets algorithms be tested against what a sensor would report, not only perfect latent glucose |
 | Empirical residual variation | optional additive residual profile | Adds real-data-like day-scale irregularity on top of the mechanistic trajectory |
 
@@ -69,12 +69,18 @@ These values are deliberately conservative software controls. They protect simul
 | Severe hypoglycemia threshold | `54 mg/dL` | Marks a more serious low-glucose state |
 | Hyperglycemia threshold | `250 mg/dL` | Marks high-glucose risk for supervision |
 | Critical termination rule | `<40 mg/dL` for `30 min` | Stops a run after sustained extreme low glucose |
-| Maximum bolus | `5.0 U` | Blocks a single excessive requested dose |
-| Maximum insulin per hour | `3.0 U` | Limits recent cumulative delivery |
-| Maximum insulin on board | `4.0 U` | Limits active insulin burden |
+| Maximum bolus | `15.0 U` | Configurable engineering envelope for one requested dose |
+| Maximum insulin per hour | `20.0 U` | Configurable engineering envelope for recent cumulative delivery |
+| Maximum insulin on board | `20.0 U` | Configurable engineering envelope for active insulin burden |
 | Falling-trend stop | `-2.0 mg/dL/min` | Helps block dosing when glucose is falling quickly |
 | Plausible sensor range | `40-500 mg/dL` | Broad fail-soft bound for incoming CGM-like readings |
 | Maximum plausible CGM change | `20 mg/dL per 5 min` | Flags implausibly abrupt sensor movement |
+
+The dose envelopes are deliberately broad defaults, not prescriptions. They
+allow meal coverage for the bundled ICR profiles while low-glucose,
+falling-trend, forecast, basal-rate, and contract guards remain active. Studies
+that make dosing claims must define and justify patient- or protocol-specific
+limits instead of relying on these defaults.
 
 ## 5. Patient Parameters
 
@@ -88,7 +94,7 @@ These values are deliberately conservative software controls. They protect simul
 | `glucose_absorption_rate` | model gain | Strength of meal-to-glucose rise in the simplified model | `0.0-0.2` | Controls carbohydrate impact in the custom model |
 | `insulin_action_duration` | min | Duration over which a dose remains active | `60-720` | Defines IOB decay and total insulin-action window |
 | `insulin_peak_time` | min | Time of peak activity inside the dose-action curve | `15-240`, below duration | Shapes early versus late insulin effect |
-| `meal_mismatch_epsilon` | ratio | `true carbs / announced carbs` | `0.5-1.5` | Models under- or over-estimation of meals |
+| `meal_mismatch_epsilon` | ratio | Legacy name for the effective carbohydrate-appearance multiplier applied to the physical meal input | `0.5-1.5` | Calibrates the simplified meal-effect abstraction; announced-versus-actual mismatch is represented separately by scenario `reported_value` |
 | `dawn_phenomenon_strength` | mg/dL/hour | Extra early-morning rise or, in Hovorka-style mode, the scale of the dawn EGP oscillator | `0-50` | Adds explicit circadian disturbance |
 | `dawn_start_hour`, `dawn_end_hour` | hour of day | Dawn-effect window | `0-23`, `0-24` | Defines when dawn physiology is active |
 | `stem_cell_engraftment_percent` | percent | Experimental functional beta-cell/islet graft fraction in Bergman mode | `0+`, usually `0-100` for demos | Scales glucose-responsive endogenous insulin secretion through `M_graft` |
@@ -121,9 +127,9 @@ These profiles are shipped with the SDK for studies, demos, and physiological co
 | `clinic_safe_hyper_challenge` | `150` | `0.55` | `45` | `9` | none | post-meal high-glucose challenge |
 | `clinic_safe_midnight` | `125` | `0.45` | `65` | `11` | none | exercise-after-evening-meal challenge |
 | `clinic_safe_pizza` | `135` | `0.50` | `50` | `10` | none | delayed-meal challenge |
-| `reference_free_living_t1d` | `151.7` | `0.50` | `50` | `10` | Ohio-informed basal target `147`, carb tail `270 min`, meal mismatch `0.83` | empirical free-living reference |
-| `reference_azt1d_t1d` | `135` | `0.50` | `50` | `10` | dawn rise `4 mg/dL/h`, meal mismatch `0.95` | AZT1D-oriented reference |
-| `reference_hupa_ucm_t1d` | `130` | `0.50` | `50` | `10` | dawn rise `8 mg/dL/h`, meal mismatch `0.95` | HUPA-UCM-oriented reference |
+| `reference_free_living_t1d` | `151.7` | `0.50` | `50` | `10` | empirically checked basal target `140`, carb tail `270 min`, effective meal-appearance multiplier `0.75` | empirical free-living reference |
+| `reference_azt1d_t1d` | `135` | `0.50` | `50` | `10` | dawn rise `4 mg/dL/h`, effective meal-appearance multiplier `0.83` | AZT1D-oriented reference |
+| `reference_hupa_ucm_t1d` | `130` | `0.50` | `50` | `10` | dawn rise `8 mg/dL/h`, effective meal-appearance multiplier `0.83` | HUPA-UCM-oriented reference |
 | `default_patient` | `120` | `0.80` | `50` | `10` | legacy simplified defaults | compatibility, not the best first demo choice |
 | `patient_559_config` | `130` | `0.90` | `45` | `12` | slower drift, longer insulin action | alternate legacy virtual patient |
 
@@ -362,7 +368,7 @@ Current OhioT1DM aggregate calibration run:
 | test | 35,925 | 12 | 161.584 mg/dL | 63.468% | 97.5 min | initial 153.233, basal target 148.0, carb duration 272.0 min |
 | all | 188,980 | 12 | 159.632 mg/dL | 63.831% | 110.0 min | initial 151.733, basal target 148.2, carb duration 323.0 min |
 
-The public `reference_free_living_t1d` profile uses a gate-compatible calibration compromise: it adopts the Ohio train basal target (`147.0 mg/dL`) while keeping carbohydrate absorption at `270.0 min` because the raw train duration hint (`331.5 min`) made the current preset realism gate fail on baseline/free-living regression tests. This is intentional: real-data hints must pass simulator realism checks before becoming defaults.
+The public `reference_free_living_t1d` profile uses a gate-compatible calibration compromise. The Ohio aggregates remain the empirical starting point, while the public simplified-model profile uses a basal target of `140.0 mg/dL`, an effective meal-appearance multiplier of `0.75`, and a carbohydrate tail of `270.0 min`. Those values were retained only after the baseline and free-living presets stayed inside the bundled empirical envelope across deterministic regression seeds. They are population-level research defaults, not identified patient parameters or treatment settings.
 
 ## 13. Experimental Or Not Fully Calibrated Yet
 

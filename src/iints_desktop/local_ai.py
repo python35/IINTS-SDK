@@ -321,7 +321,8 @@ def ask_local_ai(
         f"Result context:\n{context}\n\n"
         f"User question:\n{question.strip()}\n\n"
         "Perform a highly technical, rigorous analysis based purely on the data. "
-        "Do not offer generic advice. Structure the response perfectly."
+        "Do not offer generic advice. Use clear headings and distinguish observations, "
+        "inferences, assumptions, uncertainty, and limitations."
     )
     answer = backend.complete(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt)
     guarded = guard_ai_output(answer, source="desktop_local_ai")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Edge AI Performance Monitor - IINTS-AF
-Jetson Nano performance validation for medical device standards
+Jetson Nano research benchmarking for latency and resource use
 """
 
 import time
@@ -12,7 +12,7 @@ from datetime import datetime
 import numpy as np
 
 class EdgeAIPerformanceMonitor:
-    """Monitor Jetson Nano performance for medical device validation"""
+    """Monitor edge performance; results are not medical-device validation."""
     
     def __init__(self):
         self.performance_log = []
@@ -92,7 +92,7 @@ class EdgeAIPerformanceMonitor:
         return performance_stats
     
     def _analyze_performance_stats(self, latencies, cpu_usage, memory_usage):
-        """Analyze performance statistics for medical device validation"""
+        """Analyze latency statistics for pre-clinical research benchmarking."""
         
         if not latencies:
             return {'error': 'No valid measurements'}

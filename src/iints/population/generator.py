@@ -4,7 +4,8 @@ Population Generator — IINTS-AF
 Generates a virtual population of N patients with physiological variation
 around a base patient profile.  Each parameter is drawn from a configurable
 distribution (truncated normal or log-normal) whose bounds respect the
-clinically valid ranges defined in the SDK validation schemas.
+configured research ranges defined in the SDK schemas. These bounds are not
+population-validation or clinical-validity claims.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
+from scipy.stats import lognorm, truncnorm
 
 from iints.core.patient.profile import PatientProfile
 
@@ -26,6 +28,24 @@ class ParameterDistribution:
     lower_bound: float = 0.0
     upper_bound: float = float("inf")
 
+    def __post_init__(self) -> None:
+        if not all(np.isfinite(value) for value in (self.mean, self.cv, self.lower_bound)):
+            raise ValueError("distribution parameters must be finite or +inf")
+        if not (np.isfinite(self.upper_bound) or np.isposinf(self.upper_bound)):
+            raise ValueError("upper_bound must be finite or +inf")
+        if self.cv < 0.0:
+            raise ValueError("distribution cv must be non-negative")
+        if self.lower_bound >= self.upper_bound:
+            raise ValueError("lower_bound must be less than upper_bound")
+        if not self.lower_bound <= self.mean <= self.upper_bound:
+            raise ValueError("distribution mean must lie inside its bounds")
+        if self.distribution not in {"truncated_normal", "log_normal"}:
+            raise ValueError(
+                "distribution must be 'truncated_normal' or 'log_normal'"
+            )
+        if self.distribution == "log_normal" and self.mean <= 0.0:
+            raise ValueError("log-normal distribution mean must be positive")
+
 
 @dataclass
 class PopulationConfig:
@@ -37,6 +57,8 @@ class PopulationConfig:
     seed: Optional[int] = None
 
     def __post_init__(self) -> None:
+        if self.n_patients <= 0:
+            raise ValueError("n_patients must be positive")
         if self.base_profile is None:
             self.base_profile = PatientProfile()
         if not self.parameter_distributions:
@@ -44,7 +66,7 @@ class PopulationConfig:
 
 
 def _default_distributions(bp: PatientProfile) -> Dict[str, ParameterDistribution]:
-    """Sensible defaults based on published T1D inter-patient variability."""
+    """Conservative SDK defaults that require cohort-specific calibration."""
     return {
         "isf": ParameterDistribution(
             mean=bp.isf, cv=0.20, distribution="log_normal",
@@ -68,7 +90,7 @@ def _default_distributions(bp: PatientProfile) -> Dict[str, ParameterDistributio
         ),
         "dawn_phenomenon_strength": ParameterDistribution(
             mean=bp.dawn_phenomenon_strength, cv=0.0, distribution="truncated_normal",
-            lower_bound=0.0, upper_bound=30.0,
+            lower_bound=0.0, upper_bound=50.0,
         ),
     }
 
@@ -91,11 +113,27 @@ class PopulationGenerator:
             variance = std ** 2
             mu_ln = np.log(dist.mean ** 2 / np.sqrt(variance + dist.mean ** 2))
             sigma_ln = np.sqrt(np.log(1 + variance / dist.mean ** 2))
-            samples = self.rng.lognormal(mu_ln, sigma_ln, size=n)
-        else:  # truncated_normal
-            samples = self.rng.normal(dist.mean, std, size=n)
+            distribution = lognorm(s=sigma_ln, scale=np.exp(mu_ln))
+            lower_cdf = distribution.cdf(dist.lower_bound)
+            upper_cdf = distribution.cdf(dist.upper_bound)
+            if not upper_cdf > lower_cdf:
+                raise ValueError("log-normal bounds contain no probability mass")
+            quantiles = self.rng.uniform(lower_cdf, upper_cdf, size=n)
+            return np.asarray(distribution.ppf(quantiles), dtype=float)
 
-        return np.clip(samples, dist.lower_bound, dist.upper_bound)
+        lower_z = (dist.lower_bound - dist.mean) / std
+        upper_z = (dist.upper_bound - dist.mean) / std
+        return np.asarray(
+            truncnorm.rvs(
+                lower_z,
+                upper_z,
+                loc=dist.mean,
+                scale=std,
+                size=n,
+                random_state=self.rng,
+            ),
+            dtype=float,
+        )
 
     def generate(self) -> List[PatientProfile]:
         """Return a list of *n_patients* :class:`PatientProfile` instances."""

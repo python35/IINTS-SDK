@@ -180,11 +180,11 @@ def _write_reliability_plot(report: dict[str, Any], path: Path, *, title: str) -
     coverage = [row["interval_95_coverage_pct"] for row in bins]
     target = [report["target_coverage_pct"]] * len(bins)
     fig, ax = plt.subplots(figsize=(7.0, 4.2), dpi=160)
-    ax.bar(x, coverage, color="#0F766E", alpha=0.88, label="Empirical coverage")
-    ax.plot(x, target, color="#DC2626", linestyle="--", linewidth=1.5, label="Target coverage")
+    ax.bar(x, coverage, color="#0F766E", alpha=0.88, label="Observed heuristic coverage")
+    ax.plot(x, target, color="#DC2626", linestyle="--", linewidth=1.5, label="Gaussian reference")
     ax.set_ylim(0, 100)
     ax.set_xlabel("Predicted-uncertainty bin")
-    ax.set_ylabel("95% interval coverage (%)")
+    ax.set_ylabel("Coverage of prediction +/-1.96 model SD (%)")
     ax.set_title(title)
     ax.grid(axis="y", alpha=0.22)
     ax.legend(loc="lower right")
@@ -219,6 +219,7 @@ def _evaluate_loaded_dataset(
         y,
         horizon_steps=predictor_cfg.horizon_steps,
         time_step_minutes=predictor_cfg.time_step_minutes,
+        feature_columns=predictor_cfg.feature_columns,
     )
 
     scaler_data = model_cfg.get("scaler")

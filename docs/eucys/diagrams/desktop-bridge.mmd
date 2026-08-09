@@ -1,0 +1,8 @@
+flowchart LR
+    U["Researcher"] --> T["Rust/Tauri desktop shell"]
+    T --> R["Allowlisted Rust commands<br/>path and argument validation"]
+    R --> P["Private Python SDK engine"]
+    P --> O["Workspace outputs"]
+    O --> T
+    P -. optional localhost only .-> L["Ollama"]
+    P -. explicit research request .-> X["Public scientific APIs"]

@@ -54,11 +54,20 @@ result = review_eu_ai_pact_readiness({
 print(result.status)
 ```
 
+`compliance_score` accepts either a fraction (`0.99`) or the historical
+percentage representation (`99`). The SDK normalizes both to a fraction and
+stores the raw value in the evidence output. Values outside these two declared
+scales are rejected rather than silently reinterpreted.
+
 ## Interpretation
 
 - `research_ready`: the evidence bundle is complete enough for internal research review.
 - `needs_review`: no hard blocker, but the bundle still needs explanation or cleanup.
 - `blocked`: do not use the bundle for public AI claims until the missing controls are resolved.
+
+These statuses describe completion of an IINTS self-assessment evidence
+bundle. They are not an official EU AI Act classification, legal compliance
+decision, notified-body assessment, CE marking, or medical-device approval.
 
 ## Official Sources
 

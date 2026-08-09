@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import yaml
 
 from iints.research.glucose_model import (
@@ -43,10 +44,36 @@ def test_standardize_glucose_forecast_frame_derives_contract_columns() -> None:
     for column in ["time_minutes", "subject_id", "segment", "source_dataset", *GLUCOSE_MODEL_FEATURE_COLUMNS]:
         assert column in frame.columns
     assert frame["subject_id"].iloc[0].startswith("demo:")
-    assert frame["glucose_actual_mgdl"].between(35, 450).all()
+    assert frame["glucose_actual_mgdl"].equals(
+        _demo_frame()["glucose"].astype(float)
+    )
     assert frame["glucose_trend_mgdl_min"].abs().max() > 0
     assert frame["time_of_day_sin"].between(-1, 1).all()
     assert frame["time_of_day_cos"].between(-1, 1).all()
+
+
+def test_standardization_never_clips_observed_glucose() -> None:
+    frame = _demo_frame(rows=8)
+    frame.loc[3, "glucose"] = 601.0
+
+    with pytest.raises(ValueError, match="Values are not clipped"):
+        standardize_glucose_forecast_frame(frame, source_label="invalid")
+
+
+def test_standardization_interpolates_only_inside_one_segment() -> None:
+    frame = _demo_frame(rows=8)
+    frame.loc[3, "glucose"] = np.nan
+    standardized = standardize_glucose_forecast_frame(
+        frame, source_label="interior"
+    )
+    assert standardized.loc[3, "glucose_actual_mgdl"] == pytest.approx(
+        (float(frame.loc[2, "glucose"]) + float(frame.loc[4, "glucose"])) / 2.0
+    )
+    assert standardized.attrs["glucose_interpolated_rows"] == 1
+
+    frame.loc[0, "glucose"] = np.nan
+    with pytest.raises(ValueError, match="unresolved missing"):
+        standardize_glucose_forecast_frame(frame, source_label="boundary")
 
 
 def test_build_glucose_training_pack_writes_dataset_config_and_manifest(tmp_path: Path) -> None:

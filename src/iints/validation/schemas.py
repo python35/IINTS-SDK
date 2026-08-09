@@ -104,7 +104,7 @@ class PatientConfigModel(BaseModel):
     # Optional Bergman research parameters. They remain disabled by default and
     # are accepted here so the desktop Scenario Builder uses the same strict
     # configuration contract as the public SDK runners.
-    stem_cell_engraftment_percent: float = Field(default=0.0, ge=0.0, le=200.0)
+    stem_cell_engraftment_percent: float = Field(default=0.0, ge=0.0, le=100.0)
     stem_cell_subq_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
     immune_rejection_rate: float = Field(default=0.0, ge=0.0, le=0.1)
 

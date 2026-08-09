@@ -156,6 +156,8 @@ def _routine_safety_adjustment_mask(results_df: pd.DataFrame) -> pd.Series:
     return (
         reasons.str.startswith("PD_STACKING_PREVENTION")
         | reasons.str.startswith("PD_CLEARANCE_LIMIT")
+        | reasons.str.startswith("HEURISTIC_IOB_TAPER")
+        | reasons.str.startswith("IOB_HEADROOM_LIMIT")
         | reasons.str.startswith("WARNING: Hyperglycemia detected")
     )
 

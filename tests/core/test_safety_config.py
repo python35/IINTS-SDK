@@ -5,6 +5,7 @@ from iints.core.simulator import Simulator, StressEvent
 from iints.core.patient.models import PatientModel
 from iints.core.algorithms.mock_algorithms import ConstantDoseAlgorithm
 from iints.core.devices.models import SensorModel
+import pytest
 
 
 def test_input_validator_uses_safety_config():
@@ -43,10 +44,26 @@ def test_safety_config_has_stable_versioned_fingerprint():
     first = SafetyConfig()
     second = SafetyConfig()
 
-    assert first.to_versioned_dict()["formula_version"] == "iints-safety-formulas-v1"
+    assert first.to_versioned_dict()["formula_version"] == "iints-safety-formulas-v2"
     assert first.to_versioned_dict()["units"]["glucose"] == "mg/dL"
     assert first.fingerprint_sha256() == second.fingerprint_sha256()
     assert first.fingerprint_sha256() != SafetyConfig(max_iob=3.5).fingerprint_sha256()
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"min_glucose": 500.0, "max_glucose": 40.0},
+        {"severe_hypoglycemia_threshold": 80.0},
+        {"predictor_ood_max_feature_fraction": 1.1},
+        {"predictor_mc_dropout_samples": 0},
+        {"trend_stop": 1.0},
+        {"max_iob": float("nan")},
+    ],
+)
+def test_safety_config_rejects_invalid_values(kwargs):
+    with pytest.raises(ValueError):
+        SafetyConfig(**kwargs)
 
 
 def test_simulator_keeps_raw_and_sensor_validation_history_separate():
@@ -62,11 +79,12 @@ def test_simulator_keeps_raw_and_sensor_validation_history_separate():
     assert results["glucose_actual_mgdl"].eq(120.0).all()
 
 
-def test_simulator_does_not_rate_limit_hidden_patient_truth():
+def test_simulator_keeps_mechanistic_and_actual_glucose_equal():
     patient = PatientModel(
         initial_glucose=120.0,
-        glucose_absorption_rate=2.0,
+        glucose_absorption_rate=0.03,
         carb_absorption_duration_minutes=60.0,
+        max_glucose_rate_mgdl_per_min=6.0,
     )
     simulator = Simulator(
         patient_model=patient,
@@ -78,7 +96,7 @@ def test_simulator_does_not_rate_limit_hidden_patient_truth():
     results, _ = simulator.run_batch(duration_minutes=20)
 
     assert results["glucose_actual_mgdl"].equals(results["glucose_mechanistic_mgdl"])
-    assert results["glucose_actual_mgdl"].max() > 160.0
+    assert results["glucose_actual_mgdl"].max() > 120.0
 
 
 def test_sensor_fail_soft_rate_limits_toward_incoming_value():

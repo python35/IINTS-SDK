@@ -54,7 +54,7 @@ if nn is None:  # pragma: no cover
             ) from _IMPORT_ERROR
 
     class PhysiologicalPINNLoss:  # type: ignore[no-redef]
-        """PINN loss for physiological boundaries."""
+        """Physiology-informed constraint loss (legacy PINN class name)."""
 
         pinn_lambda: float
 
@@ -147,15 +147,18 @@ else:
 
     class PhysiologicalPINNLoss(nn.Module):  # type: ignore[misc,no-redef]
         """
-        Physics-Informed Neural Network (PINN) loss for physiological glucose forecasting.
-        Combines standard MSE with heavy penalties for biologically impossible states.
+        Physiology-informed constraint loss for glucose forecasting.
+
+        The historical class name is retained for checkpoint/configuration
+        compatibility. Inputs supplied to this loss must remain in physical
+        units; model-normalized inputs are not scientifically interpretable.
         """
 
         def __init__(
             self,
             feature_columns: list[str],
             pinn_lambda: float = 0.5,
-            pinn_max_roc: float = 10.0,
+            pinn_max_roc: float = 3.0,
             time_step_minutes: int = 5,
         ) -> None:
             super().__init__()
@@ -163,8 +166,6 @@ else:
             self.pinn_max_roc = pinn_max_roc
             self.time_step_minutes = time_step_minutes
 
-            self.idx_iob = feature_columns.index("patient_iob_units") if "patient_iob_units" in feature_columns else -1
-            self.idx_cob = feature_columns.index("patient_cob_grams") if "patient_cob_grams" in feature_columns else -1
             self.idx_glucose = feature_columns.index("glucose_actual_mgdl") if "glucose_actual_mgdl" in feature_columns else -1
 
             self.mse = nn.MSELoss()
@@ -181,13 +182,10 @@ else:
             # inputs is (batch, history, features)
             last_glucose = inputs[:, -1, self.idx_glucose]  # shape: (batch,)
 
-            iob = inputs[:, -1, self.idx_iob] if self.idx_iob != -1 else torch.zeros_like(last_glucose)
-            cob = inputs[:, -1, self.idx_cob] if self.idx_cob != -1 else torch.zeros_like(last_glucose)
-
             pinn_penalty = torch.tensor(0.0, device=preds.device)
 
             # 1. Absolute Bounds Penalty
-            # Glucose physiologically cannot be < 20 or > 600
+            # Explicit simulator support envelope, not a diagnostic boundary.
             p_low = torch.relu(20.0 - preds)  # >0 if pred < 20
             p_high = torch.relu(preds - 600.0) # >0 if pred > 600
             pinn_penalty += (p_low ** 2).mean() * 10.0
@@ -203,25 +201,21 @@ else:
             # Rate of change (mg/dL per minute)
             roc = (first_pred - last_glucose) / max(1.0, float(self.time_step_minutes))
 
-            # 2. Maximum Rate of Change Penalty (e.g. > 10 mg/dL/min is biologically unrealistic)
+            # 2. Configured rate-of-change support-envelope penalty.
             p_roc_up = torch.relu(roc - self.pinn_max_roc)
             p_roc_down = torch.relu((-roc) - self.pinn_max_roc)
             pinn_penalty += (p_roc_up ** 2).mean() * 5.0
             pinn_penalty += (p_roc_down ** 2).mean() * 5.0
 
-            # 3. IOB without COB should not result in a sharp rise
-            # If IOB > 1.0 U and COB < 5.0 g, a sharp rise (roc > 2.0) is very suspicious
-            iob_mask = (iob > 1.0).float()
-            no_cob_mask = (cob < 5.0).float()
-            suspicious_rise = torch.relu(roc - 2.0)
-            pinn_penalty += (suspicious_rise * iob_mask * no_cob_mask).mean() * 2.0
-
-            # 4. COB without IOB should not result in a sharp drop
-            # If COB > 10.0 g and IOB < 0.5 U, a sharp drop (roc < -2.0) is very suspicious
-            cob_mask = (cob > 10.0).float()
-            no_iob_mask = (iob < 0.5).float()
-            suspicious_drop = torch.relu((-roc) - 2.0)
-            pinn_penalty += (suspicious_drop * cob_mask * no_iob_mask).mean() * 2.0
+            # Apply the same rate constraint throughout the forecast horizon.
+            # IOB/COB direction rules are intentionally excluded: stress,
+            # exercise, illness and unannounced meals make them non-universal.
+            if len(preds.shape) > 1 and preds.shape[1] > 1:
+                future_roc = torch.diff(preds, dim=1) / max(
+                    1.0, float(self.time_step_minutes)
+                )
+                future_excess = torch.relu(torch.abs(future_roc) - self.pinn_max_roc)
+                pinn_penalty += (future_excess ** 2).mean() * 5.0
             return pinn_penalty
 
         def forward(self, preds: "torch.Tensor", targets: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
@@ -238,19 +232,19 @@ else:
 
     class BandWeightedPINNLoss(PhysiologicalPINNLoss):  # type: ignore[misc,no-redef]
         """
-        Band-weighted glucose forecasting loss with PINN safety constraints.
+        Band-weighted loss with physiology-informed trajectory constraints.
 
         This is the recommended long-run training objective for the public
-        IINTS glucose forecaster: band weighting keeps the optimizer focused on
-        hypo/hyper ranges, while the PINN term discourages biologically
-        impossible trajectories.
+        IINTS glucose forecaster: band weighting focuses the optimizer on
+        hypo/hyper ranges, while the constraint term discourages trajectories
+        outside the configured research support envelope.
         """
 
         def __init__(
             self,
             feature_columns: list[str],
             pinn_lambda: float = 0.5,
-            pinn_max_roc: float = 10.0,
+            pinn_max_roc: float = 3.0,
             time_step_minutes: int = 5,
             low_threshold: float = 70.0,
             high_threshold: float = 180.0,

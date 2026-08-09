@@ -46,7 +46,7 @@ iints-glucose-forecast-v0
 
 This is intentionally a numeric time-series model, not a language model. LLMs can explain runs, summarize results, or manage research artifacts, but the glucose forecaster itself should be trained and evaluated as a physiological time-series predictor.
 
-The default training profile is **band-PINN first**: the generated config uses `loss: band_pinn`, which combines hypo/hyper range weighting with penalties for impossible glucose bounds, unrealistic rate-of-change, and suspicious IOB/COB logic.
+The default training profile uses the compatibility key `loss: band_pinn`. Scientifically, this is **band-weighted forecasting with physiology-informed regularization**, not a full physics-informed neural network: it penalizes predictions outside explicit glucose and rate-of-change envelopes. IOB/COB patterns are reported only as contextual review cues because they are not universal physiological laws.
 
 ## Build A Training Pack
 
@@ -84,6 +84,24 @@ models/iints-glucose-forecast-v0/dataset/
 ├── glucose_model_config.yaml
 └── MODEL_INTENT.md
 ```
+
+## Input Integrity And Missingness
+
+The dataset builder is deliberately fail-closed for the forecast target:
+
+- glucose targets are never clipped into a preferred range;
+- malformed, non-finite, or out-of-envelope glucose values stop the build;
+- at most one interior missing glucose sample per subject/segment may be
+  interpolated;
+- boundary gaps and unresolved runs of missing glucose are rejected;
+- timestamps must be finite, unique, and strictly increasing per segment.
+
+Optional context columns may be absent because public datasets expose
+different feature sets. In that case the builder uses the documented default
+for compatibility, but records `absent_feature_columns`,
+`feature_imputation_counts`, and interpolation counts in the dataset manifest.
+A defaulted zero means “feature unavailable under this contract”; it must not
+be interpreted as a measured physiological zero.
 
 ## OhioT1DM On Jetson Without Pushing Raw Data
 
@@ -234,7 +252,14 @@ The comparison gate checks:
 - suspicious drop with COB and no IOB
 
 For the scientific reasoning behind these outputs, see [Interpreting Glucose Forecast Results](comparison_interpretation.md).
-That page explains why the lowest MSE is not automatically the best research model, why PINN can be preferable, and why long-horizon forecasts are harder.
+That page explains why the lowest MSE is not automatically the best research
+model, how physiology-informed regularization changes the error trade-off, and
+why long-horizon forecasts are harder. It does not claim that the regularizer
+is a mechanistic ODE-constrained PINN.
+
+MC-dropout spread is reported as an epistemic model-spread proxy. It is not a
+calibrated predictive interval and does not include all sensor, physiological,
+or data-distribution uncertainty.
 
 ## Export For Hugging Face
 

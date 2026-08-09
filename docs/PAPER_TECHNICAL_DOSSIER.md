@@ -41,7 +41,7 @@ Main contributions:
 - Experimental hypoglycemia science layer: counterregulation, HAAF memory, exogenous glucagon PK/PD, renal clearance.
 - AGP-style reports with time-in-range metrics, modal-day glucose profile, daily glucose profiles, PNG/SVG exports, and XAI event logs.
 - MDMP-style data quality, provenance, source, and EU AI Pact-oriented review workflows.
-- A dedicated physiology-aware glucose forecast model workflow with PINN loss, subject-level splits, HF export, and Jetson long training.
+- A dedicated glucose forecast workflow with physiology-informed regularization (legacy config name `PINN`), subject-level splits, HF export, and Jetson long training.
 - Edge and hardware workflows for Raspberry Pi, Arduino UNO Q, Pico pump lab, Jetson endurance mode, and FPGA safety-core experiments.
 - A deterministic momentum-based safety supervisor that can override AI/controller proposals using transparent glucose trajectory, IOB mass-balance, and dose-window rules.
 - Discrete pump-device error simulation, including micro-stepper dose quantization, rotor-slip-style missed/extra steps, and occlusion/dropout abstraction.
@@ -353,19 +353,28 @@ $$
 Remote insulin action:
 
 $$
-\frac{dX}{dt} = -p_2X + p_3^{eff}\max(I - I_b, 0)
+\frac{dX}{dt} = -p_2X + p_3^{eff}(I - I_{ref})
 $$
+
+where \(I_{ref}\) is the pump-supported fasting insulin concentration derived
+from configured basal delivery, insulin distribution volume and clearance.
+The deviation is deliberately not clipped at zero, so basal interruption can
+reduce the remote action state.
 
 Plasma insulin:
 
 $$
-\frac{dI}{dt} = -n(I - I_b) + \gamma\max(G - h, 0) + \frac{R_{a,I}}{V_I}
+q_{sec}=\gamma M_{graft}\max(G-h,0)V_I
+$$
+
+$$
+\frac{dI}{dt}=-nI+\frac{q_{sec}(1-f_{subq})+R_{a,I}}{V_I}
 $$
 
 Subcutaneous insulin absorption:
 
 $$
-\frac{dS_1}{dt} = u_I - k_aS_1
+\frac{dS_1}{dt}=u_I+q_{sec}f_{subq}-k_aS_1
 $$
 
 $$
@@ -811,9 +820,9 @@ $$
 
 The model is evaluated by horizon-specific error, hypoglycemia detection, physiological violations, and source/subject splits.
 
-### 12.3 PINN Loss
+### 12.3 Physiology-Informed Regularization (Legacy `PINN` Name)
 
-The physiological PINN loss combines ordinary forecast error with penalties:
+This loss combines ordinary forecast error with explicit support-envelope penalties. It is not a full PINN because it does not minimize residuals of the physiological ODE system:
 
 $$
 L = MSE(\hat{Y}, Y) + \lambda L_{phys}

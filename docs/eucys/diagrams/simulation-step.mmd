@@ -1,0 +1,17 @@
+sequenceDiagram
+    participant S as Scenario
+    participant P as Patient model
+    participant C as CGM sensor
+    participant A as Candidate algorithm
+    participant V as Safety supervisor
+    participant R as Recorder
+
+    S->>P: Apply meal, exercise, stress or device event
+    P->>P: Integrate deterministic state equations
+    P->>C: Provide latent blood glucose
+    C->>A: Provide CGM-like reading and context
+    A->>V: Propose insulin or research glucagon action
+    V->>V: Validate values, limits, trend and active insulin
+    V->>P: Apply approved, reduced or blocked action
+    P->>R: Record next physiological state
+    V->>R: Record decision, reason and safety event

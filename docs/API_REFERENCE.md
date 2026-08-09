@@ -636,7 +636,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Functions
 
 - `compute_metrics(results_df: pd.DataFrame) -> Dict[str, float]`
-- `run_baseline_comparison(patient_params: Dict[str, Any], stress_event_payloads: List[Dict[str, Any]], duration: int, time_step: int, primary_label: str, primary_results: pd.DataFrame, primary_safety: Dict[str, Any], compare_standard_pump: bool = True, seed: Optional[int] = None) -> Dict[str, Any]`
+- `run_baseline_comparison(patient_params: Dict[str, Any], stress_event_payloads: List[Dict[str, Any]], duration: int, time_step: int, primary_label: str, primary_results: pd.DataFrame, primary_safety: Dict[str, Any], compare_standard_pump: bool = True, seed: Optional[int] = None, patient_model_type: str = 'auto') -> Dict[str, Any]`
 - `write_baseline_comparison(comparison: Dict[str, Any], output_dir: Path) -> Dict[str, str]`
 
 ## `iints.analysis.booth_demo`
@@ -749,13 +749,13 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ## `iints.analysis.edge_performance_monitor`
 
 - Source: `src/iints/analysis/edge_performance_monitor.py`
-- Summary: Edge AI Performance Monitor - IINTS-AF Jetson Nano performance validation for medical device standards
+- Summary: Edge AI Performance Monitor - IINTS-AF Jetson Nano research benchmarking for latency and resource use
 
 ### Public Classes
 
 | Class | Signature | Summary |
 | --- | --- | --- |
-| `EdgeAIPerformanceMonitor` | `EdgeAIPerformanceMonitor` | Monitor Jetson Nano performance for medical device validation |
+| `EdgeAIPerformanceMonitor` | `EdgeAIPerformanceMonitor` | Monitor edge performance; results are not medical-device validation. |
 
 #### `EdgeAIPerformanceMonitor` methods
 
@@ -1423,7 +1423,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `research_glucose_model_init(output_dir: Annotated[Path, typer.Option(help='Output directory for the glucose model starter files.')] = Path('models/iints-glucose-forecast-v0'), profile: Annotated[str, typer.Option(help='Training profile: smoke, quick, long, or paper.')] = 'long', history_minutes: Annotated[int, typer.Option(help='Model history window in minutes.')] = 360, horizon_minutes: Annotated[int, typer.Option(help='Prediction horizon in minutes.')] = 120, time_step_minutes: Annotated[int, typer.Option(help='Expected CGM sample interval in minutes.')] = 5) -> None`
 - `research_glucose_model_train(data: Annotated[Path, typer.Option(help='Normalized glucose training dataset CSV/Parquet.')], output_dir: Annotated[Path, typer.Option(help='Output directory for predictor.pt and training_report.json.')] = Path('models/iints-glucose-forecast-v0'), config: Annotated[Optional[Path], typer.Option(help='Config YAML. If omitted, one is generated.')] = None, profile: Annotated[str, typer.Option(help='Generated config profile: smoke, quick, long, or paper.')] = 'long', epochs: Annotated[Optional[int], typer.Option(help='Override training.epochs for long local runs.')] = None, batch_size: Annotated[Optional[int], typer.Option(help='Override training.batch_size.')] = None, learning_rate: Annotated[Optional[float], typer.Option(help='Override training.learning_rate.')] = None, warm_start: Annotated[Optional[Path], typer.Option(help='Optional predictor.pt warm-start checkpoint.')] = None, export_hf: Annotated[bool, typer.Option('--export-hf/--no-export-hf', help='Build a Hugging Face-ready folder after training.')] = True, repo_id: Annotated[Optional[str], typer.Option(help='Optional Hugging Face repo id for model card hints.')] = None, dataset_manifest: Annotated[Optional[Path], typer.Option(help='Optional dataset manifest for HF public metadata.')] = None, comparison_dir: Annotated[Optional[Path], typer.Option(help='Optional glucose-model compare output directory to bundle with the Hugging Face export.')] = None) -> None`
 - `research_glucose_model_export_hf(model_dir: Annotated[Path, typer.Option(help='Directory containing predictor.pt and training_report.json.')] = Path('models/iints-glucose-forecast-v0'), output_dir: Annotated[Path, typer.Option(help='Output directory for the Hugging Face-ready bundle.')] = Path('models/iints-glucose-forecast-v0/huggingface'), repo_id: Annotated[Optional[str], typer.Option(help='Optional Hugging Face repo id, e.g. user/iints-glucose-forecast-v0.')] = None, dataset_manifest: Annotated[Optional[Path], typer.Option(help='Optional private manifest to redact into public metadata.')] = None, comparison_dir: Annotated[Optional[Path], typer.Option(help='Optional glucose-model compare output directory to include comparison metrics and reports.')] = None) -> None`
-- `research_glucose_model_compare(data: Annotated[Path, typer.Option(help='Normalized glucose dataset CSV/Parquet to evaluate on.')], output_dir: Annotated[Path, typer.Option(help='Output directory for comparison reports.')] = Path('results/glucose_model_comparison'), model_specs: Annotated[Optional[List[str]], typer.Option('--model', '-m', help='Model checkpoint as label=path/to/predictor.pt. Repeat for MSE/Band/PINN models.')] = None, config: Annotated[Optional[Path], typer.Option(help='Comparison config YAML. Defaults to glucose-model quick config.')] = None, include_baselines: Annotated[bool, typer.Option('--include-baselines/--no-baselines', help='Compare transparent LastValue/LinearTrend/Physiology baselines.')] = True, mc_samples: Annotated[int, typer.Option(help='MC dropout samples for checkpoint uncertainty. Use 0 to disable.')] = 0, max_roc_mgdl_min: Annotated[float, typer.Option(help='Maximum plausible predicted glucose rate-of-change in mg/dL/min.')] = 10.0) -> None`
+- `research_glucose_model_compare(data: Annotated[Path, typer.Option(help='Normalized glucose dataset CSV/Parquet to evaluate on.')], output_dir: Annotated[Path, typer.Option(help='Output directory for comparison reports.')] = Path('results/glucose_model_comparison'), model_specs: Annotated[Optional[List[str]], typer.Option('--model', '-m', help='Model checkpoint as label=path/to/predictor.pt. Repeat for MSE, band-weighted, or physiology-regularized models (legacy name: PINN).')] = None, config: Annotated[Optional[Path], typer.Option(help='Comparison config YAML. Defaults to glucose-model quick config.')] = None, include_baselines: Annotated[bool, typer.Option('--include-baselines/--no-baselines', help='Compare transparent LastValue/LinearTrend/Physiology baselines.')] = True, mc_samples: Annotated[int, typer.Option(help='MC dropout samples for checkpoint uncertainty. Use 0 to disable.')] = 0, max_roc_mgdl_min: Annotated[float, typer.Option(help='Maximum plausible predicted glucose rate-of-change in mg/dL/min.')] = 3.0) -> None`
 - `research_glucose_model_jetson_train_hf(dataset: Annotated[Path, typer.Option(help='Normalized glucose training dataset CSV/Parquet built by glucose-model build-dataset.')] = Path('models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv'), base_hf_repo: Annotated[Optional[str], typer.Option('--base-hf-repo', '--repo-id', help='External Hugging Face model to pull from (e.g. username/GlucoFM). If empty, pulls from target_hf_repo. --repo-id is kept as a compatibility alias.')] = None, target_hf_repo: Annotated[Optional[str], typer.Option('--target-hf-repo', help='Your Hugging Face model repo id to push to, e.g. username/iints-glucose-forecast-v0.')] = 'IINTS/iints-glucose-forecast-v0', local_base_dir: Annotated[Optional[Path], typer.Option(help='Use an already downloaded base model folder instead of downloading from Hugging Face.')] = None, work_dir: Annotated[Path, typer.Option(help='Jetson training workspace for downloads, trials, champion, and leaderboard.')] = Path('models/jetson_hf_training'), revision: Annotated[Optional[str], typer.Option(help='Optional Hugging Face revision/tag/branch to download.')] = None, profile: Annotated[str, typer.Option(help='Fallback config profile when the HF repo has no glucose_model_config.yaml.')] = 'quick', max_trials: Annotated[int, typer.Option(help='Number of trials. Use 0 to keep training until Ctrl+C.')] = 1, epochs: Annotated[int, typer.Option(help='Fine-tune epochs per trial.')] = 8, batch_size: Annotated[int, typer.Option(help='Batch size per trial; keep modest on Jetson Nano.')] = 64, timeout_minutes: Annotated[float, typer.Option(help='Timeout for each train/compare subprocess.')] = 45.0, cooldown_seconds: Annotated[float, typer.Option(help='Pause between trials to keep Jetson thermals stable.')] = 10.0, min_lr: Annotated[float, typer.Option(help='Minimum sampled learning rate for fine-tuning.')] = 1e-05, max_lr: Annotated[float, typer.Option(help='Maximum sampled learning rate for fine-tuning.')] = 0.0005, min_pinn_lambda: Annotated[float, typer.Option(help='Minimum sampled PINN loss weight.')] = 0.05, max_pinn_lambda: Annotated[float, typer.Option(help='Maximum sampled PINN loss weight.')] = 0.8, min_score_improvement: Annotated[float, typer.Option(help='Required composite-score improvement before replacing the local champion.')] = 0.0, physiology_weight: Annotated[float, typer.Option(help='Composite score penalty weight for physiological violations.')] = 0.1, hypo_weight: Annotated[float, typer.Option(help='Composite score penalty weight for missed/false hypo behavior.')] = 0.2, seed: Annotated[int, typer.Option(help='Random seed for reproducible trial configs.')] = 42, dataset_manifest: Annotated[Optional[Path], typer.Option(help='Optional dataset manifest to redact into the HF export bundle.')] = None, upload_mode: Annotated[str, typer.Option(help='Upload behavior: none, pr, or direct. Default is safe local-only.')] = 'none', private_upload: Annotated[bool, typer.Option('--private-upload/--public-upload', help='Mark HF upload private when upload is enabled.')] = True, force_download: Annotated[bool, typer.Option('--force-download/--reuse-download', help='Re-download the HF base model even if cached locally.')] = False, hf_home: Annotated[Optional[Path], typer.Option(help='Optional HF_HOME cache directory. Defaults inside the Jetson work dir.')] = None) -> None`
 - `research_parity_check(model: Annotated[Path, typer.Option(help='Predictor checkpoint (.pt)')], onnx: Annotated[Path, typer.Option(help='Exported ONNX model path')], samples: Annotated[int, typer.Option(help='Random sample count for parity check')] = 64, tolerance: Annotated[float, typer.Option(help='Maximum allowed absolute error')] = 0.001, seed: Annotated[int, typer.Option(help='Random seed')] = 42, output_json: Annotated[Optional[Path], typer.Option(help='Write parity report JSON')] = None)`
 - `research_registry_list(registry: Annotated[Path, typer.Option(help='Path to model registry JSON')] = Path('models/registry.json'), stage: Annotated[Optional[str], typer.Option(help='Optional stage filter (candidate/validated/production/archived)')] = None, limit: Annotated[int, typer.Option(help='Max rows to print')] = 30)`
@@ -1698,7 +1698,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 | Class | Signature | Summary |
 | --- | --- | --- |
-| `MPCController` | `MPCController(InsulinAlgorithm)` | Agentic Physics-Informed MPC. Simulates the biological ODEs into the future to find the safest dose. |
+| `MPCController` | `MPCController(InsulinAlgorithm)` | Research nonlinear MPC prototype using an adapted Bergman model. |
 
 #### `MPCController` methods
 
@@ -1864,7 +1864,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 | Class | Signature | Summary |
 | --- | --- | --- |
-| `DigitalTwinCalibrator` | `DigitalTwinCalibrator` | AI-driven Calibration Engine for creating a personalized Digital Twin. It takes historical data (CGM, carbs, insulin) and uses scipy optimization (L-BFGS-B) to find the metabolic "Big 5" parameters that minimize the RMSE between the simulation and real patient data. |
+| `DigitalTwinCalibrator` | `DigitalTwinCalibrator` | Research parameter-calibration engine for a Hovorka simulation profile. |
 
 #### `DigitalTwinCalibrator` methods
 
@@ -1934,7 +1934,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ## `iints.core.patient.bergman_model`
 
 - Source: `src/iints/core/patient/bergman_model.py`
-- Summary: Bergman Minimal Model — IINTS-AF ================================== ODE-based patient model inspired by the Bergman Minimal Model with an additional gut absorption compartment for realistic carbohydrate dynamics.
+- Summary: Bergman Minimal Model — IINTS-AF ================================== ODE-based patient model inspired by the Bergman Minimal Model with an adapted gut absorption chain for delayed carbohydrate appearance.
 
 ### Public Classes
 
@@ -1962,7 +1962,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ## `iints.core.patient.hovorka_model`
 
 - Source: `src/iints/core/patient/hovorka_model.py`
-- Summary: Improved Hovorka Model - IINTS-AF ================================== Based on standard Hovorka artificial pancreas equations and extended to match the IINTS simulator's interface.
+- Summary: Adapted Hovorka Research Model - IINTS-AF ========================================== Based on published Hovorka artificial-pancreas equations and extended with explicit research stressors to match the IINTS simulator interface. The extensions are not part of the canonical Hovorka model and are not clinically validated patient physiology.
 
 ### Public Classes
 
@@ -1996,6 +1996,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 | Class | Signature | Summary |
 | --- | --- | --- |
+| `PatientModelDomainError` | `PatientModelDomainError(RuntimeError)` | The model left its declared numerical/physiological validity domain. |
 | `CustomPatientModel` | `CustomPatientModel` | A simplified patient model for simulating blood glucose dynamics. This model is intended for educational and stress-testing purposes, not for clinical accuracy. |
 
 #### `CustomPatientModel` methods
@@ -2040,6 +2041,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `carbs_on_board(self)`
 - `trigger_event(self, event_type, value)`
 - `get_patient_state(self)`
+- `get_ratio_state(self) -> Dict[str, float]`
+- `set_ratio_state(self, isf: Optional[float] = None, icr: Optional[float] = None, basal_rate: Optional[float] = None, dia_minutes: Optional[float] = None) -> None`
 
 ## `iints.core.patient.physiology`
 
@@ -2048,8 +2051,19 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 ### Public Functions
 
+- `validated_snapshot_scalar(value: Any, *, name: str, minimum: float | None = None, maximum: float | None = None) -> float`
+- `validated_snapshot_bool(value: Any, *, name: str) -> bool`
+- `validated_activity_events(value: Any, *, name: str, age_key: str) -> list[dict[str, float]]`
+- `glucagon_mg_to_pg(dose_mg: float) -> float`
+- `dawn_glucose_rate_mgdl_min(current_time_minutes: float, *, peak_strength_mgdl_per_hour: float, start_hour: float, end_hour: float) -> float`
+- `antecedent_hypoglycemia_memory_derivative(glucose_mgdl: float, memory: float, *, awareness_threshold_mgdl: float = 70.0, severe_threshold_mgdl: float = 54.0, build_time_constant_minutes: float = 360.0, recovery_time_constant_minutes: float = 4320.0) -> float`
+- `counterregulatory_rescue_multiplier(glucose_mgdl: float, memory: float, *, threshold_mgdl: float = 70.0, half_activation_mgdl: float = 16.0, maximum_fractional_increase: float = 1.0) -> float`
 - `smooth_threshold_excess(value: float, *, threshold: float, splay: float = 10.0) -> float`
 - `renal_glucose_clearance_concentration(glucose_mgdl: float, *, threshold_mgdl: float = 180.0, gain: float = 0.05, splay_mgdl: float = 10.0) -> float`
+
+### Public Constants
+
+- `PICOGRAMS_PER_MILLIGRAM`
 
 ## `iints.core.patient.profile`
 
@@ -2235,7 +2249,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 #### `IndependentSupervisor` methods
 
-- `evaluate_safety(self, current_glucose: float, proposed_insulin: float, current_time: float, current_iob: float = 0.0, predicted_glucose_30min: Optional[float] = None, basal_insulin_units: Optional[float] = None, basal_limit_units: Optional[float] = None) -> Dict[str, Any]`
+- `evaluate_safety(self, current_glucose: float, proposed_insulin: float, current_time: float, current_iob: float = 0.0, predicted_glucose_30min: Optional[float] = None, basal_insulin_units: Optional[float] = None, basal_limit_units: Optional[float] = None, meal_bolus_units: Optional[float] = None) -> Dict[str, Any]`
 - `get_safety_report(self) -> Dict[str, Any]`
 - `reset(self) -> None`
 - `get_state(self) -> Dict[str, Any]`
@@ -3559,7 +3573,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ## `iints.population.generator`
 
 - Source: `src/iints/population/generator.py`
-- Summary: Population Generator — IINTS-AF ================================ Generates a virtual population of N patients with physiological variation around a base patient profile. Each parameter is drawn from a configurable distribution (truncated normal or log-normal) whose bounds respect the clinically valid ranges defined in the SDK validation schemas.
+- Summary: Population Generator — IINTS-AF ================================ Generates a virtual population of N patients with physiological variation around a base patient profile. Each parameter is drawn from a configurable distribution (truncated normal or log-normal) whose bounds respect the configured research ranges defined in the SDK schemas. These bounds are not population-validation or clinical-validity claims.
 
 ### Public Classes
 
@@ -4051,7 +4065,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 ### Public Functions
 
-- `standardize_glucose_forecast_frame(df: pd.DataFrame, *, source_label: str, time_step_minutes: int = 5, subject_prefix: Optional[str] = None, max_gap_multiplier: float = 2.5) -> pd.DataFrame`
+- `standardize_glucose_forecast_frame(df: pd.DataFrame, *, source_label: str, time_step_minutes: int = 5, subject_prefix: Optional[str] = None, max_gap_multiplier: float = 2.5, glucose_bounds_mgdl: tuple[float, float] = (20.0, 600.0)) -> pd.DataFrame`
 - `glucose_model_config_payload(*, profile: str = 'long', history_minutes: int = 360, horizon_minutes: int = 120, time_step_minutes: int = 5, feature_columns: Optional[Sequence[str]] = None) -> dict[str, Any]`
 - `write_glucose_model_config(path: Path, **kwargs: Any) -> dict[str, Any]`
 - `build_glucose_training_pack(input_paths: Sequence[Path], output_dir: Path, *, labels: Optional[Sequence[str]] = None, output_format: str = 'csv', profile: str = 'long', history_minutes: int = 360, horizon_minutes: int = 120, time_step_minutes: int = 5) -> GlucoseTrainingPack`
@@ -4066,8 +4080,8 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `render_hf_publishing_notes(*, repo_id: Optional[str]) -> str`
 - `parse_model_specs(values: Sequence[str]) -> list[GlucoseModelSpec]`
 - `horizon_error_rows(*, label: str, observed: np.ndarray, predicted: np.ndarray, time_step_minutes: int) -> list[dict[str, Any]]`
-- `physiological_violation_report(X: np.ndarray, predicted: np.ndarray, *, feature_columns: Sequence[str], time_step_minutes: int, absolute_low_mgdl: float = 20.0, absolute_high_mgdl: float = 600.0, display_low_mgdl: float = 35.0, display_high_mgdl: float = 450.0, max_roc_mgdl_min: float = 10.0, suspicious_roc_mgdl_min: float = 2.0) -> dict[str, Any]`
-- `compare_glucose_models(*, data_path: Path, output_dir: Path, model_specs: Sequence[GlucoseModelSpec] = (), config_path: Optional[Path] = None, include_baselines: bool = True, mc_samples: int = 0, max_roc_mgdl_min: float = 10.0) -> GlucoseModelComparisonBundle`
+- `physiological_violation_report(X: np.ndarray, predicted: np.ndarray, *, feature_columns: Sequence[str], time_step_minutes: int, absolute_low_mgdl: float = 20.0, absolute_high_mgdl: float = 600.0, display_low_mgdl: float = 35.0, display_high_mgdl: float = 450.0, max_roc_mgdl_min: float = 3.0, suspicious_roc_mgdl_min: float = 2.0) -> dict[str, Any]`
+- `compare_glucose_models(*, data_path: Path, output_dir: Path, model_specs: Sequence[GlucoseModelSpec] = (), config_path: Optional[Path] = None, include_baselines: bool = True, mc_samples: int = 0, max_roc_mgdl_min: float = 3.0) -> GlucoseModelComparisonBundle`
 
 ### Public Constants
 
@@ -4603,7 +4617,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 | Class | Signature | Summary |
 | --- | --- | --- |
-| `DigitalTwinCalibrator` | `DigitalTwinCalibrator` | Fits the AdvancedMetabolicModel parameters (p1, p2, p3, Gb) to real patient data (like the OhioT1DM dataset) to create a true Digital Twin. |
+| `DigitalTwinCalibrator` | `DigitalTwinCalibrator` | Fit a limited AdvancedMetabolicModel parameter set to research data. |
 
 #### `DigitalTwinCalibrator` methods
 

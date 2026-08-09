@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple, cast
 
@@ -17,7 +18,13 @@ class SensorModel:
     """
     Sensor error model for CGM readings.
 
-    Supports noise, bias, lag (minutes), and dropout (hold last value).
+    Supports a first-order blood-to-interstitial approximation, optional
+    transport dead time, measurement noise, bias, drift, and data gaps.
+
+    ``lag_minutes`` is retained for API compatibility and represents explicit
+    transport dead time. ``isf_tau_minutes`` is the time constant of the
+    first-order interstitial compartment. They are separate assumptions and
+    should not both be fitted to the same observed total CGM lag.
     """
 
     def __init__(
@@ -38,23 +45,69 @@ class SensorModel:
         compression_low_mgdl_range: Tuple[float, float] = (12.0, 28.0),
         compression_low_duration_steps: int | Tuple[int, int] = (3, 8),
     ) -> None:
-        self.noise_std = noise_std
-        self.bias = bias
-        self.lag_minutes = lag_minutes
-        self.dropout_prob = dropout_prob
-        self.drift_std_per_hour = drift_std_per_hour
-        self.drift_max_abs_mgdl = drift_max_abs_mgdl
-        self.isf_tau_minutes = max(1.0, isf_tau_minutes)
-        self.noise_ar1_phi = max(0.0, min(0.99, noise_ar1_phi))
-        self.noise_fbm_hurst = (
-            None if noise_fbm_hurst is None else float(np.clip(noise_fbm_hurst, 0.5, 0.95))
-        )
+        numeric = {
+            "noise_std": float(noise_std),
+            "bias": float(bias),
+            "lag_minutes": float(lag_minutes),
+            "isf_tau_minutes": float(isf_tau_minutes),
+            "noise_ar1_phi": float(noise_ar1_phi),
+            "dropout_prob": float(dropout_prob),
+            "drift_std_per_hour": float(drift_std_per_hour),
+            "drift_max_abs_mgdl": float(drift_max_abs_mgdl),
+            "compression_low_prob": float(compression_low_prob),
+            "compression_low_max_glucose": float(compression_low_max_glucose),
+        }
+        if not all(np.isfinite(value) for value in numeric.values()):
+            raise ValueError("sensor parameters must all be finite")
+        if int(lag_minutes) != float(lag_minutes) or int(lag_minutes) < 0:
+            raise ValueError("lag_minutes must be a non-negative whole number")
+        if numeric["noise_std"] < 0.0:
+            raise ValueError("noise_std must be non-negative")
+        if numeric["isf_tau_minutes"] <= 0.0:
+            raise ValueError("isf_tau_minutes must be positive")
+        if not 0.0 <= numeric["noise_ar1_phi"] < 1.0:
+            raise ValueError("noise_ar1_phi must satisfy 0 <= phi < 1")
+        for name in ("dropout_prob", "compression_low_prob"):
+            if not 0.0 <= numeric[name] <= 1.0:
+                raise ValueError(f"{name} must be between 0 and 1")
+        for name in (
+            "drift_std_per_hour",
+            "drift_max_abs_mgdl",
+            "compression_low_max_glucose",
+        ):
+            if numeric[name] < 0.0:
+                raise ValueError(f"{name} must be non-negative")
+        if noise_fbm_hurst is not None:
+            hurst = float(noise_fbm_hurst)
+            if not np.isfinite(hurst) or not 0.5 <= hurst <= 0.95:
+                raise ValueError("noise_fbm_hurst must be between 0.5 and 0.95")
+        compression_range = tuple(float(value) for value in compression_low_mgdl_range)
+        if (
+            len(compression_range) != 2
+            or not all(np.isfinite(value) for value in compression_range)
+            or compression_range[0] < 0.0
+            or compression_range[1] < compression_range[0]
+        ):
+            raise ValueError(
+                "compression_low_mgdl_range must be an ordered non-negative pair"
+            )
+
+        self.noise_std = numeric["noise_std"]
+        self.bias = numeric["bias"]
+        self.lag_minutes = int(lag_minutes)
+        self.dropout_prob = numeric["dropout_prob"]
+        self.drift_std_per_hour = numeric["drift_std_per_hour"]
+        self.drift_max_abs_mgdl = numeric["drift_max_abs_mgdl"]
+        self.isf_tau_minutes = numeric["isf_tau_minutes"]
+        self.noise_ar1_phi = numeric["noise_ar1_phi"]
+        self.noise_fbm_hurst = None if noise_fbm_hurst is None else float(noise_fbm_hurst)
         self.dropout_duration_steps = _normalize_step_window(dropout_duration_steps)
-        self.compression_low_prob = compression_low_prob
-        self.compression_low_max_glucose = compression_low_max_glucose
-        self.compression_low_mgdl_range = compression_low_mgdl_range
+        self.compression_low_prob = numeric["compression_low_prob"]
+        self.compression_low_max_glucose = numeric["compression_low_max_glucose"]
+        self.compression_low_mgdl_range = compression_range
         self.compression_low_duration_steps = _normalize_step_window(compression_low_duration_steps)
         self._rng = np.random.default_rng(seed)
+        self._initial_rng_state = copy.deepcopy(self._rng.bit_generator.state)
         self._history: list[tuple[float, float]] = []
         self._last_reading: Optional[float] = None
         self._last_timestamp: Optional[float] = None
@@ -67,6 +120,7 @@ class SensorModel:
         self._compression_offset = 0.0
 
     def reset(self) -> None:
+        self._rng.bit_generator.state = copy.deepcopy(self._initial_rng_state)
         self._history = []
         self._last_reading = None
         self._last_timestamp = None
@@ -117,6 +171,12 @@ class SensorModel:
         return self._history[-1][1]
 
     def read(self, true_glucose: float, current_time: float) -> SensorReading:
+        if not np.isfinite(true_glucose) or true_glucose < 0.0:
+            raise ValueError("true_glucose must be a finite non-negative value")
+        if not np.isfinite(current_time):
+            raise ValueError("current_time must be finite")
+        if self._last_timestamp is not None and current_time <= self._last_timestamp:
+            raise ValueError("Sensor timestamps must be strictly increasing")
         self._history.append((current_time, true_glucose))
 
         # Calculate time step
@@ -124,15 +184,15 @@ class SensorModel:
         if self._last_timestamp is not None and current_time > self._last_timestamp:
             dt = current_time - self._last_timestamp
 
-        # Interstitial Fluid (ISF) Kinetics (Physics/Math)
-        # ISF acts as a low-pass filter of blood glucose
+        # First-order blood-to-interstitial approximation. This is a compact
+        # sensor research model, not a device-specific CGM transfer function.
         lagged_glucose = self._lagged_glucose(current_time)
         if self._current_isf is None:
             self._current_isf = lagged_glucose
         elif dt > 0:
-            # Explicit Euler integration for the ODE: tau * dISF/dt = BG - ISF
-            alpha = dt / self.isf_tau_minutes
-            alpha = min(alpha, 1.0)  # Stability bound
+            # Exact update for constant input over the step:
+            # ISF(t + dt) = BG + (ISF(t) - BG) * exp(-dt / tau).
+            alpha = 1.0 - float(np.exp(-dt / self.isf_tau_minutes))
             self._current_isf = self._current_isf + alpha * (lagged_glucose - self._current_isf)
 
         base = self._current_isf
@@ -213,52 +273,127 @@ class SensorModel:
             "compression_offset": self._compression_offset,
             "history": self._history,
             "rng_state": self._rng.bit_generator.state,
+            "initial_rng_state": self._initial_rng_state,
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
-        self.noise_std = state.get("noise_std", self.noise_std)
-        self.bias = state.get("bias", self.bias)
-        self.lag_minutes = state.get("lag_minutes", self.lag_minutes)
-        self.isf_tau_minutes = max(1.0, float(state.get("isf_tau_minutes", self.isf_tau_minutes)))
-        self.noise_ar1_phi = max(0.0, min(0.99, float(state.get("noise_ar1_phi", self.noise_ar1_phi))))
-        noise_fbm_hurst = state.get("noise_fbm_hurst", self.noise_fbm_hurst)
-        self.noise_fbm_hurst = (
-            None if noise_fbm_hurst is None else float(np.clip(noise_fbm_hurst, 0.5, 0.95))
+        validated = SensorModel(
+            noise_std=state.get("noise_std", self.noise_std),
+            bias=state.get("bias", self.bias),
+            lag_minutes=state.get("lag_minutes", self.lag_minutes),
+            isf_tau_minutes=state.get("isf_tau_minutes", self.isf_tau_minutes),
+            noise_ar1_phi=state.get("noise_ar1_phi", self.noise_ar1_phi),
+            noise_fbm_hurst=state.get("noise_fbm_hurst", self.noise_fbm_hurst),
+            dropout_prob=state.get("dropout_prob", self.dropout_prob),
+            drift_std_per_hour=state.get(
+                "drift_std_per_hour", self.drift_std_per_hour
+            ),
+            drift_max_abs_mgdl=state.get(
+                "drift_max_abs_mgdl", self.drift_max_abs_mgdl
+            ),
+            dropout_duration_steps=state.get(
+                "dropout_duration_steps", self.dropout_duration_steps
+            ),
+            compression_low_prob=state.get(
+                "compression_low_prob", self.compression_low_prob
+            ),
+            compression_low_max_glucose=state.get(
+                "compression_low_max_glucose", self.compression_low_max_glucose
+            ),
+            compression_low_mgdl_range=state.get(
+                "compression_low_mgdl_range", self.compression_low_mgdl_range
+            ),
+            compression_low_duration_steps=state.get(
+                "compression_low_duration_steps",
+                self.compression_low_duration_steps,
+            ),
         )
-        self.dropout_prob = state.get("dropout_prob", self.dropout_prob)
-        self.drift_std_per_hour = state.get("drift_std_per_hour", self.drift_std_per_hour)
-        self.drift_max_abs_mgdl = state.get("drift_max_abs_mgdl", self.drift_max_abs_mgdl)
-        self.dropout_duration_steps = _normalize_step_window(state.get("dropout_duration_steps", self.dropout_duration_steps))
-        self.compression_low_prob = state.get("compression_low_prob", self.compression_low_prob)
-        self.compression_low_max_glucose = state.get("compression_low_max_glucose", self.compression_low_max_glucose)
-        self.compression_low_mgdl_range = tuple(state.get("compression_low_mgdl_range", self.compression_low_mgdl_range))
-        self.compression_low_duration_steps = _normalize_step_window(
-            state.get("compression_low_duration_steps", self.compression_low_duration_steps)
-        )
-        self._last_reading = state.get("last_reading")
-        self._last_timestamp = state.get("last_timestamp")
-        self._current_isf = state.get("current_isf")
+        for name in (
+            "noise_std",
+            "bias",
+            "lag_minutes",
+            "isf_tau_minutes",
+            "noise_ar1_phi",
+            "noise_fbm_hurst",
+            "dropout_prob",
+            "drift_std_per_hour",
+            "drift_max_abs_mgdl",
+            "dropout_duration_steps",
+            "compression_low_prob",
+            "compression_low_max_glucose",
+            "compression_low_mgdl_range",
+            "compression_low_duration_steps",
+        ):
+            setattr(self, name, getattr(validated, name))
+
+        optional_dynamic = {
+            "last_reading": state.get("last_reading"),
+            "last_timestamp": state.get("last_timestamp"),
+            "current_isf": state.get("current_isf"),
+        }
+        for name, value in optional_dynamic.items():
+            if value is not None and not np.isfinite(value):
+                raise ValueError(f"sensor snapshot {name} must be finite")
+        self._last_reading = optional_dynamic["last_reading"]
+        self._last_timestamp = optional_dynamic["last_timestamp"]
+        self._current_isf = optional_dynamic["current_isf"]
         self._current_colored_noise = float(state.get("current_colored_noise", self._current_colored_noise))
         self._fbm_components = cast(
             NDArray[np.float64],
             np.asarray(state.get("fbm_components", self._fbm_components), dtype=np.float64),
         )
-        self._drift_offset = state.get("drift_offset", self._drift_offset)
+        if self._fbm_components.shape != (3,) or not np.all(
+            np.isfinite(self._fbm_components)
+        ):
+            raise ValueError("sensor snapshot fbm_components must contain 3 finite values")
+        self._drift_offset = float(state.get("drift_offset", self._drift_offset))
         self._dropout_remaining_steps = int(state.get("dropout_remaining_steps", self._dropout_remaining_steps))
         self._compression_remaining_steps = int(state.get("compression_remaining_steps", self._compression_remaining_steps))
-        self._compression_offset = state.get("compression_offset", self._compression_offset)
-        self._history = state.get("history", [])
+        self._compression_offset = float(
+            state.get("compression_offset", self._compression_offset)
+        )
+        if not all(
+            np.isfinite(value)
+            for value in (
+                self._current_colored_noise,
+                self._drift_offset,
+                self._compression_offset,
+            )
+        ):
+            raise ValueError("sensor snapshot dynamic values must be finite")
+        if self._dropout_remaining_steps < 0 or self._compression_remaining_steps < 0:
+            raise ValueError("sensor snapshot remaining-step counts must be non-negative")
+        if self._compression_offset < 0.0:
+            raise ValueError("sensor snapshot compression_offset must be non-negative")
+        history = state.get("history", [])
+        if not isinstance(history, list):
+            raise ValueError("sensor snapshot history must be a list")
+        normalized_history: list[tuple[float, float]] = []
+        for item in history:
+            if not isinstance(item, (list, tuple)) or len(item) != 2:
+                raise ValueError("sensor snapshot history entries must be time/value pairs")
+            timestamp, glucose = float(item[0]), float(item[1])
+            if not np.isfinite(timestamp) or not np.isfinite(glucose) or glucose < 0.0:
+                raise ValueError("sensor snapshot history contains an invalid value")
+            if normalized_history and timestamp <= normalized_history[-1][0]:
+                raise ValueError("sensor snapshot history timestamps must increase")
+            normalized_history.append((timestamp, glucose))
+        self._history = normalized_history
         if "rng_state" in state:
             self._rng.bit_generator.state = state["rng_state"]
+        if "initial_rng_state" in state:
+            self._initial_rng_state = copy.deepcopy(state["initial_rng_state"])
 
 
 def _normalize_step_window(value: int | Tuple[int, int] | list[int]) -> Tuple[int, int]:
     if isinstance(value, (tuple, list)):
+        if len(value) != 2:
+            raise ValueError("duration step window must contain exactly two values")
         start, end = int(value[0]), int(value[1])
     else:
         start = end = int(value)
-    start = max(1, start)
-    end = max(start, end)
+    if start < 1 or end < start:
+        raise ValueError("duration step window must satisfy 1 <= start <= end")
     return (start, end)
 
 
@@ -267,7 +402,7 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
         "noise_std": 0.0,
         "bias": 0.0,
         "lag_minutes": 0,
-        "isf_tau_minutes": 5.0,
+        "isf_tau_minutes": 1.0,
         "noise_ar1_phi": 0.85,
         "noise_fbm_hurst": None,
         "dropout_prob": 0.0,
@@ -282,8 +417,8 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
     "clinical_cgm": {
         "noise_std": 5.0,
         "bias": 0.0,
-        "lag_minutes": 5,
-        "isf_tau_minutes": 10.0,
+        "lag_minutes": 0,
+        "isf_tau_minutes": 8.0,
         "noise_ar1_phi": 0.85,
         "noise_fbm_hurst": None,
         "dropout_prob": 0.0,
@@ -298,7 +433,7 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
     "free_living_cgm": {
         "noise_std": 8.0,
         "bias": 0.0,
-        "lag_minutes": 10,
+        "lag_minutes": 0,
         "isf_tau_minutes": 10.0,
         "noise_ar1_phi": 0.85,
         "noise_fbm_hurst": 0.75,
@@ -314,7 +449,7 @@ SENSOR_PROFILES: Dict[str, Dict[str, Any]] = {
     "compression_prone": {
         "noise_std": 8.5,
         "bias": 0.0,
-        "lag_minutes": 12,
+        "lag_minutes": 0,
         "isf_tau_minutes": 12.0,
         "noise_ar1_phi": 0.88,
         "noise_fbm_hurst": 0.78,
@@ -357,7 +492,9 @@ class PumpModel:
     """
     Pump error model for insulin delivery.
 
-    Supports max delivery per step, quantization, and occlusion/dropout.
+    Supports a per-step delivery cap, dose quantization, stochastic delivery
+    error, and a binary delivery-interruption scenario. These are transparent
+    bench-test abstractions; they are not a validated motor or fluid model.
     """
 
     def __init__(
@@ -366,19 +503,54 @@ class PumpModel:
         quantization_units: Optional[float] = None,
         dropout_prob: float = 0.0,
         delivery_noise_std: float = 0.0,
+        step_error_probability: Optional[float] = None,
         seed: Optional[int] = None,
     ) -> None:
-        self.max_units_per_step = max_units_per_step
-        self.quantization_units = quantization_units
-        self.dropout_prob = dropout_prob
-        self.delivery_noise_std = delivery_noise_std
+        optional_positive = {
+            "max_units_per_step": max_units_per_step,
+            "quantization_units": quantization_units,
+        }
+        for name, value in optional_positive.items():
+            if value is not None and (
+                not np.isfinite(value) or float(value) <= 0.0
+            ):
+                raise ValueError(f"{name} must be finite and positive when supplied")
+        if not np.isfinite(dropout_prob) or not 0.0 <= float(dropout_prob) <= 1.0:
+            raise ValueError("dropout_prob must be between 0 and 1")
+        if not np.isfinite(delivery_noise_std) or float(delivery_noise_std) < 0.0:
+            raise ValueError("delivery_noise_std must be finite and non-negative")
+        if step_error_probability is not None and (
+            not np.isfinite(step_error_probability)
+            or not 0.0 <= float(step_error_probability) <= 1.0
+        ):
+            raise ValueError("step_error_probability must be between 0 and 1")
+
+        self.max_units_per_step = (
+            None if max_units_per_step is None else float(max_units_per_step)
+        )
+        self.quantization_units = (
+            None if quantization_units is None else float(quantization_units)
+        )
+        self.dropout_prob = float(dropout_prob)
+        self.delivery_noise_std = float(delivery_noise_std)
+        self.step_error_probability = (
+            None
+            if step_error_probability is None
+            else float(step_error_probability)
+        )
         self._rng = np.random.default_rng(seed)
+        self._initial_rng_state = copy.deepcopy(self._rng.bit_generator.state)
 
     def reset(self) -> None:
-        pass
+        self._rng.bit_generator.state = copy.deepcopy(self._initial_rng_state)
 
     def deliver(self, requested_units: float, time_step_minutes: float) -> PumpDelivery:
-        delivered = requested_units
+        if not np.isfinite(requested_units):
+            raise ValueError("requested_units must be finite")
+        if not np.isfinite(time_step_minutes) or time_step_minutes <= 0.0:
+            raise ValueError("time_step_minutes must be finite and positive")
+
+        delivered = float(requested_units)
         status = "ok"
         reason = "approved"
 
@@ -392,36 +564,44 @@ class PumpModel:
             status = "capped"
             reason = f"max_units_per_step {self.max_units_per_step:.2f}"
 
-        if self.quantization_units:
-            # SCIENTIFIC UPGRADE: discrete micro-stepper quantization.
-            # The pump delivers integer motor steps; optional noise is modeled as
-            # missed or extra steps instead of continuous Gaussian dose drift.
+        if self.delivery_noise_std > 0.0:
+            # Dose-domain uncertainty remains in units. It is not reinterpreted
+            # as a probability merely because quantization is enabled.
+            delivered += float(self._rng.normal(0.0, self.delivery_noise_std))
+            delivered = max(0.0, delivered)
+            status = "delivery_error"
+            reason = "continuous_delivery_noise"
+
+        if self.quantization_units is not None:
             micro_steps = round(delivered / self.quantization_units)
-            
-            if self.delivery_noise_std > 0:
-                # Instead of adding Gaussian noise, we simulate physical rotor slip per micro-step.
-                slip_prob = min(0.15, self.delivery_noise_std)  # Convert abstract std into slip probability
+            error_probability = self.step_error_probability
+
+            step_error_count = 0
+            if error_probability is not None and error_probability > 0.0:
                 actual_steps = micro_steps
                 for _ in range(int(micro_steps)):
-                    if float(self._rng.random()) < slip_prob:
-                        # 70% chance to miss a step (friction/backlash), 30% chance to double-step (momentum)
+                    if float(self._rng.random()) < error_probability:
+                        # Generic missed/extra actuation event. The asymmetry is
+                        # a configurable research assumption, not rotor physics.
                         if float(self._rng.random()) < 0.7:
                             actual_steps -= 1
                         else:
                             actual_steps += 1
+                        step_error_count += 1
                 micro_steps = max(0, actual_steps)
-                
+
             delivered = micro_steps * self.quantization_units
             delivered = max(0.0, delivered)
-        elif self.delivery_noise_std > 0:
-            # Fallback for continuous infusion models without quantization
-            delivered += float(self._rng.normal(0, self.delivery_noise_std))
-            delivered = max(0.0, delivered)
-
+            if step_error_count:
+                status = "delivery_error"
+                reason = f"quantized_step_errors={step_error_count}"
         if self.dropout_prob > 0 and float(self._rng.random()) < self.dropout_prob:
             delivered = 0.0
-            status = "occlusion"
-            reason = "pump_dropout"
+            status = "delivery_interruption"
+            reason = "configured_dropout"
+
+        if self.max_units_per_step is not None:
+            delivered = min(delivered, self.max_units_per_step)
 
         return PumpDelivery(delivered_units=delivered, status=status, reason=reason)
 
@@ -431,10 +611,33 @@ class PumpModel:
             "quantization_units": self.quantization_units,
             "dropout_prob": self.dropout_prob,
             "delivery_noise_std": self.delivery_noise_std,
+            "step_error_probability": self.step_error_probability,
+            "rng_state": copy.deepcopy(self._rng.bit_generator.state),
+            "initial_rng_state": copy.deepcopy(self._initial_rng_state),
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
-        self.max_units_per_step = state.get("max_units_per_step", self.max_units_per_step)
-        self.quantization_units = state.get("quantization_units", self.quantization_units)
-        self.dropout_prob = state.get("dropout_prob", self.dropout_prob)
-        self.delivery_noise_std = state.get("delivery_noise_std", self.delivery_noise_std)
+        validated = PumpModel(
+            max_units_per_step=state.get(
+                "max_units_per_step", self.max_units_per_step
+            ),
+            quantization_units=state.get(
+                "quantization_units", self.quantization_units
+            ),
+            dropout_prob=state.get("dropout_prob", self.dropout_prob),
+            delivery_noise_std=state.get(
+                "delivery_noise_std", self.delivery_noise_std
+            ),
+            step_error_probability=state.get(
+                "step_error_probability", self.step_error_probability
+            ),
+        )
+        self.max_units_per_step = validated.max_units_per_step
+        self.quantization_units = validated.quantization_units
+        self.dropout_prob = validated.dropout_prob
+        self.delivery_noise_std = validated.delivery_noise_std
+        self.step_error_probability = validated.step_error_probability
+        if "initial_rng_state" in state:
+            self._initial_rng_state = copy.deepcopy(state["initial_rng_state"])
+        if "rng_state" in state:
+            self._rng.bit_generator.state = copy.deepcopy(state["rng_state"])

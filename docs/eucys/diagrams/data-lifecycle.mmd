@@ -1,0 +1,8 @@
+flowchart LR
+    A["Public, licensed or user data"] --> B["Local import"]
+    B --> C["Schema and unit mapping"]
+    C --> D["MDMP contract<br/>quality and provenance"]
+    D --> E["Realism and leakage checks"]
+    E --> F["Analysis or training dataset"]
+    F --> G["Metrics, model card<br/>and evidence manifest"]
+    D -->|fail / warn| H["Blocked or review-only"]

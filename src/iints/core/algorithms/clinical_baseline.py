@@ -34,7 +34,9 @@ class ClinicalBaselineAlgorithm(InsulinAlgorithm):
             "carb_ratio": 11.0,
             "insulin_sensitivity_factor": 55.0,
             "max_correction_units": 2.5,
-            "max_total_units_per_step": 3.5,
+            # Allows meal coverage implied by the bundled 10-15 g/U profiles.
+            # The independent supervisor still owns low-glucose and dose gates.
+            "max_total_units_per_step": 12.0,
             "hypo_guard_glucose": 90.0,
             "falling_trend_guard": -1.2,
         }

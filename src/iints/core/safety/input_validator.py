@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict, Optional
 
 from iints.core.safety.config import (
@@ -32,9 +33,23 @@ class InputValidator:
             max_glucose = safety_config.max_glucose
             max_glucose_delta_per_5_min = safety_config.max_glucose_delta_per_5_min
 
-        self.min_glucose = min_glucose
-        self.max_glucose = max_glucose
-        self.max_glucose_delta_per_5_min = max_glucose_delta_per_5_min
+        values = {
+            "min_glucose": float(min_glucose),
+            "max_glucose": float(max_glucose),
+            "max_glucose_delta_per_5_min": float(max_glucose_delta_per_5_min),
+        }
+        if not all(math.isfinite(value) for value in values.values()):
+            raise ValueError("input-validator limits must all be finite")
+        if not 0.0 <= values["min_glucose"] < values["max_glucose"]:
+            raise ValueError("min_glucose must be non-negative and below max_glucose")
+        if values["max_glucose_delta_per_5_min"] <= 0.0:
+            raise ValueError("max_glucose_delta_per_5_min must be positive")
+
+        self.min_glucose = values["min_glucose"]
+        self.max_glucose = values["max_glucose"]
+        self.max_glucose_delta_per_5_min = values[
+            "max_glucose_delta_per_5_min"
+        ]
         self.last_valid_glucose: Optional[float] = None
         self.last_validation_time: Optional[float] = None
 
@@ -50,8 +65,27 @@ class InputValidator:
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
-        self.last_valid_glucose = state.get("last_valid_glucose")
-        self.last_validation_time = state.get("last_validation_time")
+        glucose = state.get("last_valid_glucose")
+        timestamp = state.get("last_validation_time")
+        if (glucose is None) != (timestamp is None):
+            raise ValueError(
+                "validator snapshot must provide both glucose and time or neither"
+            )
+        if glucose is None:
+            self.reset()
+            return
+        assert timestamp is not None
+        try:
+            restored_glucose = float(glucose)
+            restored_time = float(timestamp)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("validator snapshot values must be numeric") from exc
+        if not all(math.isfinite(value) for value in (restored_glucose, restored_time)):
+            raise ValueError("validator snapshot values must be finite")
+        if not self.min_glucose <= restored_glucose <= self.max_glucose:
+            raise ValueError("validator snapshot glucose is outside configured bounds")
+        self.last_valid_glucose = restored_glucose
+        self.last_validation_time = restored_time
 
     def validate_glucose(self, glucose_value: float, current_time: float) -> float:
         """
@@ -67,20 +101,30 @@ class InputValidator:
         Raises:
             ValueError: If the value is outside biological plausibility limits.
         """
+        try:
+            glucose = float(glucose_value)
+            timestamp = float(current_time)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("glucose and current_time must be numeric") from exc
+        if not math.isfinite(glucose) or not math.isfinite(timestamp):
+            raise ValueError("glucose and current_time must be finite")
+
         # 1. Broad CGM/sensor plausibility check
-        if not (self.min_glucose <= glucose_value <= self.max_glucose):
+        if not (self.min_glucose <= glucose <= self.max_glucose):
             raise ValueError(
-                f"BIOLOGICAL_PLAUSIBILITY_ERROR: Glucose {glucose_value} mg/dL is outside the "
+                f"BIOLOGICAL_PLAUSIBILITY_ERROR: Glucose {glucose} mg/dL is outside the "
                 f"valid range [{self.min_glucose}, {self.max_glucose}]."
             )
 
         # 2. Rate-of-change check for unrealistic jumps
         if self.last_valid_glucose is not None and self.last_validation_time is not None:
-            time_delta = current_time - self.last_validation_time
+            time_delta = timestamp - self.last_validation_time
+            if time_delta < 0.0:
+                raise ValueError("current_time must not move backwards")
             if time_delta > 0:
                 # Normalize the max allowed delta to the actual time step
                 allowed_delta = self.max_glucose_delta_per_5_min * (time_delta / 5.0)
-                glucose_delta = abs(glucose_value - self.last_valid_glucose)
+                glucose_delta = abs(glucose - self.last_valid_glucose)
 
                 if glucose_delta > allowed_delta:
                     raise ValueError(
@@ -89,12 +133,18 @@ class InputValidator:
                     )
 
         # If all checks pass, update state and return the value
-        self.last_valid_glucose = glucose_value
-        self.last_validation_time = current_time
-        return glucose_value
+        self.last_valid_glucose = glucose
+        self.last_validation_time = timestamp
+        return glucose
 
     def validate_insulin(self, dose: float) -> float:
-        """Validates that a proposed insulin dose is non-negative."""
-        if dose < 0:
+        """Fail safely for negative requests and reject malformed requests."""
+        try:
+            numeric = float(dose)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("insulin dose must be numeric") from exc
+        if not math.isfinite(numeric):
+            raise ValueError("insulin dose must be finite")
+        if numeric < 0.0:
             return 0.0
-        return dose
+        return numeric

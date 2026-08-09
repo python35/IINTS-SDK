@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
 import importlib.resources
@@ -107,8 +109,6 @@ def create_mdmp_certificate_payload(
 ) -> dict[str, Any]:
     """Create an MDMP certificate payload from a certification report."""
 
-    from mdmp_core.certification import create_certificate
-
     payload = report.to_dict() if isinstance(report, MDMPValidationResult) else dict(report)
     cert_input = {
         **payload,
@@ -117,12 +117,32 @@ def create_mdmp_certificate_payload(
         "protocol_version": payload.get("mdmp_protocol_version"),
         "intended_use": "research_and_education_only",
     }
-    certificate = create_certificate(
-        cert_input,
-        issued_by=issued_by,
-        level=str(payload.get("mdmp_grade", "draft")),
-        certificate_id=certificate_id,
-    )
+    issued_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    certificate = {
+        "spec_version": "1.0",
+        "mdmp_object": "certificate",
+        "certificate_id": certificate_id or f"mdmp-cert-{issued_utc}",
+        "issued_utc": issued_utc,
+        "issued_by": issued_by,
+        "level": str(payload.get("mdmp_grade", "draft")),
+        "dataset_fingerprint": cert_input.get("dataset_fingerprint_sha256"),
+        "contract_fingerprint": cert_input.get("contract_fingerprint_sha256"),
+        "grade": cert_input.get("effective_grade", cert_input.get("grade")),
+        "grade_reason": cert_input.get("grade_reason"),
+        "compliance_score": cert_input.get("compliance_score"),
+        "consent_verified": cert_input.get("consent_verified"),
+        "schema_version": cert_input.get("schema_version"),
+        "protocol_version": cert_input.get("protocol_version"),
+        "governance_profile": cert_input.get("governance_profile"),
+        "eu_ai_pact_readiness": cert_input.get("eu_ai_pact_readiness"),
+        "intended_use": cert_input.get("intended_use", "research_only"),
+        "certification_scope": (
+            "artifact fingerprint and data-contract result only; no clinical certification"
+        ),
+    }
+    certificate["signature_sha256"] = sha256(
+        json.dumps(certificate, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     certificate["signature_status"] = "unsigned_sha256_only"
     certificate["verification_note"] = (
         "This certificate has only a deterministic SHA-256 digest. "

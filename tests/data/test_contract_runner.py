@@ -57,7 +57,8 @@ def test_contract_runner_passes_for_valid_dataframe() -> None:
     assert result.compliance_score == 100.0
     assert result.mdmp_grade == "clinical_grade"
     assert result.mdmp_protocol_version == "1.0-draft"
-    assert result.certified_for_medical_research is True
+    assert result.contract_quality_gate_passed is True
+    assert result.certified_for_medical_research is False
 
 
 def test_contract_runner_fails_on_missing_column() -> None:

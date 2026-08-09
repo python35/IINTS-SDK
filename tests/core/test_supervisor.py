@@ -4,7 +4,7 @@ from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 
 
 def test_supervisor_caps_max_bolus():
-    supervisor = IndependentSupervisor(max_insulin_per_bolus=5.0)
+    supervisor = IndependentSupervisor(max_insulin_per_bolus=5.0, max_60min=3.0)
 
     result = supervisor.evaluate_safety(
         current_glucose=180.0,
@@ -54,7 +54,7 @@ def test_hypo_cutoff_emergency_level_is_not_downgraded():
 
 
 def test_supervisor_reduces_dose_on_high_iob():
-    supervisor = IndependentSupervisor(max_insulin_per_bolus=5.0)
+    supervisor = IndependentSupervisor(max_insulin_per_bolus=5.0, max_iob=4.0)
 
     result = supervisor.evaluate_safety(
         current_glucose=120.0,
@@ -64,7 +64,47 @@ def test_supervisor_reduces_dose_on_high_iob():
     )
 
     assert result["approved_insulin"] < 4.0
-    assert any("High IOB" in action for action in result["actions_taken"])
+    assert any("IOB_HEADROOM_LIMIT" in action for action in result["actions_taken"])
+
+
+def test_supervisor_preserves_announced_meal_coverage_from_generic_iob_taper():
+    supervisor = IndependentSupervisor(
+        max_insulin_per_bolus=10.0,
+        max_iob=4.0,
+        max_60min=20.0,
+    )
+
+    result = supervisor.evaluate_safety(
+        current_glucose=140.0,
+        proposed_insulin=5.0,
+        current_time=0.0,
+        current_iob=4.0,
+        meal_bolus_units=4.0,
+    )
+
+    assert result["approved_insulin"] == pytest.approx(4.0)
+    assert any("IOB_HEADROOM_LIMIT" in action for action in result["actions_taken"])
+
+
+def test_meal_coverage_never_bypasses_predicted_hypoglycemia_stop():
+    supervisor = IndependentSupervisor(
+        max_insulin_per_bolus=10.0,
+        max_iob=20.0,
+        max_60min=20.0,
+    )
+
+    result = supervisor.evaluate_safety(
+        current_glucose=110.0,
+        proposed_insulin=4.0,
+        current_time=0.0,
+        current_iob=1.0,
+        predicted_glucose_30min=55.0,
+        meal_bolus_units=4.0,
+    )
+
+    assert result["approved_insulin"] == 0.0
+    assert result["safety_level"] == SafetyLevel.EMERGENCY
+    assert any("PREDICTED_HYPO" in action for action in result["actions_taken"])
 
 
 def test_supervisor_records_violation_when_actions_taken():
@@ -95,6 +135,23 @@ def test_supervisor_blocks_predicted_hypoglycemia():
 
     assert result["approved_insulin"] == 0
     assert any("PREDICTED_HYPO" in action for action in result["actions_taken"])
+
+
+def test_predicted_hypoglycemia_emergency_is_not_cleared_by_current_high() -> None:
+    supervisor = IndependentSupervisor(predicted_hypoglycemia_threshold=60.0)
+
+    result = supervisor.evaluate_safety(
+        current_glucose=180.0,
+        proposed_insulin=2.0,
+        current_time=0.0,
+        current_iob=1.0,
+        predicted_glucose_30min=55.0,
+    )
+
+    assert result["approved_insulin"] == 0.0
+    assert result["safety_level"] == SafetyLevel.EMERGENCY
+    assert result["emergency_mode"] is True
+    assert not any("RECOVERY" in action for action in result["actions_taken"])
 
 
 def test_supervisor_caps_basal_limit():

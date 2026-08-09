@@ -4,10 +4,9 @@ from iints.core.devices.models import PumpModel
 from iints.core.algorithms.pid_controller import PIDController
 from iints.api.base_algorithm import AlgorithmInput
 
-def test_supervisor_pd_clearance_curve():
+def test_supervisor_iob_headroom_limit():
     """
-    Test that the safety supervisor enforces Pharmacodynamic (PD) IOB clearance
-    rather than a static hard ceiling.
+    Test that the safety supervisor enforces its configured IOB headroom.
     """
     supervisor = IndependentSupervisor(max_iob=4.0)
     
@@ -24,12 +23,11 @@ def test_supervisor_pd_clearance_curve():
     )
     
     assert result["approved_insulin"] == 0.5
-    assert "PD_CLEARANCE_LIMIT" in result["safety_reason"]
+    assert "IOB_HEADROOM_LIMIT" in result["safety_reason"]
 
-def test_supervisor_bifurcation_risk():
+def test_supervisor_linear_trajectory_guard():
     """
-    Test that the safety supervisor blocks insulin using a physics-based velocity
-    vector (momentum trajectory) rather than a simple static trend cutoff.
+    Test that the supervisor blocks insulin under a linear trend projection.
     """
     supervisor = IndependentSupervisor(severe_hypoglycemia_threshold=54.0)
     
@@ -39,7 +37,7 @@ def test_supervisor_bifurcation_risk():
     
     # At t=2, glucose is 100. Rate is -2.0.
     # 30-min momentum = 100 + (-2.0 * 30) = 40.0 mg/dL
-    # 40.0 is below the 54.0 severe hypo threshold, so it MUST trigger BIFURCATION_RISK.
+    # 40.0 is below the 54.0 severe hypo threshold, so the trajectory guard fires.
     
     result = supervisor.evaluate_safety(
         current_glucose=100.0,
@@ -48,7 +46,7 @@ def test_supervisor_bifurcation_risk():
     )
     
     assert result["approved_insulin"] == 0.0
-    assert "BIFURCATION_RISK" in result["safety_reason"]
+    assert "LINEAR_TRAJECTORY_GUARD" in result["safety_reason"]
 
 def test_pid_pharmacokinetic_feedforward():
     """
@@ -80,14 +78,13 @@ def test_pid_pharmacokinetic_feedforward():
 
 def test_pump_microstepper_quantization():
     """
-    Test that the PumpModel uses discrete mechanical rotor simulations
-    instead of continuous Gaussian dose drift when quantization is configured.
+    Test that a quantized pump abstraction emits only whole delivery steps.
     """
     pump = PumpModel(quantization_units=0.05, delivery_noise_std=0.15, seed=42)
     
     # Request 0.075 units. 
     # A true micro-stepper will either round down to 0.05 (1 step) or up to 0.10 (2 steps)
-    # Then mechanical slip may alter the steps.
+    # A generic step error may alter the number of steps.
     delivery = pump.deliver(requested_units=0.075, time_step_minutes=5.0)
     
     # The final delivered units must be an EXACT multiple of quantization_units (0.05)

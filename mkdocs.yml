@@ -86,6 +86,16 @@ nav:
           - Research Evidence Bundle: EVIDENCE_BUNDLE.md
           - Booth Demo: BOOTH_DEMO.md
   - Research:
+      - EUCYS Jury Dossier:
+          - Start Here: eucys/index.md
+          - Project And Research Question: eucys/01_PROJECT_AND_QUESTION.md
+          - System Architecture: eucys/02_SYSTEM_ARCHITECTURE.md
+          - Scientific Model And Formulas: eucys/03_SCIENTIFIC_MODEL.md
+          - AI, Data And Evidence: eucys/04_AI_DATA_AND_EVIDENCE.md
+          - Results, Validation And Limitations: eucys/05_RESULTS_VALIDATION_AND_LIMITATIONS.md
+          - Live Demonstration Runbook: eucys/06_DEMO_RUNBOOK.md
+          - Jury Quick Reference: eucys/07_JURY_QUICK_REFERENCE.md
+          - Claim-To-Evidence Map: eucys/08_EVIDENCE_MAP.md
       - Scientific Workflow: SCIENTIFIC_WORKFLOW.md
       - Academic Research Workbench: ACADEMIC_RESEARCH_WORKBENCH.md
       - Physiology And Models:
@@ -163,6 +173,6 @@ nav:
       - Manual Overview: OFFICIAL_MANUAL.md
       - Full Technical Manual: manuals/IINTS-AF_SDK_Manual.md
   - Releases:
-      - Latest (v1.5.32): releases/v1.5.32.md
-      - v1.5.31: releases/v1.5.31.md
+      - Latest (v1.5.33): releases/v1.5.33.md
+      - v1.5.32: releases/v1.5.32.md
       - Release Archive: releases/INDEX.md

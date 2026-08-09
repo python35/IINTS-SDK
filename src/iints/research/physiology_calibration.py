@@ -118,37 +118,86 @@ def standardize_calibration_dataframe(
     """Standardize real/simulated glucose data for calibration metrics."""
 
     cols = columns or resolve_calibration_columns(dataframe)
+    time_minutes = _normalize_time_minutes(dataframe[cols.time])
+    if time_minutes.isna().any() or not np.all(np.isfinite(time_minutes)):
+        raise ValueError("Calibration time contains unparseable or non-finite values")
+
+    raw_glucose = dataframe[cols.glucose]
+    glucose = pd.to_numeric(raw_glucose, errors="coerce")
+    invalid_glucose = raw_glucose.notna() & glucose.isna()
+    if invalid_glucose.any():
+        raise ValueError("Calibration glucose contains non-numeric values")
+    missing_glucose_rows = int(glucose.isna().sum())
+    finite_glucose = glucose.dropna().astype(float)
+    if not np.all(np.isfinite(finite_glucose)):
+        raise ValueError("Calibration glucose contains non-finite values")
+    outside = (finite_glucose < 20.0) | (finite_glucose > 600.0)
+    if outside.any():
+        bad = float(finite_glucose[outside].iloc[0])
+        raise ValueError(
+            f"Calibration glucose {bad} is outside the declared [20, 600] mg/dL envelope"
+        )
+
+    def event_column(column: str | None, *, name: str) -> tuple[pd.Series, bool]:
+        if column is None:
+            return pd.Series(0.0, index=dataframe.index, dtype=float), True
+        raw = dataframe[column]
+        numeric = pd.to_numeric(raw, errors="coerce")
+        blank = raw.isna() | raw.astype(str).str.strip().eq("")
+        invalid = ~blank & numeric.isna()
+        if invalid.any():
+            raise ValueError(f"Calibration {name} contains non-numeric values")
+        numeric = numeric.fillna(0.0).astype(float)
+        if not np.all(np.isfinite(numeric)) or (numeric < 0.0).any():
+            raise ValueError(
+                f"Calibration {name} must contain finite non-negative values"
+            )
+        return numeric, False
+
+    carbs, carbs_absent = event_column(cols.carbs, name="carbs")
+    insulin, insulin_absent = event_column(cols.insulin, name="insulin")
+    exercise, exercise_absent = event_column(cols.exercise, name="exercise")
+    if (exercise > 1.0).any():
+        raise ValueError("Calibration exercise_flag must be inside [0, 1]")
+
     out = pd.DataFrame(
         {
-            "time_minutes": _normalize_time_minutes(dataframe[cols.time]),
-            "glucose_mgdl": pd.to_numeric(dataframe[cols.glucose], errors="coerce"),
+            "time_minutes": time_minutes.astype(float),
+            "glucose_mgdl": glucose.astype(float),
+            "carbs_g": carbs,
+            "insulin_u": insulin,
+            "exercise_flag": exercise,
         }
     )
-    out["carbs_g"] = (
-        pd.to_numeric(dataframe[cols.carbs], errors="coerce").fillna(0.0)
-        if cols.carbs is not None
-        else 0.0
-    )
-    out["insulin_u"] = (
-        pd.to_numeric(dataframe[cols.insulin], errors="coerce").fillna(0.0)
-        if cols.insulin is not None
-        else 0.0
-    )
-    out["exercise_flag"] = (
-        pd.to_numeric(dataframe[cols.exercise], errors="coerce").fillna(0.0)
-        if cols.exercise is not None
-        else 0.0
-    )
     if cols.subject is not None:
+        if dataframe[cols.subject].isna().any():
+            raise ValueError("Calibration subject_id contains missing values")
         out["subject_id"] = dataframe[cols.subject].astype(str)
     else:
         out["subject_id"] = "unknown"
-    out = out.dropna(subset=["time_minutes", "glucose_mgdl"]).copy()
-    out = out[np.isfinite(out["glucose_mgdl"])].copy()
-    out = out[(out["glucose_mgdl"] >= 20.0) & (out["glucose_mgdl"] <= 600.0)].copy()
-    out["time_minutes"] = out["time_minutes"].astype(float)
+    out = out.dropna(subset=["glucose_mgdl"]).copy()
+    if out.empty:
+        raise ValueError("No observed glucose rows available for calibration")
     out["hour_of_day"] = (out["time_minutes"] % 1440.0) / 60.0
-    return out.sort_values(["subject_id", "time_minutes"]).reset_index(drop=True)
+    out = out.sort_values(["subject_id", "time_minutes"]).reset_index(drop=True)
+    deltas = out.groupby("subject_id", observed=False)["time_minutes"].diff()
+    if (deltas.dropna() <= 0.0).any():
+        raise ValueError(
+            "Calibration timestamps must be unique and strictly increasing per subject"
+        )
+    out.attrs["input_rows"] = int(len(dataframe))
+    out.attrs["retained_rows"] = int(len(out))
+    out.attrs["missing_glucose_rows_dropped"] = missing_glucose_rows
+    out.attrs["absent_event_columns"] = [
+        name
+        for name, absent in (
+            ("carbs_g", carbs_absent),
+            ("insulin_u", insulin_absent),
+            ("exercise_flag", exercise_absent),
+        )
+        if absent
+    ]
+    return out
 
 
 def _safe_float(value: float | np.floating[Any]) -> float | None:
@@ -333,32 +382,71 @@ def build_parameter_hints(
     roc_p99 = glucose.get("roc_abs_p99_mgdl_min")
     carb_delta = meal.get("median_peak_delta_per_10g_mgdl")
 
-    carb_duration = 240.0
+    raw_carb_duration = 240.0
     if peak_time is not None:
-        carb_duration = float(np.clip(max(float(p75_peak or peak_time) * 1.7, float(peak_time) * 2.0), 120.0, 420.0))
+        raw_carb_duration = max(
+            float(p75_peak or peak_time) * 1.7,
+            float(peak_time) * 2.0,
+        )
+    carb_duration = float(np.clip(raw_carb_duration, 120.0, 420.0))
 
-    max_rate = 3.0
+    raw_max_rate = 3.0
     if roc_p99 is not None:
         # Keep simulator guards slightly above empirical p99, while avoiding impossible CGM cliffs.
-        max_rate = float(np.clip(float(roc_p99) * 1.35, 1.0, 4.0))
+        raw_max_rate = float(roc_p99) * 1.35
+    max_rate = float(np.clip(raw_max_rate, 1.0, 4.0))
 
-    absorption_rate = 0.03
+    raw_absorption_rate = 0.03
     if carb_delta is not None:
         # CustomPatientModel absorption rates are unitless educational knobs; keep range conservative.
-        absorption_rate = float(np.clip(float(carb_delta) / 350.0, 0.012, 0.06))
+        raw_absorption_rate = float(carb_delta) / 350.0
+    absorption_rate = float(np.clip(raw_absorption_rate, 0.012, 0.06))
 
-    hints = {
-        "initial_glucose": round(float(np.clip(median_glucose, 80.0, 220.0)), 3),
-        "basal_glucose_target": round(float(np.clip(float(overnight or mean_glucose), 80.0, 200.0)), 3),
-        "carb_absorption_duration_minutes": round(carb_duration, 3),
-        "glucose_absorption_rate": round(absorption_rate, 5),
-        "max_glucose_rate_mgdl_per_min": round(max_rate, 3),
-        "dawn_phenomenon_strength": round(float(np.clip(dawn_rise / 4.0, 0.0, 25.0)), 3),
+    raw_hints = {
+        "initial_glucose": median_glucose,
+        "basal_glucose_target": float(overnight or mean_glucose),
+        "carb_absorption_duration_minutes": raw_carb_duration,
+        "glucose_absorption_rate": raw_absorption_rate,
+        "max_glucose_rate_mgdl_per_min": raw_max_rate,
+        "dawn_phenomenon_strength": dawn_rise / 4.0,
         "insulin_action_duration": 300.0,
         "insulin_peak_time": 75.0,
     }
+
+    bounded_hints = {
+        "initial_glucose": float(np.clip(median_glucose, 80.0, 220.0)),
+        "basal_glucose_target": float(
+            np.clip(float(overnight or mean_glucose), 80.0, 200.0)
+        ),
+        "carb_absorption_duration_minutes": carb_duration,
+        "glucose_absorption_rate": absorption_rate,
+        "max_glucose_rate_mgdl_per_min": max_rate,
+        "dawn_phenomenon_strength": float(
+            np.clip(dawn_rise / 4.0, 0.0, 25.0)
+        ),
+        "insulin_action_duration": 300.0,
+        "insulin_peak_time": 75.0,
+    }
+    precision = {
+        "glucose_absorption_rate": 5,
+    }
+    hints = {
+        name: round(float(value), precision.get(name, 3))
+        for name, value in bounded_hints.items()
+    }
+    bound_hits = [
+        name
+        for name, raw_value in raw_hints.items()
+        if not np.isclose(
+            float(raw_value), float(bounded_hints[name]), rtol=0.0, atol=1e-9
+        )
+    ]
     return {
         "patient_profile_hints": hints,
+        "raw_empirical_estimates_before_bounds": {
+            name: round(float(value), 5) for name, value in raw_hints.items()
+        },
+        "bound_hits": bound_hits,
         "calibration_limits": [
             "Hints are empirical starting points, not identified clinical parameters.",
             "Meal absorption is estimated from observed CGM peaks and can be confounded by insulin timing and missed carbs.",
@@ -418,6 +506,7 @@ def physiology_calibration_report(
         "schema_version": 1,
         "purpose": "research physiology calibration audit; not clinical validation",
         "real_dataset": {
+            "data_quality": dict(real.attrs),
             "glucose_summary": glucose,
             "meal_response_summary": meal,
             "exercise_response_summary": exercise,

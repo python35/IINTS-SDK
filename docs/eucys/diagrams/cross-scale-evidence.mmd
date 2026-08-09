@@ -1,0 +1,7 @@
+flowchart LR
+    A["AlphaFold<br/>predicted structure confidence"] --> R["Cross-scale evidence review"]
+    B["ClinVar<br/>variant-condition classification"] --> R
+    C["GTEx / expression resources<br/>tissue context"] --> R
+    D["ChEMBL / BindingDB<br/>measured chemical records"] --> R
+    R --> P["Documented scenario assumption<br/>or no model change"]
+    P --> S["Separate simulation experiment"]

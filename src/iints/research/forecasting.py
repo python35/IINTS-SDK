@@ -53,6 +53,32 @@ class ForecastConfig:
     critical_high_threshold_mgdl: float = 300.0
     uncertainty_std_threshold_mgdl: float = 35.0
 
+    def __post_init__(self) -> None:
+        positive = {
+            "history_minutes": self.history_minutes,
+            "horizon_minutes": self.horizon_minutes,
+            "time_step_minutes": self.time_step_minutes,
+            "max_rate_mgdl_min": self.max_rate_mgdl_min,
+            "trend_decay_minutes": self.trend_decay_minutes,
+            "insulin_action_minutes": self.insulin_action_minutes,
+            "carb_absorption_minutes": self.carb_absorption_minutes,
+            "uncertainty_std_threshold_mgdl": self.uncertainty_std_threshold_mgdl,
+        }
+        for name, value in positive.items():
+            if not np.isfinite(value) or float(value) <= 0.0:
+                raise ValueError(f"{name} must be finite and positive")
+        thresholds = (
+            float(self.urgent_low_threshold_mgdl),
+            float(self.low_threshold_mgdl),
+            float(self.high_threshold_mgdl),
+            float(self.very_high_threshold_mgdl),
+            float(self.critical_high_threshold_mgdl),
+        )
+        if not all(np.isfinite(value) for value in thresholds):
+            raise ValueError("forecast thresholds must all be finite")
+        if list(thresholds) != sorted(thresholds) or len(set(thresholds)) != 5:
+            raise ValueError("forecast thresholds must be strictly increasing")
+
     @property
     def history_steps(self) -> int:
         return max(1, int(round(self.history_minutes / self.time_step_minutes)))
@@ -91,6 +117,13 @@ def _safe_clip(value: float, low: float, high: float) -> float:
     return float(np.clip(value, low, high))
 
 
+def _bounded_feature(value: float, *, name: str, low: float, high: float) -> float:
+    numeric = float(value)
+    if not np.isfinite(numeric) or not low <= numeric <= high:
+        raise ValueError(f"{name} must be finite and between {low} and {high}")
+    return numeric
+
+
 def _feature_index(feature_columns: Sequence[str], candidates: Sequence[str]) -> Optional[int]:
     for candidate in candidates:
         if candidate in feature_columns:
@@ -119,6 +152,16 @@ class PhysiologyAwareBaseline:
     ) -> None:
         if horizon_steps <= 0:
             raise ValueError("horizon_steps must be > 0")
+        numeric_positive = {
+            "time_step_minutes": time_step_minutes,
+            "max_rate_mgdl_min": max_rate_mgdl_min,
+            "trend_decay_minutes": trend_decay_minutes,
+            "insulin_action_minutes": insulin_action_minutes,
+            "carb_absorption_minutes": carb_absorption_minutes,
+        }
+        for name, value in numeric_positive.items():
+            if not np.isfinite(value) or float(value) <= 0.0:
+                raise ValueError(f"{name} must be finite and positive")
         self.horizon_steps = int(horizon_steps)
         self.time_step_minutes = float(time_step_minutes)
         self.feature_columns = list(feature_columns or DEFAULT_FORECAST_FEATURE_COLUMNS)
@@ -133,6 +176,10 @@ class PhysiologyAwareBaseline:
     def predict(self, X: np.ndarray) -> np.ndarray:
         if X.ndim != 3:
             raise ValueError("X must have shape [N, T, F]")
+        if X.shape[1] == 0 or X.shape[2] == 0:
+            raise ValueError("X must contain at least one time step and feature")
+        if not np.all(np.isfinite(X)):
+            raise ValueError("X must contain only finite feature values")
         predictions = np.empty((X.shape[0], self.horizon_steps), dtype=np.float32)
         for row_index in range(X.shape[0]):
             predictions[row_index] = self._predict_one(X[row_index])
@@ -142,7 +189,12 @@ class PhysiologyAwareBaseline:
         index = _feature_index(self.feature_columns, candidates)
         if index is None or index >= window.shape[1]:
             return default
-        return _as_float(window[-1, index], default)
+        value = float(window[-1, index])
+        if not np.isfinite(value):
+            raise ValueError(
+                f"Forecast feature {self.feature_columns[index]!r} must be finite"
+            )
+        return value
 
     def _predict_one(self, window: np.ndarray) -> np.ndarray:
         glucose_index = _feature_index(
@@ -153,7 +205,12 @@ class PhysiologyAwareBaseline:
             raise ValueError("A glucose feature column is required for physiology-aware forecasting.")
 
         glucose_history = window[:, glucose_index].astype(float)
-        current_glucose = _as_float(glucose_history[-1], 120.0)
+        current_glucose = _bounded_feature(
+            float(glucose_history[-1]),
+            name="current_glucose",
+            low=0.0,
+            high=1_000.0,
+        )
         trend = self._read_last(window, ("glucose_trend_mgdl_min", "glucose_rate_mgdl_min"), float("nan"))
         if not np.isfinite(trend):
             if len(glucose_history) >= 2:
@@ -162,32 +219,77 @@ class PhysiologyAwareBaseline:
                 trend = 0.0
         trend = _safe_clip(trend, -self.max_rate_mgdl_min, self.max_rate_mgdl_min)
 
-        iob = max(0.0, self._read_last(window, ("patient_iob_units", "iob", "insulin_on_board"), 0.0))
-        cob = max(0.0, self._read_last(window, ("patient_cob_grams", "cob", "carbs_on_board"), 0.0))
-        isf = _safe_clip(self._read_last(window, ("effective_isf", "isf"), 50.0), 5.0, 250.0)
-        icr = _safe_clip(self._read_last(window, ("effective_icr", "icr"), 10.0), 1.0, 80.0)
-        dia = _safe_clip(
+        iob = _bounded_feature(
+            self._read_last(window, ("patient_iob_units", "iob", "insulin_on_board"), 0.0),
+            name="IOB",
+            low=0.0,
+            high=100.0,
+        )
+        cob = _bounded_feature(
+            self._read_last(window, ("patient_cob_grams", "cob", "carbs_on_board"), 0.0),
+            name="COB",
+            low=0.0,
+            high=1_000.0,
+        )
+        isf = _bounded_feature(
+            self._read_last(window, ("effective_isf", "isf"), 50.0),
+            name="ISF",
+            low=5.0,
+            high=250.0,
+        )
+        icr = _bounded_feature(
+            self._read_last(window, ("effective_icr", "icr"), 10.0),
+            name="ICR",
+            low=1.0,
+            high=80.0,
+        )
+        dia = _bounded_feature(
             self._read_last(window, ("effective_dia_minutes", "dia_minutes"), self.insulin_action_minutes),
-            30.0,
-            480.0,
+            name="DIA",
+            low=30.0,
+            high=480.0,
         )
-        heart_rate = self._read_last(window, ("heart_rate",), 0.0)
-        steps = self._read_last(window, ("steps",), 0.0)
-        exercise_intensity = self._read_last(window, ("exercise_intensity",), 0.0)
-        stress_intensity = self._read_last(window, ("stress_intensity", "illness_intensity"), 0.0)
-        antibody_binding = _safe_clip(
+        heart_rate = _bounded_feature(
+            self._read_last(window, ("heart_rate",), 0.0),
+            name="heart_rate",
+            low=0.0,
+            high=300.0,
+        )
+        steps = _bounded_feature(
+            self._read_last(window, ("steps",), 0.0),
+            name="steps",
+            low=0.0,
+            high=1_000_000.0,
+        )
+        exercise_intensity = _bounded_feature(
+            self._read_last(window, ("exercise_intensity",), 0.0),
+            name="exercise_intensity",
+            low=0.0,
+            high=1.0,
+        )
+        stress_intensity = _bounded_feature(
+            self._read_last(window, ("stress_intensity", "illness_intensity"), 0.0),
+            name="stress_intensity",
+            low=0.0,
+            high=1.0,
+        )
+        antibody_binding = _bounded_feature(
             self._read_last(window, ("insulin_antibody_binding_fraction",), 0.0),
-            0.0,
-            0.95,
+            name="insulin_antibody_binding_fraction",
+            low=0.0,
+            high=0.95,
         )
-        antibody_release = _safe_clip(
+        antibody_release = _bounded_feature(
             self._read_last(window, ("insulin_antibody_release_fraction",), 0.0),
-            0.0,
-            0.75,
+            name="insulin_antibody_release_fraction",
+            low=0.0,
+            high=0.75,
         )
-        antibody_bound_pool = max(
-            0.0,
+        antibody_bound_pool = _bounded_feature(
             self._read_last(window, ("antibody_bound_insulin_units",), 0.0),
+            name="antibody_bound_insulin_units",
+            low=0.0,
+            high=100.0,
         )
 
         exercise_signal = max(0.0, (heart_rate - 105.0) / 75.0) + max(0.0, steps / 2500.0)
@@ -225,7 +327,12 @@ class PhysiologyAwareBaseline:
             stress_delta = stress_signal * self.time_step_minutes * 0.45
             raw_delta = trend_delta + insulin_delta + carb_delta + exercise_delta + stress_delta
             max_step_delta = self.max_rate_mgdl_min * self.time_step_minutes
-            glucose = _safe_clip(glucose + _safe_clip(raw_delta, -max_step_delta, max_step_delta), 35.0, 420.0)
+            # The rate envelope is part of this comparator's declared model.
+            # Absolute glucose is deliberately not clipped: evaluation must be
+            # able to observe and count impossible forecasts.
+            glucose = glucose + _safe_clip(
+                raw_delta, -max_step_delta, max_step_delta
+            )
             values.append(glucose)
         return np.asarray(values, dtype=np.float32)
 
@@ -325,13 +432,38 @@ def _coerce_forecast_input(df: pd.DataFrame, config: ForecastConfig) -> pd.DataF
     glucose_column = _first_existing(frame, ("glucose_actual_mgdl", "glucose_to_algo_mgdl", "glucose"))
     if glucose_column is None:
         raise ValueError("Input data must include glucose_actual_mgdl, glucose_to_algo_mgdl, or glucose")
-    if "glucose_actual_mgdl" not in frame.columns:
-        frame["glucose_actual_mgdl"] = pd.to_numeric(frame[glucose_column], errors="coerce")
-    else:
-        frame["glucose_actual_mgdl"] = pd.to_numeric(frame["glucose_actual_mgdl"], errors="coerce")
+    glucose_source = (
+        frame[glucose_column]
+        if "glucose_actual_mgdl" not in frame.columns
+        else frame["glucose_actual_mgdl"]
+    )
+    glucose = pd.to_numeric(glucose_source, errors="coerce").replace(
+        [np.inf, -np.inf], np.nan
+    )
+    malformed = glucose.isna() & glucose_source.notna()
+    if malformed.any():
+        raise ValueError(
+            f"Glucose input contains {int(malformed.sum())} malformed values"
+        )
+    glucose = glucose.interpolate(method="linear", limit=1, limit_area="inside")
+    if glucose.isna().any():
+        raise ValueError(
+            "Glucose input contains unresolved missing values; boundary values "
+            "are not replaced with a synthetic 120 mg/dL default"
+        )
+    frame["glucose_actual_mgdl"] = glucose.astype(float)
 
     if "time_minutes" not in frame.columns:
         frame["time_minutes"] = np.arange(len(frame)) * config.time_step_minutes
+    else:
+        time_values = pd.to_numeric(
+            frame["time_minutes"], errors="coerce"
+        ).replace([np.inf, -np.inf], np.nan)
+        if time_values.isna().any():
+            raise ValueError("time_minutes must contain only finite numeric values")
+        if (time_values.diff().dropna() <= 0.0).any():
+            raise ValueError("time_minutes must be strictly increasing")
+        frame["time_minutes"] = time_values.astype(float)
     if "glucose_trend_mgdl_min" not in frame.columns:
         frame["glucose_trend_mgdl_min"] = (
             frame["glucose_actual_mgdl"].diff().fillna(0.0) / max(config.time_step_minutes, 1)
@@ -355,9 +487,17 @@ def _coerce_forecast_input(df: pd.DataFrame, config: ForecastConfig) -> pd.DataF
     for column, default in defaults.items():
         if column not in frame.columns:
             frame[column] = default
-        frame[column] = pd.to_numeric(frame[column], errors="coerce").fillna(default)
-    frame["glucose_actual_mgdl"] = frame["glucose_actual_mgdl"].interpolate(limit_direction="both")
-    frame["glucose_actual_mgdl"] = frame["glucose_actual_mgdl"].fillna(120.0)
+            continue
+        source = frame[column]
+        parsed = pd.to_numeric(source, errors="coerce").replace(
+            [np.inf, -np.inf], np.nan
+        )
+        malformed = parsed.isna() & source.notna()
+        if malformed.any():
+            raise ValueError(
+                f"Forecast feature {column!r} contains malformed values"
+            )
+        frame[column] = parsed.fillna(default)
     return frame
 
 

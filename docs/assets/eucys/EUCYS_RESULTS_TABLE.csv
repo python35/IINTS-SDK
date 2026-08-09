@@ -1,0 +1,4 @@
+arm_id,run_count,mean_tir_70_180,mean_tir_below_70,mean_tir_above_180,mean_glucose,mean_supervisor_interventions,severe_hypo_run_count,terminated_early_run_count,poster_png
+clean_certified,1200,90.29959630911188,6.451557093425605,3.2488465974625145,115.92523673366073,177.18666666666667,743,0,/Volumes/Samsung SSD 990 EVO Plus Media/IINTS-AF/IINTS-SDK-main/results/eucys_2026/EUCYS_RESULTS/arms/clean_certified/study_poster.png
+corrupted_uncertified,1200,73.18829296424452,3.6891580161476356,23.122549019607842,141.66482924526682,219.7175,560,0,/Volumes/Samsung SSD 990 EVO Plus Media/IINTS-AF/IINTS-SDK-main/results/eucys_2026/EUCYS_RESULTS/arms/corrupted_uncertified/study_poster.png
+supervisor_off_ablation,1200,80.7762399077278,3.8786043829296424,15.34515570934256,140.23812322977452,198.02083333333334,193,0,/Volumes/Samsung SSD 990 EVO Plus Media/IINTS-AF/IINTS-SDK-main/results/eucys_2026/EUCYS_RESULTS/arms/supervisor_off_ablation/study_poster.png

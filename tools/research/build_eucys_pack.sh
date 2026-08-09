@@ -26,4 +26,6 @@ for source_name in "${sources[@]}"; do
     --output "$output_path"
 done
 
+tools/research/build_eucys_dossier.sh
+
 printf '[IINTS] EUCYS evidence pack ready: %s\n' "$PDF_DIR"

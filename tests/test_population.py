@@ -90,6 +90,35 @@ class TestPopulationGenerator:
         # Log-normal is right-skewed: median < mean
         assert np.median(isf_values) <= np.mean(isf_values) + 5
 
+    def test_truncation_does_not_create_boundary_pileups(self):
+        dist = ParameterDistribution(
+            mean=1.0,
+            cv=2.0,
+            distribution="truncated_normal",
+            lower_bound=0.5,
+            upper_bound=1.5,
+        )
+        samples = PopulationGenerator(
+            PopulationConfig(n_patients=20, seed=42)
+        )._sample_parameter(dist, 2_000)
+
+        assert np.all(samples > 0.5)
+        assert np.all(samples < 1.5)
+        assert not np.any(samples == 0.5)
+        assert not np.any(samples == 1.5)
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"mean": 1.0, "cv": -0.1},
+            {"mean": 2.0, "cv": 0.1, "lower_bound": 0.0, "upper_bound": 1.0},
+            {"mean": 1.0, "cv": 0.1, "distribution": "unknown"},
+        ],
+    )
+    def test_invalid_distribution_is_rejected(self, kwargs):
+        with pytest.raises(ValueError):
+            ParameterDistribution(**kwargs)
+
 
 # ---------------------------------------------------------------------------
 # Aggregate helpers

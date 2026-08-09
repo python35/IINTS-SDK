@@ -186,6 +186,9 @@ def _simulate_patient(
         initial_ketones=initial_ketones,
         initial_beta_mass=initial_beta_mass,
         basal_insulin_rate=basal_insulin_rate,
+        # The stress lab measures excursions up to this explicit research
+        # envelope; it must not abort at the stricter default preset gate.
+        max_glucose_rate_mgdl_per_min=10.0,
     )
     insulin_schedule = insulin_schedule or {}
     carb_schedule = carb_schedule or {}

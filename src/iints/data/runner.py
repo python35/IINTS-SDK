@@ -37,9 +37,15 @@ MDMP_GRADE_DEFINITIONS = {
         "allowed_use": "Research workflows, model development, and reproducibility evidence.",
     },
     "clinical_grade": {
-        "meaning": "Passes all hard contract checks with a compliance score >= 90.",
+        "meaning": (
+            "Legacy MDMP label for the strictest built-in data-contract tier; "
+            "it is not evidence of clinical validity."
+        ),
         "minimum_conditions": "is_compliant=True and compliance_score >= 90.",
-        "allowed_use": "Stronger pre-clinical research evidence; not medical-device approval.",
+        "allowed_use": (
+            "High-assurance data-quality workflows after independent scientific review; "
+            "not clinical certification, medical-device approval, or treatment authority."
+        ),
     },
 }
 
@@ -66,6 +72,7 @@ class ValidationResult:
     compliance_score: float
     mdmp_grade: str
     mdmp_protocol_version: str
+    contract_quality_gate_passed: bool
     certified_for_medical_research: bool
     contract_fingerprint_sha256: str
     dataset_fingerprint_sha256: str
@@ -79,7 +86,11 @@ class ValidationResult:
             "compliance_score": self.compliance_score,
             "mdmp_grade": self.mdmp_grade,
             "mdmp_protocol_version": self.mdmp_protocol_version,
+            "contract_quality_gate_passed": self.contract_quality_gate_passed,
             "certified_for_medical_research": self.certified_for_medical_research,
+            "certification_scope": (
+                "deterministic data-contract conformance only; no clinical or regulatory certification"
+            ),
             "contract_fingerprint_sha256": self.contract_fingerprint_sha256,
             "dataset_fingerprint_sha256": self.dataset_fingerprint_sha256,
             "row_count": self.row_count,
@@ -405,7 +416,10 @@ class ContractRunner:
             compliance_score=compliance_score,
             mdmp_grade=grade,
             mdmp_protocol_version=MDMP_PROTOCOL_VERSION,
-            certified_for_medical_research=grade in {"clinical_grade", "research_grade"},
+            contract_quality_gate_passed=is_compliant and compliance_score >= 90.0,
+            # Retained as a backward-compatible field. An internal contract
+            # runner cannot issue clinical or medical-research certification.
+            certified_for_medical_research=False,
             contract_fingerprint_sha256=self.contract.fingerprint(),
             dataset_fingerprint_sha256=dataframe_fingerprint(working),
             row_count=len(working),

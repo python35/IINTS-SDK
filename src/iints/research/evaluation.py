@@ -5,6 +5,39 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 import numpy as np
 
 
+def _finite_vector(values: np.ndarray, *, name: str) -> np.ndarray:
+    vector = np.asarray(values, dtype=float).reshape(-1)
+    if vector.size == 0:
+        raise ValueError(f"{name} must not be empty")
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(f"{name} must contain only finite values")
+    return vector
+
+
+def _forecast_vectors(
+    observed: np.ndarray,
+    predicted: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    obs = _finite_vector(observed, name="observed")
+    pred = _finite_vector(predicted, name="predicted")
+    if obs.shape != pred.shape:
+        raise ValueError("observed and predicted must have the same shape")
+    return obs, pred
+
+
+def _validated_standard_deviation(
+    predicted_std: np.ndarray,
+    *,
+    expected_shape: tuple[int, ...],
+) -> np.ndarray:
+    std = _finite_vector(predicted_std, name="predicted_std")
+    if std.shape != expected_shape:
+        raise ValueError("predicted_std must have same shape as observed")
+    if np.any(std < 0.0):
+        raise ValueError("predicted_std must be non-negative")
+    return std
+
+
 def _band_mask(observed: np.ndarray, band: str) -> np.ndarray:
     if band == "hypo":
         return observed < 70.0
@@ -20,12 +53,7 @@ def forecast_error_report(
     predicted: np.ndarray,
     predicted_std: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
-    obs = np.asarray(observed, dtype=float).reshape(-1)
-    pred = np.asarray(predicted, dtype=float).reshape(-1)
-    if obs.shape != pred.shape:
-        raise ValueError("observed and predicted must have the same shape")
-    if len(obs) == 0:
-        raise ValueError("empty inputs")
+    obs, pred = _forecast_vectors(observed, predicted)
 
     error = pred - obs
     abs_error = np.abs(error)
@@ -57,14 +85,18 @@ def forecast_error_report(
     report["band_metrics"] = band_metrics
 
     if predicted_std is not None:
-        std = np.asarray(predicted_std, dtype=float).reshape(-1)
-        if std.shape != obs.shape:
-            raise ValueError("predicted_std must have same shape as observed")
+        std = _validated_standard_deviation(predicted_std, expected_shape=obs.shape)
         lower = pred - (1.96 * std)
         upper = pred + (1.96 * std)
         coverage = (obs >= lower) & (obs <= upper)
         report["interval_95_coverage_pct"] = float(np.mean(coverage) * 100.0)
         report["mean_predicted_std_mgdl"] = float(np.mean(std))
+        report["interval_method"] = "prediction +/- 1.96 * MC-dropout model standard deviation"
+        report["interval_is_calibrated_predictive_interval"] = False
+        report["interval_warning"] = (
+            "Backward-compatible metric name only; MC-dropout model spread does not "
+            "include aleatoric noise and is not a calibrated 95% predictive interval."
+        )
 
     return report
 
@@ -76,12 +108,9 @@ def hypoglycemia_detection_report(
     threshold_mgdl: float = 70.0,
 ) -> Dict[str, Any]:
     """Report binary hypo-detection performance at a clinically explicit threshold."""
-    obs = np.asarray(observed, dtype=float).reshape(-1)
-    pred = np.asarray(predicted, dtype=float).reshape(-1)
-    if obs.shape != pred.shape:
-        raise ValueError("observed and predicted must have the same shape")
-    if len(obs) == 0:
-        raise ValueError("empty inputs")
+    obs, pred = _forecast_vectors(observed, predicted)
+    if not np.isfinite(threshold_mgdl):
+        raise ValueError("threshold_mgdl must be finite")
 
     observed_hypo = obs < threshold_mgdl
     predicted_hypo = pred < threshold_mgdl
@@ -134,19 +163,19 @@ def uncertainty_reliability_report(
     bins: int = 5,
     confidence: float = 0.95,
 ) -> Dict[str, Any]:
-    """Bin predictions by uncertainty and compare nominal vs empirical coverage."""
+    """Diagnose MC-dropout spread against a Gaussian 95% reference.
+
+    This does not convert MC-dropout spread into a calibrated predictive
+    interval. A separate calibration set and aleatoric-noise model are required
+    before the result may be interpreted as 95% predictive coverage.
+    """
     if confidence != 0.95:
         raise ValueError("Only confidence=0.95 is currently supported.")
     if bins <= 0:
         raise ValueError("bins must be > 0")
 
-    obs = np.asarray(observed, dtype=float).reshape(-1)
-    pred = np.asarray(predicted, dtype=float).reshape(-1)
-    std = np.asarray(predicted_std, dtype=float).reshape(-1)
-    if obs.shape != pred.shape or obs.shape != std.shape:
-        raise ValueError("observed, predicted, and predicted_std must have the same shape")
-    if len(obs) == 0:
-        raise ValueError("empty inputs")
+    obs, pred = _forecast_vectors(observed, predicted)
+    std = _validated_standard_deviation(predicted_std, expected_shape=obs.shape)
 
     std = np.maximum(std, 1e-6)
     abs_error = np.abs(pred - obs)
@@ -189,6 +218,12 @@ def uncertainty_reliability_report(
         "target_coverage_pct": float(confidence * 100.0),
         "overall_coverage_pct": float(np.mean(covered) * 100.0),
         "weighted_calibration_abs_error_pct": float(weighted_error),
+        "interval_is_calibrated_predictive_interval": False,
+        "interval_method": "prediction +/- 1.96 * MC-dropout model standard deviation",
+        "warning": (
+            "Diagnostic Gaussian reference only; do not report this as a calibrated "
+            "95% predictive interval without independent calibration."
+        ),
         "bins": bucket_rows,
     }
 
@@ -201,14 +236,15 @@ def subgroup_error_report(
     predicted_std: Optional[np.ndarray] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Evaluate forecast quality separately for each provided subgroup label."""
-    obs = np.asarray(observed, dtype=float).reshape(-1)
-    pred = np.asarray(predicted, dtype=float).reshape(-1)
+    obs, pred = _forecast_vectors(observed, predicted)
     group_values = np.asarray(groups).reshape(-1)
     if obs.shape != pred.shape or obs.shape != group_values.shape:
         raise ValueError("observed, predicted, and groups must have the same flattened shape")
-    std = None if predicted_std is None else np.asarray(predicted_std, dtype=float).reshape(-1)
-    if std is not None and std.shape != obs.shape:
-        raise ValueError("predicted_std must have the same flattened shape as observed")
+    std = (
+        None
+        if predicted_std is None
+        else _validated_standard_deviation(predicted_std, expected_shape=obs.shape)
+    )
 
     report: Dict[str, Dict[str, Any]] = {}
     for group in sorted({str(value) for value in group_values}):

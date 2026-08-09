@@ -1,223 +1,146 @@
-# Complete Scientific Theories in IINTS-AF
+# Scientific Mechanisms And Their Limits
 
-This document summarizes the physiological and mathematical mechanisms currently implemented or exposed for pre-clinical simulation in the IINTS-AF Digital Twin SDK. It is an implementation reference for EUCYS-style explanation, not clinical validation.
+IINTS-AF is a **research and educational simulator**, not a clinically validated
+patient model or medical device. This page explains what the deterministic code
+implements and, equally importantly, what each mechanism does **not** prove.
 
-The simulation engine includes the `AdvancedMetabolicModel`, an extended 18-state differential-equation model derived from the Bergman-style core and expanded with research-oriented metabolic stress states.
+The authoritative equation list is the [Formula Registry](FORMULA_REGISTRY.md).
+Every entry is labelled as:
 
----
+- `canonical`: a direct published equation;
+- `adapted`: a published model modified for SDK integration;
+- `heuristic`: an explicit, testable research assumption.
 
-## 1. The Bergman Minimal Model
-**Foundation:** The core system is inspired by the classical Bergman minimal model (1979) tradition, using a compact compartmental structure to track Plasma Glucose ($G$), Plasma Insulin ($I$), and Insulin Action ($X$).
+Published equations do not automatically validate the combined implementation,
+its parameters, or its use for an individual person.
 
-**Mathematics:**
+## 1. Bergman-Style Glucose Balance (`F01`)
 
-$$
-\frac{dG}{dt} = -X \cdot G + p_1 \cdot G_b + R_a
-$$
+The Bergman mode uses a concentration-domain glucose balance with a remote
+insulin-action state. Meal appearance, renal loss, exercise, stress, dawn and
+glucagon terms are IINTS extensions. It is therefore **Bergman-style**, not an
+unmodified implementation of the 1979 protocol model.
 
-$$
-\frac{dX}{dt} = -p_2 \cdot X + p_3 \cdot \max(I - I_b, 0)
-$$
+## 2. Remote Insulin Action (`F02`)
 
-*Here, $p_1$ represents glucose effectiveness (GEZI) and $p_3$ represents insulin sensitivity.*
-
-**Practical Impact:** Determines the fundamental balance between how fast glucose falls due to the body's natural metabolism versus the action of administered insulin.
-
-## 2. Multi-Compartment Gastric Emptying (Dalla Man)
-**Foundation:** Dalla Man, Rizza, and Cobelli's meal simulation model (2007).
-
-**Mathematics:** Rather than assuming immediate absorption, carbohydrates flow through three delayed compartments:
+The action state follows insulin above or below a basal reference:
 
 $$
-\frac{dQ_{sto1}}{dt} = -k_{gri} \cdot Q_{sto1} + D_{carbs}
+\frac{dX}{dt}=-p_2X+p_{3,\mathrm{eff}}(I-I_{\mathrm{ref}}).
 $$
 
-$$
-\frac{dQ_{sto2}}{dt} = k_{gri} \cdot Q_{sto1} - k_{emp} \cdot Q_{sto2}
-$$
+Here, \(I_{\mathrm{ref}}\) is the pump-supported fasting concentration derived
+from basal delivery, distribution volume and clearance. Allowing a negative
+deviation matters after interrupted basal delivery; clipping the deviation at
+zero would hide the loss of basal insulin action.
 
-$$
-\frac{dQ_{gut}}{dt} = k_{emp} \cdot Q_{sto2} - k_{abs} \cdot Q_{gut}
-$$
+## 3. Plasma Insulin And Optional Graft Secretion (`F03`)
 
-**Practical Impact:** Prevents ingested carbohydrates from instantly entering the blood. It models the physiological delay of gastric emptying, resulting in a realistic glucose spike 45-90 minutes after eating.
+Plasma insulin is cleared by a first-order term and receives absorbed
+subcutaneous insulin. Optional beta-cell or graft secretion is an **experimental
+heuristic**, disabled in standard T1D profiles. It is not a transplantation
+outcome predictor.
 
-## 3. Subcutaneous Insulin Absorption Kinetics
-**Foundation:** Hovorka / Dalla Man pharmacokinetics.
+## 4. Subcutaneous Insulin PK (`F04`)
 
-**Mathematics:** Tracks the physiological lag ($\tau$) between pump delivery ($u_{ins}$) and plasma appearance via two subcutaneous compartments:
+Two serial depots delay pump delivery before plasma appearance. The structure is
+literature-based; insulin-type time constants are predefined research profiles,
+not product-specific bioequivalence claims.
 
-$$
-\frac{dS_1}{dt} = u_{ins} - k_a \cdot S_1
-$$
+## 5. Meal Appearance (`F05`)
 
-$$
-\frac{dS_2}{dt} = k_a \cdot S_1 - k_a \cdot S_2
-$$
+Hovorka mode uses its published two-compartment meal chain. Bergman and advanced
+modes use an adapted stomach/gut chain. The latter must not be called an exact
+Dalla Man implementation: it does not reproduce the complete Dalla Man meal
+submodel or its nonlinear gastric-emptying function.
 
-$$
-R_{a, I} = k_a \cdot S_2
-$$
+## 6. Hovorka Glucose Mass Balance (`F06`)
 
-**Practical Impact:** Controls the dangerous "Insulin On Board" (IOB) tail. Pumped insulin does not work immediately but only reaches its peak effect in the tissue after 60-90 minutes.
+Accessible and non-accessible glucose are represented as mass compartments.
+The base balance follows Hovorka structure, while stress, exercise, circadian,
+renal, HAAF and glucagon terms are declared extensions. Mass is converted to
+concentration only through the configured glucose distribution volume.
 
-## 4. Lipotoxicity & Free Fatty Acid (FFA) Dynamics
-**Foundation:** Advanced pathophysiology of insulin resistance.
+## 7. Hovorka Insulin-Action Channels (`F07`)
 
-**Mathematics:** Insulin inhibits lipolysis. Without insulin, FFA ($F$) rises and down-regulates insulin sensitivity ($p_3$):
+Three action channels affect distribution, disposal and endogenous glucose
+production. Tissue and molecular-affinity scalars are scenario stressors, not
+quantitative consequences inferred from AlphaFold, GTEx or ClinVar. Structural
+confidence and gene-expression evidence remain contextual evidence only.
 
-$$
-\frac{dF}{dt} = l_0 \cdot e^{-l_1 I} - k_f F
-$$
+## 8. Stress And Exercise States (`F08`)
 
-$$
-p_{3, eff} = p_3 \times \frac{0.4}{\max(0.4, F)}
-$$
+Stress and exercise are filtered scenario inputs that alter sensitivity and
+glucose fluxes. They are not measured cortisol, adrenaline, AMPK or lactate
+concentrations. Their coefficients require empirical calibration before a
+specific population claim can be made.
 
-**Practical Impact:** Models a strong insulin-resistance pressure when an insulin pump fails or is occluded for hours, so later correction boluses may become less effective in the simulation.
+## 9. Exercise/GLUT4 Abstraction (`F09`)
 
-## 5. Ketogenesis & Diabetic Ketoacidosis (DKA)
-**Foundation:** The ketone-production cascade under insulin deficiency.
+The bounded `GLUT4_active` state adds insulin-independent glucose uptake during
+exercise. It captures a plausible direction of effect but is not a molecular
+translocation model and cannot be validated by a protein structure image alone.
 
-**Mathematics:** Ketone ($K$) production is driven by extreme FFA levels and near-zero insulin:
+## 10. Circadian/Dawn Term (`F10`)
 
-$$
-\frac{dK}{dt} = k_0 \cdot F \cdot e^{-k_1 I} - k_2 K
-$$
+A gated Fourier profile can perturb endogenous glucose production. It is off or
+weak in baseline profiles and is a configurable circadian stressor, not a model
+of measured growth hormone or cortisol secretion.
 
-**Practical Impact:** Allows the simulator and audit tools to flag DKA-risk trajectories during severe pump failure or acute illness scenarios.
+## 11. Counter-Regulatory Rescue (`F11`)
 
-## 6. Hypoglycemia-Associated Autonomic Failure (HAAF)
-**Foundation:** Cryer's theory of defective counter-regulation.
+Low glucose activates a bounded increase in endogenous glucose production. The
+response is reduced by the antecedent-hypoglycaemia memory state. This tests the
+direction of counter-regulation; it does not estimate a patient's glucagon or
+epinephrine response.
 
-**Mathematics:** Tracks "hypo-memory". Past hypos suppress future adrenaline rescue mechanisms:
+## 12. Antecedent-Hypoglycaemia Memory (`F12`)
 
-$$
-\Delta_{hypo} = \max(0, 70-G)
-$$
+The HAAF-like state accumulates gradually during hypoglycaemia and recovers over
+days. It is deliberately bounded and labelled heuristic. It must never be
+reported as a diagnosis of impaired awareness or HAAF.
 
-$$
-\frac{dHAAF}{dt} = k_{build} \cdot \Delta_{hypo} \cdot (1-HAAF) - k_{decay} \cdot HAAF
-$$
+## 13. Exogenous Glucagon PK/PD (`F13`)
 
-**Practical Impact:** Mimics clinical reality: patients who experienced a deep hypoglycemic event during the night are physiologically much more vulnerable to another, deeper hypo the next day because their counter-regulatory adrenaline response is depleted.
+The two-state absorption and clearance equations use literature-informed ranges,
+with exact mass conversion (`1 mg = 10^9 pg`). The bounded concentration-effect
+coupling is an IINTS adaptation and has not been established as a dose-selection
+model for patient care.
 
-## 7. Circadian Rhythms & Dawn Phenomenon
-**Foundation:** Chronobiology and counter-regulatory morning hormones.
+## 14. Renal Glucose Loss (`F14`)
 
-**Mathematics:** Applies a continuous sinusoidal wave to Endogenous Glucose Production (EGP), peaking around 05:00 AM:
+A smooth softplus approximation replaces a discontinuous renal threshold. This
+is numerically useful and represents threshold/splay behaviour qualitatively,
+but renal threshold varies between and within people. It is not an eGFR or renal
+disease model.
 
-$$
-\text{Circadian} = 1.0 + A_{circ} \cdot \cos\left(\frac{2\pi}{24} (t_{hours} - 5)\right)
-$$
+## 15. CGM Observation Model (`F15`)
 
-**Practical Impact:** Creates the infamous "Dawn Phenomenon" where patients experience unexplained, severe high blood sugars early in the morning despite not eating anything.
+Latent blood glucose passes through an explicit dead time and a first-order
+blood-to-interstitial compartment before bias, drift, dropout and seeded noise
+are applied. This separates physiology from measurement. It is a generic CGM
+observation model, not a Dexcom-, Libre- or Medtronic-equivalent sensor model.
 
-## 8. Physiological Renal Glucose Clearance (RGC)
-**Foundation:** Kidney filtration physics.
+## Additional Advanced Stressors
 
-**Mathematics:** When glucose exceeds the Renal Threshold (~180 mg/dL), kidneys excrete it. Modeled via a softplus function to prevent stiff-ODE crashes:
+The advanced model also exposes FFA, ketone, protein, fat, illness, menstrual
+cycle, beta-cell and cannula-age states. These are hypothesis-generating stress
+tests. In particular:
 
-$$
-RGC = c_{renal} \cdot 10 \cdot \ln\left(1 + \exp\left(\frac{G - 180}{10}\right)\right)
-$$
-
-**Practical Impact:** Acts as the body's natural safety valve. Without this mathematical sink, simulated glucose levels in a patient suffering from pump failure would rise to infinity.
-
-## 9. Exercise Physiology & Stress
-**Foundation:** Metabolic shifts during physical exertion.
-
-**Mathematics:** Exercise intensity ($E$) increases insulin sensitivity ($p_3$) and drives insulin-independent muscle uptake:
-
-$$
-p_{3,eff} = p_3 \cdot (1 + 2E)
-$$
-
-$$
-\text{Uptake}_{muscle} = E \cdot 0.005 \cdot G
-$$
-
-**Practical Impact:** Creates exercise-driven downward glucose pressure for testing whether algorithms reduce insulin early enough during exertion-induced hypoglycemia risk.
-
-## 10. Residual Beta-Cell Autoimmune Decay
-**Foundation:** The T1D "Honeymoon Phase".
-
-**Mathematics:** The residual healthy Beta-cell mass fraction ($\beta$) undergoes exponential autoimmune decay:
-
-$$
-\frac{d\beta}{dt} = -\alpha \cdot \beta
-$$
-
-$$
-\text{Secretion}_{endo} = \beta \cdot \gamma \cdot \max(G - h, 0)
-$$
-
-**Practical Impact:** Allows researchers to benchmark algorithms over multi-year lifespans, testing how well an AI adapts as the patient slowly shifts from a mild "Honeymoon" phase to a brittle, 100% dependent diabetic.
-
-## 11. Exogenous Glucagon Kinetics
-**Foundation:** Emergency hormonal rescue pharmacokinetics.
-
-**Mathematics:** Simulates glucagon transport ($\Gamma$) causing direct hepatic glycogen release:
-
-$$
-\frac{dY_1}{dt} = u_{gluc} - \frac{Y_1}{\tau} \quad \rightarrow \quad \frac{d\Gamma}{dt} = \frac{Y_2}{\tau \cdot V_{gluc}} - k_e \Gamma
-$$
-
-**Practical Impact:** Enables pre-clinical testing of bi-hormonal pump logic that can deliver both insulin and glucagon in low-glucose-risk scenarios.
-
-## 12. Multi-Macronutrient Gastric Emptying
-**Foundation:** Advanced meal composition (Fat & Protein).
-
-**Mathematics:** Fat ($Q_{fat}$) exponentially delays gastric emptying ($k_{emp}$). Protein ($Q_{prot}$) triggers slow gluconeogenesis:
-
-$$
-k_{emp,eff} = \frac{1}{\tau_{meal}} \cdot e^{-0.02 \cdot Q_{fat}}
-$$
-
-$$
-R_{a,prot} = 0.5 \cdot k_{prot} \cdot Q_{prot}
-$$
-
-**Practical Impact:** Simulates the dangerous "Pizza Paradox", where delayed fat and protein absorption causes unexpected and massive hyperglycemic spikes up to 6 hours after a meal.
-
-## 13. Cannula Degradation & Lipohypertrophy
-**Foundation:** Mechanical tissue resistance & inflammation.
-
-**Mathematics:** Subcutaneous absorption ($k_a$) degrades linearly by up to 30% after wearing the pump for 48 hours (2880 mins):
-
-$$
-k_{a,eff} = k_a \cdot \left(1 - 0.3 \cdot \max\left(0, \frac{t - 2880}{2880}\right)\right)
-$$
-
-**Practical Impact:** Penalizes algorithms in long-term endurance tests. After wearing the infusion set for 3 days, tissue inflammation occurs, causing insulin to be absorbed at an increasingly slower and erratic rate.
-
-## 14. Menstrual Cycle Hormonal Drifts
-**Foundation:** Female biology and cyclical resistance.
-
-**Mathematics:** A 28-day low-frequency sinusoidal wave alters insulin sensitivity ($p_3$), peaking in resistance during the Luteal phase:
-
-$$
-p_{3,eff} = p_3 \cdot \left(1 - 0.25 \cdot \sin\left(\frac{2\pi \cdot t}{28 \cdot 24 \cdot 60}\right)\right)
-$$
-
-**Practical Impact:** Tests whether an algorithm is adaptive enough to handle the subtle, multi-week hormonal resistance drifts (like PMS) that heavily impact insulin requirements in female patients.
-
-## 15. Acute Illness & Cytokine Resistance
-**Foundation:** Immune system stress response.
-
-**Mathematics:** A sickness severity factor ($\zeta$) increases basal glucose production ($G_b$) while reducing tissue sensitivity:
-
-$$
-Gb_{eff} = Gb \cdot (1 + 0.8 \cdot \zeta)
-$$
-
-$$
-p_{3,eff} = p_3 \cdot (1 - 0.5 \cdot \zeta)
-$$
-
-**Practical Impact:** Designed as a hyperglycemia stress test. Illness scenarios can increase simulated insulin requirements, so algorithms must adapt without violating safety limits.
-
----
-
-### Conclusion
-Together, these mechanisms form a cohesive 18-state pre-clinical Digital Twin for stress-testing insulin algorithms under controlled, documented assumptions.
+- ketone state is not a DKA diagnosis;
+- menstrual phase is not inferred from hormone measurements;
+- cannula ageing is not a device-specific failure probability;
+- protein-to-glucose conversion is a simplified delayed flux;
+- beta-cell/graft states are not transplant efficacy predictions.
+
+## AI, Calibration And Validation Boundary
+
+LLMs may summarize deterministic outputs but never calculate the ODEs, safety
+limits or formula values. The glucose predictor's physiology-aware loss is a
+regularizer, not a full ODE-residual PINN. Parameter calibration estimates a
+small bounded profile from CGM and event data; those parameters are generally
+not uniquely identifiable and require held-out and external validation.
+
+Scientific use therefore requires reporting the model version, parameter set,
+seed, input semantics, evidence class, numerical checks, held-out performance,
+failure cases and limitations with every result.

@@ -29,13 +29,20 @@ Data certification is the data-quality protocol layer in IINTS-AF.
 It does:
 - Validate schema, types, value ranges, and explicit data rules.
 - Generate deterministic fingerprints for contract and dataset.
-- Assign a quality grade (`draft`, `research_grade`, `clinical_grade`).
+- Assign an internal contract-conformance tier (`draft`, `research_grade`,
+  legacy `clinical_grade`).
 - Produce machine-readable reports and optional HTML dashboards.
 
 It does not:
 - Grant clinical approval.
+- Establish that a dataset is representative, unbiased, physiologically valid,
+  privacy-safe, or fit for patient care.
 - Convert this SDK into a medical device.
 - Replace model evaluation or clinical study design.
+
+The historical word `clinical_grade` is retained only for file and API
+compatibility. Read it as **strict contract conformance**, never as clinical
+validation.
 
 ## Protocol Surface
 
@@ -126,14 +133,21 @@ MDMP computes:
 - `compliance_score` = `(passed_checks / total_checks) * 100`
 - `is_compliant` = all checks pass
 
-Grade logic:
-- `clinical_grade` if compliant and score >= 90
+Tier logic:
+- legacy `clinical_grade` if every implemented check passes and score >= 90
 - `research_grade` if score >= 75
 - `draft` otherwise
 
 Protocol also returns:
-- `certified_for_medical_research` = `true` for `research_grade` and `clinical_grade`
+- `contract_quality_gate_passed` = `true` only when every implemented check
+  passes and score >= 90
+- legacy `certified_for_medical_research` = always `false`; it remains in the
+  schema only so older readers do not crash
 - `mdmp_protocol_version` (currently `1.0-draft`)
+
+The score is coverage of the checks implemented by the selected contract. It
+is not a probability that the data are correct and is not scientific or
+regulatory certification.
 
 ## Fingerprints and Reproducibility
 
@@ -145,6 +159,12 @@ Practical meaning:
 - If data changes, dataset fingerprint changes.
 - If contract changes, contract fingerprint changes.
 - This allows exact audit traceability of what was validated.
+
+A SHA-256 fingerprint detects content changes when compared with a trusted
+reference. It does not identify an issuer. An optional Ed25519 signature can
+authenticate the signed artifact, but even a valid signature proves integrity
+and provenance only—not physiological validity, privacy compliance, or fitness
+for clinical use.
 
 ## CLI Workflows
 
@@ -277,7 +297,8 @@ For each experiment, store together:
 - Keep current grammar simple (`is null`, `is not null`, numeric comparisons, `and/or`).
 
 4. Grade gate fails unexpectedly
-- Check both compliance and score; `clinical_grade` requires compliance + >=90.
+- Check both compliance and score; the legacy `clinical_grade` tier requires
+  compliance + >=90 and still means only strict contract conformance.
 
 ## Where To Go Next
 

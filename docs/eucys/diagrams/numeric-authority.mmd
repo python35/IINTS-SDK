@@ -1,0 +1,7 @@
+flowchart TD
+    P["Mechanistic patient model<br/>calculates physiological state"] --> C["Deterministic controller or<br/>research model proposes candidate"]
+    C --> S["Independent deterministic supervisor<br/>checks and constrains candidate"]
+    S --> O["Recorded simulated output"]
+    O --> M["Deterministic metrics and validation"]
+    O -. read-only artifacts .-> L["Local language model explanation"]
+    L -. no numerical or actuator authority .-> M

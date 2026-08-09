@@ -138,5 +138,5 @@ def test_repository_exposes_machine_readable_software_citation() -> None:
 
     assert "cff-version: 1.2.0" in citation
     assert 'title: "IINTS-AF SDK"' in citation
-    assert 'version: "1.5.32"' in citation
+    assert 'version: "1.5.33"' in citation
     assert "https://github.com/python35/IINTS-SDK" in citation

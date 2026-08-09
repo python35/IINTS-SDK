@@ -16,7 +16,7 @@ By the end, you should have a contract, a certification report, and a shareable 
 - contract validation results
 - compliance score
 - deterministic dataset and contract fingerprints
-- trust grade: `draft`, `research_grade`, or `clinical_grade`
+- contract grade: `draft`, `research_grade`, or legacy `clinical_grade`
 
 ## Fastest Working Path
 
@@ -67,7 +67,7 @@ Use this when you need schema-realistic development data without distributing ra
 | --- | --- |
 | `draft` | useful for iteration, not ready for rigorous research claims |
 | `research_grade` | acceptable for research workflows |
-| `clinical_grade` | strongest validation level currently exposed by the SDK |
+| `clinical_grade` | legacy name for the strongest implemented contract-check tier; not clinical validation or certification |
 
 ## Optional Python Gate
 

@@ -5,7 +5,7 @@ import time
 from typing import Callable
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Generator
-from iints.core.patient.models import PatientModel
+from iints.core.patient.models import PatientModel, PatientModelDomainError
 from iints.api.base_algorithm import InsulinAlgorithm, AlgorithmInput
 from iints.core.supervisor import IndependentSupervisor, SafetyLevel
 from iints.core.safety import InputValidator, SafetyConfig
@@ -501,42 +501,50 @@ class Simulator:
 
     def _bound_simulation_glucose(self, glucose_value: float, current_time: float) -> float:
         """
-        Keep the hidden physiological state numerically bounded without applying
-        CGM input rate limits to the patient truth trace.
+        Validate the hidden physiological state without rewriting model output.
 
         The input validator is intentionally strict for sensor values that reach
         an algorithm. The simulated patient state can move faster during stress
-        tests, so rate-limiting it would hide the very physiology we need to
-        evaluate.
+        tests, but clipping hidden truth would corrupt mass balance and outcome
+        metrics. Unsupported values therefore stop the run after an audit event.
         """
-        if not np.isfinite(glucose_value):
-            fallback = float(self.patient_model.get_current_glucose())
+        value = float(glucose_value)
+        if not np.isfinite(value):
             self._write_audit_log(
                 {
                     "timestamp": current_time,
                     "event": "simulation_glucose_non_finite",
                     "input_value": glucose_value,
-                    "fallback_value": fallback,
                 }
             )
-            return fallback
-        clipped = float(
-            np.clip(
-                glucose_value,
-                SIMULATION_GLUCOSE_FLOOR_MGDL,
-                SIMULATION_GLUCOSE_CEILING_MGDL,
+            raise SimulationLimitError(
+                "Patient model produced non-finite glucose; hidden truth was not replaced",
+                current_time=float(current_time),
+                glucose_value=value,
+                duration_minutes=0.0,
             )
-        )
-        if clipped != float(glucose_value):
+        if not (
+            SIMULATION_GLUCOSE_FLOOR_MGDL
+            <= value
+            <= SIMULATION_GLUCOSE_CEILING_MGDL
+        ):
             self._write_audit_log(
                 {
                     "timestamp": current_time,
-                    "event": "simulation_glucose_clipped",
-                    "input_value": glucose_value,
-                    "clipped_value": clipped,
+                    "event": "simulation_glucose_outside_supported_envelope",
+                    "input_value": value,
+                    "supported_floor_mgdl": SIMULATION_GLUCOSE_FLOOR_MGDL,
+                    "supported_ceiling_mgdl": SIMULATION_GLUCOSE_CEILING_MGDL,
                 }
             )
-        return clipped
+            raise SimulationLimitError(
+                "Patient model glucose left the supported simulation envelope; "
+                "hidden truth was not clipped",
+                current_time=float(current_time),
+                glucose_value=value,
+                duration_minutes=0.0,
+            )
+        return value
 
     def _update_glucose_trend(self, current_time: float, glucose_value: float) -> float:
         """
@@ -751,6 +759,15 @@ class Simulator:
                 "current_time_minutes": err.current_time,
                 "glucose_value": err.glucose_value,
                 "duration_minutes": err.duration_minutes,
+            }
+        except PatientModelDomainError as err:
+            logger.error("Simulation terminated outside patient-model domain: %s", err)
+            self._termination_info = {
+                "reason": str(err),
+                "current_time_minutes": float(self._current_time),
+                "glucose_value": float(err.proposed_glucose),
+                "last_supported_glucose_mgdl": float(err.current_glucose),
+                "termination_class": "patient_model_domain",
             }
         simulation_results_df = pd.DataFrame(all_records)
         safety_report = self.supervisor.get_safety_report()
@@ -1104,6 +1121,7 @@ class Simulator:
                 predicted_glucose_30min=predicted_glucose_30,
                 basal_insulin_units=proposed_basal_units,
                 basal_limit_units=basal_limit_units,
+                meal_bolus_units=float(insulin_output.get("meal_bolus") or 0.0),
             )
             supervisor_latency_ms = (time.perf_counter() - start_perf_time) * 1000
             if self.enable_profiling:
@@ -1281,8 +1299,8 @@ class Simulator:
             bolus_insulin_reported = insulin_output.get("bolus_insulin")
             if bolus_insulin_reported is None:
                 bolus_insulin_reported = (
-                    float(insulin_output.get("meal_bolus", 0.0))
-                    + float(insulin_output.get("correction_bolus", 0.0))
+                    float(insulin_output.get("meal_bolus") or 0.0)
+                    + float(insulin_output.get("correction_bolus") or 0.0)
                 )
 
             # --- XAI Engine (Explainable Events) ---

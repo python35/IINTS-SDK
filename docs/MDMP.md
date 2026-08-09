@@ -22,7 +22,7 @@ Public SDK surface:
 
 - `Contract`: machine-readable schema + constraint definition.
 - `Validation run`: one execution of contract checks against a dataset.
-- `Grade`: MDMP level (`draft`, `research_grade`, `clinical_grade`).
+- `Grade`: MDMP contract-check level (`draft`, `research_grade`, legacy `clinical_grade`).
 - `Fingerprint`: deterministic SHA-256 hash for contract and dataset.
 
 ## Section Structure
@@ -71,7 +71,8 @@ Implemented in:
 
 ## MDMP Grades
 
-- `clinical_grade`: compliant and score >= 90
+- `clinical_grade`: legacy label for compliant and score >= 90; it does not
+  mean clinically validated, unbiased, safe for care, or regulator-certified
 - `research_grade`: score >= 75
 - `draft`: below research threshold
 

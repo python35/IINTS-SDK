@@ -1,8 +1,10 @@
 """
-Improved Hovorka Model - IINTS-AF
-==================================
-Based on standard Hovorka artificial pancreas equations and extended
-to match the IINTS simulator's interface.
+Adapted Hovorka Research Model - IINTS-AF
+==========================================
+Based on published Hovorka artificial-pancreas equations and extended with
+explicit research stressors to match the IINTS simulator interface. The
+extensions are not part of the canonical Hovorka model and are not clinically
+validated patient physiology.
 
 State vector (19 variables):
 0: Q1 (mg) - Accessible glucose
@@ -13,13 +15,13 @@ State vector (19 variables):
 5: x1 (1/min) - Insulin action on distribution
 6: x2 (1/min) - Insulin action on disposal
 7: x3 (1) - Insulin action on EGP
-8: D1 (mg) - Stomach Solid carbs
-9: D2 (mg) - Stomach Liquid carbs
-10: D3 (mg) - Gut carbs
+8: D1 (mg) - First meal-absorption compartment
+9: D2 (mg) - Second meal-absorption compartment
+10: D3 (mg) - Reserved legacy meal mass (migrated into D2 on restore)
 11: H_stress (1) - Adrenaline/Cortisol pseudo-hormone
 12: H_exercise (1) - Endorphin/AMPK pseudo-hormone
-13: Y1 (pg/mL) - SubQ Glucagon pool 1
-14: Y2 (pg/mL) - SubQ Glucagon pool 2
+13: Y1 (pg) - SubQ Glucagon pool 1
+14: Y2 (pg) - SubQ Glucagon pool 2
 15: Gamma (pg/mL) - Plasma Glucagon
 16: x_gluc (1) - Glucagon action on EGP
 17: HAAF (1) - Hypoglycemia-Associated Autonomic Failure (Memory)
@@ -27,13 +29,24 @@ State vector (19 variables):
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from .physiology import smooth_threshold_excess
+from .models import PatientModelDomainError
+from .physiology import (
+    antecedent_hypoglycemia_memory_derivative,
+    counterregulatory_rescue_multiplier,
+    dawn_glucose_rate_mgdl_min,
+    glucagon_mg_to_pg,
+    smooth_threshold_excess,
+    validated_activity_events,
+    validated_snapshot_bool,
+    validated_snapshot_scalar,
+)
 
 
 @dataclass
@@ -45,21 +58,24 @@ class HovorkaParameters:
     # Insulin absorption
     t_max_I: float = 55.0  # min
 
-    # Carb absorption (Dalla Man params)
+    # Adapted meal-chain parameters
     k_min: float = 0.008  # 1/min
     k_max: float = 0.05   # 1/min
     A_G: float = 0.8  # bioavailability
+    t_max_G: float = 40.0  # min; published two-compartment meal time constant
 
-    # Insulin type (Physics PK)
+    # Predefined research absorption profiles
     insulin_type: str = "novolog" # Options: fiasp, novolog, regular
     t_max_I_override: Optional[float] = None
 
-    # Glucagon PK/PD
-    t_max_glucagon: float = 30.0 # min
-    k_e_glucagon: float = 0.1 # 1/min
-    V_glucagon_per_kg: float = 0.2 # L/kg
-    k_a_glucagon: float = 0.05 # 1/min (activation rate on EGP)
-    S_glucagon: float = 0.02 # Sensitivity of liver to glucagon
+    # Glucagon PK/PD. k1 = 1/t_max_glucagon; k2 and apparent clearance use
+    # representative values within the Wendt et al. T1D parameter ranges.
+    t_max_glucagon: float = 25.0  # min; k1 = 0.04 1/min
+    k_e_glucagon: float = 0.165  # 1/min; second transfer/elimination rate k2
+    glucagon_clearance_ml_kg_min: float = 120.0
+    glucagon_ec50_pg_ml: float = 350.0
+    k_a_glucagon: float = 0.05  # 1/min effect-compartment rate
+    S_glucagon: float = 1.0  # maximum fractional EGP increase
 
     # Insulin kinetics
     k_e: float = 0.138  # elimination rate, 1/min
@@ -81,6 +97,36 @@ class HovorkaParameters:
     S_ID: float = 8.2e-4   # L/mU/min (effect on disposal)
     S_IE: float = 520e-4   # L/mU (effect on EGP)
 
+    def __post_init__(self) -> None:
+        if self.insulin_type not in {"fiasp", "novolog", "regular"}:
+            raise ValueError(
+                "insulin_type must be one of: fiasp, novolog, regular"
+            )
+        numeric = {
+            name: float(value)
+            for name, value in vars(self).items()
+            if name != "insulin_type" and value is not None
+        }
+        if not all(np.isfinite(value) for value in numeric.values()):
+            raise ValueError("Hovorka parameters must all be finite")
+        positive = (
+            "body_weight_kg", "t_max_I", "k_min", "k_max", "t_max_G",
+            "t_max_glucagon", "k_e_glucagon",
+            "glucagon_clearance_ml_kg_min", "glucagon_ec50_pg_ml",
+            "k_a_glucagon", "k_e", "V_I_per_kg", "V_G_per_kg", "k_12",
+            "EGP_0_per_kg", "F_01c_per_kg", "k_a1", "k_a2", "k_a3",
+            "S_IT", "S_ID", "S_IE",
+        )
+        for name in positive:
+            if numeric[name] <= 0.0:
+                raise ValueError(f"Hovorka parameter {name} must be positive")
+        if not 0.0 <= numeric["A_G"] <= 1.0:
+            raise ValueError("Hovorka parameter A_G must be between 0 and 1")
+        if numeric["S_glucagon"] < 0.0:
+            raise ValueError("Hovorka parameter S_glucagon must be non-negative")
+        if self.t_max_I_override is not None and float(self.t_max_I_override) <= 0.0:
+            raise ValueError("t_max_I_override must be positive when provided")
+
 
 class HovorkaPatientModel:
     def __init__(
@@ -91,7 +137,7 @@ class HovorkaPatientModel:
         initial_glucose: float = 120.0,
         basal_glucose_target: Optional[float] = None,
         glucose_decay_rate: float = 0.05,
-        glucose_absorption_rate: float = 0.03,
+        glucose_absorption_rate: float = 0.025,
         insulin_action_duration: float = 300.0,
         insulin_peak_time: float = 75.0,
         meal_mismatch_epsilon: float = 1.0,
@@ -105,26 +151,98 @@ class HovorkaPatientModel:
         max_glucose_rate_mgdl_per_min: float = 3.0,
         hovorka_params: Optional[HovorkaParameters] = None,
     ) -> None:
-        self.basal_insulin_rate = basal_insulin_rate
-        self.molecular_affinity_scalar = molecular_affinity_scalar
-        self.muscle_sensitivity_scalar = muscle_sensitivity_scalar
-        self.liver_sensitivity_scalar = liver_sensitivity_scalar
-        self.insulin_sensitivity = insulin_sensitivity * molecular_affinity_scalar
-        self.carb_factor = carb_factor
-        self.initial_glucose = initial_glucose
-        self.basal_glucose_target = basal_glucose_target
-        self.glucose_decay_rate = glucose_decay_rate
-        self.glucose_absorption_rate = glucose_absorption_rate
-        self.insulin_action_duration = insulin_action_duration
-        self.insulin_peak_time = insulin_peak_time
-        self.meal_mismatch_epsilon = meal_mismatch_epsilon
-        self.dawn_phenomenon_strength = dawn_phenomenon_strength
-        self.dawn_start_hour = dawn_start_hour
-        self.dawn_end_hour = dawn_end_hour
-        self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
-        self.max_glucose_rate_mgdl_per_min = max_glucose_rate_mgdl_per_min
+        values = {
+            "basal_insulin_rate": float(basal_insulin_rate),
+            "insulin_sensitivity": float(insulin_sensitivity),
+            "carb_factor": float(carb_factor),
+            "initial_glucose": float(initial_glucose),
+            "glucose_decay_rate": float(glucose_decay_rate),
+            "glucose_absorption_rate": float(glucose_absorption_rate),
+            "insulin_action_duration": float(insulin_action_duration),
+            "insulin_peak_time": float(insulin_peak_time),
+            "meal_mismatch_epsilon": float(meal_mismatch_epsilon),
+            "dawn_phenomenon_strength": float(dawn_phenomenon_strength),
+            "dawn_start_hour": float(dawn_start_hour),
+            "dawn_end_hour": float(dawn_end_hour),
+            "molecular_affinity_scalar": float(molecular_affinity_scalar),
+            "muscle_sensitivity_scalar": float(muscle_sensitivity_scalar),
+            "liver_sensitivity_scalar": float(liver_sensitivity_scalar),
+            "carb_absorption_duration_minutes": float(carb_absorption_duration_minutes),
+            "max_glucose_rate_mgdl_per_min": float(max_glucose_rate_mgdl_per_min),
+        }
+        if not all(np.isfinite(value) for value in values.values()):
+            raise ValueError("Hovorka model inputs must all be finite")
+        positive = (
+            "insulin_sensitivity", "carb_factor", "initial_glucose",
+            "glucose_absorption_rate",
+            "insulin_action_duration", "insulin_peak_time",
+            "meal_mismatch_epsilon",
+            "carb_absorption_duration_minutes",
+        )
+        for name in positive:
+            if values[name] <= 0.0:
+                raise ValueError(f"{name} must be positive")
+        if values["basal_insulin_rate"] < 0.0:
+            raise ValueError("basal_insulin_rate must be non-negative")
+        for name in (
+            "molecular_affinity_scalar",
+            "muscle_sensitivity_scalar",
+            "liver_sensitivity_scalar",
+        ):
+            if values[name] < 0.0:
+                raise ValueError(f"{name} must be non-negative")
+        if values["glucose_decay_rate"] < 0.0:
+            raise ValueError("glucose_decay_rate must be non-negative")
+        if values["molecular_affinity_scalar"] > 2.0:
+            raise ValueError("molecular_affinity_scalar must not exceed 2.0")
+        if values["dawn_phenomenon_strength"] < 0.0:
+            raise ValueError("dawn_phenomenon_strength must be non-negative")
+        if values["max_glucose_rate_mgdl_per_min"] < 0.0:
+            raise ValueError("max_glucose_rate_mgdl_per_min must be non-negative")
+        if not 0.0 <= values["dawn_start_hour"] < values["dawn_end_hour"] <= 24.0:
+            raise ValueError(
+                "dawn hours must satisfy 0 <= start < end <= 24"
+            )
+        if basal_glucose_target is not None:
+            target = float(basal_glucose_target)
+            if not np.isfinite(target) or target < 20.0:
+                raise ValueError(
+                    "basal_glucose_target must be finite and at least 20 mg/dL"
+                )
 
-        self.params = hovorka_params if hovorka_params else HovorkaParameters()
+        self.basal_insulin_rate = values["basal_insulin_rate"]
+        self.molecular_affinity_scalar = values["molecular_affinity_scalar"]
+        self.muscle_sensitivity_scalar = values["muscle_sensitivity_scalar"]
+        self.liver_sensitivity_scalar = values["liver_sensitivity_scalar"]
+        # Keep the configured clinical ratio separate from the experimental
+        # molecular scalar. The scalar is applied exactly once in the ODE.
+        self.insulin_sensitivity = values["insulin_sensitivity"]
+        self.carb_factor = values["carb_factor"]
+        self.initial_glucose = values["initial_glucose"]
+        self.basal_glucose_target = basal_glucose_target
+        self.glucose_decay_rate = values["glucose_decay_rate"]
+        self.glucose_absorption_rate = values["glucose_absorption_rate"]
+        self.insulin_action_duration = values["insulin_action_duration"]
+        self.insulin_peak_time = values["insulin_peak_time"]
+        self.meal_mismatch_epsilon = values["meal_mismatch_epsilon"]
+        self.dawn_phenomenon_strength = values["dawn_phenomenon_strength"]
+        self.dawn_start_hour = values["dawn_start_hour"]
+        self.dawn_end_hour = values["dawn_end_hour"]
+        self.carb_absorption_duration_minutes = values["carb_absorption_duration_minutes"]
+        self.max_glucose_rate_mgdl_per_min = values["max_glucose_rate_mgdl_per_min"]
+
+        self.params = hovorka_params if hovorka_params else HovorkaParameters(
+            t_max_G=1.0 / max(float(glucose_absorption_rate), 1e-6)
+        )
+        self._clinical_sensitivity_scale = values["insulin_sensitivity"] / 50.0
+        basal_reference = (
+            values["initial_glucose"]
+            if basal_glucose_target is None
+            else float(basal_glucose_target)
+        )
+        self._basal_parameter_scale = self._derive_basal_parameter_scale(
+            basal_reference
+        )
 
         # Stress and Exercise book-keeping
         self.is_exercising = False
@@ -141,6 +259,7 @@ class HovorkaPatientModel:
         self.carbs_on_board = 0.0
         self.last_delivered_insulin_units = 0.0
         self.last_delivered_glucagon_mg = 0.0
+        self._last_unsupported_event: Optional[Dict[str, Any]] = None
 
         self.reset()
 
@@ -148,23 +267,90 @@ class HovorkaPatientModel:
         p = self.params
         return p.V_G_per_kg * p.body_weight_kg * 10.0
 
+    def _insulin_tmax_minutes(self) -> float:
+        p = self.params
+        if p.t_max_I_override is not None:
+            return max(float(p.t_max_I_override), 1.0)
+        return {
+            "fiasp": 35.0,
+            "regular": 90.0,
+        }.get(p.insulin_type, 55.0)
+
+    def _derive_basal_parameter_scale(self, glucose_mgdl: float) -> float:
+        """Match the configured basal infusion to a fasting steady state.
+
+        Published Hovorka parameters describe a population model, while the
+        public SDK accepts a patient-specific basal rate. This explicit scalar
+        reconciles those two inputs at the reference ISF (50 mg/dL/U) instead
+        of hiding a large startup transient in the initial conditions.
+        """
+
+        p = self.params
+        basal_input = max(float(self.basal_insulin_rate), 0.0) * 1000.0 / 60.0
+        if basal_input <= 0.0:
+            return 1.0
+
+        V_I = p.V_I_per_kg * p.body_weight_kg
+        basal_insulin = basal_input / max(V_I * p.k_e, 1e-9)
+        Q1 = max(float(glucose_mgdl), 20.0) * self._glucose_volume_dl()
+        F_01 = p.F_01c_per_kg * p.body_weight_kg
+        F_01c = F_01 * min(1.0, max(0.0, float(glucose_mgdl) / 81.0))
+        renal = 0.003 * self._glucose_volume_dl() * smooth_threshold_excess(
+            float(glucose_mgdl), threshold=162.0, splay=10.0
+        )
+        EGP_0 = p.EGP_0_per_kg * p.body_weight_kg
+
+        def residual(scale: float) -> float:
+            x1 = p.S_IT * basal_insulin * scale
+            x2 = p.S_ID * basal_insulin * scale
+            x3 = p.S_IE * basal_insulin * scale
+            Q2 = x1 * Q1 / max(p.k_12 + x2, 1e-9)
+            return (
+                -(F_01c + renal)
+                - x1 * Q1
+                + p.k_12 * Q2
+                + EGP_0 * max(0.0, 1.0 - x3)
+            )
+
+        low, high = 0.0, 1.0
+        while residual(high) > 0.0 and high < 64.0:
+            high *= 2.0
+        if residual(high) > 0.0:
+            return 1.0
+        for _ in range(80):
+            midpoint = 0.5 * (low + high)
+            if residual(midpoint) > 0.0:
+                low = midpoint
+            else:
+                high = midpoint
+        return 0.5 * (low + high)
+
     def _default_ode_state(self, glucose_mgdl: Optional[float] = None) -> np.ndarray:
         p = self.params
         V_G_dL = self._glucose_volume_dl()
 
         glucose = float(self.initial_glucose if glucose_mgdl is None else glucose_mgdl)
         Q1_init = glucose * V_G_dL
-        Q2_init = Q1_init * 0.5  # Rough steady-state approximation.
 
-        I_basal = 10.0  # mU/L approximation.
-        affinity = float(np.clip(self.molecular_affinity_scalar, 0.0, 2.0))
-        x1_init = p.S_IT * affinity * I_basal
-        x2_init = p.S_ID * affinity * self.muscle_sensitivity_scalar * I_basal
-        x3_init = p.S_IE * affinity * self.liver_sensitivity_scalar * I_basal
+        basal_input = max(float(self.basal_insulin_rate), 0.0) * 1000.0 / 60.0
+        t_max_I = self._insulin_tmax_minutes()
+        S1_init = basal_input * t_max_I
+        S2_init = basal_input * t_max_I
+        V_I = p.V_I_per_kg * p.body_weight_kg
+        I_basal = basal_input / max(V_I * p.k_e, 1e-9)
+        sensitivity = (
+            self._basal_parameter_scale
+            * self._clinical_sensitivity_scale
+            * self.molecular_affinity_scalar
+        )
+        x1_init = p.S_IT * sensitivity * I_basal
+        x2_init = p.S_ID * sensitivity * self.muscle_sensitivity_scalar * I_basal
+        x3_init = p.S_IE * sensitivity * self.liver_sensitivity_scalar * I_basal
+        Q2_init = x1_init * Q1_init / max(p.k_12 + x2_init, 1e-9)
 
-        # State vector: [Q1, Q2, S1, S2, I, x1, x2, x3, D1, D2, D3, H_stress, H_exercise, Y1, Y2, Gamma, x_gluc, HAAF, GLUT4_active]
+        # State vector follows the schema documented in the module docstring.
         return np.array(
-            [Q1_init, Q2_init, 0.0, 0.0, I_basal, x1_init, x2_init, x3_init, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            [Q1_init, Q2_init, S1_init, S2_init, I_basal, x1_init, x2_init, x3_init, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
             dtype=np.float64,
         )
 
@@ -172,43 +358,60 @@ class HovorkaPatientModel:
         """Load older Bergman/custom snapshots into a safe Hovorka state."""
         if ode_state.size == 19:
             return ode_state.astype(np.float64, copy=True)
-        if ode_state.size in {10, 11, 12, 13, 18}:
-            coerced = self._default_ode_state()
-            coerced[: ode_state.size] = ode_state.astype(np.float64, copy=False)
-            return coerced
-
-        glucose = float(self.current_glucose)
-        if ode_state.size >= 1 and np.isfinite(ode_state[0]):
-            # Older models store glucose in mg/dL as the first element. If a
-            # caller passes a Hovorka-like mass, this still keeps a plausible
-            # bounded glucose instead of crashing a resume flow.
-            candidate = float(ode_state[0])
-            glucose = candidate if candidate < 1000.0 else candidate / self._glucose_volume_dl()
+        if ode_state.size == 18:
+            return np.append(ode_state.astype(np.float64, copy=True), 0.0)
+        if ode_state.size != 7:
+            raise ValueError(
+                f"Unsupported Hovorka ODE snapshot length {ode_state.size}; "
+                "expected 7, 18, or 19"
+            )
+        if not np.all(np.isfinite(ode_state)):
+            raise ValueError("Legacy Hovorka snapshot contains non-finite values")
+        glucose = float(ode_state[0])
+        if glucose < 20.0:
+            raise ValueError(
+                "Legacy seven-state snapshots must store glucose in mg/dL "
+                "as their first value"
+            )
+        if np.any(ode_state[2:] < 0.0):
+            raise ValueError("Legacy Hovorka snapshot contains a negative compartment")
 
         coerced = self._default_ode_state(glucose_mgdl=glucose)
-        if ode_state.size >= 3 and np.isfinite(ode_state[2]):
-            coerced[4] = max(0.0, float(ode_state[2]))
-        if ode_state.size >= 4 and np.isfinite(ode_state[3]):
-            coerced[8] = max(0.0, float(ode_state[3]))
-        if ode_state.size >= 5 and np.isfinite(ode_state[4]):
-            coerced[8] = max(0.0, float(ode_state[4])) # fallback to D1
-        if ode_state.size >= 7:
-            if np.isfinite(ode_state[5]):
-                coerced[2] = max(0.0, float(ode_state[5]))
-            if np.isfinite(ode_state[6]):
-                coerced[3] = max(0.0, float(ode_state[6]))
+        # The historical seven-state custom model used
+        # [G, X, I, Q_sto, Q_gut, S1, S2]. These quantities are mapped by
+        # meaning rather than copied positionally into the 19-state model.
+        if ode_state.size == 7:
+            coerced[4] = float(ode_state[2])
+            coerced[8] = float(ode_state[3])
+            coerced[10] = float(ode_state[4])
+            coerced[2] = float(ode_state[5])
+            coerced[3] = float(ode_state[6])
         return coerced
 
     def _guard_glucose_transition(self, proposed_glucose: float, time_step: float) -> float:
         if not np.isfinite(proposed_glucose):
-            return float(self.current_glucose)
+            raise PatientModelDomainError(
+                "Hovorka ODE produced non-finite glucose",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
+        if proposed_glucose < 0.0:
+            raise PatientModelDomainError(
+                f"Hovorka ODE produced negative glucose: {proposed_glucose}",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
         max_rate = float(self.max_glucose_rate_mgdl_per_min or 0.0)
-        if max_rate <= 0.0:
-            return float(max(20.0, proposed_glucose))
-        max_delta = max_rate * max(float(time_step), 0.0)
-        requested_delta = float(proposed_glucose) - float(self.current_glucose)
-        bounded_delta = float(np.clip(requested_delta, -max_delta, max_delta))
-        return float(max(20.0, self.current_glucose + bounded_delta))
+        elapsed = max(float(time_step), 1e-9)
+        rate = abs(float(proposed_glucose) - float(self.current_glucose)) / elapsed
+        if max_rate > 0.0 and rate > max_rate + 1e-9:
+            raise PatientModelDomainError(
+                f"Hovorka ODE glucose rate {rate:.3f} mg/dL/min exceeds "
+                f"configured validation limit {max_rate:.3f}",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
+        return float(proposed_glucose)
 
     def reset(self) -> None:
         self._state = self._default_ode_state()
@@ -253,6 +456,20 @@ class HovorkaPatientModel:
         current_time: Optional[float] = None,
         **kwargs,
     ) -> float:
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"Unsupported Hovorka update arguments: {names}")
+        if not np.isfinite(time_step) or float(time_step) <= 0.0:
+            raise ValueError("time_step must be a finite positive number of minutes")
+        if not np.isfinite(delivered_insulin) or float(delivered_insulin) < 0.0:
+            raise ValueError("delivered_insulin must be finite and non-negative")
+        if not np.isfinite(carb_intake) or float(carb_intake) < 0.0:
+            raise ValueError("carb_intake must be finite and non-negative")
+        if not np.isfinite(delivered_glucagon_mg) or float(delivered_glucagon_mg) < 0.0:
+            raise ValueError("delivered_glucagon_mg must be finite and non-negative")
+        if current_time is not None and not np.isfinite(current_time):
+            raise ValueError("current_time must be finite when provided")
+        previous_state = copy.deepcopy(self.get_state())
         true_carbs = carb_intake * self.meal_mismatch_epsilon
         self.last_delivered_insulin_units = max(0.0, float(delivered_insulin))
         self.last_delivered_glucagon_mg = max(0.0, float(delivered_glucagon_mg))
@@ -291,37 +508,62 @@ class HovorkaPatientModel:
 
         # Insulin and Glucagon rates
         insulin_rate = (delivered_insulin * 1000.0) / max(time_step, 0.001)  # mU/min
-        glucagon_rate = (delivered_glucagon_mg * 1e6) / max(time_step, 0.001) # pg/min
+        glucagon_rate = glucagon_mg_to_pg(delivered_glucagon_mg) / max(time_step, 0.001)
 
         # Solve ODE
         ct = current_time if current_time is not None else 0.0
-        sol = solve_ivp(
-            fun=lambda t, y: self._ode(t, y, insulin_rate, glucagon_rate, ct),
-            t_span=(0.0, time_step),
-            y0=self._state,
-            method="RK45",
-            max_step=1.0,
-            rtol=1e-6,
-            atol=1e-8,
-        )
+        try:
+            sol = solve_ivp(
+                fun=lambda t, y: self._ode(
+                    t,
+                    y,
+                    insulin_rate,
+                    glucagon_rate,
+                    float(ct) + float(t),
+                ),
+                t_span=(0.0, time_step),
+                y0=self._state,
+                method="RK45",
+                max_step=1.0,
+                rtol=1e-6,
+                atol=1e-8,
+            )
 
-        self._state = sol.y[:, -1].copy()
+            if (
+                not sol.success
+                or sol.y.shape[1] == 0
+                or not np.all(np.isfinite(sol.y[:, -1]))
+            ):
+                raise RuntimeError(f"Hovorka ODE integration failed: {sol.message}")
+            self._state = sol.y[:, -1].copy()
 
-        # Derive glucose from Q1
-        V_G_dL = self._glucose_volume_dl()
-        raw_glucose = self._state[0] / V_G_dL
+            # Derive glucose from Q1.
+            raw_glucose = self._state[0] / self._glucose_volume_dl()
+            self.current_glucose = self._guard_glucose_transition(
+                float(raw_glucose), time_step
+            )
 
-        self.current_glucose = self._guard_glucose_transition(float(raw_glucose), time_step)
+            if np.any(self._state[1:] < -1e-6):
+                minimum = float(np.min(self._state[1:]))
+                raise RuntimeError(
+                    f"Hovorka ODE produced a negative compartment state: {minimum}"
+                )
+            for index in (11, 12, 17, 18):
+                value = float(self._state[index])
+                if value > 1.0 + 1e-6:
+                    raise RuntimeError(
+                        f"Hovorka ODE produced a fraction state above 1: {value}"
+                    )
+            # Remove only sub-micro numerical integration noise.
+            for i in range(len(self._state)):
+                self._state[i] = max(0.0, self._state[i])
+            for index in (11, 12, 17, 18):
+                self._state[index] = min(1.0, self._state[index])
 
-        # Override Q1 to match bounded glucose
-        self._state[0] = self.current_glucose * V_G_dL
-
-        # Clamp positive
-        for i in range(len(self._state)):
-            self._state[i] = max(0.0, self._state[i])
-        self._state[17] = float(np.clip(self._state[17], 0.0, 1.0))
-
-        return self.current_glucose
+            return self.current_glucose
+        except Exception:
+            self.set_state(previous_state)
+            raise
 
     def get_current_glucose(self) -> float:
         return self.current_glucose
@@ -331,6 +573,11 @@ class HovorkaPatientModel:
             self.start_exercise(float(value))
         elif event_type in {"stress", "illness"}:
             self.start_stress(float(value))
+        else:
+            self._last_unsupported_event = {
+                "event_type": str(event_type),
+                "value": value,
+            }
 
     def get_patient_state(self) -> Dict[str, float]:
         return {
@@ -372,16 +619,26 @@ class HovorkaPatientModel:
         dia_minutes: Optional[float] = None,
     ) -> None:
         if isf is not None:
+            if not np.isfinite(isf) or float(isf) <= 0.0:
+                raise ValueError("isf must be finite and positive")
             self.insulin_sensitivity = float(isf)
+            self._clinical_sensitivity_scale = self.insulin_sensitivity / 50.0
         if icr is not None:
+            if not np.isfinite(icr) or float(icr) <= 0.0:
+                raise ValueError("icr must be finite and positive")
             self.carb_factor = float(icr)
         if basal_rate is not None:
+            if not np.isfinite(basal_rate) or float(basal_rate) < 0.0:
+                raise ValueError("basal_rate must be finite and non-negative")
             self.basal_insulin_rate = float(basal_rate)
         if dia_minutes is not None:
+            if not np.isfinite(dia_minutes) or float(dia_minutes) <= 0.0:
+                raise ValueError("dia_minutes must be finite and positive")
             self.insulin_action_duration = float(dia_minutes)
 
     def get_state(self) -> Dict[str, Any]:
         return {
+            "state_schema": "hovorka_iints_v3_19",
             "ode_state": self._state.tolist(),
             "current_glucose": self.current_glucose,
             "insulin_on_board": self.insulin_on_board,
@@ -394,26 +651,108 @@ class HovorkaPatientModel:
             "exercise_intensity": self.exercise_intensity,
             "is_stressed": self.is_stressed,
             "stress_intensity": self.stress_intensity,
+            "last_unsupported_event": getattr(self, "_last_unsupported_event", None),
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
+        loaded_ode_state = False
         if "ode_state" in state:
             ode_state = np.array(state["ode_state"], dtype=np.float64)
             self._state = self._coerce_legacy_ode_state(ode_state)
-        self.current_glucose = state.get("current_glucose", self.current_glucose)
-        self.insulin_on_board = state.get("insulin_on_board", self.insulin_on_board)
-        self.carbs_on_board = state.get("carbs_on_board", self.carbs_on_board)
-        self.last_delivered_insulin_units = state.get(
-            "last_delivered_insulin_units",
-            state.get("delivered_insulin", self.last_delivered_insulin_units),
+            if state.get("state_schema") != "hovorka_iints_v3_19":
+                # v2 used D1/D2/D3 as a three-stage heuristic. Preserve total
+                # undelivered meal mass while migrating to the published
+                # Hovorka D1/D2 chain.
+                self._state[9] += self._state[10]
+                self._state[10] = 0.0
+            glucagon_k2 = max(self.params.k_e_glucagon, 1e-9)
+            clearance_ml_min = (
+                self.params.glucagon_clearance_ml_kg_min
+                * self.params.body_weight_kg
+            )
+            self._state[15] = (
+                glucagon_k2 * self._state[14] / max(clearance_ml_min, 1e-9)
+            )
+            if not np.all(np.isfinite(self._state)):
+                raise ValueError("Hovorka ODE snapshot contains non-finite values")
+            if np.any(self._state < 0.0):
+                raise ValueError("Hovorka ODE snapshot contains a negative compartment")
+            for index in (11, 12, 17, 18):
+                if self._state[index] > 1.0:
+                    raise ValueError(
+                        "Hovorka ODE snapshot contains a fraction state above 1"
+                    )
+            loaded_ode_state = True
+
+        if loaded_ode_state:
+            restored_glucose = float(self._state[0] / self._glucose_volume_dl())
+            supplied_glucose = state.get("current_glucose")
+            if supplied_glucose is not None and not np.isclose(
+                float(supplied_glucose), restored_glucose, rtol=0.0, atol=1e-6
+            ):
+                raise ValueError(
+                    "Hovorka snapshot is inconsistent: current_glucose does not "
+                    "match accessible glucose mass Q1"
+                )
+            self.current_glucose = restored_glucose
+        else:
+            self.current_glucose = validated_snapshot_scalar(
+                state.get("current_glucose", self.current_glucose),
+                name="current_glucose",
+                minimum=20.0,
+            )
+        self.insulin_on_board = validated_snapshot_scalar(
+            state.get("insulin_on_board", self.insulin_on_board),
+            name="insulin_on_board",
+            minimum=0.0,
         )
-        self.last_delivered_glucagon_mg = state.get("last_delivered_glucagon_mg", 0.0)
-        self.active_insulin_doses = state.get("active_insulin_doses", [])
-        self.active_carb_intakes = state.get("active_carb_intakes", [])
-        self.is_exercising = state.get("is_exercising", False)
-        self.exercise_intensity = state.get("exercise_intensity", 0.0)
-        self.is_stressed = state.get("is_stressed", False)
-        self.stress_intensity = state.get("stress_intensity", 0.0)
+        self.carbs_on_board = validated_snapshot_scalar(
+            state.get("carbs_on_board", self.carbs_on_board),
+            name="carbs_on_board",
+            minimum=0.0,
+        )
+        self.last_delivered_insulin_units = validated_snapshot_scalar(
+            state.get(
+                "last_delivered_insulin_units",
+                state.get("delivered_insulin", self.last_delivered_insulin_units),
+            ),
+            name="last_delivered_insulin_units",
+            minimum=0.0,
+        )
+        self.last_delivered_glucagon_mg = validated_snapshot_scalar(
+            state.get("last_delivered_glucagon_mg", 0.0),
+            name="last_delivered_glucagon_mg",
+            minimum=0.0,
+        )
+        self.active_insulin_doses = validated_activity_events(
+            state.get("active_insulin_doses", []),
+            name="active_insulin_doses",
+            age_key="age",
+        )
+        self.active_carb_intakes = validated_activity_events(
+            state.get("active_carb_intakes", []),
+            name="active_carb_intakes",
+            age_key="time_since_intake",
+        )
+        self.is_exercising = validated_snapshot_bool(
+            state.get("is_exercising", False), name="is_exercising"
+        )
+        self.exercise_intensity = validated_snapshot_scalar(
+            state.get("exercise_intensity", 0.0),
+            name="exercise_intensity",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        self.is_stressed = validated_snapshot_bool(
+            state.get("is_stressed", False), name="is_stressed"
+        )
+        self.stress_intensity = validated_snapshot_scalar(
+            state.get("stress_intensity", 0.0),
+            name="stress_intensity",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        self._last_unsupported_event = state.get("last_unsupported_event")
 
     # ------------------------------------------------------------------
     # ODE right-hand-side
@@ -432,42 +771,23 @@ class HovorkaPatientModel:
 
         V_I = p.V_I_per_kg * p.body_weight_kg
 
-        # Dehydration alters V_G. For extreme science, stress slightly decreases volume.
-        dehydration_factor = 1.0 - 0.05 * H_stress
-        V_G_dL = self._glucose_volume_dl() * dehydration_factor
+        # The published Hovorka glucose distribution volume is fixed. Fluid
+        # balance/dehydration requires a separate validated compartment and is
+        # therefore not inferred from the generic stress state.
+        V_G_dL = self._glucose_volume_dl()
 
         G = Q1 / V_G_dL
 
-        # Biochemistry: Dalla Man 3-compartment meal kinetics
-        # GLP-1 Incretin Non-linear Feedback:
-        # High glucose in Gut (D3) triggers GLP-1, slowing down stomach emptying.
-        D_total = D1 + D2
-        if D_total > 0:
-            k_empt_base = p.k_min + (p.k_max - p.k_min) / 2.0 * (1.0 - np.tanh(5 * (D_total - 50000) / 50000))
-            # GLP-1 effect: up to 50% reduction in k_empt based on D3
-            glp1_inhibition = 1.0 / (1.0 + (D3 / 20000.0)**2)
-            k_empt = k_empt_base * glp1_inhibition
-        else:
-            k_empt = p.k_min
+        # Published Hovorka two-compartment meal absorption model. D1 and D2
+        # contain meal mass in mg; bioavailability is applied to appearance.
+        meal_rate = 1.0 / max(float(p.t_max_G), 1.0)
+        dD1_dt = -meal_rate * D1
+        dD2_dt = meal_rate * D1 - meal_rate * D2
+        dD3_dt = 0.0
+        U_G = meal_rate * D2 * p.A_G  # mg/min
 
-        k_solid = p.k_max  # Solid to liquid conversion
-        k_abs = 0.05 # Intestinal absorption
-
-        dD1_dt = -k_solid * D1
-        dD2_dt = k_solid * D1 - k_empt * D2
-        dD3_dt = k_empt * D2 - k_abs * D3
-        U_G = (k_abs * D3) * p.A_G  # mg/min
-
-        # Physics/Pharmacokinetics: Insulin Diffusion
-        # Determine t_max_I based on insulin_type
-        if p.t_max_I_override is not None:
-            t_max_I = p.t_max_I_override
-        elif p.insulin_type == "fiasp":
-            t_max_I = 35.0
-        elif p.insulin_type == "regular":
-            t_max_I = 90.0
-        else:
-            t_max_I = 55.0 # novolog
+        # Two-depot insulin absorption with a predefined t_max profile.
+        t_max_I = self._insulin_tmax_minutes()
 
         dS1_dt = u_insulin - S1 / t_max_I
         dS2_dt = S1 / t_max_I - S2 / t_max_I
@@ -477,14 +797,28 @@ class HovorkaPatientModel:
         dI_dt = U_I / V_I - p.k_e * I
 
         # Exogenous Glucagon Kinetics (Bi-hormonal PK/PD)
-        V_glucagon = p.V_glucagon_per_kg * p.body_weight_kg
-        dY1_dt = u_glucagon - Y1 / p.t_max_glucagon
-        dY2_dt = Y1 / p.t_max_glucagon - Y2 / p.t_max_glucagon
-        U_Gamma = Y2 / p.t_max_glucagon
-        dGamma_dt = U_Gamma / V_glucagon - p.k_e_glucagon * Gamma
-        dx_gluc_dt = -p.k_a_glucagon * x_gluc + p.S_glucagon * p.k_a_glucagon * Gamma
+        glucagon_k1 = 1.0 / max(p.t_max_glucagon, 1.0)
+        glucagon_k2 = max(p.k_e_glucagon, 1e-9)
+        glucagon_clearance_ml_min = (
+            p.glucagon_clearance_ml_kg_min * p.body_weight_kg
+        )
+        dY1_dt = u_glucagon - glucagon_k1 * Y1
+        dY2_dt = glucagon_k1 * Y1 - glucagon_k2 * Y2
+        glucagon_concentration = (
+            glucagon_k2 * Y2 / max(glucagon_clearance_ml_min, 1e-9)
+        )
+        dGamma_dt = (
+            glucagon_k2 * dY2_dt / max(glucagon_clearance_ml_min, 1e-9)
+        )
+        glucagon_activation = glucagon_concentration / (
+            max(p.glucagon_ec50_pg_ml, 1e-9) + glucagon_concentration
+        )
+        dx_gluc_dt = p.k_a_glucagon * (
+            p.S_glucagon * glucagon_activation - x_gluc
+        )
 
-        # Endocrinology: Hormonal Kinetics (Adrenaline/Cortisol)
+        # First-order scenario stress/exercise states. They summarize effects;
+        # they are not measured adrenaline, cortisol, or AMPK concentrations.
         target_stress = self.stress_intensity if self.is_stressed else 0.0
         target_exercise = self.exercise_intensity if self.is_exercising else 0.0
 
@@ -497,48 +831,50 @@ class HovorkaPatientModel:
 
         overall_sens = stress_sens_multiplier * ex_sens_multiplier
 
-        affinity = float(np.clip(self.molecular_affinity_scalar, 0.0, 2.0))
-        k_b1 = p.S_IT * p.k_a1 * overall_sens * affinity
-        k_b2 = p.S_ID * p.k_a2 * overall_sens * affinity * self.muscle_sensitivity_scalar
-        k_b3 = p.S_IE * p.k_a3 * overall_sens * affinity * self.liver_sensitivity_scalar
+        affinity = self.molecular_affinity_scalar
+        patient_sensitivity = self._basal_parameter_scale * self._clinical_sensitivity_scale
+        k_b1 = p.S_IT * p.k_a1 * overall_sens * affinity * patient_sensitivity
+        k_b2 = p.S_ID * p.k_a2 * overall_sens * affinity * patient_sensitivity * self.muscle_sensitivity_scalar
+        k_b3 = p.S_IE * p.k_a3 * overall_sens * affinity * patient_sensitivity * self.liver_sensitivity_scalar
 
         # Insulin action
         dx1_dt = -p.k_a1 * x1 + k_b1 * I
         dx2_dt = -p.k_a2 * x2 + k_b2 * I
         dx3_dt = -p.k_a3 * x3 + k_b3 * I
 
-        # Celbiology: GLUT4 Translocation Kinetics (Exercise)
-        # Exercise brings GLUT4 to the membrane independently of insulin (NIMGU)
+        # Heuristic exercise-uptake state inspired by insulin-independent
+        # skeletal-muscle glucose uptake; not a molecular GLUT4 assay model.
         k_glut4_activation = 0.05
         k_glut4_deactivation = 0.01
         dGLUT4_active_dt = k_glut4_activation * H_exercise * (1.0 - GLUT4_active) - k_glut4_deactivation * GLUT4_active
 
-        # Glucose kinetics
-        # Fourier-series circadian EGP term for dawn/cortisol/GH research.
-        # It is intentionally gated by dawn_phenomenon_strength so default
-        # Hovorka runs do not drift from an unexplained always-on oscillator.
-        time_of_day_min = current_time % 1440
-        dawn_midpoint_min = ((self.dawn_start_hour + self.dawn_end_hour) / 2.0) * 60.0
-        phase_shift = 2.0 * np.pi * (time_of_day_min - dawn_midpoint_min) / 1440.0
-        circadian_wave = 0.15 * np.cos(phase_shift) + 0.05 * np.cos(2.0 * phase_shift)
-        dawn_scale = float(np.clip(self.dawn_phenomenon_strength / 20.0, 0.0, 1.0))
-        circadian_EGP = 1.0 + dawn_scale * circadian_wave
+        # Phenomenological dawn perturbation. The public setting has one
+        # consistent unit (mg/dL/hour) across all patient backends.
+        dawn_rate = dawn_glucose_rate_mgdl_min(
+            current_time,
+            peak_strength_mgdl_per_hour=self.dawn_phenomenon_strength,
+            start_hour=self.dawn_start_hour,
+            end_hour=self.dawn_end_hour,
+        )
+        dawn_flux = dawn_rate * V_G_dL
 
-        F_01c = p.F_01c_per_kg * p.body_weight_kg
+        F_01 = p.F_01c_per_kg * p.body_weight_kg
+        # Canonical Hovorka low-glucose branch: insulin-independent uptake
+        # decreases proportionally below 4.5 mmol/L (approximately 81 mg/dL).
+        F_01c = F_01 * min(1.0, max(0.0, G / 81.0))
 
         # Endogenous Rescue & HAAF
         # When G < 70, body naturally spikes EGP to survive (Adrenaline/Glucagon burst).
         # But HAAF blunts this response.
-        hypo_delta = max(0.0, 70.0 - G)
-        rescue_multiplier = 1.0 + (hypo_delta / 10.0) * (1.0 - HAAF)
+        rescue_multiplier = counterregulatory_rescue_multiplier(G, HAAF)
+        dHAAF_dt = antecedent_hypoglycemia_memory_derivative(G, HAAF)
 
-        # HAAF Memory Dynamics
-        # Builds up quickly when low, decays slowly (24h) when normal
-        k_haaf_build = 0.005
-        k_haaf_decay = 1.0 / (24 * 60)
-        dHAAF_dt = k_haaf_build * hypo_delta * (1.0 - HAAF) - k_haaf_decay * HAAF
-
-        EGP_0 = p.EGP_0_per_kg * p.body_weight_kg * stress_EGP_multiplier * rescue_multiplier * circadian_EGP
+        EGP_0 = (
+            p.EGP_0_per_kg
+            * p.body_weight_kg
+            * stress_EGP_multiplier
+            * rescue_multiplier
+        )
 
         # Physiological Renal Clearance (Sigmoid GFR curve instead of hard cutoff)
         # Smoothly increases glucosuria above 162 mg/dL
@@ -555,6 +891,7 @@ class HovorkaPatientModel:
             + p.k_12 * Q2
             + EGP_0 * max(0.0, 1 - x3 + x_gluc)
             + U_G
+            + dawn_flux
         )
         dQ2_dt = x1 * Q1 - (p.k_12 + x2) * Q2
 

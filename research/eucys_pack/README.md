@@ -1,32 +1,33 @@
-# EUCYS Evidence Pack
+# IINTS-AF EUCYS Jury Bundle
 
-This folder contains jury-facing explanation bundles for the IINTS-AF SDK. The files are written as Markdown and rendered to PDF by `tools/research/build_eucys_pack.sh`.
+Build date: 2026-08-09
 
-## Bundles
+SDK version: `1.5.33`
 
-| Source | PDF | Purpose |
-|---|---|---|
-| `EUCYS_00_INDEX.md` | `pdf/EUCYS_00_INDEX.pdf` | Reading order, one-page story, verification map |
-| `EUCYS_01_TECHNICAL_BRIEF.md` | `pdf/EUCYS_01_TECHNICAL_BRIEF.pdf` | SDK architecture, reproducibility, safety supervisor, MDMP |
-| `EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.md` | `pdf/EUCYS_02_PHYSIOLOGY_AND_DATA_BRIEF.pdf` | Type 1 diabetes physiology, CGM metrics, realistic data requirements |
-| `EUCYS_03_IMPACT_ETHICS_AND_MAINTENANCE.md` | `pdf/EUCYS_03_IMPACT_ETHICS_AND_MAINTENANCE.pdf` | Why the SDK matters, ethics, limitations, maintenance evidence |
-| `EUCYS_04_JURY_QA.md` | `pdf/EUCYS_04_JURY_QA.pdf` | Short answers to likely judge questions |
-| `EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.md` | `pdf/EUCYS_05_PHYSIOLOGY_REFERENCE_BROCHURE.pdf` | Standalone physiology brochure for doctors, engineers, and reviewers |
-| `EUCYS_06_JURY_PHYSIOLOGY_BRIEF.md` | `pdf/EUCYS_06_JURY_PHYSIOLOGY_BRIEF.pdf` | Fast two-page physiology handout for live judging |
+## Start here
 
-## Build
+1. Open `BROWSE_ME.html` for the offline browsable dossier.
+2. Open `pdf/IINTS_AF_EUCYS_MASTER_DOSSIER.pdf` for the print edition.
+3. Keep `pdf/IINTS_AF_EUCYS_JURY_QUICK_REFERENCE.pdf` beside the live demo.
+4. Use `pdf/IINTS_AF_EUCYS_DEMO_RUNBOOK.pdf` to rehearse.
+
+## Included
+
+- Nine linked dossier chapters.
+- Mermaid source files for every architecture and workflow diagram.
+- Static diagram fallbacks for offline reading and PDF.
+- All 15 deterministic formulas from formula registry v5.
+- Benchmark figure and CSV source tables.
+- A demo script, failure plan and jury Q&A.
+- A claim-to-code, claim-to-output and claim-to-literature evidence map.
+
+## Boundary
+
+IINTS-AF is research and educational software. It is not a medical device and
+must not be used for treatment decisions or real medication delivery.
+
+## Rebuild
 
 ```bash
-tools/research/build_eucys_pack.sh
+tools/research/build_eucys_dossier.sh
 ```
-
-The build uses the offline PDF renderer in `tools/research/render_eucys_report_pdf.py`, so the pack can be regenerated without online services.
-
-## Related Evidence
-
-The full benchmark report remains available at:
-
-- `research/EUCYS_REPORT.md`
-- `research/EUCYS_REPORT.pdf`
-
-The main figure and result tables copied into this folder come from the May 8, 2026 final benchmark bundle at `results/eucys_2026/EUCYS_RESULTS/`.

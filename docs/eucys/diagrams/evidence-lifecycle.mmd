@@ -1,0 +1,10 @@
+flowchart LR
+    A["Protocol<br/>question, matrix, seed policy"] --> B["Execution<br/>fixed configuration"]
+    B --> C["Raw trace<br/>results.csv"]
+    C --> D["Integrity<br/>metadata and manifest"]
+    C --> E["Validation<br/>safety, realism, contracts"]
+    C --> F["Analysis<br/>metrics and comparisons"]
+    D --> G["Evidence bundle"]
+    E --> G
+    F --> G
+    G --> H["Human review<br/>report, poster, jury dossier"]

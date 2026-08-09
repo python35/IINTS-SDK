@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Any, Dict, Mapping
 
 from .backend import mdmp_grade_meets_minimum
@@ -80,13 +81,19 @@ def _has_control(payload: Mapping[str, Any], control: str) -> bool:
 
 def _mdmp_evidence(payload: Mapping[str, Any]) -> Dict[str, Any]:
     grade = str(payload.get("mdmp_grade", payload.get("grade", payload.get("effective_grade", "draft"))))
-    score = float(payload.get("compliance_score", 0.0) or 0.0)
+    raw_score = float(payload.get("compliance_score", 0.0) or 0.0)
+    if not math.isfinite(raw_score) or not 0.0 <= raw_score <= 100.0:
+        raise ValueError("compliance_score must be finite and between 0 and 100")
+    # MDMP-Core historically emitted a 0..1 fraction while the bundled runner
+    # emits a 0..100 percentage. Normalize both before applying one threshold.
+    score = raw_score / 100.0 if raw_score > 1.0 else raw_score
     dataset_fp = bool(payload.get("dataset_fingerprint_sha256") or payload.get("dataset_fingerprint"))
     contract_fp = bool(payload.get("contract_fingerprint_sha256") or payload.get("contract_fingerprint"))
     row_count = int(payload.get("row_count", 0) or 0)
     return {
         "grade": grade,
-        "score": score,
+        "score_fraction": score,
+        "raw_score": raw_score,
         "dataset_fingerprint_present": dataset_fp,
         "contract_fingerprint_present": contract_fp,
         "row_count": row_count,
@@ -135,8 +142,11 @@ def review_eu_ai_pact_readiness(
     if not mdmp["meets_research_grade"]:
         critical.append(f"MDMP grade '{mdmp['grade']}' does not meet research_grade.")
         actions.append("Resolve MDMP checks until the dataset is at least research_grade.")
-    if mdmp["score"] and mdmp["score"] < 0.95:
-        warnings.append(f"MDMP compliance score is {mdmp['score']:.3f}; strict AI evidence target is >=0.950.")
+    if mdmp["score_fraction"] < 0.95:
+        warnings.append(
+            f"Normalized MDMP compliance score is {mdmp['score_fraction']:.3f}; "
+            "strict AI evidence target is >=0.950."
+        )
         actions.append("Inspect failing/warning MDMP rows before training or promoting models.")
 
     controls["mdmp_traceability"] = {

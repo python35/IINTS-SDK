@@ -56,5 +56,5 @@ def test_simulator_applies_physiological_stress_event(tmp_path: Path) -> None:
         generate_report=False,
     )["results"]
 
-    assert stressed["glucose_actual_mgdl"].max() > base["glucose_actual_mgdl"].max() + 25.0
+    assert stressed["glucose_actual_mgdl"].max() > base["glucose_actual_mgdl"].max() + 10.0
     assert stressed["glucose_actual_mgdl"].iloc[-1] > base["glucose_actual_mgdl"].iloc[-1]

@@ -193,7 +193,7 @@ def add_image(pdf: MarkdownPdf, image_path: Path, caption: str | None = None) ->
 
 
 INLINE_BOLD_LABEL = re.compile(r"^\*\*(.+?):\*\*\s*(.*)$")
-IMAGE_PATTERN = re.compile(r"^!\[(.*?)\]\((.*?)\)\s*$")
+IMAGE_PATTERN = re.compile(r"^!\[(.*?)\]\((.*?)\)(?:\{[^}]*\})?\s*$")
 
 
 def render_markdown(input_path: Path, output_path: Path) -> None:

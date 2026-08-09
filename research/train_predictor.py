@@ -338,10 +338,12 @@ def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) ->
     model.eval()
     total = 0.0
     with torch.no_grad():
-        for batch_x, batch_y in loader:
+        for batch in loader:
+            batch_x, batch_y = batch[0], batch[1]
+            physiology_x = batch[2] if len(batch) > 2 else batch_x
             preds = model(batch_x)
             if _loss_needs_inputs(criterion):
-                loss = criterion(preds, batch_y, batch_x)
+                loss = criterion(preds, batch_y, physiology_x)
             else:
                 loss = criterion(preds, batch_y)
             total += loss.item()
@@ -471,6 +473,8 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # P3-10: Feature normalisation — fit on TRAINING data only
     # -----------------------------------------------------------------------
+    X_train_raw = X_train.copy()
+    X_val_raw = X_val.copy()
     X_test_raw = X_test.copy()
     scaler = FeatureScaler(strategy=training_cfg.normalization)
     X_train = scaler.fit_transform(X_train)
@@ -483,17 +487,29 @@ def main() -> None:
     # -----------------------------------------------------------------------
     loader_generator = torch.Generator().manual_seed(training_cfg.seed)
     train_loader = DataLoader(
-        TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train)),
+        TensorDataset(
+            torch.from_numpy(X_train),
+            torch.from_numpy(y_train),
+            torch.from_numpy(X_train_raw),
+        ),
         batch_size=training_cfg.batch_size,
         shuffle=True,
         generator=loader_generator,
     )
     val_loader = DataLoader(
-        TensorDataset(torch.from_numpy(X_val), torch.from_numpy(y_val)),
+        TensorDataset(
+            torch.from_numpy(X_val),
+            torch.from_numpy(y_val),
+            torch.from_numpy(X_val_raw),
+        ),
         batch_size=training_cfg.batch_size,
     )
     test_loader = DataLoader(
-        TensorDataset(torch.from_numpy(X_test), torch.from_numpy(y_test)),
+        TensorDataset(
+            torch.from_numpy(X_test),
+            torch.from_numpy(y_test),
+            torch.from_numpy(X_test_raw),
+        ),
         batch_size=training_cfg.batch_size,
     )
 
@@ -652,11 +668,11 @@ def main() -> None:
     for epoch in range(training_cfg.epochs):
         model.train()
         train_loss = 0.0
-        for batch_x, batch_y in train_loader:
+        for batch_x, batch_y, physiology_x in train_loader:
             optimizer.zero_grad()
             preds = model(batch_x)
             if _loss_needs_inputs(criterion):
-                loss = criterion(preds, batch_y, batch_x)
+                loss = criterion(preds, batch_y, physiology_x)
             else:
                 loss = criterion(preds, batch_y)
             loss.backward()
@@ -697,7 +713,7 @@ def main() -> None:
     test_target_batches = []
     model.eval()
     with torch.no_grad():
-        for batch_x, batch_y in test_loader:
+        for batch_x, batch_y, _physiology_x in test_loader:
             test_pred_batches.append(model(batch_x).cpu().numpy())
             test_target_batches.append(batch_y.cpu().numpy())
 

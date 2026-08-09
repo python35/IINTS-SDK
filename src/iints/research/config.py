@@ -60,7 +60,7 @@ class TrainingConfig:
 
     # PINN (Physics-Informed Neural Network) loss parameters
     pinn_lambda: float = 0.5
-    pinn_max_roc: float = 10.0
+    pinn_max_roc: float = 3.0
 
     # Fine-tuning controls
     freeze_lstm_layers: int = 0          # freeze first N LSTM layers

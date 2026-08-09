@@ -507,7 +507,8 @@ iints data corrupt-for-study data/my_cgm.csv \
 - `contract_fingerprint_sha256`
 - `dataset_fingerprint_sha256`
 - `mdmp_grade` (`draft`, `research_grade`, `clinical_grade`)
-- `certified_for_medical_research`
+- `contract_quality_gate_passed` (strict contract conformance only)
+- `certified_for_medical_research` (legacy compatibility field; always `false`)
 
 `iints data certify-visualizer` generates a single self-contained HTML dashboard that can be reviewed offline by auditors and collaborators.
 

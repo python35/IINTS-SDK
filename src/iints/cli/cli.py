@@ -2347,20 +2347,20 @@ def _supervisor_off_safety_config() -> SafetyConfig:
         min_glucose=10.0,
         max_glucose=1000.0,
         max_glucose_delta_per_5_min=250.0,
-        hypoglycemia_threshold=-1000.0,
-        severe_hypoglycemia_threshold=-1000.0,
+        hypoglycemia_threshold=2.0,
+        severe_hypoglycemia_threshold=1.0,
         hyperglycemia_threshold=10000.0,
         max_insulin_per_bolus=1000.0,
-        glucose_rate_alarm=-1000.0,
+        glucose_rate_alarm=1000.0,
         max_insulin_per_hour=1000.0,
         max_iob=1000.0,
         trend_stop=-1000.0,
-        hypo_cutoff=-1000.0,
-        predicted_hypoglycemia_threshold=-1000.0,
+        hypo_cutoff=2.0,
+        predicted_hypoglycemia_threshold=1.0,
         predictor_uncertainty_gate_enabled=False,
         predictor_ood_gate_enabled=False,
         contract_enabled=False,
-        critical_glucose_threshold=-1000.0,
+        critical_glucose_threshold=1.0,
         critical_glucose_duration_minutes=100000,
     )
 
@@ -10290,7 +10290,10 @@ def research_evaluate_forecast(
     table.add_row("False hypo alarm (%)", f"{report['false_hypo_alarm_rate_pct']:.2f}")
     table.add_row("Missed hypo (%)", f"{report['missed_hypo_rate_pct']:.2f}")
     if "interval_95_coverage_pct" in report:
-        table.add_row("95% interval coverage (%)", f"{report['interval_95_coverage_pct']:.2f}")
+        table.add_row(
+            "MC-dropout +/-1.96 SD coverage (%)",
+            f"{report['interval_95_coverage_pct']:.2f}",
+        )
         table.add_row("Mean predicted std (mg/dL)", f"{report['mean_predicted_std_mgdl']:.3f}")
     console.print(table)
 
@@ -10713,7 +10716,10 @@ def research_glucose_model_compare(
         typer.Option(
             "--model",
             "-m",
-            help="Model checkpoint as label=path/to/predictor.pt. Repeat for MSE/Band/PINN models.",
+            help=(
+                "Model checkpoint as label=path/to/predictor.pt. Repeat for MSE, band-weighted, "
+                "or physiology-regularized models (legacy name: PINN)."
+            ),
         ),
     ] = None,
     config: Annotated[Optional[Path], typer.Option(help="Comparison config YAML. Defaults to glucose-model quick config.")] = None,
@@ -10725,9 +10731,9 @@ def research_glucose_model_compare(
     max_roc_mgdl_min: Annotated[
         float,
         typer.Option(help="Maximum plausible predicted glucose rate-of-change in mg/dL/min."),
-    ] = 10.0,
+    ] = 3.0,
 ) -> None:
-    """Compare MSE/Band/PINN glucose models against baselines and physiology gates."""
+    """Compare glucose models against baselines and explicit plausibility gates."""
     console = Console()
     try:
         from iints.research.glucose_model import compare_glucose_models, parse_model_specs
@@ -11832,7 +11838,7 @@ def patientmodel_list():
         "simglucose",
         "optional",
         "available" if SIMGLUCOSE_AVAILABLE else "missing optional dependency",
-        "FDA-style virtual patient set when simglucose is installed.",
+        "Open-source virtual-patient implementation when simglucose is installed; not the FDA-accepted UVA/Padova simulator.",
     )
     try:
         for record in list_local_plugin_records("patient_model"):

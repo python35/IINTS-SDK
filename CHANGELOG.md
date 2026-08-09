@@ -2,6 +2,51 @@
 
 ## Unreleased
 
+## v1.5.33
+
+Release date: 2026-08-09
+
+### Scientific Consistency
+
+- corrected glucagon, insulin-action, glucose-mass, sensor, pump, and meal-appearance unit handling
+- made Bergman and Hovorka initialization respect their reference or basal steady states and preserved signed remote insulin action
+- replaced silent out-of-domain clipping in core patient models with explicit validation failures
+- clarified HAAF, counter-regulation, renal clearance, circadian, exercise, and stem-cell mechanisms as bounded research abstractions rather than clinically validated claims
+- retuned reference patient and preset assumptions against the maintained realism envelopes
+
+### AI, Calibration, and Evidence
+
+- made physiology-aware losses consume raw physical features instead of normalized feature positions
+- removed unsupported universal IOB/COB direction rules and added epistemic uncertainty support through repeated stochastic inference
+- strengthened subject-level evaluation, held-out calibration, priors, parameter bounds, identifiability diagnostics, and provenance
+- separated local-AI observations, deterministic evidence, inferences, assumptions, and limitations
+- tightened MDMP quality terminology, population truncation disclosure, provenance, and optional Ed25519 signing
+
+### Documentation
+
+- upgraded the deterministic formula registry to v5 with explicit canonical, adapted, and heuristic classifications
+- synchronized formula identifiers and scientific boundary text across the SDK, docs, tests, and EUCYS material
+- added a maintained EUCYS dossier with architecture diagrams, formulas, evidence maps, benchmark sources, demonstration guidance, and offline-build tooling
+
+### Desktop Beta
+
+- released Rust/Tauri beta `0.2.6` against SDK `1.5.33`
+- revalidated frontend static checks, Rust formatting, Clippy, Rust tests, Python desktop bridge tests, release build, and native smoke startup
+
+### Safety
+
+- AI remains explanatory or experimental and cannot replace deterministic simulation or safety authority
+- molecular, genetic, structural, and calibration evidence is not converted silently into treatment logic
+- IINTS-AF remains research and educational software, not a medical device
+
+### Verified
+
+- full Python suite: `877 passed, 2 skipped`
+- focused scientific suite: `80 passed`
+- desktop Python suite: `60 passed, 3 skipped`
+- Rust/Tauri tests: `6 passed`; Clippy, formatting, frontend static checks, release build, and native `--smoke` passed
+- mypy succeeded for `212` source files; flake8, strict documentation, governance, and release checks passed
+
 ## v1.5.32
 
 Release date: 2026-07-23

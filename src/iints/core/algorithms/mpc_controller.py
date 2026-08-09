@@ -6,7 +6,6 @@ Uses an internal ODE model (Bergman Minimal Model) to predict glucose
 trajectory and scipy.optimize to calculate the mathematically optimal
 insulin dose that minimizes glucose deviation from target.
 """
-import copy
 from typing import Any, Dict, Optional
 
 import numpy as np
@@ -23,8 +22,10 @@ from iints.core.safety.config import (
 
 class MPCController(InsulinAlgorithm):
     """
-    Agentic Physics-Informed MPC.
-    Simulates the biological ODEs into the future to find the safest dose.
+    Research nonlinear MPC prototype using an adapted Bergman model.
+
+    The optimizer proposes a candidate dose. It does not bypass the independent
+    supervisor and is not a clinically validated dosing controller.
     """
 
     def __init__(self, settings: Optional[Dict[str, Any]] = None) -> None:
@@ -51,40 +52,73 @@ class MPCController(InsulinAlgorithm):
 
         # We keep an internal Bergman model running in parallel to the real patient
         # to maintain the mathematical state (X, I, G).
-        self.internal_model = BergmanPatientModel(initial_glucose=120.0)
+        self.internal_model = BergmanPatientModel(
+            initial_glucose=120.0,
+            max_glucose_rate_mgdl_per_min=0.0,
+        )
         self.is_initialized = False
 
     def _sync_internal_model(self, data: AlgorithmInput) -> None:
-        """Sync the internal ODE state with the real observed patient state."""
+        """Assimilate observable state without assuming a proposed dose occurred."""
         if not self.is_initialized:
+            if data.basal_rate_u_per_hr is not None:
+                self.internal_model.basal_insulin_rate = max(
+                    0.0, float(data.basal_rate_u_per_hr)
+                )
             self.internal_model.reset()
-            self.internal_model.current_glucose = data.current_glucose
-            self.internal_model._state[0] = data.current_glucose
-
-            # If the simulator passes full ODE state, we can sync perfectly.
-            if "ode_state" in data.patient_state:
+            ode_state = data.patient_state.get("ode_state")
+            if (
+                isinstance(ode_state, list)
+                and len(ode_state) == 14
+                and data.patient_state.get("state_schema", "").startswith("bergman")
+            ):
                 self.internal_model.set_state(data.patient_state)
             self.is_initialized = True
-        else:
-            # Continually correct the internal glucose to match reality (Kalman-filter style simple correction)
-            self.internal_model.current_glucose = data.current_glucose
-            self.internal_model._state[0] = data.current_glucose
 
-        # Even when only summarized patient state is available, keep the
-        # controller aware of active insulin so optimizer bounds stay cautious.
+        # Directly observed/derived summaries are assimilated at every tick.
+        # This is deterministic state correction, not a Kalman filter.
+        self.internal_model.current_glucose = float(data.current_glucose)
+        self.internal_model._state[0] = float(data.current_glucose)
+        patient_state = data.patient_state
+        if "remote_insulin_action" in patient_state:
+            self.internal_model._state[1] = max(
+                0.0, float(patient_state["remote_insulin_action"])
+            )
+        if "plasma_insulin_mU_L" in patient_state:
+            self.internal_model._state[2] = max(
+                0.0, float(patient_state["plasma_insulin_mU_L"])
+            )
+        for state_key, state_index in (
+            ("stomach_solid_mg", 3),
+            ("stomach_liquid_mg", 4),
+            ("gut_glucose_mg", 5),
+            ("subcut_insulin_1_mU", 6),
+            ("subcut_insulin_2_mU", 7),
+        ):
+            if state_key in patient_state:
+                self.internal_model._state[state_index] = max(
+                    0.0, float(patient_state[state_key])
+                )
+
         self.internal_model.insulin_on_board = max(0.0, float(data.insulin_on_board))
+        if data.isf is not None:
+            self.internal_model.set_ratio_state(isf=float(data.isf))
 
     def _cost_function(
         self,
         proposed_doses: np.ndarray,
         current_state: Dict[str, Any],
         current_carb_intake: float,
+        basal_units_per_step: float,
     ) -> float:
         """
         Calculates the cost of a specific future sequence of insulin doses.
         """
         # Clone the model state
-        sim_model = BergmanPatientModel(initial_glucose=120.0)
+        sim_model = BergmanPatientModel(
+            initial_glucose=120.0,
+            max_glucose_rate_mgdl_per_min=0.0,
+        )
         sim_model.set_state(current_state)
 
         cost = 0.0
@@ -96,7 +130,7 @@ class MPCController(InsulinAlgorithm):
             step_carbs = current_carb_intake if step_index == 0 else 0.0
             g = sim_model.update(
                 time_step=self.step_size_mins,
-                delivered_insulin=float(dose),
+                delivered_insulin=float(dose) + basal_units_per_step,
                 carb_intake=step_carbs,
             )
 
@@ -163,19 +197,36 @@ class MPCController(InsulinAlgorithm):
                 data,
             )
 
-        # 2. Setup Optimizer
+        basal_units = max(0.0, float(data.basal_rate_u_per_hr or 0.0)) * (
+            self.step_size_mins / 60.0
+        )
+        max_correction_dose = max(0.0, max_step_dose - basal_units)
+        if max_correction_dose <= 0.0:
+            return self._safe_zero_decision(
+                "MPC held insulin because configured basal exceeds the current dose envelope",
+                data,
+            )
+
+        # 2. Setup Optimizer. Decision variables are correction doses; the
+        # configured basal is included separately in every horizon step.
         initial_guess = np.zeros(horizon_steps)
         if data.current_glucose > self.target_glucose:
             isf = float(data.isf or 55.0)
-            initial_guess[0] = min(max_step_dose, max(0.0, (data.current_glucose - self.target_glucose) / isf * 0.25))
-        bounds = [(self.min_insulin_u_per_step, max_step_dose) for _ in range(horizon_steps)]
+            initial_guess[0] = min(
+                max_correction_dose,
+                max(0.0, (data.current_glucose - self.target_glucose) / isf * 0.25),
+            )
+        bounds = [
+            (self.min_insulin_u_per_step, max_correction_dose)
+            for _ in range(horizon_steps)
+        ]
 
         # 3. Solve MPC optimization problem
         self._log_reason("Running Scipy ODE prediction", "physics_engine", f"Horizon: {horizon_steps} steps")
         result = minimize(
             self._cost_function,
             initial_guess,
-            args=(current_state, max(0.0, float(data.carb_intake))),
+            args=(current_state, max(0.0, float(data.carb_intake)), basal_units),
             bounds=bounds,
             method="SLSQP",
             options={"maxiter": 20, "disp": False}
@@ -183,27 +234,25 @@ class MPCController(InsulinAlgorithm):
 
         if result.success:
             optimal_doses = result.x
-            optimal_current_dose = float(optimal_doses[0])
-            self._log_reason("MPC Optimization successful", "mpc_solver", optimal_current_dose)
+            correction_dose = float(optimal_doses[0])
+            optimal_current_dose = basal_units + correction_dose
+            self._log_reason(
+                "MPC optimization successful",
+                "mpc_solver",
+                optimal_current_dose,
+            )
         else:
             # Fallback to 0 if optimization fails
             optimal_current_dose = 0.0
             self._log_reason("MPC Optimization failed, defaulting to 0", "mpc_error", 0.0)
 
-        # 4. Advance internal model so it stays in sync for the NEXT tick
-        self.internal_model.update(
-            time_step=self.step_size_mins,
-            delivered_insulin=optimal_current_dose,
-            carb_intake=max(0.0, float(data.carb_intake)),
-            current_time=float(data.current_time),
-        )
-
         return {
             'total_insulin_delivered': optimal_current_dose,
-            'bolus_insulin': optimal_current_dose,
-            'basal_insulin': 0.0,
+            'bolus_insulin': max(0.0, optimal_current_dose - basal_units),
+            'basal_insulin': min(optimal_current_dose, basal_units),
             'mpc_recommended_units': optimal_current_dose,
-            # Expose the mathematical state for deterministic audit and optional explanation.
+            # This is the assimilated pre-decision state. It is deliberately
+            # not advanced with a dose that the supervisor/pump may reject.
             'mpc_physics_state': self.internal_model.get_patient_state(),
             'research_only': True,
         }
@@ -215,7 +264,10 @@ class MPCController(InsulinAlgorithm):
 
     def get_algorithm_info(self) -> Dict[str, Any]:
         return {
-            'name': 'Physics-Informed MPC',
+            'name': 'Adapted Bergman MPC (research prototype)',
             'type': 'Model Predictive Control',
-            'description': 'Predicts future glucose using ODE physics and optimizes insulin mathematically.'
+            'description': (
+                'Optimizes candidate insulin against an adapted Bergman ODE; '
+                'requires independent safety supervision and research validation.'
+            ),
         }

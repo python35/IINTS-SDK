@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from iints.research.forecasting import (
     ForecastConfig,
@@ -179,3 +180,42 @@ def test_evaluate_baselines_includes_stronger_physiology_baseline() -> None:
 
     assert "PhysiologyAware" in results
     assert results["PhysiologyAware"]["mae"] >= 0.0
+
+
+def test_physiology_baseline_does_not_hide_impossible_absolute_forecasts() -> None:
+    feature_columns = ["glucose_actual_mgdl", "glucose_trend_mgdl_min"]
+    X = np.zeros((1, 4, 2), dtype=np.float32)
+    X[:, :, 0] = 410.0
+    X[:, :, 1] = 4.0
+
+    predictions = PhysiologyAwareBaseline(
+        6, feature_columns=feature_columns
+    ).predict(X)
+
+    assert float(predictions.max()) > 420.0
+
+
+def test_forecast_configuration_and_features_fail_closed() -> None:
+    with pytest.raises(ValueError, match="strictly increasing"):
+        ForecastConfig(low_threshold_mgdl=54.0, urgent_low_threshold_mgdl=70.0)
+
+    feature_columns = ["glucose_actual_mgdl", "patient_iob_units"]
+    X = np.ones((1, 4, 2), dtype=np.float32) * 120.0
+    X[:, :, 1] = -1.0
+    with pytest.raises(ValueError, match="IOB"):
+        PhysiologyAwareBaseline(2, feature_columns=feature_columns).predict(X)
+
+
+def test_forecast_input_never_invents_boundary_glucose() -> None:
+    frame = pd.DataFrame(
+        {
+            "time_minutes": [0.0, 5.0, 10.0],
+            "glucose_actual_mgdl": [np.nan, 120.0, 125.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="synthetic 120"):
+        attach_forecasts_to_frame(
+            frame,
+            config=ForecastConfig(history_minutes=5, horizon_minutes=5),
+        )

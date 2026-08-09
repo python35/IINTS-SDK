@@ -1132,7 +1132,7 @@ wheels = [
 
 [[package]]
 name = "iints-sdk-python35"
-version = "1.5.32"
+version = "1.5.33"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },

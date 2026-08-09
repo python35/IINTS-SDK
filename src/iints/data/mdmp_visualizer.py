@@ -351,7 +351,9 @@ def build_mdmp_dashboard_html(
       el("complianceBar").style.width = Math.max(0, Math.min(100, score)).toFixed(2) + "%";
       el("statusText").textContent = Boolean(report.is_compliant) ? "Status: PASS" : "Status: FAIL";
 
-      el("certifiedValue").textContent = Boolean(report.certified_for_medical_research) ? "Certified for medical research: YES" : "Certified for medical research: NO";
+      el("certifiedValue").textContent = Boolean(report.contract_quality_gate_passed)
+        ? "Internal contract quality gate: PASS"
+        : "Internal contract quality gate: NOT PASSED";
       el("protocolValue").textContent = String(report.mdmp_protocol_version || "n/a");
       el("rowCountValue").textContent = String(safeNum(report.row_count));
 

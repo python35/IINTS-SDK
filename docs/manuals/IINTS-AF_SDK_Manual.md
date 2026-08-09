@@ -1,6 +1,6 @@
 > "Code shouldn't be a secret when it's managing a life."
 
-**Version 1.5.32**
+**Version 1.5.33**
 **Research use only — not for clinical care**
 
 IINTS-AF is an open-source research platform for insulin algorithm simulation, deterministic safety supervision, dataset certification, reproducible benchmarking, and edge deployment. It exists for the people who need to inspect, test, and explain dosing logic before it ever touches a real-world device.

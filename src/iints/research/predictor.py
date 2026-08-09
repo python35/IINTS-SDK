@@ -94,8 +94,9 @@ else:
                 Run MC Dropout inference to estimate predictive uncertainty.
 
                 Activates dropout at inference time and runs ``n_samples`` forward
-                passes.  Returns the mean prediction and standard deviation across
-                samples as a proxy for aleatoric + epistemic uncertainty.
+                passes. Returns the mean prediction and standard deviation across
+                samples as a model/epistemic uncertainty proxy. Observation noise
+                (aleatoric uncertainty) is not estimated by this deterministic head.
 
                 Parameters
                 ----------
@@ -225,7 +226,11 @@ def evaluate_baselines(
     feature_columns: Optional[Sequence[str]] = None,
 ) -> dict:
     """
-    Compute MAE and RMSE for both baseline predictors.
+    Compute MAE and RMSE for the applicable baseline predictors.
+
+    The physiology-aware baseline is evaluated only when ``feature_columns``
+    is supplied.  Inferring physiological meaning from anonymous or scaled
+    tensor positions would produce invalid comparisons.
 
     Parameters
     ----------
@@ -240,15 +245,16 @@ def evaluate_baselines(
     {"mae": float, "rmse": float}.
     """
     results = {}
-    baselines: Sequence[BaselinePredictor] = [
+    baselines: list[BaselinePredictor] = [
         LastValueBaseline(horizon_steps),
         LinearTrendBaseline(horizon_steps, time_step_minutes),
-        PhysiologyAwareBaseline(
+    ]
+    if feature_columns is not None:
+        baselines.append(PhysiologyAwareBaseline(
             horizon_steps,
             time_step_minutes=time_step_minutes,
             feature_columns=feature_columns,
-        ),
-    ]
+        ))
     for baseline in baselines:
         preds = baseline.predict(X)
         mae = float(np.mean(np.abs(preds - y)))

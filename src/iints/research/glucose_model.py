@@ -139,30 +139,53 @@ def _first_existing(df: pd.DataFrame, candidates: Sequence[str]) -> Optional[str
     return None
 
 
-def _safe_numeric(series: pd.Series, default: float = 0.0) -> pd.Series:
-    parsed = pd.to_numeric(series, errors="coerce")
-    return parsed.replace([np.inf, -np.inf], np.nan).fillna(default)
+def _numeric_series(series: pd.Series, *, name: str) -> pd.Series:
+    """Parse a numeric column without silently converting bad values to zero."""
+
+    parsed = pd.to_numeric(series, errors="coerce").replace(
+        [np.inf, -np.inf], np.nan
+    )
+    invalid = parsed.isna() & series.notna()
+    if invalid.any():
+        examples = series.loc[invalid].astype(str).head(3).tolist()
+        raise ValueError(
+            f"Column {name!r} contains {int(invalid.sum())} non-numeric or "
+            f"non-finite values; examples: {examples}"
+        )
+    return parsed.astype(float)
 
 
 def _derive_time_minutes(df: pd.DataFrame, *, time_step_minutes: int) -> pd.Series:
     existing = _first_existing(df, _ALIAS_COLUMNS["time_minutes"])
     if existing is not None:
-        return _safe_numeric(df[existing], 0.0)
+        parsed = _numeric_series(df[existing], name=existing)
+        if parsed.isna().any():
+            raise ValueError(f"Time column {existing!r} contains missing values")
+        return parsed
     timestamp_col = _first_existing(df, ("timestamp", "datetime", "time", "date_time", "Timestamp"))
     if timestamp_col is not None:
         parsed = pd.to_datetime(df[timestamp_col], errors="coerce", utc=True)
-        if parsed.notna().any():
-            first = parsed.dropna().iloc[0]
-            minutes = (parsed - first).dt.total_seconds() / 60.0
-            return minutes.ffill().fillna(0.0)
+        if parsed.isna().any():
+            raise ValueError(
+                f"Timestamp column {timestamp_col!r} contains "
+                f"{int(parsed.isna().sum())} unparseable or missing values"
+            )
+        first = parsed.iloc[0]
+        return ((parsed - first).dt.total_seconds() / 60.0).astype(float)
     return pd.Series(np.arange(len(df), dtype=float) * float(time_step_minutes), index=df.index)
 
 
-def _copy_alias_or_default(df: pd.DataFrame, canonical: str, default: float) -> pd.Series:
+def _copy_alias_or_default(
+    df: pd.DataFrame,
+    canonical: str,
+    default: float,
+) -> tuple[pd.Series, int, bool]:
     source = _first_existing(df, _ALIAS_COLUMNS.get(canonical, (canonical,)))
     if source is None:
-        return pd.Series(default, index=df.index, dtype=float)
-    return _safe_numeric(df[source], default)
+        return pd.Series(default, index=df.index, dtype=float), len(df), False
+    parsed = _numeric_series(df[source], name=source)
+    missing_count = int(parsed.isna().sum())
+    return parsed.fillna(default), missing_count, True
 
 
 def standardize_glucose_forecast_frame(
@@ -172,17 +195,31 @@ def standardize_glucose_forecast_frame(
     time_step_minutes: int = 5,
     subject_prefix: Optional[str] = None,
     max_gap_multiplier: float = 2.5,
+    glucose_bounds_mgdl: tuple[float, float] = (20.0, 600.0),
 ) -> pd.DataFrame:
-    """Normalize one real or simulated glucose dataframe into the v0 forecast schema."""
+    """Normalize a glucose frame without clipping or cross-segment interpolation.
+
+    A single missing interior glucose sample may be interpolated within the same
+    subject/segment. Out-of-range observations, unresolved missing targets,
+    duplicate timestamps, and malformed numeric values fail closed so source
+    errors cannot silently become training labels.
+    """
     if df.empty:
         raise ValueError("Input dataframe is empty.")
+    if time_step_minutes <= 0:
+        raise ValueError("time_step_minutes must be positive")
+    if not np.isfinite(max_gap_multiplier) or max_gap_multiplier < 1.0:
+        raise ValueError("max_gap_multiplier must be finite and at least 1")
+    glucose_low, glucose_high = map(float, glucose_bounds_mgdl)
+    if (
+        not np.isfinite(glucose_low)
+        or not np.isfinite(glucose_high)
+        or glucose_low >= glucose_high
+    ):
+        raise ValueError("glucose_bounds_mgdl must be an ordered finite pair")
 
     out = pd.DataFrame(index=df.index)
     out["time_minutes"] = _derive_time_minutes(df, time_step_minutes=time_step_minutes)
-    out["glucose_actual_mgdl"] = _copy_alias_or_default(df, "glucose_actual_mgdl", np.nan)
-    if out["glucose_actual_mgdl"].isna().all():
-        raise ValueError("No glucose column found. Expected one of: " + ", ".join(_ALIAS_COLUMNS["glucose_actual_mgdl"]))
-    out["glucose_actual_mgdl"] = out["glucose_actual_mgdl"].interpolate(limit_direction="both").clip(35.0, 450.0)
 
     subject_col = _first_existing(df, ("subject_id", "patient_id", "subject", "patient", "id"))
     if subject_col is None:
@@ -194,11 +231,58 @@ def standardize_glucose_forecast_frame(
 
     source_segment = _first_existing(df, ("segment", "segment_id", "session_id", "day"))
     if source_segment is None:
-        gap = out.groupby("subject_id", observed=False)["time_minutes"].diff().fillna(float(time_step_minutes))
-        segment_index = gap.gt(float(time_step_minutes) * max_gap_multiplier).groupby(out["subject_id"], observed=False).cumsum()
-        out["segment"] = out["subject_id"] + ":seg" + segment_index.astype(int).astype(str)
+        ordered = out[["subject_id", "time_minutes"]].sort_values(
+            ["subject_id", "time_minutes"]
+        )
+        gap = ordered.groupby("subject_id", observed=False)[
+            "time_minutes"
+        ].diff().fillna(float(time_step_minutes))
+        segment_index = gap.gt(
+            float(time_step_minutes) * max_gap_multiplier
+        ).groupby(ordered["subject_id"], observed=False).cumsum()
+        segment_values = (
+            ordered["subject_id"]
+            + ":seg"
+            + segment_index.astype(int).astype(str)
+        )
+        out["segment"] = segment_values.reindex(out.index)
     else:
         out["segment"] = out["subject_id"] + ":" + df[source_segment].fillna("segment_0").astype(str)
+
+    glucose_col = _first_existing(df, _ALIAS_COLUMNS["glucose_actual_mgdl"])
+    if glucose_col is None:
+        raise ValueError(
+            "No glucose column found. Expected one of: "
+            + ", ".join(_ALIAS_COLUMNS["glucose_actual_mgdl"])
+        )
+    glucose = _numeric_series(df[glucose_col], name=glucose_col)
+    outside = glucose.notna() & ~glucose.between(glucose_low, glucose_high)
+    if outside.any():
+        examples = glucose.loc[outside].head(5).tolist()
+        raise ValueError(
+            f"Glucose column contains {int(outside.sum())} values outside the "
+            f"declared [{glucose_low}, {glucose_high}] mg/dL training-data "
+            f"envelope; examples: {examples}. Values are not clipped."
+        )
+    missing_before = int(glucose.isna().sum())
+    out["glucose_actual_mgdl"] = glucose
+    if missing_before:
+        out["glucose_actual_mgdl"] = out.groupby(
+            ["subject_id", "segment"], observed=False
+        )["glucose_actual_mgdl"].transform(
+            lambda values: values.interpolate(
+                method="linear", limit=1, limit_area="inside"
+            )
+        )
+    unresolved = int(out["glucose_actual_mgdl"].isna().sum())
+    if unresolved:
+        raise ValueError(
+            f"Glucose target has {unresolved} unresolved missing values after "
+            "within-segment one-sample interpolation"
+        )
+
+    imputation_counts: dict[str, int] = {}
+    absent_features: list[str] = []
 
     for column in GLUCOSE_MODEL_FEATURE_COLUMNS:
         if column == "glucose_actual_mgdl":
@@ -206,11 +290,14 @@ def standardize_glucose_forecast_frame(
         if column == "glucose_trend_mgdl_min":
             existing = _first_existing(df, _ALIAS_COLUMNS.get(column, (column,)))
             if existing is not None:
-                out[column] = _safe_numeric(df[existing], 0.0)
+                parsed = _numeric_series(df[existing], name=existing)
+                imputation_counts[column] = int(parsed.isna().sum())
+                out[column] = parsed.fillna(0.0)
             else:
                 delta_g = out.groupby(["subject_id", "segment"], observed=False)["glucose_actual_mgdl"].diff()
                 delta_t = out.groupby(["subject_id", "segment"], observed=False)["time_minutes"].diff()
                 out[column] = (delta_g / delta_t.replace(0.0, np.nan)).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+                absent_features.append(column)
             continue
         if column in {"time_of_day_sin", "time_of_day_cos"}:
             minutes_of_day = np.mod(out["time_minutes"].to_numpy(dtype=float), 1440.0)
@@ -218,14 +305,34 @@ def standardize_glucose_forecast_frame(
             out["time_of_day_sin"] = np.sin(angle)
             out["time_of_day_cos"] = np.cos(angle)
             continue
-        out[column] = _copy_alias_or_default(df, column, _DEFAULT_FEATURE_VALUES[column])
+        values, missing_count, present = _copy_alias_or_default(
+            df, column, _DEFAULT_FEATURE_VALUES[column]
+        )
+        out[column] = values
+        imputation_counts[column] = missing_count
+        if not present:
+            absent_features.append(column)
 
     out["source_dataset"] = source_label
     out["source_row_index"] = np.arange(len(out), dtype=int)
     out = out.sort_values(["subject_id", "segment", "time_minutes"]).reset_index(drop=True)
+    time_deltas = out.groupby(
+        ["subject_id", "segment"], observed=False
+    )["time_minutes"].diff()
+    if (time_deltas.dropna() <= 0.0).any():
+        raise ValueError(
+            "Each subject/segment must have unique, strictly increasing timestamps"
+        )
     numeric_cols = ["time_minutes", *GLUCOSE_MODEL_FEATURE_COLUMNS]
     for column in numeric_cols:
-        out[column] = _safe_numeric(out[column], _DEFAULT_FEATURE_VALUES.get(column, 0.0))
+        numeric_values = out[column].to_numpy(dtype=float)
+        if not np.all(np.isfinite(numeric_values)):
+            raise ValueError(f"Standardized column {column!r} contains non-finite values")
+        out[column] = numeric_values
+    out.attrs["glucose_interpolated_rows"] = missing_before
+    out.attrs["feature_imputation_counts"] = imputation_counts
+    out.attrs["absent_feature_columns"] = sorted(set(absent_features))
+    out.attrs["glucose_bounds_mgdl"] = [glucose_low, glucose_high]
     return out
 
 
@@ -276,7 +383,7 @@ def glucose_model_config_payload(
             "band_weighted_high_weight": 1.6,
             "band_weighted_max_weight": 5.0,
             "pinn_lambda": 0.5,
-            "pinn_max_roc": 10.0,
+            "pinn_max_roc": 3.0,
             "early_stopping_patience": 18 if normalized in {"long", "paper"} else 5,
             "early_stopping_min_delta": 0.0005,
         },
@@ -308,6 +415,18 @@ def _source_summary(df: pd.DataFrame, *, label: str, path: Path) -> dict[str, An
         "glucose_mean_mgdl": float(df["glucose_actual_mgdl"].mean()),
         "glucose_min_mgdl": float(df["glucose_actual_mgdl"].min()),
         "glucose_max_mgdl": float(df["glucose_actual_mgdl"].max()),
+        "glucose_interpolated_rows": int(
+            df.attrs.get("glucose_interpolated_rows", 0)
+        ),
+        "feature_imputation_counts": dict(
+            df.attrs.get("feature_imputation_counts", {})
+        ),
+        "absent_feature_columns": list(
+            df.attrs.get("absent_feature_columns", [])
+        ),
+        "glucose_bounds_mgdl": list(
+            df.attrs.get("glucose_bounds_mgdl", [20.0, 600.0])
+        ),
     }
 
 
@@ -363,7 +482,7 @@ def build_glucose_training_pack(
     )
     lineage = compute_dataset_lineage(merged, source_path=dataset_path)
     manifest = {
-        "schema_version": "iints_glucose_model_dataset_v1",
+        "schema_version": "iints_glucose_model_dataset_v2",
         "model_id": GLUCOSE_MODEL_ID,
         "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "dataset_path": str(dataset_path),
@@ -904,7 +1023,9 @@ def render_hf_comparison_interpretation(*, comparison_metrics: Optional[Mapping[
             "",
             "## 3. Why PINN Is Different",
             "",
-            "The IINTS physiological loss keeps the normal forecast-error term, but adds penalties when predictions violate basic physiology:",
+            "The historical configuration name is `PINN`, but this implementation is more accurately described as physiology-informed regularization: it does not solve a physiological differential-equation residual inside the neural network.",
+            "",
+            "The IINTS physiology-informed loss keeps the normal forecast-error term and adds explicit support-envelope penalties:",
             "",
             "```text",
             "L_total = L_MSE + lambda * L_physiology",
@@ -913,13 +1034,13 @@ def render_hf_comparison_interpretation(*, comparison_metrics: Optional[Mapping[
             "In the current SDK implementation, the physiological penalty includes:",
             "",
             "- impossible glucose bounds below 20 mg/dL or above 600 mg/dL",
-            "- excessive first-step glucose rate-of-change from the last observed glucose",
-            "- suspicious fast rise when insulin-on-board is high and carbs-on-board is near zero",
-            "- suspicious fast drop when carbs-on-board is present but insulin-on-board is low",
+            "- excessive first-step or within-horizon glucose rate-of-change",
             "",
-            "This can make a PINN model trade a small amount of average error for fewer implausible or safety-relevant failures. That tradeoff is intentional: in medical-device research, a model that is slightly less optimal on average but more physiologically conservative can be more useful for simulation and safety-supervisor experiments.",
+            "IOB/COB directional patterns are reported separately as contextual review cues because meals, exercise, stress, illness, and missing announcements make those rules non-universal.",
             "",
-            "The recommended `band_pinn` objective keeps the same physiological penalty, but replaces plain MSE with band-weighted MSE. That keeps extra attention on hypo and hyperglycemia windows while still discouraging impossible glucose trajectories.",
+            "This can make a physiology-regularized model trade a small amount of average error for fewer out-of-envelope trajectories. It does not by itself establish clinical safety or physiological validity.",
+            "",
+            "The legacy `band_pinn` objective keeps the same constraint penalty but replaces plain MSE with band-weighted MSE. That keeps extra attention on hypo and hyperglycemia windows while discouraging out-of-envelope trajectories.",
             "",
             "## 4. Why Longer Horizons Are Harder",
             "",
@@ -941,9 +1062,9 @@ def render_hf_comparison_interpretation(*, comparison_metrics: Optional[Mapping[
             "",
             "## 6. Pitch-Friendly Explanation",
             "",
-            "A normal AI model learns to be close on average. IINTS-AF also asks whether the prediction still behaves like glucose in a human body. The PINN loss adds a mathematical penalty when the model predicts values or rates that are physiologically implausible, and the comparison report checks those errors separately from normal MAE/RMSE.",
+            "A normal AI model learns to be close on average. IINTS-AF additionally penalizes predictions outside explicit glucose and rate-of-change envelopes, then reports those checks separately from MAE/RMSE. This is physiology-informed regularization, not proof that the network has learned human physiology.",
             "",
-            "The current recommended training recipe is `band_pinn`: it asks the model to care more about clinically important low/high glucose ranges while preserving the PINN physiology guardrails.",
+            "The current recipe retains the compatibility key `band_pinn`: it combines range weighting with transparent trajectory constraints.",
             "",
             "## 7. Boundary",
             "",
@@ -1265,7 +1386,7 @@ def physiological_violation_report(
     absolute_high_mgdl: float = 600.0,
     display_low_mgdl: float = 35.0,
     display_high_mgdl: float = 450.0,
-    max_roc_mgdl_min: float = 10.0,
+    max_roc_mgdl_min: float = 3.0,
     suspicious_roc_mgdl_min: float = 2.0,
 ) -> dict[str, Any]:
     glucose_index = feature_columns.index("glucose_actual_mgdl") if "glucose_actual_mgdl" in feature_columns else 0
@@ -1289,9 +1410,8 @@ def physiological_violation_report(
         impossible_low.any(axis=1)
         | impossible_high.any(axis=1)
         | roc_violation.any(axis=1)
-        | suspicious_rise
-        | suspicious_drop
     )
+    contextual_review = suspicious_rise | suspicious_drop
 
     denominator = max(1, int(np.size(predicted)))
     sample_denominator = max(1, int(len(predicted)))
@@ -1314,6 +1434,12 @@ def physiological_violation_report(
         "roc_violation_pct": float(np.sum(roc_violation) / denominator * 100.0),
         "suspicious_rise_iob_no_cob_pct": float(np.sum(suspicious_rise) / sample_denominator * 100.0),
         "suspicious_drop_cob_no_iob_pct": float(np.sum(suspicious_drop) / sample_denominator * 100.0),
+        "contextual_pattern_review_pct": float(
+            np.sum(contextual_review) / sample_denominator * 100.0
+        ),
+        "contextual_pattern_note": (
+            "IOB/COB directional patterns are review cues, not universal physiological violations."
+        ),
         "any_physiology_violation_pct": float(np.sum(any_sample_violation) / sample_denominator * 100.0),
         "max_abs_roc_mgdl_min": float(np.max(np.abs(roc))) if roc.size else 0.0,
     }
@@ -1446,7 +1572,7 @@ def compare_glucose_models(
     config_path: Optional[Path] = None,
     include_baselines: bool = True,
     mc_samples: int = 0,
-    max_roc_mgdl_min: float = 10.0,
+    max_roc_mgdl_min: float = 3.0,
 ) -> GlucoseModelComparisonBundle:
     payload = _load_predictor_config_payload(config_path)
     predictor_cfg = PredictorConfig(**payload["predictor"])

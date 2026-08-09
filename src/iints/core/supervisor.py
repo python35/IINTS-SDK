@@ -49,10 +49,10 @@ class IndependentSupervisor:
                  hypoglycemia_threshold: float = 70.0,      # mg/dL
                  severe_hypoglycemia_threshold: float = 54.0,  # mg/dL
                  hyperglycemia_threshold: float = 250.0,    # mg/dL
-                 max_insulin_per_bolus: float = 5.0,        # Units
+                 max_insulin_per_bolus: float = 15.0,       # Units
                  glucose_rate_alarm: float = 5.0,           # mg/dL per minute
-                 max_60min: float = 3.0,                    # Units per 60 minutes
-                 max_iob: float = 4.0,                      # Units
+                 max_60min: float = 20.0,                   # Units per 60 minutes
+                 max_iob: float = 20.0,                     # Units
                  trend_stop: float = -2.0,                  # mg/dL per minute
                  hypo_cutoff: float = 70.0,                 # mg/dL
                  predicted_hypoglycemia_threshold: float = 60.0,  # mg/dL
@@ -109,15 +109,44 @@ class IndependentSupervisor:
         predicted_glucose_30min: Optional[float] = None,
         basal_insulin_units: Optional[float] = None,
         basal_limit_units: Optional[float] = None,
+        meal_bolus_units: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Evaluate safety of proposed insulin dose based on current glucose and IOB.
         Returns modified insulin dose and safety status.
         """
+        required_values = {
+            "current_glucose": current_glucose,
+            "proposed_insulin": proposed_insulin,
+            "current_time": current_time,
+            "current_iob": current_iob,
+        }
+        for name, value in required_values.items():
+            if not np.isfinite(value):
+                raise ValueError(f"{name} must be finite")
+        if current_glucose < 0.0:
+            raise ValueError("current_glucose must be non-negative")
+        if current_iob < 0.0:
+            raise ValueError("current_iob must be non-negative")
+        if predicted_glucose_30min is not None and not np.isfinite(
+            predicted_glucose_30min
+        ):
+            raise ValueError("predicted_glucose_30min must be finite when supplied")
+        for name, optional_value in (
+            ("basal_insulin_units", basal_insulin_units),
+            ("basal_limit_units", basal_limit_units),
+            ("meal_bolus_units", meal_bolus_units),
+        ):
+            if optional_value is not None and (
+                not np.isfinite(optional_value) or optional_value < 0.0
+            ):
+                raise ValueError(f"{name} must be finite and non-negative when supplied")
+
         original_insulin = proposed_insulin
         self.last_iob = current_iob
         safety_status = SafetyLevel.SAFE
         actions_taken = []
+        predicted_hypo_active = False
         
         # Update glucose history
         self.glucose_history.append((current_time, current_glucose))
@@ -127,6 +156,7 @@ class IndependentSupervisor:
         # Predictive hypo guard (30-min horizon)
         if predicted_glucose_30min is not None:
             if predicted_glucose_30min <= self.predicted_hypoglycemia_threshold:
+                predicted_hypo_active = True
                 safety_status = SafetyLevel.EMERGENCY
                 proposed_insulin = 0
                 actions_taken.append(
@@ -166,10 +196,11 @@ class IndependentSupervisor:
             actions_taken.append("CRITICAL: Hypoglycemia - insulin limited")
             
         elif current_glucose >= self.hyperglycemia_threshold:
-            safety_status = SafetyLevel.WARNING
+            safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
             actions_taken.append("WARNING: Hyperglycemia detected")
         
-        # 3. Bifurcation Risk Threshold (Physics-based velocity vector)
+        # 3. Linear trend projection guard. This is deliberately not labelled
+        # as bifurcation analysis: it is a short-horizon momentum extrapolation.
         glucose_rate = self._calculate_glucose_rate()
         
         # Calculate 30-min trajectory without new insulin (pure momentum)
@@ -177,7 +208,18 @@ class IndependentSupervisor:
         
         if momentum_trajectory <= self.severe_hypoglycemia_threshold:
             proposed_insulin = 0
-            actions_taken.append(f"BIFURCATION_RISK: Momentum trajectory crosses {momentum_trajectory:.1f} mg/dL")
+            actions_taken.append(
+                f"LINEAR_TRAJECTORY_GUARD: projected glucose crosses "
+                f"{momentum_trajectory:.1f} mg/dL"
+            )
+            safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
+
+        if glucose_rate <= self.trend_stop and proposed_insulin > 0.0:
+            proposed_insulin = 0.0
+            actions_taken.append(
+                f"FALLING_TREND_STOP: trend {glucose_rate:.2f} mg/dL/min is at or below "
+                f"{self.trend_stop:.2f} mg/dL/min"
+            )
             safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
 
         # 3b. Formal safety contract (logic validation)
@@ -195,11 +237,21 @@ class IndependentSupervisor:
                 )
                 safety_status = self._max_level(safety_status, SafetyLevel.CRITICAL)
 
-        # 4. Pharmacodynamic (PD) Mass-Balance IOB Clearance
+        # 4. Configured IOB headroom. Preserve explicitly announced meal
+        # coverage while limiting correction/basal insulin. Treating all IOB
+        # as a reason to suppress meal coverage caused systematic underdosing.
+        protected_meal = min(
+            max(float(meal_bolus_units or 0.0), 0.0),
+            max(float(proposed_insulin), 0.0),
+        )
+        non_meal_insulin = max(0.0, proposed_insulin - protected_meal)
         max_safe_bolus = max(0.0, self.max_iob - current_iob)
-        if proposed_insulin > max_safe_bolus:
-            proposed_insulin = max_safe_bolus
-            actions_taken.append(f"PD_CLEARANCE_LIMIT / High IOB: Active IOB {current_iob:.2f}U restricts max safe bolus to {max_safe_bolus:.2f}U")
+        if non_meal_insulin > max_safe_bolus:
+            proposed_insulin = protected_meal + max_safe_bolus
+            actions_taken.append(
+                f"IOB_HEADROOM_LIMIT: active IOB {current_iob:.2f}U restricts "
+                f"non-meal insulin headroom to {max_safe_bolus:.2f}U"
+            )
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 5. Insulin Dose Limits
@@ -208,13 +260,17 @@ class IndependentSupervisor:
             actions_taken.append(f"LIMIT: Bolus capped at {self.max_insulin_per_bolus}U")
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
-        # 6. Scientific Stacking Prevention (Pharmacodynamic feedback)
-        # We modulate insulin based on an exponential decay curve against target glucose (100 mg/dL)
-        if current_iob > 0.5 and current_glucose < 160:
+        # 6. Heuristic IOB taper. This is a conservative engineering rule,
+        # not a fitted pharmacodynamic model.
+        if current_iob > 0.5 and current_glucose < 160 and proposed_insulin > protected_meal:
             distance_to_target = max(0.0, current_glucose - 100.0)
             pd_reduction_factor = np.exp(-distance_to_target / 50.0)
-            proposed_insulin *= (1.0 - pd_reduction_factor)
-            actions_taken.append(f"PD_STACKING_PREVENTION: Dose reduced by {pd_reduction_factor*100:.1f}% due to unabsorbed IOB ({current_iob:.2f}U)")
+            non_meal_insulin = max(0.0, proposed_insulin - protected_meal)
+            proposed_insulin = protected_meal + non_meal_insulin * (1.0 - pd_reduction_factor)
+            actions_taken.append(
+                f"HEURISTIC_IOB_TAPER: dose reduced by {pd_reduction_factor*100:.1f}% "
+                f"with active IOB {current_iob:.2f}U"
+            )
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
 
         # 7. Glucose Rate of Change (legacy alarm)
@@ -247,7 +303,11 @@ class IndependentSupervisor:
             safety_status = self._max_level(safety_status, SafetyLevel.WARNING)
         
         # 9. Emergency Mode Recovery
-        if self.emergency_mode and current_glucose > self.hypoglycemia_threshold + 20:
+        if (
+            self.emergency_mode
+            and not predicted_hypo_active
+            and current_glucose > self.hypoglycemia_threshold + 20
+        ):
             self.emergency_mode = False
             actions_taken.append("RECOVERY: Emergency mode cleared")
         

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from iints.research.evaluation import (
     feature_drift_report,
@@ -57,6 +58,27 @@ def test_uncertainty_reliability_report_bins_predictions() -> None:
     assert report["target_coverage_pct"] == 95.0
     assert len(report["bins"]) == 2
     assert sum(row["count"] for row in report["bins"]) == 4
+
+
+@pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
+def test_forecast_reports_reject_nonfinite_values(bad_value: float) -> None:
+    observed = np.array([100.0, bad_value], dtype=float)
+    predicted = np.array([101.0, 102.0], dtype=float)
+
+    with pytest.raises(ValueError, match="finite"):
+        forecast_error_report(observed, predicted)
+    with pytest.raises(ValueError, match="finite"):
+        hypoglycemia_detection_report(observed, predicted)
+
+
+def test_uncertainty_reports_reject_negative_or_nonfinite_standard_deviation() -> None:
+    observed = np.array([100.0, 105.0], dtype=float)
+    predicted = np.array([101.0, 106.0], dtype=float)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        forecast_error_report(observed, predicted, np.array([2.0, -1.0]))
+    with pytest.raises(ValueError, match="finite"):
+        uncertainty_reliability_report(observed, predicted, np.array([2.0, np.nan]))
 
 
 def test_subgroup_error_report_splits_labels() -> None:

@@ -116,7 +116,25 @@ outputs/
 tmp/
 .mplt_formulas/
 .mplt_training/
+.mplt_calibration/
+.mplt_eucys_playbook/
 patch_app*.py
 finalize_training.py
 train_quick.py
 IINTS-SDK/
+output/
+desktop-dist-*/
+app_log.txt
+qt_log.txt
+
+# Generated EUCYS review bundles (maintained sources live in docs/eucys)
+research/eucys_pack/BROWSE_ME.html
+research/eucys_pack/EUCYS_MASTER_DOSSIER.md
+research/eucys_pack/IINTS_AF_EUCYS_BROWSE_BUNDLE.zip
+research/eucys_pack/assets/diagrams/
+research/eucys_pack/browse/
+research/eucys_pack/complete_playbook/
+research/eucys_pack/diagrams/
+research/eucys_pack/pdf/IINTS_AF_EUCYS_DEMO_RUNBOOK.pdf
+research/eucys_pack/pdf/IINTS_AF_EUCYS_JURY_QUICK_REFERENCE.pdf
+research/eucys_pack/pdf/IINTS_AF_EUCYS_MASTER_DOSSIER.pdf

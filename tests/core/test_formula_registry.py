@@ -13,7 +13,7 @@ from iints.core.formula_registry import (
 
 
 def test_formula_registry_has_exactly_15_static_formulas() -> None:
-    assert FORMULA_REGISTRY_VERSION == "iints-formula-registry-v1"
+    assert FORMULA_REGISTRY_VERSION == "iints-formula-registry-v5"
     assert len(FORMULAS) == 15
     assert len({formula.formula_id for formula in FORMULAS}) == 15
 
@@ -29,6 +29,8 @@ def test_formula_specs_have_sources_units_and_implementation_paths() -> None:
         assert formula.solved_or_runtime_form
         assert formula.units
         assert formula.literature_basis
+        assert formula.evidence_class in {"canonical", "adapted", "heuristic"}
+        assert not any("wikipedia.org" in source for source in formula.literature_basis)
         assert all(source.startswith(("https://", "http://")) for source in formula.literature_basis)
         assert "never derive" in formula.ai_policy.lower()
         for implementation in formula.implementation_paths:
@@ -64,9 +66,9 @@ def test_formula_registry_markdown_lists_all_formulas() -> None:
     markdown = formula_registry_markdown()
 
     assert "# IINTS-AF Formula Registry" in markdown
-    assert markdown.count("\\[") == 15
-    assert markdown.count("\\]") == 15
+    assert markdown.count("$$") == 30
     assert markdown.count("Plain-text runtime notation") == 15
+    assert markdown.count("Evidence class: `") == 15
     for formula in FORMULAS:
         assert formula.formula_id in markdown
         assert formula.latex_expression in markdown

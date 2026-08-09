@@ -37,14 +37,23 @@ MDMP_GRADE_DEFINITIONS: dict[str, dict[str, str]] = {
         "allowed_use": "Research workflows, model development, and reproducibility evidence.",
     },
     "clinical_grade": {
-        "meaning": "Passes all hard contract checks with compliance score >= 90.",
+        "meaning": (
+            "Legacy MDMP label for strict data-contract conformance; it does not "
+            "mean that the dataset is clinically validated."
+        ),
         "minimum_conditions": "is_compliant=True and compliance_score >= 90.",
-        "allowed_use": "Stronger pre-clinical research evidence; not medical-device approval.",
+        "allowed_use": (
+            "High-assurance data-quality workflows after independent scientific review; not "
+            "clinical certification, medical-device approval, or treatment authority."
+        ),
     },
     "ai_ready": {
-        "meaning": "Signed, governed, AI-training-ready MDMP artifact.",
+        "meaning": "Governed, signed, contract-conformant artifact for AI research workflows.",
         "minimum_conditions": "Clinical-grade quality plus explicit governance/signature policy.",
-        "allowed_use": "High-trust AI research pipelines; still not treatment authority.",
+        "allowed_use": (
+            "High-trust AI research pipelines; the signature proves artifact integrity, "
+            "not physiological validity or fitness for patient care."
+        ),
     },
 }
 
@@ -71,6 +80,7 @@ class MDMPValidationResult:
     compliance_score: float
     mdmp_grade: str
     mdmp_protocol_version: str
+    contract_quality_gate_passed: bool
     certified_for_medical_research: bool
     contract_fingerprint_sha256: str
     dataset_fingerprint_sha256: str
@@ -83,7 +93,11 @@ class MDMPValidationResult:
             "compliance_score": self.compliance_score,
             "mdmp_grade": self.mdmp_grade,
             "mdmp_protocol_version": self.mdmp_protocol_version,
+            "contract_quality_gate_passed": self.contract_quality_gate_passed,
             "certified_for_medical_research": self.certified_for_medical_research,
+            "certification_scope": (
+                "data-contract conformance and artifact integrity only; no clinical or regulatory certification"
+            ),
             "contract_fingerprint_sha256": self.contract_fingerprint_sha256,
             "dataset_fingerprint_sha256": self.dataset_fingerprint_sha256,
             "row_count": self.row_count,
@@ -202,12 +216,15 @@ def run_mdmp_validation(
             raw_result = external_contract_runner(contract).run(df)
             grade = _normalize_grade(str(getattr(raw_result, "grade", "draft")))
             checks = _normalize_checks(getattr(raw_result, "checks", []))
+            is_compliant = bool(getattr(raw_result, "is_compliant", False))
+            compliance_score = float(getattr(raw_result, "compliance_score", 0.0))
             return MDMPValidationResult(
-                is_compliant=bool(getattr(raw_result, "is_compliant", False)),
-                compliance_score=float(getattr(raw_result, "compliance_score", 0.0)),
+                is_compliant=is_compliant,
+                compliance_score=compliance_score,
                 mdmp_grade=grade,
                 mdmp_protocol_version=str(getattr(raw_result, "protocol_version", "1.0")),
-                certified_for_medical_research=grade in {"clinical_grade", "ai_ready"},
+                contract_quality_gate_passed=is_compliant and compliance_score >= 90.0,
+                certified_for_medical_research=False,
                 contract_fingerprint_sha256=str(getattr(raw_result, "contract_fingerprint_sha256", "")),
                 dataset_fingerprint_sha256=str(getattr(raw_result, "dataset_fingerprint_sha256", "")),
                 row_count=int(getattr(raw_result, "row_count", len(df))),
@@ -227,7 +244,8 @@ def run_mdmp_validation(
         compliance_score=raw_result.compliance_score,
         mdmp_grade=_normalize_grade(raw_result.mdmp_grade),
         mdmp_protocol_version=raw_result.mdmp_protocol_version,
-        certified_for_medical_research=raw_result.certified_for_medical_research,
+        contract_quality_gate_passed=raw_result.contract_quality_gate_passed,
+        certified_for_medical_research=False,
         contract_fingerprint_sha256=raw_result.contract_fingerprint_sha256,
         dataset_fingerprint_sha256=raw_result.dataset_fingerprint_sha256,
         row_count=raw_result.row_count,

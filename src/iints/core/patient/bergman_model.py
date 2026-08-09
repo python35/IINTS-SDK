@@ -2,11 +2,11 @@
 Bergman Minimal Model — IINTS-AF
 ==================================
 ODE-based patient model inspired by the Bergman Minimal Model with an
-additional gut absorption compartment for realistic carbohydrate dynamics.
+adapted gut absorption chain for delayed carbohydrate appearance.
 
-This provides a more physiologically accurate glucose simulation than the
-default ``CustomPatientModel``, at the cost of higher computational load
-(uses ``scipy.integrate.solve_ivp``).
+It is a more mechanistic research option than ``CustomPatientModel``, but the
+extensions and parameterization are not independently clinically validated.
+It uses ``scipy.integrate.solve_ivp`` and has a higher computational cost.
 
 The model tracks 14 state variables:
 
@@ -29,13 +29,24 @@ References
 """
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from .physiology import smooth_threshold_excess
+from .models import PatientModelDomainError
+from .physiology import (
+    antecedent_hypoglycemia_memory_derivative,
+    counterregulatory_rescue_multiplier,
+    dawn_glucose_rate_mgdl_min,
+    glucagon_mg_to_pg,
+    smooth_threshold_excess,
+    validated_activity_events,
+    validated_snapshot_bool,
+    validated_snapshot_scalar,
+)
 
 
 @dataclass
@@ -58,11 +69,15 @@ class BergmanParameters:
     k_a: float = 0.018      # 1/min  — subcutaneous insulin absorption rate constant
 
     # --- Exogenous Glucagon ---
-    t_max_glucagon: float = 30.0  # min
-    k_e_glucagon: float = 0.1     # 1/min
-    V_glucagon_per_kg: float = 0.2 # L/kg
-    k_a_glucagon: float = 0.05    # 1/min
-    S_glucagon: float = 0.02      # sensitivity
+    # Literature-informed glucagon PK medians/ranges from Wendt et al. The
+    # first absorption rate is represented as 1 / t_max_glucagon for backward
+    # configuration compatibility.
+    t_max_glucagon: float = 25.0  # min; k1 = 0.04 1/min
+    k_e_glucagon: float = 0.165   # 1/min; second transfer/elimination rate k2
+    glucagon_clearance_ml_kg_min: float = 120.0  # apparent clearance
+    glucagon_ec50_pg_ml: float = 350.0
+    k_a_glucagon: float = 0.05    # 1/min; effect-compartment rate
+    S_glucagon: float = 1.0       # maximum fractional EGP increase
 
     # --- Stem Cell Graft (Research) ---
     stem_cell_engraftment_percent: float = 0.0 # 0 for T1D, 100 for cure
@@ -76,6 +91,39 @@ class BergmanParameters:
 
     # --- Patient physical ---
     body_weight_kg: float = 70.0
+
+    def __post_init__(self) -> None:
+        numeric = {
+            name: float(value)
+            for name, value in vars(self).items()
+        }
+        if not all(np.isfinite(value) for value in numeric.values()):
+            raise ValueError("Bergman parameters must all be finite")
+        positive = (
+            "p1", "p2", "p3", "Gb", "Vg", "n", "Vi", "k_a",
+            "t_max_glucagon", "k_e_glucagon",
+            "glucagon_clearance_ml_kg_min", "glucagon_ec50_pg_ml",
+            "k_a_glucagon", "tau_meal", "k_abs", "body_weight_kg",
+        )
+        for name in positive:
+            if numeric[name] <= 0.0:
+                raise ValueError(f"Bergman parameter {name} must be positive")
+        non_negative = (
+            "Ib", "gamma", "h", "S_glucagon", "immune_rejection_rate",
+        )
+        for name in non_negative:
+            if numeric[name] < 0.0:
+                raise ValueError(
+                    f"Bergman parameter {name} must be non-negative"
+                )
+        if not 0.0 <= numeric["f_bio"] <= 1.0:
+            raise ValueError("Bergman parameter f_bio must be between 0 and 1")
+        if not 0.0 <= numeric["stem_cell_engraftment_percent"] <= 100.0:
+            raise ValueError(
+                "stem_cell_engraftment_percent must be between 0 and 100"
+            )
+        if not 0.0 <= numeric["stem_cell_subq_fraction"] <= 1.0:
+            raise ValueError("stem_cell_subq_fraction must be between 0 and 1")
 
 
 class BergmanPatientModel:
@@ -102,37 +150,123 @@ class BergmanPatientModel:
         carb_absorption_duration_minutes: float = 240.0,
         max_glucose_rate_mgdl_per_min: float = 3.0,
         bergman_params: Optional[BergmanParameters] = None,
-        **kwargs
+        stem_cell_engraftment_percent: float = 0.0,
+        stem_cell_subq_fraction: float = 0.0,
+        immune_rejection_rate: float = 0.0,
+        **kwargs: Any,
     ) -> None:
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"Unsupported Bergman model arguments: {names}")
+        values = {
+            "basal_insulin_rate": float(basal_insulin_rate),
+            "insulin_sensitivity": float(insulin_sensitivity),
+            "carb_factor": float(carb_factor),
+            "initial_glucose": float(initial_glucose),
+            "glucose_decay_rate": float(glucose_decay_rate),
+            "glucose_absorption_rate": float(glucose_absorption_rate),
+            "insulin_action_duration": float(insulin_action_duration),
+            "insulin_peak_time": float(insulin_peak_time),
+            "meal_mismatch_epsilon": float(meal_mismatch_epsilon),
+            "dawn_phenomenon_strength": float(dawn_phenomenon_strength),
+            "dawn_start_hour": float(dawn_start_hour),
+            "dawn_end_hour": float(dawn_end_hour),
+            "carb_absorption_duration_minutes": float(carb_absorption_duration_minutes),
+            "max_glucose_rate_mgdl_per_min": float(max_glucose_rate_mgdl_per_min),
+            "stem_cell_engraftment_percent": float(stem_cell_engraftment_percent),
+            "stem_cell_subq_fraction": float(stem_cell_subq_fraction),
+            "immune_rejection_rate": float(immune_rejection_rate),
+        }
+        if not all(np.isfinite(value) for value in values.values()):
+            raise ValueError("Bergman model inputs must all be finite")
+        positive = (
+            "insulin_sensitivity", "carb_factor", "initial_glucose",
+            "glucose_absorption_rate",
+            "insulin_action_duration", "insulin_peak_time",
+            "meal_mismatch_epsilon", "carb_absorption_duration_minutes",
+        )
+        for name in positive:
+            if values[name] <= 0.0:
+                raise ValueError(f"{name} must be positive")
+        if values["basal_insulin_rate"] < 0.0:
+            raise ValueError("basal_insulin_rate must be non-negative")
+        if values["glucose_decay_rate"] < 0.0:
+            raise ValueError("glucose_decay_rate must be non-negative")
+        if values["dawn_phenomenon_strength"] < 0.0:
+            raise ValueError("dawn_phenomenon_strength must be non-negative")
+        if values["max_glucose_rate_mgdl_per_min"] < 0.0:
+            raise ValueError("max_glucose_rate_mgdl_per_min must be non-negative")
+        if not 0.0 <= values["dawn_start_hour"] < values["dawn_end_hour"] <= 24.0:
+            raise ValueError(
+                "dawn hours must satisfy 0 <= start < end <= 24"
+            )
+        if not 0.0 <= values["stem_cell_engraftment_percent"] <= 100.0:
+            raise ValueError(
+                "stem_cell_engraftment_percent must be between 0 and 100"
+            )
+        if not 0.0 <= values["stem_cell_subq_fraction"] <= 1.0:
+            raise ValueError("stem_cell_subq_fraction must be between 0 and 1")
+        if values["immune_rejection_rate"] < 0.0:
+            raise ValueError("immune_rejection_rate must be non-negative")
+        if basal_glucose_target is not None:
+            target = float(basal_glucose_target)
+            if not np.isfinite(target) or target < 20.0:
+                raise ValueError(
+                    "basal_glucose_target must be finite and at least 20 mg/dL"
+                )
+
         # Store clinical knobs (for ratio queries and compatibility)
-        self.basal_insulin_rate = basal_insulin_rate
-        self.insulin_sensitivity = insulin_sensitivity
-        self.carb_factor = carb_factor
-        self.initial_glucose = initial_glucose
+        self.basal_insulin_rate = values["basal_insulin_rate"]
+        self.insulin_sensitivity = values["insulin_sensitivity"]
+        self.carb_factor = values["carb_factor"]
+        self.initial_glucose = values["initial_glucose"]
         self.basal_glucose_target = basal_glucose_target
-        self.glucose_decay_rate = glucose_decay_rate
-        self.glucose_absorption_rate = glucose_absorption_rate
-        self.insulin_action_duration = insulin_action_duration
-        self.insulin_peak_time = insulin_peak_time
-        self.meal_mismatch_epsilon = meal_mismatch_epsilon
-        self.dawn_phenomenon_strength = dawn_phenomenon_strength
-        self.dawn_start_hour = dawn_start_hour
-        self.dawn_end_hour = dawn_end_hour
-        self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
-        self.max_glucose_rate_mgdl_per_min = max_glucose_rate_mgdl_per_min
+        self.glucose_decay_rate = values["glucose_decay_rate"]
+        self.glucose_absorption_rate = values["glucose_absorption_rate"]
+        self.insulin_action_duration = values["insulin_action_duration"]
+        self.insulin_peak_time = values["insulin_peak_time"]
+        self.meal_mismatch_epsilon = values["meal_mismatch_epsilon"]
+        self.dawn_phenomenon_strength = values["dawn_phenomenon_strength"]
+        self.dawn_start_hour = values["dawn_start_hour"]
+        self.dawn_end_hour = values["dawn_end_hour"]
+        self.carb_absorption_duration_minutes = values["carb_absorption_duration_minutes"]
+        self.max_glucose_rate_mgdl_per_min = values["max_glucose_rate_mgdl_per_min"]
 
         # Bergman ODE parameters
-        basal_target = float(initial_glucose) if basal_glucose_target is None else float(basal_glucose_target)
-        gb_default = min(float(initial_glucose), 115.0) if basal_glucose_target is None else float(np.clip(basal_target, 80.0, 220.0))
-        self.params = bergman_params if bergman_params else BergmanParameters(
-            Gb=gb_default,
-            tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
-            k_abs=max(0.015, min(float(glucose_absorption_rate), 0.035)),
-            stem_cell_engraftment_percent=kwargs.get('stem_cell_engraftment_percent', 0.0),
-            stem_cell_subq_fraction=kwargs.get('stem_cell_subq_fraction', 0.0),
-            immune_rejection_rate=kwargs.get('immune_rejection_rate', 0.0),
-            gamma=0.005 if kwargs.get('stem_cell_engraftment_percent', 0.0) > 0 else 0.0
+        gb_default = (
+            float(initial_glucose)
+            if basal_glucose_target is None
+            else float(basal_glucose_target)
         )
+        if bergman_params is not None:
+            if any(
+                value != 0.0
+                for value in (
+                    stem_cell_engraftment_percent,
+                    stem_cell_subq_fraction,
+                    immune_rejection_rate,
+                )
+            ):
+                raise ValueError(
+                    "Pass stem-cell parameters either through bergman_params "
+                    "or constructor arguments, not both"
+                )
+            self.params = bergman_params
+        else:
+            self.params = BergmanParameters(
+                p1=0.028 * max(float(glucose_decay_rate), 1e-6) / 0.05,
+                p3=5.0e-6 * max(float(insulin_sensitivity), 1e-6) / 50.0,
+                Gb=gb_default,
+                k_a=1.0 / max(float(insulin_peak_time), 1.0),
+                tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
+                k_abs=float(glucose_absorption_rate),
+                stem_cell_engraftment_percent=stem_cell_engraftment_percent,
+                stem_cell_subq_fraction=stem_cell_subq_fraction,
+                immune_rejection_rate=immune_rejection_rate,
+                gamma=0.005 if stem_cell_engraftment_percent > 0 else 0.0,
+            )
+        self._p3_per_isf = self.params.p3 / max(float(insulin_sensitivity), 1e-6)
+        self._refresh_basal_steady_state()
 
         # Exercise book-keeping
         self.is_exercising = False
@@ -153,6 +287,7 @@ class BergmanPatientModel:
         self.carbs_on_board = 0.0
         self.last_delivered_insulin_units = 0.0
         self.last_delivered_glucagon_mg = 0.0
+        self._last_unsupported_event: Optional[Dict[str, Any]] = None
         self.meal_effect_delay = 30  # kept for API compat
 
         # ODE state vector:
@@ -160,12 +295,12 @@ class BergmanPatientModel:
         self._state = np.array([
             initial_glucose,       # 0: G  (mg/dL)
             0.0,                   # 1: X  (1/min)
-            self.params.Ib,        # 2: I  (mU/L)
+            self._reference_insulin_mU_L,  # 2: I  (mU/L)
             0.0,                   # 3: Q_sto1 (mg) - Solid Stomach
             0.0,                   # 4: Q_sto2 (mg) - Liquid Stomach
             0.0,                   # 5: Q_gut (mg)  - Intestine
-            0.0,                   # 6: S1 (mU)
-            0.0,                   # 7: S2 (mU)
+            self._basal_depot_mU,  # 6: S1 (mU)
+            self._basal_depot_mU,  # 7: S2 (mU)
             0.0,                   # 8: Y1 (pg) - Glucagon subQ 1
             0.0,                   # 9: Y2 (pg) - Glucagon subQ 2
             0.0,                   # 10: Gamma (pg/mL) - Plasma Glucagon
@@ -176,17 +311,52 @@ class BergmanPatientModel:
 
         self.reset()
 
+    def _refresh_basal_steady_state(self) -> None:
+        """Derive pump-supported fasting insulin states in consistent units."""
+
+        p = self.params
+        self._basal_input_mU_per_min = (
+            max(float(self.basal_insulin_rate), 0.0) * 1000.0 / 60.0
+        )
+        insulin_volume_l = p.Vi * p.body_weight_kg
+        if self._basal_input_mU_per_min > 0.0:
+            self._reference_insulin_mU_L = self._basal_input_mU_per_min / max(
+                insulin_volume_l * p.n, 1e-9
+            )
+        else:
+            self._reference_insulin_mU_L = max(float(p.Ib), 0.0)
+        self._basal_depot_mU = self._basal_input_mU_per_min / max(p.k_a, 1e-9)
+
     def _guard_glucose_transition(self, proposed_glucose: float, time_step: float) -> float:
-        """Bound solver output to a plausible research-simulator transition."""
+        """Validate solver output without altering physiological mass balance."""
         if not np.isfinite(proposed_glucose):
-            return float(self.current_glucose)
+            raise PatientModelDomainError(
+                "Bergman ODE produced non-finite glucose",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
+        if proposed_glucose < 0.0:
+            raise PatientModelDomainError(
+                f"Bergman ODE produced negative glucose: {proposed_glucose}",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
         max_rate = float(getattr(self, "max_glucose_rate_mgdl_per_min", 0.0) or 0.0)
-        if max_rate <= 0.0:
-            return float(max(20.0, proposed_glucose))
-        max_delta = max_rate * max(float(time_step), 0.0)
-        requested_delta = float(proposed_glucose) - float(self.current_glucose)
-        bounded_delta = float(np.clip(requested_delta, -max_delta, max_delta))
-        return float(max(20.0, self.current_glucose + bounded_delta))
+        elapsed = max(float(time_step), 1e-9)
+        rate = abs(float(proposed_glucose) - float(self.current_glucose)) / elapsed
+        if max_rate > 0.0 and rate > max_rate + 1e-9:
+            raise PatientModelDomainError(
+                f"Bergman ODE glucose rate {rate:.3f} mg/dL/min exceeds "
+                f"configured validation limit {max_rate:.3f}",
+                current_glucose=self.current_glucose,
+                proposed_glucose=proposed_glucose,
+            )
+        return float(proposed_glucose)
+
+    def _bounded_fraction_state_indices(self) -> tuple[int, ...]:
+        """Return state indices whose interpretation is limited to [0, 1]."""
+
+        return (12, 13)  # antecedent-hypoglycemia memory, graft mass fraction
 
     # ------------------------------------------------------------------
     # Public interface (mirrors CustomPatientModel exactly)
@@ -194,8 +364,16 @@ class BergmanPatientModel:
 
     def reset(self) -> None:
         """Reset to initial conditions."""
+        self._refresh_basal_steady_state()
         self._state = np.array([
-            self.initial_glucose, 0.0, self.params.Ib, 0.0, 0.0, 0.0, 0.0, 0.0,
+            self.initial_glucose,
+            0.0,
+            self._reference_insulin_mU_L,
+            0.0,
+            0.0,
+            0.0,
+            self._basal_depot_mU,
+            self._basal_depot_mU,
             0.0, 0.0, 0.0, 0.0, 0.0, (self.params.stem_cell_engraftment_percent / 100.0)
         ], dtype=np.float64)
         self.current_glucose = self.initial_glucose
@@ -240,6 +418,20 @@ class BergmanPatientModel:
         **kwargs,
     ) -> float:
         """Advance the model by *time_step* minutes and return new glucose."""
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"Unsupported Bergman update arguments: {names}")
+        if not np.isfinite(time_step) or float(time_step) <= 0.0:
+            raise ValueError("time_step must be a finite positive number of minutes")
+        if not np.isfinite(delivered_insulin) or float(delivered_insulin) < 0.0:
+            raise ValueError("delivered_insulin must be finite and non-negative")
+        if not np.isfinite(carb_intake) or float(carb_intake) < 0.0:
+            raise ValueError("carb_intake must be finite and non-negative")
+        if not np.isfinite(delivered_glucagon_mg) or float(delivered_glucagon_mg) < 0.0:
+            raise ValueError("delivered_glucagon_mg must be finite and non-negative")
+        if current_time is not None and not np.isfinite(current_time):
+            raise ValueError("current_time must be finite when provided")
+        previous_state = copy.deepcopy(self.get_state())
         true_carbs = carb_intake * self.meal_mismatch_epsilon
         self.last_delivered_insulin_units = max(0.0, float(delivered_insulin))
         self.last_delivered_glucagon_mg = max(0.0, float(delivered_glucagon_mg))
@@ -279,35 +471,70 @@ class BergmanPatientModel:
 
         # --- Prepare exogenous insulin/glucagon rate ---
         insulin_rate = (delivered_insulin * 1000.0) / max(time_step, 0.001)
-        glucagon_rate = (delivered_glucagon_mg * 1e6) / max(time_step, 0.001) # pg/min
+        glucagon_rate = glucagon_mg_to_pg(delivered_glucagon_mg) / max(time_step, 0.001)
 
         # --- Solve ODE ---
         ct = current_time if current_time is not None else 0.0
-        sol = solve_ivp(
-            fun=lambda t, y: self._ode(t, y, insulin_rate, glucagon_rate, ct),
-            t_span=(0.0, time_step),
-            y0=self._state,
-            method="RK45",
-            max_step=1.0,
-            rtol=1e-6,
-            atol=1e-8,
-        )
+        try:
+            sol = solve_ivp(
+                fun=lambda t, y: self._ode(
+                    t,
+                    y,
+                    insulin_rate,
+                    glucagon_rate,
+                    float(ct) + float(t),
+                ),
+                t_span=(0.0, time_step),
+                y0=self._state,
+                method="RK45",
+                max_step=1.0,
+                rtol=1e-6,
+                atol=1e-8,
+            )
 
-        self._state = sol.y[:, -1].copy()
-        self._state[0] = self._guard_glucose_transition(float(self._state[0]), time_step)
-        # Clamp non-negative for other compartments
-        for i in range(1, len(self._state)):
-            self._state[i] = max(0.0, self._state[i])
-        self._state[12] = float(np.clip(self._state[12], 0.0, 1.0))
+            if (
+                not sol.success
+                or sol.y.shape[1] == 0
+                or not np.all(np.isfinite(sol.y[:, -1]))
+            ):
+                raise RuntimeError(f"Bergman ODE integration failed: {sol.message}")
+            self._state = sol.y[:, -1].copy()
+            self._state[0] = self._guard_glucose_transition(
+                float(self._state[0]), time_step
+            )
+            # X is a deviation-from-basal action state and may legitimately be
+            # negative when plasma insulin falls below its reference value.
+            if np.any(self._state[2:] < -1e-6):
+                minimum = float(np.min(self._state[2:]))
+                raise RuntimeError(
+                    f"Bergman ODE produced a negative compartment state: {minimum}"
+                )
+            for index in self._bounded_fraction_state_indices():
+                value = float(self._state[index])
+                if value > 1.0 + 1e-6:
+                    raise RuntimeError(
+                        f"Bergman ODE produced a fraction state above 1: {value}"
+                    )
+            # Remove only sub-micro numerical integration noise.
+            for i in range(2, len(self._state)):
+                self._state[i] = max(0.0, self._state[i])
+            for index in self._bounded_fraction_state_indices():
+                self._state[index] = min(1.0, self._state[index])
 
-        self.current_glucose = float(self._state[0])
-        return self.current_glucose
+            self.current_glucose = float(self._state[0])
+            return self.current_glucose
+        except Exception:
+            self.set_state(previous_state)
+            raise
 
     def get_current_glucose(self) -> float:
         return self.current_glucose
 
     def trigger_event(self, event_type: str, value: Any) -> None:
-        pass  # handled by the simulator
+        # Scenario events are applied by the simulator through the explicit
+        # start/stop methods. Retain the last unsupported event for audit
+        # visibility instead of silently claiming that it changed physiology.
+        self._last_unsupported_event = {"event_type": str(event_type), "value": value}
 
     def get_patient_state(self) -> Dict[str, float]:
         return {
@@ -319,6 +546,7 @@ class BergmanPatientModel:
             "icr": self.carb_factor,
             "dia_minutes": self.insulin_action_duration,
             "plasma_insulin_mU_L": float(self._state[2]),
+            "reference_insulin_mU_L": self._reference_insulin_mU_L,
             "remote_insulin_action": float(self._state[1]),
             "stomach_glucose_mg": float(self._state[3] + self._state[4]),
             "stomach_solid_mg": float(self._state[3]),
@@ -356,16 +584,26 @@ class BergmanPatientModel:
         dia_minutes: Optional[float] = None,
     ) -> None:
         if isf is not None:
+            if not np.isfinite(isf) or float(isf) <= 0.0:
+                raise ValueError("isf must be finite and positive")
             self.insulin_sensitivity = float(isf)
+            self.params.p3 = self._p3_per_isf * self.insulin_sensitivity
         if icr is not None:
+            if not np.isfinite(icr) or float(icr) <= 0.0:
+                raise ValueError("icr must be finite and positive")
             self.carb_factor = float(icr)
         if basal_rate is not None:
+            if not np.isfinite(basal_rate) or float(basal_rate) < 0.0:
+                raise ValueError("basal_rate must be finite and non-negative")
             self.basal_insulin_rate = float(basal_rate)
         if dia_minutes is not None:
+            if not np.isfinite(dia_minutes) or float(dia_minutes) <= 0.0:
+                raise ValueError("dia_minutes must be finite and positive")
             self.insulin_action_duration = float(dia_minutes)
 
     def get_state(self) -> Dict[str, Any]:
         return {
+            "state_schema": "bergman_iints_v2_14",
             "ode_state": self._state.tolist(),
             "current_glucose": self.current_glucose,
             "insulin_on_board": self.insulin_on_board,
@@ -378,9 +616,11 @@ class BergmanPatientModel:
             "exercise_intensity": self.exercise_intensity,
             "is_stressed": self.is_stressed,
             "stress_intensity": self.stress_intensity,
+            "last_unsupported_event": getattr(self, "_last_unsupported_event", None),
         }
 
     def set_state(self, state: Dict[str, Any]) -> None:
+        loaded_ode_state = False
         if "ode_state" in state:
             ode_state = np.array(state["ode_state"], dtype=np.float64)
             # Handle legacy snapshot coercions to 13-state vector
@@ -409,21 +649,99 @@ class BergmanPatientModel:
                     list(ode_state) + [(self.params.stem_cell_engraftment_percent / 100.0)],
                     dtype=np.float64,
                 )
+            if ode_state.size != 14:
+                raise ValueError(
+                    f"Unsupported Bergman ODE snapshot length {ode_state.size}; expected 14"
+                )
+            if not np.all(np.isfinite(ode_state)):
+                raise ValueError("Bergman ODE snapshot contains non-finite values")
+            if ode_state[0] < 0.0 or np.any(ode_state[2:] < 0.0):
+                raise ValueError("Bergman ODE snapshot contains a negative mass or concentration")
+            for index in self._bounded_fraction_state_indices():
+                if ode_state[index] > 1.0:
+                    raise ValueError(
+                        "Bergman ODE snapshot contains a fraction state above 1"
+                    )
             self._state = ode_state
-        self.current_glucose = state.get("current_glucose", self.current_glucose)
-        self.insulin_on_board = state.get("insulin_on_board", self.insulin_on_board)
-        self.carbs_on_board = state.get("carbs_on_board", self.carbs_on_board)
-        self.last_delivered_insulin_units = state.get(
-            "last_delivered_insulin_units",
-            state.get("delivered_insulin", self.last_delivered_insulin_units),
+            clearance_ml_min = (
+                self.params.glucagon_clearance_ml_kg_min
+                * self.params.body_weight_kg
+            )
+            self._state[10] = (
+                self.params.k_e_glucagon * self._state[9]
+                / max(clearance_ml_min, 1e-9)
+            )
+            loaded_ode_state = True
+
+        if loaded_ode_state:
+            restored_glucose = float(self._state[0])
+            supplied_glucose = state.get("current_glucose")
+            if supplied_glucose is not None and not np.isclose(
+                float(supplied_glucose), restored_glucose, rtol=0.0, atol=1e-6
+            ):
+                raise ValueError(
+                    "Bergman snapshot is inconsistent: current_glucose does not "
+                    "match ode_state[0]"
+                )
+            self.current_glucose = restored_glucose
+        else:
+            self.current_glucose = validated_snapshot_scalar(
+                state.get("current_glucose", self.current_glucose),
+                name="current_glucose",
+                minimum=20.0,
+            )
+        self.insulin_on_board = validated_snapshot_scalar(
+            state.get("insulin_on_board", self.insulin_on_board),
+            name="insulin_on_board",
+            minimum=0.0,
         )
-        self.last_delivered_glucagon_mg = state.get("last_delivered_glucagon_mg", 0.0)
-        self.active_insulin_doses = state.get("active_insulin_doses", [])
-        self.active_carb_intakes = state.get("active_carb_intakes", [])
-        self.is_exercising = state.get("is_exercising", False)
-        self.exercise_intensity = state.get("exercise_intensity", 0.0)
-        self.is_stressed = state.get("is_stressed", False)
-        self.stress_intensity = state.get("stress_intensity", 0.0)
+        self.carbs_on_board = validated_snapshot_scalar(
+            state.get("carbs_on_board", self.carbs_on_board),
+            name="carbs_on_board",
+            minimum=0.0,
+        )
+        self.last_delivered_insulin_units = validated_snapshot_scalar(
+            state.get(
+                "last_delivered_insulin_units",
+                state.get("delivered_insulin", self.last_delivered_insulin_units),
+            ),
+            name="last_delivered_insulin_units",
+            minimum=0.0,
+        )
+        self.last_delivered_glucagon_mg = validated_snapshot_scalar(
+            state.get("last_delivered_glucagon_mg", 0.0),
+            name="last_delivered_glucagon_mg",
+            minimum=0.0,
+        )
+        self.active_insulin_doses = validated_activity_events(
+            state.get("active_insulin_doses", []),
+            name="active_insulin_doses",
+            age_key="age",
+        )
+        self.active_carb_intakes = validated_activity_events(
+            state.get("active_carb_intakes", []),
+            name="active_carb_intakes",
+            age_key="time_since_intake",
+        )
+        self.is_exercising = validated_snapshot_bool(
+            state.get("is_exercising", False), name="is_exercising"
+        )
+        self.exercise_intensity = validated_snapshot_scalar(
+            state.get("exercise_intensity", 0.0),
+            name="exercise_intensity",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        self.is_stressed = validated_snapshot_bool(
+            state.get("is_stressed", False), name="is_stressed"
+        )
+        self.stress_intensity = validated_snapshot_scalar(
+            state.get("stress_intensity", 0.0),
+            name="stress_intensity",
+            minimum=0.0,
+            maximum=1.0,
+        )
+        self._last_unsupported_event = state.get("last_unsupported_event")
 
     # ------------------------------------------------------------------
     # ODE right-hand-side
@@ -442,26 +760,38 @@ class BergmanPatientModel:
 
         Vg_abs = p.Vg * p.body_weight_kg   # dL
         Vi_abs = p.Vi * p.body_weight_kg    # L
-        V_glucagon = p.V_glucagon_per_kg * p.body_weight_kg
+        glucagon_clearance_ml_min = (
+            p.glucagon_clearance_ml_kg_min * p.body_weight_kg
+        )
 
         # --- Glucose rate of appearance from gut ---
         Ra = (p.k_abs * Q_gut) / Vg_abs  # mg/dL/min
 
         # --- Exogenous Glucagon Kinetics (Bi-hormonal PK/PD) ---
-        dY1_dt = u_glucagon_pg_per_min - Y1 / p.t_max_glucagon
-        dY2_dt = Y1 / p.t_max_glucagon - Y2 / p.t_max_glucagon
-        U_Gamma = Y2 / p.t_max_glucagon
-        dGamma_dt = U_Gamma / V_glucagon - p.k_e_glucagon * Gamma
-        dx_gluc_dt = -p.k_a_glucagon * x_gluc + p.S_glucagon * p.k_a_glucagon * Gamma
+        glucagon_k1 = 1.0 / max(p.t_max_glucagon, 1.0)
+        glucagon_k2 = max(p.k_e_glucagon, 1e-9)
+        dY1_dt = u_glucagon_pg_per_min - glucagon_k1 * Y1
+        dY2_dt = glucagon_k1 * Y1 - glucagon_k2 * Y2
+        glucagon_concentration = (
+            glucagon_k2 * Y2 / max(glucagon_clearance_ml_min, 1e-9)
+        )
+        dGamma_dt = (
+            glucagon_k2 * dY2_dt / max(glucagon_clearance_ml_min, 1e-9)
+        )
+        glucagon_activation = glucagon_concentration / (
+            max(p.glucagon_ec50_pg_ml, 1e-9) + glucagon_concentration
+        )
+        dx_gluc_dt = p.k_a_glucagon * (
+            p.S_glucagon * glucagon_activation - x_gluc
+        )
 
         # --- Dawn phenomenon ---
-        dawn = 0.0
-        if self.dawn_phenomenon_strength > 0:
-            minutes_in_day = current_time % 1440
-            ds = self.dawn_start_hour * 60
-            de = self.dawn_end_hour * 60
-            if ds <= minutes_in_day <= de:
-                dawn = self.dawn_phenomenon_strength / 60.0  # mg/dL/min
+        dawn = dawn_glucose_rate_mgdl_min(
+            current_time,
+            peak_strength_mgdl_per_hour=self.dawn_phenomenon_strength,
+            start_hour=self.dawn_start_hour,
+            end_hour=self.dawn_end_hour,
+        )
 
         # --- Exercise Physiologic Impact ---
         exercise_p1_multiplier = 1.0
@@ -482,13 +812,8 @@ class BergmanPatientModel:
             stress_Gb_multiplier = 1.0 + 0.5 * self.stress_intensity
 
         # --- Endogenous Rescue & HAAF ---
-        hypo_delta = max(0.0, 70.0 - G)
-        rescue_multiplier = 1.0 + (hypo_delta / 10.0) * (1.0 - HAAF)
-
-        # HAAF Memory Dynamics
-        k_haaf_build = 0.005
-        k_haaf_decay = 1.0 / (24 * 60)
-        dHAAF_dt = k_haaf_build * hypo_delta * (1.0 - HAAF) - k_haaf_decay * HAAF
+        rescue_multiplier = counterregulatory_rescue_multiplier(G, HAAF)
+        dHAAF_dt = antecedent_hypoglycemia_memory_derivative(G, HAAF)
 
         p1_eff = p.p1 * exercise_p1_multiplier * stress_p1_multiplier
         p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier
@@ -504,15 +829,16 @@ class BergmanPatientModel:
         dGdt = -(p1_eff + X) * G + p1_eff * Gb_eff + Ra + dawn - exercise_glucose_uptake - F_R
 
         # --- dX/dt ---
-        dXdt = -p.p2 * X + p3_eff * max(I - p.Ib, 0.0)
+        dXdt = -p.p2 * X + p3_eff * (I - self._reference_insulin_mU_L)
 
         # --- Stem Cell / Islet Secretion ---
         # Gamma acts as base secretion rate for a 100% functional pancreas
         # M_graft acts as the survival fraction multiplier.
-        total_secretion = p.gamma * M_graft * max(G - p.h, 0.0)
+        total_secretion_concentration = p.gamma * M_graft * max(G - p.h, 0.0)
         
-        secretion_subq = total_secretion * p.stem_cell_subq_fraction
-        secretion_plasma = total_secretion * (1.0 - p.stem_cell_subq_fraction)
+        secretion_mass = total_secretion_concentration * Vi_abs
+        secretion_subq = secretion_mass * p.stem_cell_subq_fraction
+        secretion_plasma = secretion_mass * (1.0 - p.stem_cell_subq_fraction)
 
         # --- dS1/dt, dS2/dt (Subcutaneous Insulin Absorption) ---
         # Any SubQ implanted islet cells release into S1
@@ -524,12 +850,12 @@ class BergmanPatientModel:
 
         # --- dI/dt ---
         # Any PV/Hepatic implanted islet cells release directly into plasma
-        dIdt = -p.n * (I - p.Ib) + secretion_plasma + Ra_I / Vi_abs
+        dIdt = -p.n * I + (secretion_plasma + Ra_I) / Vi_abs
         
         # --- dM_graft/dt ---
         dM_graft_dt = -p.immune_rejection_rate * M_graft
 
-        # --- Dalla Man Multi-compartment Meal Kinetcs ---
+        # --- Adapted three-stage meal absorption chain ---
         gastric_emptying_rate = 1.0 / max(float(p.tau_meal), 1.0)
         solid_to_liquid_rate = gastric_emptying_rate * 1.5 
         dQ_sto1_dt = -solid_to_liquid_rate * Q_sto1

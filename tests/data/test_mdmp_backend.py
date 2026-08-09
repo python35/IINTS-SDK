@@ -51,6 +51,8 @@ def test_run_mdmp_validation_normalizes_result_shape() -> None:
 
     assert result.row_count == 3
     assert result.mdmp_grade in {"draft", "research_grade", "clinical_grade", "ai_ready", "raw"}
+    assert result.contract_quality_gate_passed is True
+    assert result.certified_for_medical_research is False
     assert isinstance(result.to_dict(), dict)
 
 

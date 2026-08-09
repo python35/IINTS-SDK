@@ -281,7 +281,7 @@ jobs:
 
           This prerelease contains the native Rust/Tauri research workbench with a restrained text-only IINTS-AF identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
 
-          Version 0.2.5 fixes patient-model compatibility in baseline comparisons and completes the bundled AlphaFold controls. Protein cards now provide a local interactive C-alpha viewer, static PNG opening, safe Finder/Explorer reveal for mmCIF coordinates, on-demand PAE generation, and an allowlisted link to the matching official AlphaFold entry.
+          Version 0.2.6 accompanies SDK v1.5.33 and revalidates the complete research workbench against the strengthened physiological-unit, calibration, provenance, MDMP, and formula-registry boundaries. It also retains the local interactive C-alpha viewer, static PNG opening, safe Finder/Explorer reveal for mmCIF coordinates, on-demand PAE generation, and allowlisted links to matching official AlphaFold entries.
 
           Paths across run output, result inspection, academic export, SBML, COPASI, CellML, and FMI workflows retain native file and folder selectors. Inputs remain editable for advanced use, while extension checks, required-field validation, consent-aware actions, disabled unavailable actions, keyboard shortcuts, and responsive layouts reduce avoidable operator mistakes.
 

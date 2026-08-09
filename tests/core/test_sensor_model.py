@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from iints.core.devices.models import SENSOR_PROFILES, SensorModel, create_sensor_model
 
 
@@ -8,7 +10,8 @@ def test_create_sensor_model_profile_exposes_free_living_artifacts() -> None:
     state = sensor.get_state()
 
     assert "free_living_cgm" in SENSOR_PROFILES
-    assert state["lag_minutes"] == 10
+    assert state["lag_minutes"] == 0
+    assert state["isf_tau_minutes"] == 10.0
     assert state["noise_std"] == 8.0
     assert state["drift_std_per_hour"] > 0.0
     assert state["noise_fbm_hurst"] == 0.75
@@ -35,7 +38,7 @@ def test_sensor_model_can_emit_compression_low_episode() -> None:
     assert first.status == "compression_low"
     assert second.status == "compression_low"
     assert first.value == 92.0
-    assert second.value == 98.0
+    assert second.value == pytest.approx(95.79272335297135)
 
 
 def test_sensor_model_can_hold_dropouts_across_multiple_steps() -> None:

@@ -120,14 +120,23 @@ def test_hovorka_circadian_egp_is_gated_by_dawn_strength() -> None:
 
 
 def test_hovorka_molecular_affinity_scalar_affects_insulin_action_curve() -> None:
-    normal = HovorkaPatientModel(initial_glucose=120.0, molecular_affinity_scalar=1.0)
-    resistant = HovorkaPatientModel(initial_glucose=120.0, molecular_affinity_scalar=0.2)
+    normal = HovorkaPatientModel(
+        initial_glucose=120.0,
+        molecular_affinity_scalar=1.0,
+        max_glucose_rate_mgdl_per_min=4.0,
+    )
+    resistant = HovorkaPatientModel(
+        initial_glucose=120.0,
+        molecular_affinity_scalar=0.2,
+        max_glucose_rate_mgdl_per_min=4.0,
+    )
     normal_trace: list[float] = []
     resistant_trace: list[float] = []
 
     for minute in range(0, 241, 5):
         carbs = 60.0 if minute == 30 else 0.0
-        insulin = 6.0 if minute == 25 else 0.0
+        basal_for_step = normal.basal_insulin_rate * 5.0 / 60.0
+        insulin = basal_for_step + (6.0 if minute == 25 else 0.0)
         normal_trace.append(normal.update(5.0, insulin, carbs, current_time=float(minute)))
         resistant_trace.append(resistant.update(5.0, insulin, carbs, current_time=float(minute)))
 

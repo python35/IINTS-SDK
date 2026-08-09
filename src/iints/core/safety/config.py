@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import math
 from typing import Any
 
 SENSOR_GLUCOSE_MIN_MGDL = 40.0
@@ -15,7 +16,7 @@ CONTROLLER_HYPO_GUARD_MGDL = 90.0
 CONTROLLER_FALLING_TREND_GUARD_MGDL_MIN = -1.0
 CONTROLLER_HIGH_IOB_GUARD_UNITS = 4.0
 ML_MAX_INSULIN_CANDIDATE_PER_STEP_UNITS = 1.0
-SAFETY_FORMULA_VERSION = "iints-safety-formulas-v1"
+SAFETY_FORMULA_VERSION = "iints-safety-formulas-v2"
 
 
 @dataclass
@@ -34,7 +35,10 @@ class SafetyConfig:
     hypoglycemia_threshold: float = 70.0
     severe_hypoglycemia_threshold: float = 54.0
     hyperglycemia_threshold: float = 250.0
-    max_insulin_per_bolus: float = 5.0
+    # Configurable engineering envelopes, not patient-specific prescriptions.
+    # Defaults must permit ordinary meal coverage in the bundled ICR profiles;
+    # low-glucose, falling-trend, prediction and basal guards remain separate.
+    max_insulin_per_bolus: float = 15.0
     # Research-only glucagon safety rails for bi-hormonal simulations.
     # These caps prevent algorithm outputs from becoming unbounded actuator
     # commands. They are not clinical dosing advice.
@@ -42,8 +46,8 @@ class SafetyConfig:
     max_glucagon_per_hour_mg: float = 2.0
     glucagon_allowed_above_glucose_mgdl: float = 110.0
     glucose_rate_alarm: float = 5.0
-    max_insulin_per_hour: float = 3.0
-    max_iob: float = 4.0
+    max_insulin_per_hour: float = 20.0
+    max_iob: float = 20.0
     trend_stop: float = -2.0
     hypo_cutoff: float = 70.0
     max_basal_multiplier: float = 3.0
@@ -71,6 +75,90 @@ class SafetyConfig:
     # Simulation termination limits
     critical_glucose_threshold: float = 40.0
     critical_glucose_duration_minutes: int = 30
+
+    def __post_init__(self) -> None:
+        numeric_fields = {
+            name: value
+            for name, value in asdict(self).items()
+            if not isinstance(value, bool)
+        }
+        for name, value in numeric_fields.items():
+            if not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                raise ValueError(f"SafetyConfig.{name} must be finite")
+
+        if not 0.0 <= self.min_glucose < self.max_glucose:
+            raise ValueError("min_glucose must be non-negative and below max_glucose")
+        if self.max_glucose_delta_per_5_min <= 0.0:
+            raise ValueError("max_glucose_delta_per_5_min must be positive")
+        if not (
+            0.0
+            < self.severe_hypoglycemia_threshold
+            < self.hypoglycemia_threshold
+            < self.hyperglycemia_threshold
+        ):
+            raise ValueError(
+                "glucose thresholds must satisfy 0 < severe < hypo < hyper"
+            )
+        if not 0.0 < self.hypo_cutoff <= self.hyperglycemia_threshold:
+            raise ValueError("hypo_cutoff must be positive and below hyper threshold")
+        if self.predicted_hypoglycemia_threshold <= 0.0:
+            raise ValueError("predicted_hypoglycemia_threshold must be positive")
+        if self.critical_glucose_threshold <= 0.0:
+            raise ValueError("critical_glucose_threshold must be positive")
+
+        strictly_positive = (
+            "glucose_rate_alarm",
+            "max_basal_multiplier",
+            "predicted_hypoglycemia_horizon_minutes",
+            "predictor_mc_dropout_samples",
+            "predictor_uncertainty_max_std_mgdl",
+            "predictor_ood_zscore_threshold",
+            "controller_hypo_guard_mgdl",
+            "contract_glucose_threshold",
+            "critical_glucose_duration_minutes",
+        )
+        for name in strictly_positive:
+            if float(getattr(self, name)) <= 0.0:
+                raise ValueError(f"SafetyConfig.{name} must be positive")
+        non_negative = (
+            "max_insulin_per_bolus",
+            "max_glucagon_per_step_mg",
+            "max_glucagon_per_hour_mg",
+            "max_insulin_per_hour",
+            "max_iob",
+            "controller_high_iob_guard_units",
+            "ml_max_insulin_candidate_per_step_units",
+        )
+        for name in non_negative:
+            if float(getattr(self, name)) < 0.0:
+                raise ValueError(f"SafetyConfig.{name} must be non-negative")
+        if self.glucagon_allowed_above_glucose_mgdl <= 0.0:
+            raise ValueError("glucagon_allowed_above_glucose_mgdl must be positive")
+        if self.controller_falling_trend_guard_mgdl_min >= 0.0:
+            raise ValueError(
+                "controller_falling_trend_guard_mgdl_min must be negative"
+            )
+        if self.trend_stop >= 0.0 or self.contract_trend_threshold_mgdl_min >= 0.0:
+            raise ValueError("falling-trend thresholds must be negative")
+        if not 0.0 <= self.predictor_ood_max_feature_fraction <= 1.0:
+            raise ValueError(
+                "predictor_ood_max_feature_fraction must be between 0 and 1"
+            )
+        for name in (
+            "predictor_uncertainty_gate_enabled",
+            "predictor_ood_gate_enabled",
+            "contract_enabled",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise ValueError(f"SafetyConfig.{name} must be a boolean")
+        for name in (
+            "predicted_hypoglycemia_horizon_minutes",
+            "predictor_mc_dropout_samples",
+            "critical_glucose_duration_minutes",
+        ):
+            value = getattr(self, name)
+            if isinstance(value, bool) or int(value) != value:
+                raise ValueError(f"SafetyConfig.{name} must be an integer")
 
     def to_versioned_dict(self) -> dict[str, Any]:
         return {

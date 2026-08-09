@@ -382,7 +382,7 @@
         {
           "start_time": 1080,
           "event_type": "stress",
-          "value": 0.55,
+          "value": 0.65,
           "duration": 120
         }
       ]

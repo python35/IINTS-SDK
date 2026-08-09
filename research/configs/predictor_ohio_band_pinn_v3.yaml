@@ -39,7 +39,7 @@ training:
   band_weighted_high_weight: 1.8
   band_weighted_max_weight: 6.0
   pinn_lambda: 0.25
-  pinn_max_roc: 8.0
+  pinn_max_roc: 3.0
   early_stopping_patience: 10
   early_stopping_min_delta: 0.0003
   meal_announcement_minutes: 15

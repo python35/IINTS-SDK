@@ -1,0 +1,13 @@
+flowchart LR
+    A["Scenario, patient profile<br/>dataset and seed"] --> B["Data and configuration<br/>validation"]
+    B --> C["Simulation orchestrator"]
+    C --> D["Virtual patient<br/>Custom / Bergman / Hovorka"]
+    D --> E["CGM-like sensor<br/>lag, drift, seeded noise"]
+    E --> F["Candidate algorithm"]
+    F --> G["Deterministic safety<br/>supervisor"]
+    G -->|approved / reduced / blocked| D
+    C --> H["Run recorder"]
+    G --> H
+    H --> I["CSV + JSON manifests<br/>audit and validation"]
+    I --> J["Metrics, AGP-style report<br/>poster and evidence bundle"]
+    I -. evidence only .-> K["Optional local AI<br/>explanation and review"]
