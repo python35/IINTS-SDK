@@ -35,6 +35,7 @@ Release date: 2026-08-09
 
 ### Safety
 
+- upgraded `cryptography` to the fixed 50.x line after `PYSEC-2026-3552` was published
 - AI remains explanatory or experimental and cannot replace deterministic simulation or safety authority
 - molecular, genetic, structural, and calibration evidence is not converted silently into treatment logic
 - IINTS-AF remains research and educational software, not a medical device
