@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from iints.cli.cli import app
@@ -88,6 +89,18 @@ def test_contract_runner_applies_builtin_unit_conversion() -> None:
     result = runner_impl.run(df, apply_builtin_transforms=True)
 
     assert result.is_compliant is True
+
+
+def test_contract_runner_rejects_ambiguous_unit_conversion_column() -> None:
+    payload = _base_contract()
+    payload["streams"][0]["metadata"]["unit_conversions"] = {  # type: ignore[index]
+        "glucose": {"from": "mmol/L", "to": "mg/dL"}
+    }
+    df = pd.DataFrame([[1, 6.0, 7.0]], columns=["timestamp", "glucose", "glucose"])
+    runner_impl = ContractRunner(parse_contract(payload))
+
+    with pytest.raises(ValueError, match="one unique column named 'glucose'"):
+        runner_impl.run(df, apply_builtin_transforms=True)
 
 
 def test_mdmp_grade_helpers() -> None:

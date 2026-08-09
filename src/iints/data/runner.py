@@ -303,15 +303,21 @@ class ContractRunner:
             raw_conversions = stream.metadata.get("unit_conversions", {})
             if not isinstance(raw_conversions, dict):
                 continue
-            for column, spec in raw_conversions.items():
-                if column not in transformed.columns or not isinstance(spec, dict):
+            for raw_column, spec in raw_conversions.items():
+                if not isinstance(raw_column, str) or not isinstance(spec, dict):
                     continue
+                column = raw_column
+                if column not in transformed.columns:
+                    continue
+                values = transformed[column]
+                if not isinstance(values, pd.Series):
+                    raise ValueError(f"Unit conversion requires one unique column named '{column}'.")
                 from_unit = str(spec.get("from", "")).strip().lower()
                 to_unit = str(spec.get("to", "")).strip().lower()
                 if from_unit == "mmol/l" and to_unit == "mg/dl":
-                    transformed[column] = pd.to_numeric(transformed[column], errors="coerce") * 18.0182
+                    transformed[column] = pd.to_numeric(values, errors="coerce") * 18.0182
                 elif from_unit == "mg/dl" and to_unit == "mmol/l":
-                    transformed[column] = pd.to_numeric(transformed[column], errors="coerce") / 18.0182
+                    transformed[column] = pd.to_numeric(values, errors="coerce") / 18.0182
         return transformed
 
     def run(

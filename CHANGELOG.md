@@ -41,7 +41,7 @@ Release date: 2026-08-09
 
 ### Verified
 
-- full Python suite: `877 passed, 2 skipped`
+- full Python suite: `878 passed, 2 skipped`
 - focused scientific suite: `80 passed`
 - desktop Python suite: `60 passed, 3 skipped`
 - Rust/Tauri tests: `6 passed`; Clippy, formatting, frontend static checks, release build, and native `--smoke` passed
