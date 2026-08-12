@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=83.0.0,<84.0.0"]
+requires = ["setuptools>=83.0.0,<85.0.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -96,19 +96,19 @@ mdmp = [
 ]
 desktop = [
   "pyinstaller>=6.11.0,<7.0.0",
-  "setuptools>=83.0.0,<84.0.0",
+  "setuptools>=83.0.0,<85.0.0",
   "PySide6>=6.7.0,<7.0.0",
   "plotly>=5.18.0,<7.0.0",
 ]
 desktop-qt = [
   "pyinstaller>=6.11.0,<7.0.0",
-  "setuptools>=83.0.0,<84.0.0",
+  "setuptools>=83.0.0,<85.0.0",
   "PySide6>=6.7.0,<7.0.0",
   "plotly>=5.18.0,<7.0.0",
 ]
 desktop-macos = [
   "pyinstaller>=6.11.0,<7.0.0",
-  "setuptools>=83.0.0,<84.0.0",
+  "setuptools>=83.0.0,<85.0.0",
   "pyobjc-framework-Cocoa>=10.0,<13.0",
 ]
 desktop-all = [
@@ -129,7 +129,7 @@ desktop-all = [
   "pyserial>=3.5,<4.0",
   "PySide6>=6.7.0,<7.0.0",
   "seaborn>=0.11.0,<1.0.0",
-  "setuptools>=83.0.0,<84.0.0",
+  "setuptools>=83.0.0,<85.0.0",
   "torch>=2.13.0,<3.0.0",
 ]
 
