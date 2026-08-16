@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-8" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-10" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -289,8 +289,12 @@
         </svg>
         <div class="subsection-heading">
           <h3>Tabular preview</h3>
-          <span>First bounded rows only</span>
+          <span id="table-preview-summary">First bounded rows only</span>
         </div>
+        <label class="checkbox-field table-column-toggle">
+          <input id="show-all-columns" type="checkbox" />
+          <span>Show every technical column</span>
+        </label>
         <div class="table-wrap">
           <table id="preview-table"></table>
         </div>
@@ -687,6 +691,22 @@
         <div class="button-row">
           <button id="evidence-refresh-btn">Load evidence connectors</button>
         </div>
+        <div class="evidence-filter-bar" aria-label="Evidence filters">
+          <label>
+            Search resources
+            <input id="evidence-search" type="search" placeholder="Name, category, method..." spellcheck="false" />
+          </label>
+          <label>
+            Integration status
+            <select id="evidence-level">
+              <option value="all">All statuses</option>
+              <option value="integrated">Integrated</option>
+              <option value="partial">Partially integrated</option>
+              <option value="portal">Portal only</option>
+              <option value="planned">Planned</option>
+            </select>
+          </label>
+        </div>
         <pre id="evidence-status" class="status-box compact">Evidence connectors not loaded yet.</pre>
         <div id="evidence-list" class="evidence-list" aria-live="polite"></div>
       </section>
@@ -699,6 +719,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js?v=workbench-8"></script>
+    <script type="module" src="./main.js?v=workbench-10"></script>
   </body>
 </html>

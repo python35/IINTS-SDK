@@ -46,7 +46,7 @@ class IINTSDesktopApp:
 
     def _apply_app_icon(self) -> None:
         try:
-            icon_ref = resources.files("iints_desktop").joinpath("assets", "app_icon.png")
+            icon_ref = resources.files("iints_desktop").joinpath("assets").joinpath("app_icon.png")
             if icon_ref.is_file():
                 self._window_icon = tk.PhotoImage(file=str(icon_ref))
                 self.root.iconphoto(True, self._window_icon)

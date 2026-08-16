@@ -28,8 +28,11 @@ from iints_desktop.local_ai import (
     RECOMMENDED_OLLAMA_MODELS,
     SYSTEM_PROMPT,
     LocalAIStartResult,
+    audit_ai_numeric_claims,
     format_ai_answer,
     resolve_ollama_executable,
+    restrict_ai_to_review_sections,
+    suppress_unsupported_numeric_lines,
 )
 from iints_desktop.mdmp import create_desktop_mdmp_certificate
 from iints_desktop.molecules import (
@@ -38,7 +41,11 @@ from iints_desktop.molecules import (
     load_molecule_backbone,
     pae_html_path,
 )
-from iints_desktop.results import build_ai_result_context, load_results_preview
+from iints_desktop.results import (
+    build_ai_result_context,
+    load_results_preview,
+    screen_results_csv,
+)
 from iints_desktop.update import format_shell_command
 from iints.research.structure import TARGETS
 
@@ -149,11 +156,11 @@ def test_results_preview_builds_metrics_graph_and_bounded_rows(tmp_path: Path) -
     csv_path.write_text(
         "\n".join(
             [
-                "time_minutes,glucose_actual_mgdl,carb_intake_grams,delivered_insulin_units",
-                "0,110,0,0.01",
-                "5,145,20,0.03",
-                "10,185,0,0.02",
-                "15,65,0,0.00",
+                "time_minutes,glucose_actual_mgdl,carb_intake_grams,delivered_insulin_units,safety_triggered",
+                "0,110,0,0.01,false",
+                "5,145,20,0.03,false",
+                "10,185,0,0.02,true",
+                "15,65,0,0.00,false",
             ]
         ),
         encoding="utf-8",
@@ -165,8 +172,16 @@ def test_results_preview_builds_metrics_graph_and_bounded_rows(tmp_path: Path) -
     assert len(preview.rows) == 2
     assert preview.metrics["Mean glucose"] == "126.2 mg/dL"
     assert preview.metrics["Time below 70"] == "25.0%"
+    assert preview.metrics["Duration"] == "15.0 min"
+    assert preview.metrics["Median sample interval"] == "5.0 min"
+    assert preview.metrics["Safety-triggered samples"] == "1"
     assert preview.graph_path is not None
     assert preview.graph_path.exists()
+
+    screen = screen_results_csv(csv_path)
+    assert screen.status == "excursions_present"
+    assert any("below 70" in flag for flag in screen.flags)
+    assert any("Safety logic" in flag for flag in screen.flags)
 
 
 def test_desktop_mdmp_certificate_signs_loaded_results(tmp_path: Path) -> None:
@@ -204,15 +219,17 @@ def test_ai_result_context_is_summary_only(tmp_path: Path) -> None:
 
     context = build_ai_result_context(csv_path)
 
-    assert "Summary metrics" in context
+    assert "AUTHORITATIVE DETERMINISTIC FACTS" in context
     assert "Mean glucose" in context
+    assert "Do not calculate new statistics" in context
     assert "Do not infer treatment decisions" in context
 
 
 def test_local_ai_prompt_is_research_only() -> None:
-    assert "Not a medical device" in SYSTEM_PROMPT
+    assert "not a medical device" in SYSTEM_PROMPT.lower()
     assert "Do not provide diagnosis" in SYSTEM_PROMPT
-    assert "Clinical Overview" in SYSTEM_PROMPT
+    assert "Deterministic Facts" in SYSTEM_PROMPT
+    assert "Never calculate, estimate" in SYSTEM_PROMPT
     assert RECOMMENDED_OLLAMA_MODELS
 
 
@@ -223,6 +240,61 @@ def test_local_ai_answer_formatter_removes_markdown_noise() -> None:
     assert "**" not in formatted
     assert "---" not in formatted
     assert "• Glucose is stable" in formatted
+
+
+def test_local_ai_numeric_audit_flags_invented_values() -> None:
+    context = "Mean glucose: 130.0 mg/dL\nTime in 70-180: 75.0%"
+
+    assert audit_ai_numeric_claims("Mean glucose was 130.0 mg/dL.", context) == ()
+    warnings = audit_ai_numeric_claims("The 95% confidence interval was 12.4 mg/dL.", context)
+
+    assert len(warnings) == 1
+    assert "95%" in warnings[0]
+    assert "12.4" in warnings[0]
+
+
+def test_local_ai_hides_lines_with_unsupported_quantities() -> None:
+    context = "Mean glucose: 130.0 mg/dL\nRows: 145"
+    answer = "\n".join(
+        [
+            "Deterministic Facts",
+            "• Mean glucose was 130.0 mg/dL.",
+            "• Invented interval was 12.4 mg/dL.",
+            "Next Checks",
+            "1. Review the trace.",
+        ]
+    )
+
+    filtered, count = suppress_unsupported_numeric_lines(answer, context)
+
+    assert count == 1
+    assert "130.0 mg/dL" in filtered
+    assert "12.4" not in filtered
+    assert "1. Review the trace" in filtered
+    assert "were hidden" in filtered
+
+
+def test_local_ai_csv_scope_keeps_only_review_sections() -> None:
+    answer = "\n".join(
+        [
+            "Deterministic Facts",
+            "• Model restatement that should not replace SDK facts.",
+            "Interpretation",
+            "• Unsupported causal story.",
+            "Limitations",
+            "• Predictor error was not computed.",
+            "Next Checks",
+            "• Inspect predictor uncertainty and safety reasons.",
+        ]
+    )
+
+    restricted = restrict_ai_to_review_sections(answer)
+
+    assert "Unsupported causal story" not in restricted
+    assert "Model restatement" not in restricted
+    assert "Predictor error was not computed" in restricted
+    assert "Inspect predictor uncertainty" in restricted
+    assert "aggregate SDK metrics" in restricted
 
 
 def test_local_ai_can_resolve_ollama_from_extra_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

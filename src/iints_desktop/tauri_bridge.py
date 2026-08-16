@@ -31,6 +31,9 @@ from iints_desktop.results import load_results_preview
 from iints_desktop.update import get_desktop_update_info
 
 
+DESKTOP_BRIDGE_API_VERSION = 2
+
+
 def _json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
@@ -65,6 +68,7 @@ def _status(_args: argparse.Namespace) -> int:
             "sdk_version": env.sdk_version,
             "python_executable": sys.executable,
             "bridge": "iints_desktop.tauri_bridge",
+            "bridge_api_version": DESKTOP_BRIDGE_API_VERSION,
             "research_only": True,
             "medical_device": False,
         }
@@ -127,6 +131,7 @@ def _diagnostics(_args: argparse.Namespace) -> int:
     return _ok(
         {
             "sdk_version": env.sdk_version,
+            "bridge_api_version": DESKTOP_BRIDGE_API_VERSION,
             "python_executable": sys.executable,
             "python_version": sys.version.split()[0],
             "cwd": Path.cwd(),
@@ -566,6 +571,10 @@ def _ai_ask(args: argparse.Namespace) -> int:
             "policy_violations": list(answer.policy_violations),
             "policy_warnings": list(answer.policy_warnings),
             "policy_action": answer.policy_action,
+            "numeric_claim_warnings": list(answer.numeric_claim_warnings),
+            "deterministic_metrics": answer.deterministic_metrics or {},
+            "suppressed_line_count": answer.suppressed_line_count,
+            "interpretation_restricted": answer.interpretation_restricted,
         }
     )
 

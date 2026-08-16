@@ -69,9 +69,9 @@ DESKTOP_PRESETS: tuple[DesktopPreset, ...] = (
         preset_name="hypo_prone_night",
         audience="Clinical feedback",
         description=(
-            "A calm, medically framed night-risk scenario. Use this when you want "
-            "to discuss safety checks, uncertainty, and what clinicians would want "
-            "to see before trusting an algorithm."
+            "An overnight hypoglycemia challenge for discussing safety checks, "
+            "uncertainty, and failure modes with clinical reviewers. The generated "
+            "trace must be reviewed before it is used as an example."
         ),
         expected_output="CSV data, safety/audit artifacts, and a clinical PDF report.",
         talk_track=(
@@ -138,8 +138,9 @@ DESKTOP_PRESETS: tuple[DesktopPreset, ...] = (
         preset_name="baseline_t1d",
         audience="SDK verification",
         description=(
-            "A full-day baseline reference run. Best for checking whether the SDK "
-            "installation, reporting pipeline, and artifact generation all work."
+            "A full-day baseline pipeline run. It checks whether the SDK installation, "
+            "reporting pipeline, and artifact generation work; it is not a validated "
+            "clinical reference trace."
         ),
         expected_output="Full-day CSV output, audit artifacts, and a PDF report.",
         talk_track=(
@@ -213,6 +214,33 @@ def run_demo_preset(
     report_pdf = _optional_path(outputs.get("report_pdf"))
     config_path = _optional_path(outputs.get("config_path"))
     run_id = str(outputs.get("run_id", "unknown-run"))
+    threshold_lines: list[str] = []
+    if results_csv is not None and results_csv.exists():
+        from iints_desktop.results import screen_results_csv
+
+        screen = screen_results_csv(results_csv)
+        selected_metrics = (
+            "Duration",
+            "Mean glucose",
+            "Min glucose",
+            "Max glucose",
+            "Glucose CV",
+            "Time in 70-180",
+            "Time below 70",
+            "Time above 180",
+            "Safety-triggered samples",
+        )
+        threshold_lines = [f"Threshold screen: {screen.label}"]
+        threshold_lines.extend(
+            f"{key}: {screen.metrics[key]}"
+            for key in selected_metrics
+            if key in screen.metrics
+        )
+        threshold_lines.extend(f"Review flag: {flag}" for flag in screen.flags)
+        threshold_lines.append(
+            "Threshold flags describe this simulated trace; they do not establish physiological or clinical validity."
+        )
+
     summary = "\n".join(
         line
         for line in [
@@ -223,6 +251,7 @@ def run_demo_preset(
             f"Output folder: {target}",
             f"Results CSV: {results_csv}" if results_csv else "Results CSV: not generated",
             f"Clinical report: {report_pdf}" if report_pdf else "Clinical report: not generated",
+            *threshold_lines,
             "Research only: not a medical device and not for treatment decisions.",
         ]
     )

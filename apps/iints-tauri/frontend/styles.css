@@ -1,18 +1,18 @@
 :root {
   color-scheme: light;
   font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  font-size: 15px;
-  --ink: #17232b;
-  --ink-muted: #53636d;
-  --navy: #132b3a;
-  --navy-active: #204358;
-  --blue: #1f5a78;
-  --blue-dark: #18475f;
-  --paper: #f3f4f2;
+  font-size: 14px;
+  --ink: #18242c;
+  --ink-muted: #596872;
+  --navy: #1b2b36;
+  --navy-active: #294b60;
+  --blue: #245f7a;
+  --blue-dark: #184b64;
+  --paper: #e9edef;
   --surface: #ffffff;
-  --surface-muted: #f7f8f7;
-  --line: #d4d9dc;
-  --line-strong: #aeb8be;
+  --surface-muted: #f6f8f8;
+  --line: #cdd4d8;
+  --line-strong: #a8b3b9;
   --success: #2c684f;
   --success-soft: #eef6f1;
   --warning: #78581f;
@@ -83,6 +83,7 @@ summary {
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
+select:focus-visible,
 summary:focus-visible,
 .workflow-card:focus-visible {
   outline: 2px solid var(--blue);
@@ -112,7 +113,7 @@ summary:focus-visible,
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 232px minmax(0, 1fr);
+  grid-template-columns: 218px minmax(0, 1fr);
 }
 
 .app-sidebar {
@@ -122,7 +123,7 @@ summary:focus-visible,
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 20px 14px 16px;
+  padding: 17px 12px 14px;
   color: #e8eef1;
   background: var(--navy);
   border-right: 1px solid #0b202d;
@@ -130,10 +131,10 @@ summary:focus-visible,
 }
 
 .brand-block {
-  min-height: 52px;
+  min-height: 45px;
   display: flex;
   align-items: center;
-  padding: 2px 7px 18px;
+  padding: 1px 8px 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.18);
 }
 
@@ -148,16 +149,16 @@ summary:focus-visible,
 
 .brand-wordmark {
   color: #ffffff;
-  font-size: 1.08rem;
-  font-weight: 780;
-  letter-spacing: 0.075em;
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
   line-height: 1;
 }
 
 .workspace-nav {
   display: grid;
   gap: 2px;
-  margin-top: 18px;
+  margin-top: 15px;
 }
 
 .nav-section-label {
@@ -176,16 +177,16 @@ summary:focus-visible,
 
 .nav-item {
   width: 100%;
-  min-height: 38px;
+  min-height: 35px;
   display: flex;
   align-items: center;
-  padding: 8px 10px;
+  padding: 7px 10px;
   color: #cbd7dd;
   background: transparent;
   border: 1px solid transparent;
   border-radius: 2px;
   text-align: left;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
 }
@@ -235,12 +236,12 @@ summary:focus-visible,
   position: sticky;
   top: 0;
   z-index: 8;
-  min-height: 106px;
+  min-height: 88px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 19px 28px;
+  padding: 15px 24px;
   background: #ffffff;
   border-bottom: 1px solid var(--line);
 }
@@ -262,41 +263,42 @@ h1,
 h2,
 h3 {
   color: var(--navy);
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
 }
 
 h1 {
   margin: 0;
-  font-family: Charter, "Iowan Old Style", Georgia, serif;
-  font-size: clamp(1.55rem, 2vw, 1.95rem);
-  font-weight: 650;
-  line-height: 1.15;
+  font-size: clamp(1.35rem, 1.7vw, 1.62rem);
+  font-weight: 680;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 h2 {
   margin: 0;
-  font-family: Charter, "Iowan Old Style", Georgia, serif;
-  font-size: 1.08rem;
-  font-weight: 650;
-  line-height: 1.25;
+  font-size: 0.93rem;
+  font-weight: 720;
+  letter-spacing: 0.005em;
+  line-height: 1.3;
 }
 
 h3 {
   margin: 0 0 7px;
-  font-size: 0.91rem;
+  font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.3;
 }
 
 .subtitle {
   max-width: 760px;
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--ink-muted);
-  font-size: 0.83rem;
+  font-size: 0.79rem;
   line-height: 1.45;
 }
 
 .header-status {
-  flex: 0 0 min(320px, 34vw);
+  flex: 0 0 min(350px, 38vw);
   display: grid;
   justify-items: end;
   gap: 4px;
@@ -333,6 +335,10 @@ h3 {
   background: var(--success);
 }
 
+.status-dot.warn {
+  background: var(--warning);
+}
+
 .status-dot.error {
   background: var(--danger);
 }
@@ -353,22 +359,19 @@ h3 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
-  gap: 14px;
-  padding: 20px 24px 28px;
+  gap: 12px;
+  padding: 16px 18px 24px;
 }
 
 .panel {
   min-width: 0;
-  padding: 19px;
+  padding: 0 16px 16px;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: 2px;
 }
 
-.update-panel {
-  border-top-color: var(--blue);
-}
-
+.diagnostics-panel,
 .history-panel,
 .results-panel,
 .academic-panel,
@@ -384,8 +387,9 @@ h3 {
   align-items: start;
   justify-content: space-between;
   gap: 18px;
-  margin-bottom: 15px;
-  padding-bottom: 11px;
+  margin: 0 -16px 14px;
+  padding: 11px 16px 10px;
+  background: #f8f9f9;
   border-bottom: 1px solid var(--line);
 }
 
@@ -397,7 +401,7 @@ h3 {
   max-width: 340px;
   margin: 2px 0 0;
   color: var(--ink-muted);
-  font-size: 0.75rem;
+  font-size: 0.71rem;
   line-height: 1.45;
   text-align: right;
 }
@@ -461,13 +465,13 @@ h3 {
 }
 
 button {
-  min-height: 36px;
-  padding: 7px 11px;
+  min-height: 33px;
+  padding: 6px 10px;
   color: #263b47;
   background: #f8f9f8;
   border: 1px solid var(--line-strong);
   border-radius: 3px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 650;
   cursor: pointer;
 }
@@ -492,6 +496,18 @@ button.primary:hover:not(:disabled) {
   color: #ffffff;
   background: var(--blue-dark);
   border-color: var(--blue-dark);
+}
+
+.nav-item:hover:not(:disabled) {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: transparent;
+}
+
+.nav-item.is-active:hover:not(:disabled) {
+  color: #ffffff;
+  background: var(--navy-active);
+  border-color: #496879;
 }
 
 button.quiet {
@@ -555,7 +571,8 @@ label {
 }
 
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   min-width: 0;
   color: var(--ink);
@@ -566,8 +583,18 @@ textarea {
 }
 
 input {
-  min-height: 37px;
-  padding: 7px 9px;
+  min-height: 35px;
+  padding: 6px 8px;
+}
+
+select {
+  min-height: 35px;
+  padding: 6px 28px 6px 8px;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  font-size: 0.78rem;
 }
 
 textarea {
@@ -577,12 +604,14 @@ textarea {
 }
 
 input:hover,
-textarea:hover {
+textarea:hover,
+select:hover {
   border-color: #7f929d;
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   border-color: var(--blue);
 }
 
@@ -713,10 +742,10 @@ textarea[aria-invalid="true"] {
 }
 
 .status-box {
-  min-height: 70px;
-  max-height: 290px;
+  min-height: 58px;
+  max-height: 250px;
   margin: 12px 0 0;
-  padding: 11px 12px;
+  padding: 9px 10px;
   color: #263b47;
   background: #f5f7f7;
   border: 1px solid var(--line);
@@ -731,8 +760,8 @@ textarea[aria-invalid="true"] {
 }
 
 .status-box.compact {
-  min-height: 49px;
-  max-height: 210px;
+  min-height: 42px;
+  max-height: 180px;
 }
 
 .code-panel {
@@ -826,7 +855,7 @@ textarea[aria-invalid="true"] {
 
 .ai-metadata {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin: 0 0 14px;
   border: 1px solid var(--line);
 }
@@ -859,6 +888,33 @@ textarea[aria-invalid="true"] {
   border: 1px solid #e5c4c1;
 }
 
+.ai-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0 0 14px;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+}
+
+.ai-facts div {
+  min-width: 0;
+  padding: 8px 10px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.ai-facts dt {
+  color: var(--ink-muted);
+  font-size: 0.64rem;
+}
+
+.ai-facts dd {
+  margin: 3px 0 0;
+  color: var(--navy);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .workflow-list,
 .history-list,
 .molecule-list,
@@ -868,7 +924,7 @@ textarea[aria-invalid="true"] {
 .research-tools,
 .cross-scale-grid {
   display: grid;
-  gap: 9px;
+  gap: 8px;
 }
 
 .workflow-list {
@@ -970,7 +1026,7 @@ textarea[aria-invalid="true"] {
 .tool-card,
 .reference-lab {
   min-width: 0;
-  padding: 13px;
+  padding: 11px 12px;
   background: var(--surface-muted);
   border: 1px solid var(--line);
   border-radius: 2px;
@@ -978,7 +1034,7 @@ textarea[aria-invalid="true"] {
 
 .workflow-card {
   position: relative;
-  padding-left: 17px;
+  padding-left: 15px;
   cursor: pointer;
 }
 
@@ -1282,7 +1338,7 @@ textarea[aria-invalid="true"] {
   display: grid;
   gap: 3px;
   background: #ffffff;
-  border-top: 2px solid #7e939f;
+  border-top: 2px solid #728995;
 }
 
 .metric small {
@@ -1292,8 +1348,8 @@ textarea[aria-invalid="true"] {
 
 .metric strong {
   color: var(--navy);
-  font-family: Charter, "Iowan Old Style", Georgia, serif;
-  font-size: 1.16rem;
+  font-family: "SFMono-Regular", "Cascadia Code", Consolas, monospace;
+  font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1318,7 +1374,7 @@ textarea[aria-invalid="true"] {
 
 #glucose-chart {
   width: 100%;
-  min-height: 270px;
+  min-height: 290px;
   margin-top: 11px;
   background: #ffffff;
   border: 1px solid var(--line);
@@ -1348,6 +1404,25 @@ textarea[aria-invalid="true"] {
   border: 1px solid var(--line);
 }
 
+.table-column-toggle {
+  width: fit-content;
+  margin-top: 9px;
+}
+
+.truncated-cell {
+  max-width: 340px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+}
+
+.evidence-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr);
+  gap: 12px;
+  margin-top: 13px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -1358,7 +1433,7 @@ table {
 
 th,
 td {
-  padding: 8px 10px;
+  padding: 7px 9px;
   border-bottom: 1px solid #e2e6e8;
   text-align: left;
   white-space: nowrap;
@@ -1370,6 +1445,19 @@ th {
   color: #304650;
   background: #eef1f2;
   font-weight: 700;
+}
+
+tbody tr:nth-child(even) td {
+  background: #fafbfb;
+}
+
+tbody tr:hover td {
+  background: #edf3f5;
+}
+
+.run-busy button,
+.research-busy button {
+  cursor: progress;
 }
 
 footer {
@@ -1450,6 +1538,28 @@ footer {
   }
 }
 
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .panel,
+  .diagnostics-panel,
+  .history-panel,
+  .results-panel,
+  .academic-panel,
+  .ai-panel,
+  .biology-panel,
+  .evidence-panel,
+  .settings-help-panel {
+    grid-column: 1;
+  }
+
+  .panel-heading > p {
+    max-width: min(48%, 340px);
+  }
+}
+
 @media (max-width: 760px) {
   .molecule-viewer-panel {
     scroll-margin-top: 12px;
@@ -1512,7 +1622,8 @@ footer {
   .reference-fields,
   .research-tools,
   .diagnostics-grid,
-  .ai-metadata {
+  .ai-metadata,
+  .evidence-filter-bar {
     grid-template-columns: 1fr;
   }
 

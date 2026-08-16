@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import time
@@ -12,7 +13,7 @@ from urllib.parse import urlparse
 from iints.ai.backends.ollama import DEFAULT_MINISTRAL_MODEL, OllamaBackend
 from iints.governance import RESEARCH_ONLY_NOTICE, guard_ai_output
 
-from iints_desktop.results import build_ai_result_context
+from iints_desktop.results import build_ai_result_context, load_results_preview
 
 RECOMMENDED_OLLAMA_MODELS = (
     DEFAULT_MINISTRAL_MODEL,
@@ -39,6 +40,10 @@ class LocalAIAnswer:
     policy_violations: tuple[str, ...] = ()
     policy_warnings: tuple[str, ...] = ()
     policy_action: str = "allow"
+    numeric_claim_warnings: tuple[str, ...] = ()
+    deterministic_metrics: dict[str, str] | None = None
+    suppressed_line_count: int = 0
+    interpretation_restricted: bool = False
 
 
 @dataclass(frozen=True)
@@ -50,21 +55,23 @@ class LocalAIStartResult:
     pulled_model: bool = False
 
 
-SYSTEM_PROMPT = """You are a highly advanced Medical Data Scientist and Computational Biologist analyzing output from the IINTS-AF closed-loop insulin simulator.
+SYSTEM_PROMPT = """You are a conservative research-results summarizer for the IINTS-AF diabetes simulation SDK.
 
-CRITICAL INSTRUCTIONS:
-1. Speak with absolute professional authority and scientific rigor. Do NOT sound like an AI assistant.
-2. PROHIBITED PHRASES: "Here is an analysis", "As an AI", "In conclusion", "I can help with that". Start immediately with the facts.
-3. Analyze the provided clinical simulation data. Extract meaningful physiological insights, glycemic control patterns (Time in Range, Coefficient of Variation), and algorithmic behaviors.
-4. Structure your response explicitly using these exact headers (do not use other headers):
-  Clinical Overview
-  Biomathematical Observations
-  Algorithmic Behavior
-  Conclusions
-5. Use highly specific scientific terminology (e.g., exogenous insulin kinetics, hepatic glucose production).
-6. Present findings in dense, hard-hitting bullet points. Do not write fluffy paragraphs.
-7. Acknowledge that the IINTS-AF simulator is for research and education only. It is Not a medical device. Do not provide diagnosis, insulin dosing, or treatment advice.
-8. Boundary: {research_only_notice}
+REQUIRED METHOD:
+1. Treat only the block labelled AUTHORITATIVE DETERMINISTIC FACTS as quantitative evidence.
+2. Copy numeric values exactly. Never calculate, estimate, interpolate, convert units, invent confidence intervals, or infer missing physiological parameters.
+3. If a requested metric is absent, write "not computed in the attached deterministic summary".
+4. Clearly separate observations from interpretation. Label every causal or physiological explanation as a hypothesis that requires validation.
+5. Do not infer insulin sensitivity, carbohydrate ratio, basal rate, pharmacokinetics, clinical risk, or treatment quality unless that exact metric is supplied.
+6. A safety-triggered sample count is not an intervention count: adjacent sampled rows may describe one sustained episode. Do not infer instability, glucagon use, or causal mechanism from that count alone.
+7. Totals must never be divided into ratios or converted into rates. Duration must not be converted into other units.
+8. Use these exact section headings and concise bullets:
+  Deterministic Facts
+  Interpretation
+  Limitations
+  Next Checks
+9. Acknowledge that this is simulated research output. It is not a medical device. Do not provide diagnosis, insulin dosing, or treatment advice.
+10. Boundary: {research_only_notice}
 """
 
 SYSTEM_PROMPT = SYSTEM_PROMPT.format(research_only_notice=RESEARCH_ONLY_NOTICE)
@@ -275,7 +282,8 @@ def format_ai_answer(text: str) -> str:
     lines: list[str] = []
     previous_blank = False
     for raw_line in cleaned.split("\n"):
-        line = raw_line.strip()
+        line = raw_line.strip().replace("`", "")
+        line = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", line)
         if not line:
             if not previous_blank:
                 lines.append("")
@@ -286,15 +294,109 @@ def format_ai_answer(text: str) -> str:
             line = "• " + line[2:].strip()
         if line.startswith(("---", "___", "***")):
             continue
-        if line.lower().rstrip(":") in {
-            "clinical overview", 
-            "biomathematical observations", 
-            "algorithmic behavior", 
-            "conclusions"
+        if line.lower().strip("= ").rstrip(":") in {
+            "deterministic facts",
+            "interpretation",
+            "limitations",
+            "next checks",
+            "clinical overview",
+            "biomathematical observations",
+            "algorithmic behavior",
+            "conclusions",
         }:
-            line = f"\n=== {line.rstrip(':').upper()} ==="
+            line = f"\n{line.strip('= ').rstrip(':')}"
         lines.append(line)
     return "\n".join(lines).strip()
+
+
+_NUMERIC_CLAIM_PATTERN = re.compile(r"(?<![A-Za-z_])\d+(?:\.\d+)?%?")
+
+
+def audit_ai_numeric_claims(answer: str, deterministic_context: str) -> tuple[str, ...]:
+    """Flag numbers not present in the deterministic context.
+
+    This is deliberately a lexical guard, not a scientific fact checker. It catches
+    a common and high-impact failure mode: the model inventing statistics or
+    converting units even though the desktop bridge did not compute those values.
+    """
+
+    allowed = set(_NUMERIC_CLAIM_PATTERN.findall(deterministic_context))
+    without_ordinals = re.sub(r"(?m)^\s*\d+[.)]\s+", "", answer)
+    claimed = set(_NUMERIC_CLAIM_PATTERN.findall(without_ordinals))
+    unsupported = sorted(claimed - allowed, key=lambda value: (len(value), value))
+    if not unsupported:
+        return ()
+    preview = ", ".join(unsupported[:12])
+    suffix = "" if len(unsupported) <= 12 else f" (+{len(unsupported) - 12} more)"
+    return (
+        "Numeric-claim audit found values that were not present in the deterministic "
+        f"summary: {preview}{suffix}. Treat the narrative as unverified and use the metrics panel as authoritative.",
+    )
+
+
+def suppress_unsupported_numeric_lines(
+    answer: str,
+    deterministic_context: str,
+) -> tuple[str, int]:
+    """Hide model lines that introduce quantities the SDK did not compute."""
+
+    allowed = set(_NUMERIC_CLAIM_PATTERN.findall(deterministic_context))
+    kept: list[str] = []
+    suppressed = 0
+    for line in answer.splitlines():
+        audit_line = re.sub(r"^\s*\d+[.)]\s+", "", line)
+        unsupported = set(_NUMERIC_CLAIM_PATTERN.findall(audit_line)) - allowed
+        if unsupported:
+            suppressed += 1
+            continue
+        kept.append(line)
+    cleaned = "\n".join(kept).strip()
+    if suppressed:
+        notice = (
+            f"{suppressed} AI-generated line(s) were hidden because they introduced "
+            "quantities that were not present in the deterministic SDK summary."
+        )
+        cleaned = f"{notice}\n\n{cleaned}" if cleaned else notice
+    return cleaned, suppressed
+
+
+def restrict_ai_to_review_sections(answer: str) -> str:
+    """Keep only limitations and follow-up checks for aggregate CSV context.
+
+    The desktop model receives aggregate metrics and column names, not enough
+    evidence for patient-level causal or physiological interpretation. The SDK
+    therefore owns the facts while the model is limited to proposing checks.
+    """
+
+    headings = {
+        "deterministic facts",
+        "interpretation",
+        "limitations",
+        "next checks",
+    }
+    allowed = {"limitations", "next checks"}
+    current: str | None = None
+    kept: list[str] = []
+    for line in answer.splitlines():
+        normalized = line.strip().lower().rstrip(":")
+        if normalized in headings:
+            current = normalized
+            if current in allowed:
+                kept.append(line.strip().rstrip(":"))
+            continue
+        if current in allowed and line.strip():
+            kept.append(line)
+
+    notice = (
+        "AI scope is limited to limitations and follow-up checks because the local "
+        "model received aggregate SDK metrics rather than row-level causal evidence."
+    )
+    if not kept:
+        return (
+            f"{notice}\n\nNo review notes were retained. Use the deterministic metrics "
+            "and inspect the CSV, safety reasons, and generated report directly."
+        )
+    return f"{notice}\n\n" + "\n".join(kept).strip()
 
 
 def ask_local_ai(
@@ -317,21 +419,33 @@ def ask_local_ai(
         num_ctx=2048,
     )
     context = build_ai_result_context(result_csv) if result_csv else "No result CSV is currently loaded."
+    deterministic_metrics = (
+        load_results_preview(result_csv, max_rows=1).metrics if result_csv is not None else None
+    )
     user_prompt = (
         f"Result context:\n{context}\n\n"
         f"User question:\n{question.strip()}\n\n"
-        "Perform a highly technical, rigorous analysis based purely on the data. "
-        "Do not offer generic advice. Use clear headings and distinguish observations, "
-        "inferences, assumptions, uncertainty, and limitations."
+        "Summarize conservatively. Do not add quantitative claims beyond the authoritative facts. "
+        "Distinguish observations, hypotheses, uncertainty, and limitations."
     )
     answer = backend.complete(system_prompt=SYSTEM_PROMPT, user_prompt=user_prompt)
     guarded = guard_ai_output(answer, source="desktop_local_ai")
     resolved = backend.resolved_model_name or model
+    formatted = format_ai_answer(guarded.text)
+    numeric_warnings = audit_ai_numeric_claims(formatted, context)
+    filtered, suppressed_line_count = suppress_unsupported_numeric_lines(formatted, context)
+    interpretation_restricted = result_csv is not None
+    if interpretation_restricted:
+        filtered = restrict_ai_to_review_sections(filtered)
     return LocalAIAnswer(
-        answer=format_ai_answer(guarded.text),
+        answer=filtered,
         model=resolved,
         context_used=result_csv is not None,
         policy_violations=guarded.violations,
         policy_warnings=guarded.warnings,
         policy_action=guarded.action,
+        numeric_claim_warnings=numeric_warnings,
+        deterministic_metrics=deterministic_metrics,
+        suppressed_line_count=suppressed_line_count,
+        interpretation_restricted=interpretation_restricted,
     )

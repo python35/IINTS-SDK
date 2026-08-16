@@ -1,9 +1,11 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::env;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::process::Stdio;
+use std::process::{Command, Output, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 struct PythonCandidate {
@@ -125,16 +127,127 @@ fn python_candidates() -> Vec<PythonCandidate> {
     candidates
 }
 
+fn bridge_working_dir() -> Option<PathBuf> {
+    let home = env::var_os("HOME").or_else(|| env::var_os("USERPROFILE"))?;
+    let path = PathBuf::from(home);
+    path.is_dir().then_some(path)
+}
+
+fn python_bridge_timeout(args: &[String]) -> Duration {
+    let command = args.first().map(String::as_str).unwrap_or_default();
+    let seconds = match command {
+        "status"
+        | "workflows"
+        | "diagnostics"
+        | "update-info"
+        | "molecules"
+        | "evidence-connectors"
+        | "mechanistic-status"
+        | "cross-scale-status"
+        | "history"
+        | "ai-check"
+        | "ai-models" => 20,
+        "preview" | "mechanistic-inspect" | "copasi-inspect" | "cellml-inspect" | "fmi-inspect" => {
+            60
+        }
+        "molecule-pae" | "binding-query" | "cellml-validate" | "mdmp-certify"
+        | "academic-bundle" => 300,
+        "genomics-sim" | "tissue-stress" | "mechanistic-run" | "copasi-run" | "fmi-run" => 900,
+        "ai-start" | "ai-ask" => 1_200,
+        "run" => 1_800,
+        _ => 120,
+    };
+    Duration::from_secs(seconds)
+}
+
+fn collect_pipe<T>(mut pipe: T) -> Result<Vec<u8>, String>
+where
+    T: Read,
+{
+    let mut bytes = Vec::new();
+    pipe.read_to_end(&mut bytes)
+        .map_err(|error| format!("Could not read Python bridge output: {error}"))?;
+    Ok(bytes)
+}
+
+fn join_pipe_reader(
+    handle: thread::JoinHandle<Result<Vec<u8>, String>>,
+) -> Result<Vec<u8>, String> {
+    handle
+        .join()
+        .map_err(|_| "Python bridge output reader stopped unexpectedly.".to_string())?
+}
+
+fn command_output_with_timeout(
+    mut command: Command,
+    timeout: Duration,
+    label: &str,
+) -> Result<Output, String> {
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let mut child = command
+        .spawn()
+        .map_err(|error| format!("Could not start {label}: {error}"))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| format!("Could not capture stdout from {label}."))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| format!("Could not capture stderr from {label}."))?;
+    let stdout_reader = thread::spawn(move || collect_pipe(stdout));
+    let stderr_reader = thread::spawn(move || collect_pipe(stderr));
+    let deadline = Instant::now() + timeout;
+
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < deadline => thread::sleep(Duration::from_millis(50)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = join_pipe_reader(stdout_reader);
+                let _ = join_pipe_reader(stderr_reader);
+                return Err(format!(
+                    "{label} timed out after {} seconds and was stopped.",
+                    timeout.as_secs()
+                ));
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                let _ = join_pipe_reader(stdout_reader);
+                let _ = join_pipe_reader(stderr_reader);
+                return Err(format!("Could not monitor {label}: {error}"));
+            }
+        }
+    };
+
+    Ok(Output {
+        status,
+        stdout: join_pipe_reader(stdout_reader)?,
+        stderr: join_pipe_reader(stderr_reader)?,
+    })
+}
+
 fn run_python_bridge(args: &[String]) -> Result<Value, String> {
     let mut attempts = Vec::new();
+    let timeout = python_bridge_timeout(args);
     for candidate in python_candidates() {
         let mut command = Command::new(&candidate.program);
         command.args(&candidate.prefix_args);
         command.args(["-m", "iints_desktop.tauri_bridge"]);
         command.args(args);
         command.env("PYTHONUTF8", "1");
+        command.env("PYTHONSAFEPATH", "1");
+        if let Some(working_dir) = bridge_working_dir() {
+            // Avoid importing relative to an app bundle, mounted DMG, or removable
+            // research volume. Installed packages remain available via site-packages.
+            command.current_dir(working_dir);
+        }
 
-        match command.output() {
+        let label = format!("Python bridge via {}", candidate.program);
+        match command_output_with_timeout(command, timeout, &label) {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
@@ -167,10 +280,17 @@ fn run_python_bridge(args: &[String]) -> Result<Value, String> {
                 }
                 return Err(message.to_string());
             }
-            Err(error) => attempts.push(format!(
-                "{} {:?}: {error}",
-                candidate.program, candidate.prefix_args
-            )),
+            Err(error) => {
+                if error.contains("timed out after") {
+                    return Err(format!(
+                        "The IINTS Python research engine did not respond in time. Open Settings and run 'Refresh versions'. If this repeats, use 'Install or update Python SDK' to repair the private engine.\n{error}"
+                    ));
+                }
+                attempts.push(format!(
+                    "{} {:?}: {error}",
+                    candidate.program, candidate.prefix_args
+                ));
+            }
         }
     }
     Err(format!(
@@ -1442,5 +1562,21 @@ mod tests {
             r#""C:\Program Files\Python\python.exe""#
         );
         assert_eq!(quote_cmd_arg("package&command"), r#""package&command""#);
+    }
+
+    #[test]
+    fn bridge_timeouts_keep_health_checks_short_and_research_runs_long() {
+        assert_eq!(
+            python_bridge_timeout(&["status".to_string()]),
+            Duration::from_secs(20)
+        );
+        assert_eq!(
+            python_bridge_timeout(&["ai-ask".to_string()]),
+            Duration::from_secs(1_200)
+        );
+        assert_eq!(
+            python_bridge_timeout(&["run".to_string()]),
+            Duration::from_secs(1_800)
+        );
     }
 }

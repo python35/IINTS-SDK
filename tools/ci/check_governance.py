@@ -359,8 +359,15 @@ def _check_tauri_security_boundary() -> List[str]:
     rust_main = _read_text("apps/iints-tauri/src-tauri/src/main.rs")
     if "iints_desktop.tauri_bridge" not in rust_main:
         issues.append("Tauri Rust shell must call the audited Python bridge module.")
-    if "std::process::Command" not in rust_main:
+    explicit_process_import = (
+        "std::process::Command" in rust_main or "std::process::{Command" in rust_main
+    )
+    if not explicit_process_import or "Command::new" not in rust_main:
         issues.append("Tauri Rust shell should keep Python process invocation explicit and reviewable.")
+    if "command_output_with_timeout" not in rust_main:
+        issues.append("Tauri Python bridge subprocesses must have explicit execution timeouts.")
+    if 'command.env("PYTHONSAFEPATH", "1")' not in rust_main:
+        issues.append("Tauri Python bridge must disable unsafe current-directory imports.")
 
     frontend = _read_text("apps/iints-tauri/frontend/index.html")
     if "Not a medical device" not in frontend:

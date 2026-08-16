@@ -143,7 +143,7 @@ def desktop_icon_path() -> Path | None:
     """Return the bundled desktop icon path when available."""
 
     try:
-        icon = resources.files("iints_desktop").joinpath("assets", "app_icon.png")
+        icon = resources.files("iints_desktop").joinpath("assets").joinpath("app_icon.png")
         if icon.is_file():
             return Path(str(icon))
     except Exception:

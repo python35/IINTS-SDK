@@ -33,6 +33,28 @@ let lastBinding = null;
 let appInfo = null;
 let runBusy = false;
 let researchBusy = false;
+let aiBusy = false;
+let engineCompatible = false;
+const REQUIRED_BRIDGE_API_VERSION = 2;
+const ESSENTIAL_RESULT_COLUMNS = new Set([
+  "time_minutes",
+  "timestamp",
+  "glucose_actual_mgdl",
+  "glucose_to_algo_mgdl",
+  "glucose_trend_mgdl_min",
+  "predicted_glucose_30min",
+  "delivered_insulin_units",
+  "carb_intake_grams",
+  "patient_iob_units",
+  "patient_cob_grams",
+  "sensor_status",
+  "pump_status",
+  "predictor_used",
+  "predictor_uncertainty_std_mgdl",
+  "safety_level",
+  "safety_triggered",
+  "safety_reason"
+]);
 const moleculeViewer = {
   molecule: null,
   rotationX: -0.35,
@@ -468,19 +490,35 @@ function selectWorkflow(key) {
 async function loadStatus() {
   try {
     const status = await call("desktop_status");
-    $("sdk-status").textContent = `SDK ${status.sdk_version} via ${status.python_executable}`;
-    $("sdk-status-dot").className = "status-dot ok";
-    $("install-engine-btn").hidden = true;
+    const bridgeApiVersion = Number(status.bridge_api_version || 0);
+    engineCompatible = bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION;
+    $("sdk-status").textContent = engineCompatible
+      ? `SDK ${status.sdk_version} via ${status.python_executable}`
+      : `SDK ${status.sdk_version} needs a compatibility update`;
+    $("sdk-status-dot").className = engineCompatible ? "status-dot ok" : "status-dot warn";
+    $("install-engine-btn").hidden = engineCompatible;
     setText("settings-sdk-version", status.sdk_version || "Unknown");
     setText("settings-python-path", status.python_executable || "Python path unavailable");
-    setText("run-status", "Python SDK bridge ready.\nSelect a workflow and run it.");
+    setText(
+      "run-status",
+      engineCompatible
+        ? "Python SDK bridge ready.\nSelect a workflow and run it."
+        : [
+            "Python SDK update required before protocols can run.",
+            `Installed bridge API: ${bridgeApiVersion || "legacy"}; required: ${REQUIRED_BRIDGE_API_VERSION}.`,
+            "Open Settings and choose Install or update Python SDK, then refresh versions."
+          ].join("\n")
+    );
+    refreshActionAvailability();
   } catch (error) {
+    engineCompatible = false;
     $("sdk-status").textContent = "Python bridge unavailable";
     $("sdk-status-dot").className = "status-dot error";
     $("install-engine-btn").hidden = false;
     setText("settings-sdk-version", "Unavailable");
     setText("settings-python-path", errorMessage(error));
     setText("run-status", errorMessage(error));
+    refreshActionAvailability();
   }
 }
 
@@ -534,6 +572,16 @@ async function loadAppInfo() {
     setText("settings-app-version", "Unavailable");
     setText("settings-app-platform", errorMessage(error));
   }
+}
+
+async function refreshSoftwareVersions() {
+  setText("update-status", "Refreshing app and Python-engine compatibility...");
+  // Python imports can touch large research environments. Run bridge checks
+  // sequentially so removable disks and first-start caches cannot deadlock startup.
+  await loadAppInfo();
+  await loadStatus();
+  await loadUpdateInfo();
+  await runDiagnostics();
 }
 
 async function openAppDownloads() {
@@ -644,11 +692,29 @@ async function loadEvidenceConnectors() {
 function renderEvidenceConnectors(items) {
   const list = $("evidence-list");
   list.replaceChildren();
-  if (!items.length) {
-    list.appendChild(statusPill("warn", "No evidence connectors returned by the SDK bridge."));
+  const query = $("evidence-search").value.trim().toLowerCase();
+  const level = $("evidence-level").value;
+  const visibleItems = items.filter((connector) => {
+    if (level !== "all" && connector.integration_level !== level) return false;
+    if (!query) return true;
+    return [
+      connector.title,
+      connector.key,
+      connector.category,
+      connector.why_it_matters,
+      connector.workbench_use,
+      connector.integration_status
+    ].some((value) => String(value || "").toLowerCase().includes(query));
+  });
+  setText("evidence-status", `Showing ${visibleItems.length} of ${items.length} curated evidence resources.`);
+  if (!visibleItems.length) {
+    list.appendChild(statusPill(
+      "warn",
+      items.length ? "No evidence resources match the current filters." : "No evidence connectors returned by the SDK bridge."
+    ));
     return;
   }
-  for (const connector of items) {
+  for (const connector of visibleItems) {
     const card = document.createElement("article");
     card.className = "evidence-card";
     card.innerHTML = `
@@ -979,6 +1045,14 @@ function renderDiagnostics(payload) {
   const grid = $("diagnostics-grid");
   grid.replaceChildren();
   grid.appendChild(diagnosticRow("IINTS-AF SDK", payload.sdk_version, "good"));
+  const bridgeApiVersion = Number(payload.bridge_api_version || 0);
+  grid.appendChild(diagnosticRow(
+    "Desktop bridge",
+    bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION
+      ? `Compatible (API ${bridgeApiVersion})`
+      : `Update required (API ${bridgeApiVersion || "legacy"})`,
+    bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION ? "good" : "bad"
+  ));
   grid.appendChild(diagnosticRow("Python", payload.python_version, "good"));
   grid.appendChild(diagnosticRow("Ollama", payload.ollama_on_path ? "Available on PATH" : "Not found on PATH", payload.ollama_on_path ? "good" : "warn"));
   const modules = payload.optional_modules || {};
@@ -1028,6 +1102,13 @@ async function loadWorkflows() {
 }
 
 async function runSelectedWorkflow() {
+  if (!engineCompatible) {
+    setText(
+      "run-status",
+      "Update the Python SDK in Settings before running a protocol. This prevents the app and scientific engine from using incompatible workflow parameters."
+    );
+    return;
+  }
   if (!selectedWorkflow) {
     setText("run-status", "Select a workflow first.");
     return;
@@ -1064,7 +1145,13 @@ async function runSelectedWorkflow() {
     }
     await loadHistory();
   } catch (error) {
-    setText("run-status", errorMessage(error));
+    const message = errorMessage(error);
+    setText(
+      "run-status",
+      message.includes("unexpected keyword argument")
+        ? `The installed Python engine is incompatible with this protocol. Update it in Settings, refresh versions, and retry.\n\nTechnical summary: ${message.split("\n", 1)[0]}`
+        : message
+    );
   } finally {
     setBusy(false);
   }
@@ -1255,11 +1342,23 @@ function renderTable(columns, rows) {
   const table = $("preview-table");
   table.replaceChildren();
   if (!columns.length) {
+    setText("table-preview-summary", "No tabular data loaded");
     return;
   }
+  const showAll = $("show-all-columns").checked;
+  let columnIndices = columns
+    .map((column, index) => ({ column: String(column), index }))
+    .filter(({ column }) => showAll || ESSENTIAL_RESULT_COLUMNS.has(column.toLowerCase()));
+  if (!columnIndices.length) {
+    columnIndices = columns.slice(0, 12).map((column, index) => ({ column: String(column), index }));
+  }
+  setText(
+    "table-preview-summary",
+    `Showing ${columnIndices.length} of ${columns.length} columns and ${rows.length} bounded rows`
+  );
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  for (const column of columns) {
+  for (const { column } of columnIndices) {
     const th = document.createElement("th");
     th.textContent = column;
     headRow.appendChild(th);
@@ -1270,9 +1369,17 @@ function renderTable(columns, rows) {
   const tbody = document.createElement("tbody");
   for (const row of rows) {
     const tr = document.createElement("tr");
-    for (const cell of row) {
+    for (const { index } of columnIndices) {
+      const cell = row[index] ?? "";
       const td = document.createElement("td");
-      td.textContent = cell;
+      const fullText = String(cell);
+      if (fullText.length > 180) {
+        td.textContent = `${fullText.slice(0, 176)}...`;
+        td.title = fullText.length <= 2000 ? fullText : "Long structured value. Open the CSV for the complete content.";
+        td.classList.add("truncated-cell");
+      } else {
+        td.textContent = fullText;
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -1391,7 +1498,7 @@ async function listAiModels() {
     setText(
       "ai-status",
       models.length
-        ? `Available and recommended models (${models.length}):\n${models.map((model) => `- ${model}`).join("\n")}`
+        ? `Selectable models (${models.length}). Installed models appear first; a suggested model may need to be downloaded:\n${models.map((model) => `- ${model}`).join("\n")}`
         : "No local or recommended models were returned."
     );
   } catch (error) {
@@ -1406,7 +1513,9 @@ async function askAi() {
     return;
   }
   const csv = $("csv-path").value.trim();
-  setText("ai-answer", "Running local AI analysis. This can take a while on small machines...");
+  aiBusy = true;
+  refreshActionAvailability();
+  setText("ai-answer", "Running local AI analysis. The model is local; generation can take several minutes on small machines.");
   try {
     const payload = await call("ask_local_ai", {
       question,
@@ -1417,6 +1526,9 @@ async function askAi() {
     renderAiAnswer(payload);
   } catch (error) {
     setText("ai-answer", errorMessage(error));
+  } finally {
+    aiBusy = false;
+    refreshActionAvailability();
   }
 }
 
@@ -1427,10 +1539,18 @@ function renderAiAnswer(payload) {
   const metadata = document.createElement("dl");
   metadata.className = "ai-metadata";
   const guard = payload.policy_action || ((payload.policy_violations || []).length ? "blocked" : "clear");
+  const suppressedLineCount = Number(payload.suppressed_line_count || 0);
   for (const [label, value] of [
     ["Model", payload.model || "unknown"],
     ["CSV context", payload.context_used ? "used" : "not used"],
-    ["Policy guard", guard]
+    ["Policy guard", guard],
+    [
+      "Numeric claim audit",
+      suppressedLineCount
+        ? `${suppressedLineCount} unsupported line${suppressedLineCount === 1 ? "" : "s"} hidden`
+        : "no unsupported values detected"
+    ],
+    ["AI scope", payload.interpretation_restricted ? "limitations + next checks" : "general research question"]
   ]) {
     const item = document.createElement("div");
     const term = document.createElement("dt");
@@ -1442,9 +1562,29 @@ function renderAiAnswer(payload) {
   }
   container.appendChild(metadata);
 
+  const deterministicMetrics = payload.deterministic_metrics || {};
+  if (Object.keys(deterministicMetrics).length) {
+    const factsHeading = document.createElement("h3");
+    factsHeading.textContent = "Deterministic SDK facts";
+    container.appendChild(factsHeading);
+    const facts = document.createElement("dl");
+    facts.className = "ai-facts";
+    for (const [label, value] of Object.entries(deterministicMetrics)) {
+      const item = document.createElement("div");
+      const term = document.createElement("dt");
+      term.textContent = label;
+      const description = document.createElement("dd");
+      description.textContent = String(value);
+      item.append(term, description);
+      facts.appendChild(item);
+    }
+    container.appendChild(facts);
+  }
+
   const alerts = [
     ...(payload.policy_violations || []).map((text) => `Policy violation: ${text}`),
-    ...(payload.policy_warnings || []).map((text) => `Policy warning: ${text}`)
+    ...(payload.policy_warnings || []).map((text) => `Policy warning: ${text}`),
+    ...(payload.numeric_claim_warnings || []).map((text) => `Factuality warning: ${text}`)
   ];
   if (alerts.length) {
     const list = document.createElement("ul");
@@ -1469,20 +1609,29 @@ function appendReadableText(container, text) {
       continue;
     }
     const normalized = line.replace(/^#{1,6}\s*/, "").replaceAll("**", "").trim();
-    if (["Clinical Overview", "Biomathematical Observations", "Algorithmic Behavior", "Conclusions"].includes(normalized)) {
+    if ([
+      "Deterministic Facts",
+      "Interpretation",
+      "Limitations",
+      "Next Checks",
+      "Clinical Overview",
+      "Biomathematical Observations",
+      "Algorithmic Behavior",
+      "Conclusions"
+    ].includes(normalized)) {
       activeList = null;
       const heading = document.createElement("h3");
       heading.textContent = normalized;
       container.appendChild(heading);
       continue;
     }
-    if (/^[-*]\s+/.test(line)) {
+    if (/^(?:[-*]|•)\s+/.test(line)) {
       if (!activeList) {
         activeList = document.createElement("ul");
         container.appendChild(activeList);
       }
       const item = document.createElement("li");
-      item.textContent = normalized.replace(/^[-*]\s+/, "");
+      item.textContent = normalized.replace(/^(?:[-*]|•)\s+/, "");
       activeList.appendChild(item);
       continue;
     }
@@ -2071,6 +2220,7 @@ function refreshActionAvailability() {
   const seedValid = Number.isInteger(seed) && seed >= 0 && seed <= 2147483647;
   const csv = $("csv-path").value.trim();
   const csvValid = pathHasExtension(csv, ["csv"]);
+  const aiQuestionValid = Boolean($("ai-question").value.trim());
   const academicRun = $("academic-run-dir").value.trim()
     || lastRun?.output_dir
     || parentPath(lastPreview?.csv_path || csv);
@@ -2083,7 +2233,7 @@ function refreshActionAvailability() {
   const cellmlValid = pathHasExtension(cellmlModel, ["cellml", "xml"]);
   const fmiValid = pathHasExtension(fmiModel, ["fmu"]);
 
-  setDisabled("run-btn", runBusy || !selectedWorkflow || !outputDir || !seedValid);
+  setDisabled("run-btn", runBusy || !engineCompatible || !selectedWorkflow || !outputDir || !seedValid);
   setDisabled("refresh-btn", runBusy);
   setDisabled("history-btn", runBusy || !outputDir);
   setDisabled("output-browse-btn", runBusy);
@@ -2099,6 +2249,12 @@ function refreshActionAvailability() {
   setDisabled("academic-open-metadata-btn", !lastAcademicBundle?.ro_crate_metadata);
   setDisabled("academic-open-audit-btn", !lastAcademicBundle?.audit_json);
   setDisabled("academic-open-guide-btn", !lastAcademicBundle?.readme_md);
+  setDisabled("ai-ask-btn", aiBusy || !aiQuestionValid);
+  $("ai-ask-btn").textContent = aiBusy
+    ? "Analyzing..."
+    : csvValid
+      ? "Analyze loaded result"
+      : "Ask local AI without result";
 
   for (const id of [
     "mechanistic-model-browse-btn",
@@ -2143,11 +2299,16 @@ function refreshActionAvailability() {
 
 function setBusy(isBusy) {
   runBusy = Boolean(isBusy);
+  document.documentElement.classList.toggle("run-busy", runBusy);
+  $("run-btn").textContent = runBusy ? "Running protocol..." : "Run selected protocol";
+  $("workspace-content").setAttribute("aria-busy", String(runBusy || researchBusy));
   refreshActionAvailability();
 }
 
 function setResearchBusy(isBusy) {
   researchBusy = Boolean(isBusy);
+  document.documentElement.classList.toggle("research-busy", researchBusy);
+  $("workspace-content").setAttribute("aria-busy", String(runBusy || researchBusy));
   refreshActionAvailability();
 }
 
@@ -2388,7 +2549,7 @@ $("history-btn").addEventListener("click", loadHistory);
 $("diagnostics-btn").addEventListener("click", runDiagnostics);
 $("open-output-btn").addEventListener("click", openOutputFolder);
 $("install-engine-btn").addEventListener("click", openSdkUpdateTerminal);
-$("update-refresh-btn").addEventListener("click", loadUpdateInfo);
+$("update-refresh-btn").addEventListener("click", refreshSoftwareVersions);
 $("update-download-btn").addEventListener("click", openAppDownloads);
 $("update-docs-btn").addEventListener("click", openUpdateDocs);
 $("update-copy-btn").addEventListener("click", copyUpdateCommand);
@@ -2398,6 +2559,9 @@ $("open-report-btn").addEventListener("click", openLatestReport);
 $("output-browse-btn").addEventListener("click", chooseRunOutputFolder);
 $("preview-btn").addEventListener("click", previewCsv);
 $("csv-browse-btn").addEventListener("click", chooseResultsCsv);
+$("show-all-columns").addEventListener("change", () => {
+  if (lastPreview) renderTable(lastPreview.columns || [], lastPreview.rows || []);
+});
 $("mdmp-btn").addEventListener("click", certifyMdmp);
 $("open-csv-btn").addEventListener("click", openLoadedCsv);
 $("open-certificate-btn").addEventListener("click", openLatestCertificate);
@@ -2409,6 +2573,7 @@ $("academic-open-guide-btn").addEventListener("click", openAcademicGuide);
 $("ai-start-btn").addEventListener("click", startAi);
 $("ai-check-btn").addEventListener("click", checkAi);
 $("ai-models-btn").addEventListener("click", listAiModels);
+$("ai-question").addEventListener("input", refreshActionAvailability);
 $("ai-ask-btn").addEventListener("click", askAi);
 $("molecule-refresh-btn").addEventListener("click", loadMolecules);
 $("open-structural-folder-btn").addEventListener("click", openStructuralFolder);
@@ -2474,6 +2639,8 @@ $("binding-query-btn").addEventListener("click", queryBindingEvidence);
 $("binding-open-btn").addEventListener("click", openBindingBundle);
 $("binding-csv-btn").addEventListener("click", openBindingCsv);
 $("evidence-refresh-btn").addEventListener("click", loadEvidenceConnectors);
+$("evidence-search").addEventListener("input", () => renderEvidenceConnectors(evidenceConnectors));
+$("evidence-level").addEventListener("change", () => renderEvidenceConnectors(evidenceConnectors));
 
 initializeNativeInteractionPolicy();
 initializeFormState();
@@ -2482,12 +2649,11 @@ initializeKeyboardShortcuts();
 const initialSettings = initializeSettings();
 initializeNavigation();
 refreshActionAvailability();
-const startupTasks = [loadStatus()];
+await loadStatus();
 if (initialSettings.autoDiagnostics) {
-  startupTasks.push(runDiagnostics());
+  await runDiagnostics();
 } else {
   $("diagnostics-grid").replaceChildren(
     diagnosticRow("Diagnostics", "Automatic startup check disabled in Settings.", "info")
   );
 }
-await Promise.allSettled(startupTasks);

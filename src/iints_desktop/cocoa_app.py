@@ -86,7 +86,7 @@ def main() -> int:
         @objc.python_method
         def _apply_app_icon(self) -> None:
             try:
-                icon_ref = resources.files("iints_desktop").joinpath("assets", "app_icon.png")
+                icon_ref = resources.files("iints_desktop").joinpath("assets").joinpath("app_icon.png")
                 if icon_ref.is_file():
                     image = NSImage.alloc().initWithContentsOfFile_(str(icon_ref))
                     if image is not None:
