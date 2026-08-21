@@ -8,10 +8,18 @@ Use this page when you know the task and want the public command family quickly,
 
 **Read next:** [Technical Reference](TECHNICAL_README.md) for deeper integration details.
 
+## Command Navigation
+
+### `iints menu` (or `iints hub`)
+Choose a maintained command domain and print reliable entry points without invoking a workflow automatically.
+
+### `iints map` (or `iints overview`)
+Print the maintained command domains. Typer-generated `--help` remains authoritative for options.
+
 ## Beginner-Friendly Entry Points
 
 ### `iints guide`
-Use this when you are not sure where to start.
+Run the short starter demo or open command navigation.
 
 ### `iints start`
 Print a goal-based first-run plan, or run the safe starter action.
@@ -96,6 +104,17 @@ The generated project is self-contained: it includes `patients/stable_patient.ya
 ### `iints run --wizard`
 Interactive custom run builder.
 
+### `iints version`
+Compare the active Python environment with the latest stable PyPI release.
+
+```bash
+iints version --refresh
+iints version --offline --json
+iints version --refresh --fail-if-outdated --fail-if-unknown
+```
+
+The report distinguishes installed distribution metadata from active source code and includes the Python executable, CLI path, package location, release source, and check time. Exit code `2` means a verified update is available; exit code `3` means release status could not be verified when `--fail-if-unknown` is active.
+
 ### `iints update`
 Update the current Python environment to the newest SDK release.
 
@@ -106,11 +125,11 @@ iints update
 iints update --dry-run
 iints update --repair --force-reinstall --yes
 iints update --no-cache-dir --yes
-iints update --source github --yes
+iints update --source github --github-ref stable --yes
 iints update --extras full,mdmp,research,edge
 ```
 
-The command prints the exact `python -m pip install -U ...` invocation before it changes anything. By default it uses `--source auto`: PyPI first, then GitHub main as a fallback if the release has not propagated yet. Use `--dry-run` during a live demo setup check.
+The command prints the exact `python -m pip install -U ...` invocation before it changes anything. By default `--source auto` uses the stable PyPI release and never silently falls back to GitHub `main`. Use `--dry-run` during a live demo setup check, or `--check` for a status-only automation check.
 
 ### `iints delete`
 Remove IINTS from the current machine/environment with a visible deletion plan.
@@ -652,6 +671,43 @@ iints profiles create --name endurance_patient --preset endurance
 ```
 
 Starter presets are provided for `stable-demo`, `stress-test`, and `endurance`.
+
+## MDMP Cryptography And Provenance
+
+### `iints mdmp encrypt-data`
+Encrypt a local dataset with ChaCha20-Poly1305 authenticated encryption. Text passphrases are processed with a random per-envelope scrypt salt:
+
+```bash
+iints mdmp encrypt-data --input data/patient_cgm.csv --output data/patient_cgm.enc
+```
+
+### `iints mdmp decrypt-data`
+Decrypt and authenticate encrypted dataset files, ensuring tamper-resistance:
+
+```bash
+iints mdmp decrypt-data --input data/patient_cgm.enc --output data/restored.csv
+```
+
+### `iints mdmp sign`
+Sign an MDMP dataset passport card with Ed25519. The SDK does not currently implement or claim an ML-DSA/post-quantum signature:
+
+```bash
+iints mdmp sign --card results/passport.json --key keys/mdmp_private_v1.pem
+```
+
+### `iints mdmp verify`
+Verify an MDMP dataset passport card signature, expiry, and SHA-256 fingerprint:
+
+```bash
+iints mdmp verify results/passport.json --dataset data/patient_cgm.csv
+```
+
+### `iints mdmp validate`
+Validate dataset against an MDMP contract schema and range rules:
+
+```bash
+iints mdmp validate contracts/cgm_contract.yaml data/patient_cgm.csv --min-mdmp-grade research_grade
+```
 
 ## Full Details
 

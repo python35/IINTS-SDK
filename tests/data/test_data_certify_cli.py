@@ -43,10 +43,10 @@ processes:
     )
 
 
-def test_main_help_hides_legacy_mdmp_namespace() -> None:
+def test_main_help_exposes_first_class_mdmp_namespace() -> None:
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "\n  mdmp " not in result.stdout.lower()
+    assert "\n  mdmp " in result.stdout.lower()
     assert "data" in result.stdout.lower()
 
 

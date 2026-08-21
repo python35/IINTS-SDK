@@ -1,8 +1,8 @@
-basal_insulin_rate: 0.45
-insulin_sensitivity: 65.0
-carb_factor: 11.0
-glucose_decay_rate: 0.003
-initial_glucose: 125.0
+basal_insulin_rate: 0.55
+insulin_sensitivity: 55.0
+carb_factor: 10.0
+glucose_decay_rate: 0.005
+initial_glucose: 105.0
 glucose_absorption_rate: 0.03
 insulin_action_duration: 300.0
 insulin_peak_time: 75.0

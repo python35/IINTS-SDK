@@ -5,6 +5,15 @@ This is the fast command page for demos, research runs, data prep, local AI, Jet
 !!! warning "Research-only boundary"
     IINTS-AF is for simulation, education, benchmarking, and bench-only research. Do not use these commands for real insulin dosing.
 
+## Command Navigation
+
+```bash
+iints menu    # Choose one of the maintained command domains
+iints map     # Print the maintained command map
+iints guide   # Run a first demo or open command navigation
+iints version --refresh
+```
+
 ## First-Time Setup
 
 ```bash
@@ -17,8 +26,9 @@ After the SDK is installed, future updates are shorter:
 
 ```bash
 iints update
-iints update --dry-run                         # show PyPI + GitHub fallback commands
-iints update --source github --yes             # newest GitHub version
+iints version --refresh                        # compare with stable release metadata
+iints update --dry-run                         # show the stable PyPI command
+iints update --source github --github-ref stable --yes
 iints update --repair --force-reinstall --yes  # repair stale/legacy installs
 ```
 
@@ -255,6 +265,15 @@ iints import-tidepool --output-dir results/tidepool
 Realism and MDMP checks:
 
 ```bash
+# Authenticated local-file encryption. Prompting avoids shell-history leakage.
+iints mdmp encrypt-data --input data/cgm.csv --output data/cgm.enc
+iints mdmp decrypt-data --input data/cgm.enc --output data/cgm_dec.csv
+
+# Ed25519 data-passport signing; no post-quantum signature is claimed.
+iints mdmp sign --card results/passport.json --key keys/private.pem
+iints mdmp verify results/passport.json
+
+# Contract conformance & realism
 iints data realism-check results/imported_trace/cgm_standard.csv \
   --reference free_living_t1d \
   --output-html results/imported_trace/realism_dashboard.html
@@ -475,9 +494,10 @@ iints sources
 If a command exists in the docs but not on your machine, update the SDK:
 
 ```bash
-iints update --source github --yes
+iints version --refresh
+iints update
 hash -r
-iints --help
+iints version --refresh
 ```
 
 ## What To Open After A Demo

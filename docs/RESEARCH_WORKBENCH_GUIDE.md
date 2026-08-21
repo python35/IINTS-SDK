@@ -251,8 +251,10 @@ Select **Save settings** to apply these values to the Run and Local AI workspace
 The desktop app and Python SDK have separate version records:
 
 - **Install or update Python SDK** creates, repairs, or updates the private app engine through a fixed, Rust-owned command. The app does not accept arbitrary shell text.
-- **Download latest app update** opens the stable `tauri-beta-latest` GitHub release. Install the new signed installer for your platform after closing the current app.
-- **Refresh versions** checks the native app and the Python engine independently.
+- **Download latest app update** opens the newest verified versioned Tauri beta release. Install the new signed installer for your platform after closing the current app.
+- **Refresh versions** compares the native app with versioned GitHub beta releases and the Python SDK with the stable PyPI release. The two components are never treated as one version.
+
+Successful checks are cached for six hours. When release services are unavailable, the app labels the result as unverified or uses clearly identified stale cache data; it does not claim that an unknown version is current. A separate warning appears when active Python source code and installed package metadata disagree.
 
 The beta deliberately does not replace its own executable silently. This keeps downloads, signatures, and release notes visible until a signed Tauri self-updater is introduced and audited.
 

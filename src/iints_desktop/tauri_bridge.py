@@ -31,7 +31,7 @@ from iints_desktop.results import load_results_preview
 from iints_desktop.update import get_desktop_update_info
 
 
-DESKTOP_BRIDGE_API_VERSION = 2
+DESKTOP_BRIDGE_API_VERSION = 3
 
 
 def _json_safe(value: Any) -> Any:
@@ -146,8 +146,16 @@ def _diagnostics(_args: argparse.Namespace) -> int:
     )
 
 
-def _update_info(_args: argparse.Namespace) -> int:
-    return _ok(asdict(get_desktop_update_info()))
+def _update_info(args: argparse.Namespace) -> int:
+    return _ok(
+        asdict(
+            get_desktop_update_info(
+                app_version=args.app_version,
+                refresh=bool(args.refresh),
+                offline=bool(args.offline),
+            )
+        )
+    )
 
 
 def _image_data_url(path: Path) -> str | None:
@@ -596,6 +604,9 @@ def build_parser() -> argparse.ArgumentParser:
     diagnostics.set_defaults(func=_diagnostics)
 
     update_info = subcommands.add_parser("update-info")
+    update_info.add_argument("--app-version")
+    update_info.add_argument("--refresh", action="store_true")
+    update_info.add_argument("--offline", action="store_true")
     update_info.set_defaults(func=_update_info)
 
     molecules = subcommands.add_parser("molecules")

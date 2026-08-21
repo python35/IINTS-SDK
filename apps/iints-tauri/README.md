@@ -71,8 +71,9 @@ the text-only `IINTS-AF` name so the application identity stays legible at every
 - Select output folders, completed runs, result CSVs, SBML, COPASI, CellML, and FMU files through
   native macOS, Windows, and Linux dialogs while retaining editable paths for advanced workflows.
 - Load SDK version/status.
-- Show SDK/app update information, bootstrap or repair a private Python engine, open the stable
-  Tauri app release and documentation, and launch a fixed maintenance terminal.
+- Check SDK and app releases independently with semantic comparison, bounded network access, and
+  explicit cache/offline states; bootstrap or repair a private Python engine; open the newest
+  versioned Tauri app release and documentation; and launch a fixed maintenance terminal.
 - Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
 - Run a workflow through the normal Python SDK engine.

@@ -31,7 +31,17 @@ from .bundle import build_audit_bundle, verify_bundle_integrity, build_bundle_fr
 from .certification import create_certificate
 from .synthetic import build_synthetic_metadata
 from .llm_provenance import build_llm_training_card
-from .crypto import MDMPSigner, MDMPVerifier, generate_keypair
+from .crypto import (
+    MDMPSigner,
+    MDMPVerifier,
+    decrypt_cgm_dataset_file,
+    decrypt_patient_payload,
+    derive_key_hkdf,
+    derive_key_scrypt,
+    encrypt_cgm_dataset_file,
+    encrypt_patient_payload,
+    generate_keypair,
+)
 from .delegate import DelegateConstraints, DelegateIssuer, DelegateSigner, DelegateVerifier
 from .policy import PolicySpec, default_policy, evaluate_policy, load_policy, parse_policy, save_policy
 from .conformance import run_conformance_suite
@@ -97,6 +107,12 @@ __all__ = [
     "build_llm_training_card",
     "MDMPSigner",
     "MDMPVerifier",
+    "derive_key_hkdf",
+    "derive_key_scrypt",
+    "encrypt_patient_payload",
+    "decrypt_patient_payload",
+    "encrypt_cgm_dataset_file",
+    "decrypt_cgm_dataset_file",
     "generate_keypair",
     "DelegateConstraints",
     "DelegateIssuer",

@@ -20,7 +20,7 @@ def load_presets() -> List[Dict[str, Any]]:
 def get_preset(name: str) -> Dict[str, Any]:
     presets = load_presets()
     for preset in presets:
-        if preset.get("name") == name:
+        if preset.get("name") == name or name in preset.get("aliases", []):
             return preset
     raise KeyError(name)
 

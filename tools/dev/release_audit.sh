@@ -38,7 +38,7 @@ require_file() {
 require_file "docs/releases/$TAG.md"
 
 require_contains "pyproject.toml" "version = \"$VERSION\"" "pyproject version is not $VERSION"
-require_contains "src/iints/__init__.py" "__version__ = \"$VERSION\"" "fallback __version__ is not $VERSION"
+require_contains "src/iints/_version.py" "__version__ = \"$VERSION\"" "source __version__ is not $VERSION"
 require_contains "docs/releases/$TAG.md" "# $TAG" "release note header is not $TAG"
 require_contains "docs/releases/INDEX.md" "[$TAG]($TAG.md)" "release archive does not link $TAG"
 require_contains "mkdocs.yml" "Latest ($TAG): releases/$TAG.md" "MkDocs latest release nav is not $TAG"

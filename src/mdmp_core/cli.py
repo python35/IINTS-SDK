@@ -700,8 +700,8 @@ def verify(
         cert_payload = json.loads(cert.read_text(encoding="utf-8"))
         if not isinstance(cert_payload, dict):
             raise typer.BadParameter("Certificate must be a JSON object")
-        verifier = DelegateVerifier(public_key, trust_store_path=trust_store)
-        result = verifier.verify(payload, cert_payload, dataset_path=dataset)
+        delegate_verifier = DelegateVerifier(public_key, trust_store_path=trust_store)
+        result = delegate_verifier.verify(payload, cert_payload, dataset_path=dataset)
         status = "TRUSTED" if result.get("valid") else "UNTRUSTED"
         typer.echo("MDMP Trust Chain Verification")
         typer.echo("=" * 40)
@@ -715,8 +715,8 @@ def verify(
         if result.get("error"):
             typer.echo(f"Error: {result.get('error')}")
     else:
-        verifier = MDMPVerifier(public_key, trust_store_path=trust_store)
-        result = verifier.verify(payload, dataset_path=dataset)
+        card_verifier = MDMPVerifier(public_key, trust_store_path=trust_store)
+        result = card_verifier.verify(payload, dataset_path=dataset)
 
         status = "VALID" if result.get("valid") else "INVALID"
         tamper = "CLEAN" if not result.get("tampered") else "TAMPER DETECTED"

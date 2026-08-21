@@ -3,16 +3,17 @@
 This page is generated from the Python source tree by `tools/docs/generate_api_reference.py`.
 Do not edit it by hand; regenerate it after public module changes.
 
-Documented modules: **218**
+Documented modules: **221**
 
 ## Package Index
 
 | Package | Modules |
 | --- | ---: |
+| `_version` | 1 |
 | `ai` | 13 |
 | `analysis` | 30 |
 | `api` | 4 |
-| `cli` | 3 |
+| `cli` | 4 |
 | `core` | 40 |
 | `data` | 25 |
 | `demo_assets` | 1 |
@@ -33,9 +34,14 @@ Documented modules: **218**
 | `tools` | 3 |
 | `utils` | 6 |
 | `validation` | 7 |
+| `versioning` | 1 |
 | `visualization` | 3 |
 
 ## Module Index
+
+### `_version`
+
+- [`iints._version`](#iints_version)
 
 ### `ai`
 
@@ -97,6 +103,7 @@ Documented modules: **218**
 
 - [`iints.cli`](#iintscli)
 - [`iints.cli.cli`](#iintsclicli)
+- [`iints.cli.menu`](#iintsclimenu)
 - [`iints.cli.patient_cli`](#iintsclipatient_cli)
 
 ### `core`
@@ -324,6 +331,10 @@ Documented modules: **218**
 - [`iints.validation.safety_contract`](#iintsvalidationsafety_contract)
 - [`iints.validation.schemas`](#iintsvalidationschemas)
 
+### `versioning`
+
+- [`iints.versioning`](#iintsversioning)
+
 ### `visualization`
 
 - [`iints.visualization`](#iintsvisualization)
@@ -346,6 +357,13 @@ Documented modules: **218**
 - `generate_demo_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]`
 - `generate_agp_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None, subject_name: str = 'Research simulation', summary_json_path: Optional[str] = None) -> Optional[str]`
 - `generate_agp_assets(simulation_results: 'pd.DataFrame', output_dir: Optional[str] = None, subject_name: str = 'Research simulation', summary_json_path: Optional[str] = None, export_svg: bool = True) -> Optional[dict]`
+
+## `iints._version`
+
+- Source: `src/iints/_version.py`
+- Summary: Version of the IINTS source code in this distribution.
+
+No public classes, functions, or all-caps constants are declared directly in this module.
 
 ## `iints.ai`
 
@@ -1311,14 +1329,14 @@ No public classes, functions, or all-caps constants are declared directly in thi
 #### `BrandedTyperGroup` methods
 
 - `get_help(self, ctx)`
-- `list_commands(self, ctx)`
 
 ### Public Functions
 
 - `app_callback(ctx: typer.Context, version: Annotated[bool, typer.Option('--version', help='Show the installed SDK version and exit.', is_eager=True)] = False)`
 - `evaluate(algo: Annotated[Path, typer.Option(help='Path to the algorithm Python file')], population: Annotated[int, typer.Option(help='Number of virtual patients to simulate')] = 100, patient_config_name: Annotated[str, typer.Option('--patient-config', help='Base patient configuration name')] = 'default_patient', patient_config_path: Annotated[Optional[Path], typer.Option('--patient-config-path', help='Path to base patient config YAML')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario', help='Path to scenario JSON')] = None, duration: Annotated[int, typer.Option(help='Simulation duration in minutes')] = 720, time_step: Annotated[int, typer.Option(help='Time step in minutes')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory')] = None, max_workers: Annotated[Optional[int], typer.Option(help='Max parallel workers (default: all cores)')] = None, seed: Annotated[Optional[int], typer.Option(help='Random seed for reproducibility')] = None, patient_model: Annotated[str, typer.Option('--patient-model', help='Patient model: auto, bergman, custom, simglucose')] = 'auto')`
 - `doctor(smoke_run: Annotated[bool, typer.Option(help='Run a short deterministic smoke simulation')] = False, smoke_duration: Annotated[int, typer.Option(help='Smoke simulation duration in minutes')] = 30, full: Annotated[bool, typer.Option('--full', help='Run extra environment checks that help beginners debug setup issues')] = False, suggest: Annotated[bool, typer.Option('--suggest', help='Print concrete next commands based on what doctor finds')] = False)`
-- `update_sdk(source: Annotated[str, typer.Option(help='Update source: auto, pypi, or github. Auto tries PyPI first and falls back to GitHub main.')] = 'auto', install_extras: Annotated[str, typer.Option('--extras', help='Comma-separated extras to install, e.g. full,mdmp,research,edge. Use empty string for none.')] = 'full,mdmp,research,edge', github_ref: Annotated[str, typer.Option('--github-ref', help='Git ref used with --source github or as the auto fallback.')] = 'main', user: Annotated[bool, typer.Option('--user/--no-user', help='Pass --user to pip for user-site installs.')] = False, pre: Annotated[bool, typer.Option('--pre/--no-pre', help='Allow pre-release versions.')] = False, upgrade_pip: Annotated[bool, typer.Option('--upgrade-pip/--no-upgrade-pip', help='Upgrade pip before installing IINTS.')] = False, repair: Annotated[bool, typer.Option('--repair/--no-repair', help='Uninstall legacy/conflicting IINTS packages before reinstalling.')] = False, force_reinstall: Annotated[bool, typer.Option('--force-reinstall/--no-force-reinstall', help='Ask pip to reinstall even if the version appears current.')] = False, no_cache_dir: Annotated[bool, typer.Option('--no-cache-dir/--use-pip-cache', help="Disable pip's wheel/download cache for this update.")] = False, dry_run: Annotated[bool, typer.Option('--dry-run', help='Print the pip command without executing it.')] = False, yes: Annotated[bool, typer.Option('--yes', '-y', help='Run without asking for confirmation.')] = False, verify: Annotated[bool, typer.Option('--verify/--no-verify', help='Verify the installed package version after the update command completes.')] = True) -> None`
+- `version_status(refresh: Annotated[bool, typer.Option('--refresh/--cached', help='Refresh stable release metadata instead of using a fresh cache entry.')] = False, offline: Annotated[bool, typer.Option('--offline', help='Do not access release services; use local and cached information only.')] = False, json_output: Annotated[bool, typer.Option('--json', help='Emit machine-readable JSON.')] = False, fail_if_outdated: Annotated[bool, typer.Option('--fail-if-outdated', help='Exit with code 2 when a newer stable SDK release exists.')] = False, fail_if_unknown: Annotated[bool, typer.Option('--fail-if-unknown', help='Exit with code 3 when the latest stable release cannot be verified.')] = False, fail_if_mismatch: Annotated[bool, typer.Option('--fail-if-mismatch', help='Exit with code 4 when package metadata and active SDK source report different versions.')] = False) -> None`
+- `update_sdk(source: Annotated[str, typer.Option(help='Update source: auto, pypi, or github. Auto uses the stable PyPI release channel.')] = 'auto', install_extras: Annotated[str, typer.Option('--extras', help='Comma-separated extras to install, e.g. full,mdmp,research,edge. Use empty string for none.')] = 'full,mdmp,research,edge', github_ref: Annotated[str, typer.Option('--github-ref', help="Git ref used with --source github. Use 'stable' for the latest SDK release tag.")] = 'stable', user: Annotated[bool, typer.Option('--user/--no-user', help='Pass --user to pip for user-site installs.')] = False, pre: Annotated[bool, typer.Option('--pre/--no-pre', help='Allow pre-release versions.')] = False, upgrade_pip: Annotated[bool, typer.Option('--upgrade-pip/--no-upgrade-pip', help='Upgrade pip before installing IINTS.')] = False, repair: Annotated[bool, typer.Option('--repair/--no-repair', help='Uninstall legacy/conflicting IINTS packages before reinstalling.')] = False, force_reinstall: Annotated[bool, typer.Option('--force-reinstall/--no-force-reinstall', help='Ask pip to reinstall even if the version appears current.')] = False, no_cache_dir: Annotated[bool, typer.Option('--no-cache-dir/--use-pip-cache', help="Disable pip's wheel/download cache for this update.")] = False, dry_run: Annotated[bool, typer.Option('--dry-run', help='Print the pip command without executing it.')] = False, yes: Annotated[bool, typer.Option('--yes', '-y', help='Run without asking for confirmation.')] = False, verify: Annotated[bool, typer.Option('--verify/--no-verify', help='Verify the installed package version after the update command completes.')] = True, check_only: Annotated[bool, typer.Option('--check', help='Check stable release metadata without changing the environment.')] = False) -> None`
 - `delete_sdk(everything: Annotated[bool, typer.Option('--everything/--standard', help='Remove packages, user data, local generated outputs, and a detected IINTS source checkout.')] = False, packages: Annotated[bool, typer.Option('--packages/--no-packages', help='Uninstall IINTS Python packages from the active Python environment.')] = True, user_data: Annotated[bool, typer.Option('--user-data/--no-user-data', help='Remove user-level IINTS config, plugin, and cache folders.')] = True, local_outputs: Annotated[bool, typer.Option('--local-outputs/--no-local-outputs', help='Also remove known generated IINTS output folders in the current directory.')] = False, source_checkout: Annotated[bool, typer.Option('--source-checkout/--no-source-checkout', help='Also remove the detected local IINTS-SDK source checkout, if running from one.')] = False, extra_path: Annotated[Optional[List[Path]], typer.Option('--path', help='Extra IINTS-owned path to remove. Refuses home, root, and current working directory.')] = None, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show what would be removed without deleting anything.')] = False, yes: Annotated[bool, typer.Option('--yes', '-y', help='Delete without asking for confirmation.')] = False) -> None`
 - `run_doctor(algo: Annotated[Optional[Path], typer.Option(help='Algorithm Python file to inspect.')] = None, patient_config_path: Annotated[Optional[Path], typer.Option(help='Patient YAML used for the run.')] = None, scenario_path: Annotated[Optional[Path], typer.Option('--scenario-path', '--scenario', help='Scenario JSON used for the run.')] = None, duration: Annotated[int, typer.Option(help='Requested duration in minutes.')] = 1440, time_step: Annotated[int, typer.Option(help='Simulation time step in minutes.')] = 5, output_dir: Annotated[Optional[Path], typer.Option(help='Output directory to preflight.')] = None, patient_config_name: Annotated[str, typer.Option(help='Packaged patient profile name, if not using a YAML path.')] = 'default_patient', output_json: Annotated[Optional[Path], typer.Option(help='Optional JSON report path.')] = None, fail_on_warning: Annotated[bool, typer.Option(help='Exit with code 1 when any warning is found.')] = False) -> None`
 - `evidence_build(run: Annotated[List[str], typer.Option('--run', help='Repeatable run input in label=path form, for example normal=results/normal.')], output_dir: Annotated[Path, typer.Option(help='Output directory for the evidence bundle.')] = Path('results/evidence_bundle'), title: Annotated[str, typer.Option(help='Human-readable bundle title.')] = 'IINTS Research Evidence Bundle', local_ai_dir: Annotated[Optional[Path], typer.Option(help='Optional local AI lab output directory.')] = None, pump_bundle_dir: Annotated[Optional[Path], typer.Option(help='Optional Pico pump bundle directory.')] = None) -> None`
@@ -1342,6 +1360,10 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `demo(demo_kind: Annotated[Optional[str], typer.Argument(help='Optional story preset: doctor, eucys, booth, live, quick, or full. Example: `iints demo eucys`.')] = None, output_dir: Annotated[Path, typer.Option(help='Directory where demo outputs should be written')] = Path('results/demo'), mode: Annotated[str, typer.Option('--mode', help='Demo mode: live, quick, or full')] = 'live', quick_mode: Annotated[bool, typer.Option('--quick', help='Shortcut for --mode quick')] = False, full_mode: Annotated[bool, typer.Option('--full', help='Shortcut for --mode full')] = False, presentation_mode: Annotated[bool, typer.Option('--presentation/--simulation-only', help='Default starts the full presentation demo; use --simulation-only for the old one-run starter simulation.')] = True, preset: Annotated[Optional[str], typer.Option(help='Optional preset override. Defaults to quickstart_meal for quick and realistic_reference_day for full.')] = None, seed: Annotated[int, typer.Option(help='Deterministic seed for the bundled demo')] = 42, compare_baselines: Annotated[bool, typer.Option(help='Include built-in baselines in the demo output')] = True, audience: Annotated[str, typer.Option(help='Presenter framing for the live demo: mixed, clinical, engineering, or jury.')] = 'jury', prepare_ai: Annotated[bool, typer.Option('--prepare-ai/--skip-ai', help='Prepare optional local-AI artifacts during the live demo.')] = False, build_evidence: Annotated[bool, typer.Option('--evidence/--no-evidence', help='Build a public research evidence bundle after the demo.')] = True, full_code: Annotated[bool, typer.Option('--full-code/--preview-code', help='Print the whole exported live demo script instead of the curated preview.')] = False, overwrite: Annotated[bool, typer.Option('--overwrite/--no-overwrite', help='Allow replacing previously exported live demo files.')] = True, stage_mode: Annotated[bool, typer.Option('--stage/--technical', help='Default keeps the live demo audience-safe; --technical shows more raw execution detail.')] = True, dry_run: Annotated[bool, typer.Option('--dry-run', help='Show the plan without running the demo')] = False)`
 - `start(goal: Annotated[str, typer.Option('--goal', help='What you want to do: demo, project, study, edge, or data. Aliases like pi, research, and quickstart also work.')] = 'demo', run_now: Annotated[bool, typer.Option('--run', help='Run the safe starter action for demo, project, or edge instead of only printing the plan.')] = False, output_dir: Annotated[Path, typer.Option(help='Output directory for --goal demo.')] = Path('results/demo'), project_name: Annotated[str, typer.Option(help='Project folder name for --goal project.')] = 'iints_quickstart', edge_output_dir: Annotated[Path, typer.Option(help='Edge project folder for --goal edge.')] = Path('iints_pi_demo'), board: Annotated[str, typer.Option(help='Edge board for --goal edge: raspberry_pi or uno_q.')] = 'raspberry_pi') -> None`
 - `onboard(output_dir: Annotated[Path, typer.Option(help='Root directory for the canonical onboarding outputs.')] = Path('results/onboarding'), run_safe_steps: Annotated[bool, typer.Option('--run-safe-steps', help='Run doctor, demo, import-demo, and realism-check.')] = False) -> None`
+- `cli_map()`
+- `cli_overview()`
+- `cli_menu()`
+- `cli_hub()`
 - `guide()`
 - `new_algo(name: Annotated[str, typer.Option(help='Name of the new algorithm')], author: Annotated[str, typer.Option(help='Author of the algorithm')], output_dir: Annotated[Path, typer.Option(help='Directory to save the new algorithm file')] = Path('.'))`
 - `presets_list()`
@@ -1387,6 +1409,10 @@ No public classes, functions, or all-caps constants are declared directly in thi
 - `mdmp_validate(contract_path: Annotated[Path, typer.Argument(help='Path to MDMP contract YAML')], input_csv: Annotated[Path, typer.Argument(help='Path to input CSV')], output_json: Annotated[Optional[Path], typer.Option(help='Optional output report JSON path')] = None, apply_builtin_transforms: Annotated[bool, typer.Option(help='Apply built-in unit conversion transforms (default: off for explicit MDMP operation)')] = False, fail_on_noncompliant: Annotated[bool, typer.Option(help='Exit code 1 when compliance checks fail')] = False, min_mdmp_grade: Annotated[Optional[str], typer.Option(help='Optional MDMP grade gate (draft, research_grade, clinical_grade)')] = None)`
 - `mdmp_visualizer(report_json: Annotated[Path, typer.Argument(help='Path to MDMP validation report JSON')], output_html: Annotated[Path, typer.Option(help='Output HTML path')] = Path('results/mdmp_dashboard.html'), title: Annotated[str, typer.Option(help='Dashboard title')] = 'IINTS MDMP Certification Dashboard')`
 - `mdmp_synthetic_mirror(input_csv: Annotated[Path, typer.Argument(help='Source CSV')], contract_path: Annotated[Path, typer.Argument(help='MDMP contract YAML')], output_csv: Annotated[Path, typer.Option(help='Output synthetic CSV path')] = Path('data/synthetic_mirror.csv'), output_json: Annotated[Optional[Path], typer.Option(help='Optional synthetic mirror report JSON')] = Path('results/synthetic_mirror_report.json'), rows: Annotated[Optional[int], typer.Option(help='Optional number of rows to generate')] = None, seed: Annotated[int, typer.Option(help='Random seed')] = 42, noise_scale: Annotated[float, typer.Option(help='Numeric perturbation scale')] = 0.05, min_mdmp_grade: Annotated[Optional[str], typer.Option(help='Optional MDMP grade gate')] = 'research_grade', fail_on_noncompliant: Annotated[bool, typer.Option(help='Exit code 1 when generated dataset fails compliance')] = True)`
+- `mdmp_encrypt_data(input_file: Annotated[Path, typer.Option('--input', '-i', help='Path to input dataset file (CSV/JSON/Parquet)')], output_file: Annotated[Optional[Path], typer.Option('--output', '-o', help='Path to encrypted output file (.enc)')] = None, key: Annotated[Optional[str], typer.Option('--key', '-k', help='Passphrase value (discouraged: visible in shell history; prompt or --key-file is safer)')] = None, key_file: Annotated[Optional[Path], typer.Option('--key-file', help='File containing a passphrase or exactly 32 raw key bytes')] = None, aad: Annotated[Optional[str], typer.Option('--aad', help='Optional Associated Authenticated Data (e.g. study-ID)')] = None, force: Annotated[bool, typer.Option('--force', help='Allow replacing an existing encrypted output file')] = False)`
+- `mdmp_decrypt_data(input_file: Annotated[Path, typer.Option('--input', '-i', help='Path to encrypted .enc file')], output_file: Annotated[Path, typer.Option('--output', '-o', help='Path to restored output file')], key: Annotated[Optional[str], typer.Option('--key', '-k', help='Passphrase value (discouraged: visible in shell history; prompt or --key-file is safer)')] = None, key_file: Annotated[Optional[Path], typer.Option('--key-file', help='File containing a passphrase or exactly 32 raw key bytes')] = None, aad: Annotated[Optional[str], typer.Option('--aad', help='Associated Authenticated Data used during encryption')] = None, force: Annotated[bool, typer.Option('--force', help='Allow replacing an existing decrypted output file')] = False)`
+- `mdmp_sign_card(card_file: Annotated[Path, typer.Option('--card', '-c', help='Path to JSON data card / passport')], private_key: Annotated[Path, typer.Option('--key', '-k', help='Path to Ed25519 private key PEM')], output_file: Annotated[Optional[Path], typer.Option('--output', '-o', help='Path to signed output JSON')] = None, signer_name: Annotated[str, typer.Option('--signer', help='Authority name / signer identity')] = 'MDMP-Authority-v1', key_id: Annotated[str, typer.Option('--key-id', help='Key identifier')] = 'mdmp_pub_v1', post_quantum: Annotated[bool, typer.Option('--pqc', '--hybrid', help='Reserved compatibility flag; real ML-DSA signing is not implemented')] = False)`
+- `mdmp_verify_card(card_file: Annotated[Path, typer.Argument(help='Path to signed JSON data card / passport')], public_key: Annotated[Optional[Path], typer.Option('--key', '-k', help='Optional explicit public key PEM')] = None, dataset_path: Annotated[Optional[Path], typer.Option('--dataset', '-d', help='Optional dataset file to verify fingerprint match')] = None)`
 - `sources(category: Annotated[Optional[str], typer.Option(help='Filter by source category (guideline, trial, model, dataset, ...).')] = None, output_json: Annotated[Optional[Path], typer.Option(help='Optional JSON output path.')] = None)`
 - `research_prepare_azt1d(input_dir: Annotated[Path, typer.Option(help='Root directory containing AZT1D Subject folders')] = Path('data_packs/public/azt1d/AZT1D 2025/CGM Records'), output: Annotated[Path, typer.Option(help='Output dataset path (CSV or Parquet)')] = Path('data_packs/public/azt1d/processed/azt1d_merged.csv'), report: Annotated[Path, typer.Option(help='Quality report output path')] = Path('data_packs/public/azt1d/quality_report.json'), time_step: Annotated[int, typer.Option(help='Expected CGM sample interval (minutes)')] = 5, max_gap_multiplier: Annotated[float, typer.Option(help='Segment-break gap multiplier')] = 2.5, dia_minutes: Annotated[float, typer.Option(help='Insulin action duration (minutes)')] = 240.0, peak_minutes: Annotated[float, typer.Option(help='IOB peak time (minutes, OpenAPS bilinear)')] = 75.0, carb_absorb_minutes: Annotated[float, typer.Option(help='Carb absorption duration (minutes)')] = 120.0, max_basal: Annotated[float, typer.Option(help='Clip basal values above this (U/hr)')] = 20.0, max_bolus: Annotated[float, typer.Option(help='Clip bolus values above this (U)')] = 30.0, max_carbs: Annotated[float, typer.Option(help='Clip carb grams above this')] = 200.0, basal_is_rate: Annotated[bool, typer.Option(help='Treat Basal column as U/hr (convert to U/step)')] = True)`
 - `research_prepare_ohio(input_dir: Annotated[Path, typer.Option(help='Local OhioT1DM root containing 2018/2020 train/test XML folders. Do not commit this folder.')] = Path('OhioT1DM-volledig'), output: Annotated[Path, typer.Option(help='Output dataset path (CSV or Parquet)')] = Path('data_packs/public/ohio_t1dm_full/processed/ohio_train.csv'), report: Annotated[Path, typer.Option(help='Quality report output path')] = Path('data_packs/public/ohio_t1dm_full/processed/ohio_train_quality_report.json'), years: Annotated[str, typer.Option(help='Comma-separated years to include, e.g. 2018,2020')] = '2018,2020', splits: Annotated[str, typer.Option(help='Comma-separated Ohio splits to include: train,test')] = 'train', time_step: Annotated[int, typer.Option(help='Expected CGM sample interval (minutes)')] = 5, max_gap_multiplier: Annotated[float, typer.Option(help='Segment-break gap multiplier')] = 2.5, dia_minutes: Annotated[float, typer.Option(help='Insulin action duration (minutes)')] = 240.0, peak_minutes: Annotated[float, typer.Option(help='IOB peak time (minutes, OpenAPS bilinear)')] = 75.0, carb_absorb_minutes: Annotated[float, typer.Option(help='Carb absorption duration (minutes)')] = 120.0, max_basal: Annotated[float, typer.Option(help='Clip basal values above this (U/hr)')] = 20.0, max_bolus: Annotated[float, typer.Option(help='Clip bolus insulin units above this')] = 30.0, max_carbs: Annotated[float, typer.Option(help='Clip carb grams above this')] = 200.0, icr_default: Annotated[float, typer.Option(help='Fallback ICR (g/U)')] = 10.0, isf_default: Annotated[float, typer.Option(help='Fallback ISF (mg/dL per U)')] = 50.0, filter_meals_without_rise: Annotated[bool, typer.Option('--filter-meals-without-rise/--keep-all-meals', help='Filter meal events that do not show a post-meal glucose rise.')] = True, meal_rise_threshold: Annotated[float, typer.Option(help='Minimum post-meal glucose rise to keep a meal event.')] = 10.0, meal_pre_window: Annotated[float, typer.Option(help='Minutes before meal used for baseline glucose.')] = 10.0, meal_post_window: Annotated[float, typer.Option(help='Minutes after meal used for rise detection.')] = 90.0)`
@@ -1519,6 +1545,27 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - `APP_HELP`
 - `IINTS_ASCII_LOGO`
+
+## `iints.cli.menu`
+
+- Source: `src/iints/cli/menu.py`
+- Summary: Small, stable navigation helpers for the public CLI.
+- Explicit exports: `COMMAND_DOMAINS, interactive_menu, show_command_map`
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `CommandDomain` | `CommandDomain` | No module docstring. |
+
+### Public Functions
+
+- `show_command_map(console: Optional[Console] = None) -> None`
+- `interactive_menu(console: Optional[Console] = None) -> None`
+
+### Public Constants
+
+- `COMMAND_DOMAINS`
 
 ## `iints.cli.patient_cli`
 
@@ -3482,7 +3529,7 @@ No public classes, functions, or all-caps constants are declared directly in thi
 
 - Source: `src/iints/mdmp/__init__.py`
 - Summary: MDMP public API (separated namespace).
-- Explicit exports: `StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, build_mdmp_dashboard_html, MDMPValidationResult, MDMPCheckResult, BACKEND_MDMP_GRADE_ORDER, backend_mdmp_grade_meets_minimum, get_backend, is_mdmp_available, active_mdmp_backend, load_mdmp_contract, run_mdmp_validation, build_mdmp_dashboard_html_with_backend, CORE_AI_PACT_CONTROLS, EU_AI_PACT_CONTROL_DESCRIPTIONS, HIGH_RISK_READINESS_CONTROLS, EUAIPactReadinessResult, review_eu_ai_pact_readiness`
+- Explicit exports: `StreamSpec, FeatureSpec, LabelSpec, ValidationSpec, ProcessSpec, ModelReadyContract, compile_contract, parse_contract, load_contract_yaml, ContractRunner, ValidationResult, CheckResult, MDMP_PROTOCOL_VERSION, MDMP_GRADE_ORDER, classify_mdmp_grade, mdmp_grade_meets_minimum, dataframe_fingerprint, mdmp_gate, MDMPGateError, generate_synthetic_mirror, SyntheticMirrorArtifact, build_mdmp_dashboard_html, MDMPValidationResult, MDMPCheckResult, BACKEND_MDMP_GRADE_ORDER, backend_mdmp_grade_meets_minimum, get_backend, is_mdmp_available, active_mdmp_backend, load_mdmp_contract, run_mdmp_validation, build_mdmp_dashboard_html_with_backend, CORE_AI_PACT_CONTROLS, EU_AI_PACT_CONTROL_DESCRIPTIONS, HIGH_RISK_READINESS_CONTROLS, EUAIPactReadinessResult, review_eu_ai_pact_readiness, MDMPSigner, MDMPVerifier, derive_key_hkdf, derive_key_scrypt, encrypt_patient_payload, decrypt_patient_payload, encrypt_cgm_dataset_file, decrypt_cgm_dataset_file`
 
 No public classes, functions, or all-caps constants are declared directly in this module.
 
@@ -4924,6 +4971,44 @@ No public classes, functions, or all-caps constants are declared directly in thi
 ### Public Constants
 
 - `LATEST_SCHEMA_VERSION`
+
+## `iints.versioning`
+
+- Source: `src/iints/versioning.py`
+- Summary: Shared, network-bounded version inspection for the CLI and desktop app.
+- Explicit exports: `APP_RELEASE_URL, APP_RELEASES_API_URL, ComponentVersionStatus, SDK_DISTRIBUTION, SDK_PYPI_JSON_URL, SDK_RELEASE_URL, check_app_version, check_sdk_version, clear_version_cache, installed_sdk_environment, installed_sdk_version, version_is_newer, version_report`
+
+### Public Classes
+
+| Class | Signature | Summary |
+| --- | --- | --- |
+| `ComponentVersionStatus` | `ComponentVersionStatus` | No module docstring. |
+
+#### `ComponentVersionStatus` methods
+
+- `to_dict(self) -> dict[str, Any]`
+
+### Public Functions
+
+- `version_is_newer(candidate: str, reference: str) -> bool`
+- `clear_version_cache(path: Path | None = None) -> None`
+- `installed_sdk_version() -> str`
+- `installed_sdk_environment() -> dict[str, Any]`
+- `check_sdk_version(*, installed: str | None = None, refresh: bool = False, offline: bool = False, cache_path: Path | None = None, cache_ttl: timedelta = DEFAULT_CACHE_TTL, timeout: float = DEFAULT_NETWORK_TIMEOUT_SECONDS, fetch_json: JsonFetcher = _fetch_json) -> ComponentVersionStatus`
+- `check_app_version(installed: str, *, refresh: bool = False, offline: bool = False, cache_path: Path | None = None, cache_ttl: timedelta = DEFAULT_CACHE_TTL, timeout: float = DEFAULT_NETWORK_TIMEOUT_SECONDS, fetch_json: JsonFetcher = _fetch_json) -> ComponentVersionStatus`
+- `version_report(*, app_version: str | None = None, refresh: bool = False, offline: bool = False) -> dict[str, Any]`
+
+### Public Constants
+
+- `APP_RELEASES_API_URL`
+- `APP_RELEASE_URL`
+- `APP_TAG_PREFIX`
+- `DEFAULT_CACHE_TTL`
+- `DEFAULT_NETWORK_TIMEOUT_SECONDS`
+- `SDK_DISTRIBUTION`
+- `SDK_PYPI_JSON_URL`
+- `SDK_RELEASE_URL`
+- `VERSION_CHECK_SCHEMA`
 
 ## `iints.visualization`
 

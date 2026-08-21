@@ -451,7 +451,7 @@ def test_qt_app_exposes_desktop_update_panel() -> None:
     update_source = Path("src/iints_desktop/update.py").read_text(encoding="utf-8")
 
     assert "DESKTOP_RELEASE_URL" in source
-    assert "desktop-beta-latest" in update_source
+    assert "APP_RELEASE_URL" in update_source
     assert "Open App Downloads" in source
     assert "Open Update Docs" in source
     assert "Copy Update Command" in source
@@ -615,10 +615,8 @@ def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
     assert "IINTS-AF-Desktop-Beta-windows-x64.exe" in combined
     assert "IINTS-AF-Desktop-Beta-macos.dmg" in combined
     assert "IINTS-AF-Desktop-Beta-linux-x64" in combined
-    assert release_tag in readme
     assert release_tag in app_install
     assert release_tag in desktop_docs
-    assert release_tag in source or release_tag in update_source
     assert release_tag in workflow
     assert not re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", combined)
     assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
@@ -877,6 +875,11 @@ def test_tauri_app_exposes_sdk_update_actions_safely() -> None:
     assert "Install or update Python SDK" in frontend
     assert "update-status" in frontend
     assert "desktop_update_info" in frontend_js
+    assert "settings-sdk-latest" in frontend
+    assert "settings-app-latest" in frontend
+    assert "Latest stable SDK" in frontend_js
+    assert "Latest app beta" in frontend_js
+    assert 'call("desktop_update_info", { refresh })' in frontend_js
     assert "open_sdk_update_terminal" in frontend_js
     assert "~/.iints-af/python-engine" in frontend_js
     assert "update-panel" in frontend_css

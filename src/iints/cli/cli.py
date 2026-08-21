@@ -36,6 +36,12 @@ from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
+from iints.versioning import (
+    ComponentVersionStatus,
+    check_sdk_version,
+    clear_version_cache,
+    installed_sdk_environment,
+)
 from iints.analysis import (
     build_booth_demo,
     build_carelink_workbench,
@@ -259,10 +265,6 @@ class BrandedTyperGroup(TyperGroup):
     def get_help(self, ctx):  # type: ignore[override]
         return f"{IINTS_ASCII_LOGO}\n\n{super().get_help(ctx)}"
 
-    def list_commands(self, ctx):  # type: ignore[override]
-        commands = super().list_commands(ctx)
-        return [command for command in commands if command != "mdmp"]
-
 
 app = typer.Typer(
     help=APP_HELP,
@@ -274,7 +276,7 @@ docs_app = typer.Typer(help="Generate documentation and technical summaries for 
 presets_app = typer.Typer(help="Clinic-safe presets and quickstart runs.")
 profiles_app = typer.Typer(help="Patient profiles and physiological presets.")
 data_app = typer.Typer(help="Data import, certification, and public data packs.")
-mdmp_app = typer.Typer(help="Legacy MDMP namespace kept for backwards compatibility.")
+mdmp_app = typer.Typer(help="MDMP cryptographic data passports, AEAD encryption, and contract validation.")
 evidence_app = typer.Typer(help="Build public research evidence bundles from SDK runs.")
 scenarios_app = typer.Typer(help="Scenario generation and utilities.")
 algorithms_app = typer.Typer(help="Algorithm registry and plugins.")
@@ -293,7 +295,7 @@ app.add_typer(docs_app, name="docs")
 app.add_typer(presets_app, name="presets")
 app.add_typer(profiles_app, name="profiles")
 app.add_typer(data_app, name="data")
-app.add_typer(mdmp_app, name="mdmp", hidden=True, deprecated=True)
+app.add_typer(mdmp_app, name="mdmp")
 app.add_typer(ai_app, name="ai")
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(scenarios_app, name="scenarios")
@@ -512,7 +514,8 @@ def _print_run_quality_review(console: Console, quality_outputs: Dict[str, Any])
 def _get_preset(name: str) -> Dict[str, Any]:
     presets = _load_presets()
     for preset in presets:
-        if preset.get("name") == name:
+        aliases = preset.get("aliases", [])
+        if preset.get("name") == name or (isinstance(aliases, list) and name in aliases):
             return preset
     raise KeyError(name)
 
@@ -1358,6 +1361,7 @@ def _build_update_install_command(
     user: bool,
     force_reinstall: bool,
     no_cache_dir: bool,
+    version_pin: str | None = None,
 ) -> List[str]:
     normalized_ref = github_ref.strip() or "main"
     if source == "github":
@@ -1367,6 +1371,8 @@ def _build_update_install_command(
         )
     else:
         package_spec = f"iints-sdk-python35{extras_suffix}"
+        if version_pin:
+            package_spec = f"{package_spec}=={version_pin}"
 
     install_cmd = [sys.executable, "-m", "pip", "install", "-U"]
     if pre:
@@ -1381,11 +1387,104 @@ def _build_update_install_command(
     return install_cmd
 
 
+def _render_sdk_version_status(
+    console: Console,
+    *,
+    refresh: bool,
+    offline: bool,
+    release: Optional[ComponentVersionStatus] = None,
+    environment: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    release = release or check_sdk_version(refresh=refresh, offline=offline)
+    environment = environment or installed_sdk_environment()
+    table = Table(title="IINTS SDK Version Status", show_lines=False)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Installed", release.installed_version)
+    table.add_row("Active code", str(environment.get("code_version", "unknown")))
+    table.add_row("Latest stable", release.latest_version or "not available")
+    table.add_row("Status", release.status.replace("_", " "))
+    table.add_row("Release source", release.source)
+    table.add_row("Checked at", release.checked_at or "not checked")
+    table.add_row("Python", str(environment["python_executable"]))
+    table.add_row("CLI", str(environment["cli_path"] or "not found on PATH"))
+    table.add_row("Package location", str(environment["package_location"] or "not installed as a distribution"))
+    if environment["cli_matches_python"] is False:
+        table.add_row("Environment warning", "The iints executable belongs to a different Python interpreter.")
+    if environment.get("version_metadata_matches_code") is False:
+        table.add_row(
+            "Version warning",
+            "Installed package metadata and active source code report different versions. Reinstall this environment.",
+        )
+    if release.error:
+        table.add_row("Check warning", release.error)
+    console.print(table)
+    return {"schema": 1, "sdk": release.to_dict(), "environment": environment}
+
+
+@app.command(name="version")
+def version_status(
+    refresh: Annotated[
+        bool,
+        typer.Option("--refresh/--cached", help="Refresh stable release metadata instead of using a fresh cache entry."),
+    ] = False,
+    offline: Annotated[
+        bool,
+        typer.Option("--offline", help="Do not access release services; use local and cached information only."),
+    ] = False,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit machine-readable JSON."),
+    ] = False,
+    fail_if_outdated: Annotated[
+        bool,
+        typer.Option("--fail-if-outdated", help="Exit with code 2 when a newer stable SDK release exists."),
+    ] = False,
+    fail_if_unknown: Annotated[
+        bool,
+        typer.Option("--fail-if-unknown", help="Exit with code 3 when the latest stable release cannot be verified."),
+    ] = False,
+    fail_if_mismatch: Annotated[
+        bool,
+        typer.Option(
+            "--fail-if-mismatch",
+            help="Exit with code 4 when package metadata and active SDK source report different versions.",
+        ),
+    ] = False,
+) -> None:
+    """Compare the active SDK environment with the latest stable release."""
+
+    console = Console()
+    release = check_sdk_version(refresh=refresh, offline=offline)
+    environment = installed_sdk_environment()
+    payload = {"schema": 1, "sdk": release.to_dict(), "environment": environment}
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        _render_sdk_version_status(
+            console,
+            refresh=refresh,
+            offline=offline,
+            release=release,
+            environment=environment,
+        )
+        if release.status == "update_available":
+            console.print("Update with [cyan]iints update[/cyan].")
+        elif release.status == "unknown":
+            console.print("[yellow]The installed version is known, but the latest release could not be verified.[/yellow]")
+    if fail_if_unknown and (release.status == "unknown" or release.error is not None):
+        raise typer.Exit(code=3)
+    if fail_if_outdated and release.update_available:
+        raise typer.Exit(code=2)
+    if fail_if_mismatch and environment.get("version_metadata_matches_code") is False:
+        raise typer.Exit(code=4)
+
+
 @app.command(name="update")
 def update_sdk(
     source: Annotated[
         str,
-        typer.Option(help="Update source: auto, pypi, or github. Auto tries PyPI first and falls back to GitHub main."),
+        typer.Option(help="Update source: auto, pypi, or github. Auto uses the stable PyPI release channel."),
     ] = "auto",
     install_extras: Annotated[
         str,
@@ -1393,8 +1492,8 @@ def update_sdk(
     ] = "full,mdmp,research,edge",
     github_ref: Annotated[
         str,
-        typer.Option("--github-ref", help="Git ref used with --source github or as the auto fallback."),
-    ] = "main",
+        typer.Option("--github-ref", help="Git ref used with --source github. Use 'stable' for the latest SDK release tag."),
+    ] = "stable",
     user: Annotated[
         bool,
         typer.Option("--user/--no-user", help="Pass --user to pip for user-site installs."),
@@ -1434,6 +1533,10 @@ def update_sdk(
             help="Verify the installed package version after the update command completes.",
         ),
     ] = True,
+    check_only: Annotated[
+        bool,
+        typer.Option("--check", help="Check stable release metadata without changing the environment."),
+    ] = False,
 ) -> None:
     """Update the current IINTS SDK environment to the newest release."""
     console = Console()
@@ -1442,29 +1545,71 @@ def update_sdk(
         console.print("[bold red]Error: --source must be 'auto', 'pypi', or 'github'.[/bold red]")
         raise typer.Exit(code=1)
 
+    release = check_sdk_version(refresh=check_only or not dry_run, offline=dry_run)
+    environment_before = installed_sdk_environment()
+    if check_only:
+        _render_sdk_version_status(
+            console,
+            refresh=True,
+            offline=False,
+            release=release,
+            environment=environment_before,
+        )
+        if release.status == "unknown" or release.error is not None:
+            raise typer.Exit(code=3)
+        if release.update_available:
+            raise typer.Exit(code=2)
+        if environment_before.get("version_metadata_matches_code") is False:
+            raise typer.Exit(code=4)
+        return
+
+    metadata_mismatch = environment_before.get("version_metadata_matches_code") is False
+    if metadata_mismatch and not force_reinstall:
+        # A normal `pip install -U` can report "already satisfied" while an
+        # editable checkout or stale source tree still shadows that metadata.
+        force_reinstall = True
+
+    requested_github_ref = github_ref.strip() or "stable"
+    resolved_github_ref = requested_github_ref
+    if normalized_source == "github" and resolved_github_ref == "stable":
+        if not release.latest_version:
+            console.print(
+                "[bold red]Could not resolve the latest stable SDK tag. "
+                "Retry with network access or provide --github-ref explicitly.[/bold red]"
+            )
+            raise typer.Exit(code=1)
+        resolved_github_ref = f"v{release.latest_version}"
+
+    stable_channel = normalized_source in {"auto", "pypi"} or (
+        normalized_source == "github" and requested_github_ref == "stable"
+    )
+    if (
+        release.status == "current"
+        and stable_channel
+        and not pre
+        and not dry_run
+        and not metadata_mismatch
+        and not (force_reinstall or repair)
+    ):
+        console.print(
+            f"[green]IINTS SDK {release.installed_version} is already the latest stable release.[/green]"
+        )
+        console.print("Use --force-reinstall only when repairing this environment.")
+        return
+
     extra_tokens = [token.strip() for token in install_extras.split(",") if token.strip()]
     extras_suffix = f"[{','.join(extra_tokens)}]" if extra_tokens else ""
     primary_source = "pypi" if normalized_source == "auto" else normalized_source
     install_cmd = _build_update_install_command(
         source=primary_source,
         extras_suffix=extras_suffix,
-        github_ref=github_ref,
+        github_ref=resolved_github_ref,
         pre=pre,
         user=user,
         force_reinstall=force_reinstall,
         no_cache_dir=no_cache_dir,
+        version_pin=release.latest_version if primary_source == "pypi" and not pre else None,
     )
-    fallback_cmd: Optional[List[str]] = None
-    if normalized_source == "auto":
-        fallback_cmd = _build_update_install_command(
-            source="github",
-            extras_suffix=extras_suffix,
-            github_ref=github_ref,
-            pre=pre,
-            user=user,
-            force_reinstall=force_reinstall,
-            no_cache_dir=no_cache_dir,
-        )
 
     pip_cmd = [sys.executable, "-m", "pip", "install", "-U", "pip"]
     repair_cmd = [sys.executable, "-m", "pip", "uninstall", "-y", "iints", "iints-sdk-python35"]
@@ -1473,7 +1618,14 @@ def update_sdk(
     console.print(f"Python executable: [cyan]{sys.executable}[/cyan]")
     console.print(f"CLI path: [cyan]{shutil.which('iints') or 'not found on PATH'}[/cyan]")
     console.print(f"Update source: [cyan]{normalized_source}[/cyan]")
+    console.print(f"Resolved channel: [cyan]{primary_source}[/cyan]")
+    console.print(f"Latest stable release: [cyan]{release.latest_version or 'not verified'}[/cyan]")
     console.print(f"Install extras: [cyan]{','.join(extra_tokens) if extra_tokens else 'none'}[/cyan]")
+    if metadata_mismatch:
+        console.print(
+            "[yellow]Environment mismatch detected: installed package metadata and active source code "
+            "report different versions. This update will force a reinstall and verify both values.[/yellow]"
+        )
     if upgrade_pip:
         console.print("pip upgrade command:")
         console.print(shlex.join(pip_cmd), markup=False)
@@ -1482,9 +1634,6 @@ def update_sdk(
         console.print(shlex.join(repair_cmd), markup=False)
     console.print("SDK update command:")
     console.print(shlex.join(install_cmd), markup=False)
-    if fallback_cmd is not None:
-        console.print("Auto fallback command if PyPI update fails:")
-        console.print(shlex.join(fallback_cmd), markup=False)
 
     if dry_run:
         console.print("[yellow]Dry run only; no packages were changed.[/yellow]")
@@ -1507,9 +1656,6 @@ def update_sdk(
             raise typer.Exit(code=repair_result.returncode)
 
     result = subprocess.run(install_cmd, check=False)
-    if result.returncode != 0 and fallback_cmd is not None:
-        console.print("[yellow]PyPI update failed; trying GitHub fallback.[/yellow]")
-        result = subprocess.run(fallback_cmd, check=False)
     if result.returncode != 0:
         console.print("[bold red]IINTS update failed.[/bold red]")
         raise typer.Exit(code=result.returncode)
@@ -1520,8 +1666,11 @@ def update_sdk(
             sys.executable,
             "-c",
             (
-                "from importlib import metadata; "
-                "print(metadata.version('iints-sdk-python35'))"
+                "import json; from importlib import metadata; import iints; "
+                "print(json.dumps({"
+                "'distribution_version': metadata.version('iints-sdk-python35'), "
+                "'code_version': getattr(iints, '__version__', 'unknown'), "
+                "'module_location': getattr(iints, '__file__', None)}))"
             ),
         ]
         verify_result = subprocess.run(
@@ -1531,15 +1680,44 @@ def update_sdk(
             text=True,
         )
         if verify_result.returncode == 0:
-            installed_version = verify_result.stdout.strip() or "unknown"
+            try:
+                verification = json.loads(verify_result.stdout)
+            except (json.JSONDecodeError, TypeError):
+                verification = {}
+            installed_version = str(verification.get("distribution_version", "unknown"))
+            active_code_version = str(verification.get("code_version", "unknown"))
+            module_location = str(verification.get("module_location") or "unknown")
             console.print(f"Verified installed package version: [cyan]{installed_version}[/cyan]")
+            console.print(f"Verified active source version: [cyan]{active_code_version}[/cyan]")
+            console.print(f"Verified module location: [cyan]{module_location}[/cyan]")
+            if installed_version != active_code_version:
+                console.print(
+                    "[bold red]Version verification mismatch: package metadata and the imported SDK "
+                    "still disagree. Check PYTHONPATH, editable installs, and the module location above.[/bold red]"
+                )
+                raise typer.Exit(code=1)
+            if (
+                release.latest_version
+                and primary_source == "pypi"
+                and not pre
+                and (
+                    installed_version != release.latest_version
+                    or active_code_version != release.latest_version
+                )
+            ):
+                console.print(
+                    f"[bold red]Version verification mismatch: expected {release.latest_version}, "
+                    f"but the active environment reports {installed_version}.[/bold red]"
+                )
+                raise typer.Exit(code=1)
         else:
             console.print(
                 "[yellow]Update finished, but version verification failed. "
                 "Run `python -m pip show iints-sdk-python35` if you want to inspect it.[/yellow]"
             )
 
-    console.print("Run [cyan]hash -r[/cyan] or restart your terminal, then check [cyan]iints --version[/cyan].")
+    clear_version_cache()
+    console.print("Run [cyan]hash -r[/cyan] or restart your terminal, then check [cyan]iints version --refresh[/cyan].")
     console.print("If commands still look old, run [cyan]iints update --repair --force-reinstall --yes[/cyan].")
 
 
@@ -4473,36 +4651,74 @@ def onboard(
     )
 
 
+@app.command(name="map")
+def cli_map():
+    """Print the maintained public command domains and reliable entry points."""
+    from iints.cli.menu import show_command_map
+    show_command_map()
+
+
+@app.command(name="overview")
+def cli_overview():
+    """Print the maintained command map (alias for map)."""
+    from iints.cli.menu import show_command_map
+    show_command_map()
+
+
+@app.command(name="menu")
+def cli_menu():
+    """Browse command domains without automatically running a workflow."""
+    from iints.cli.menu import interactive_menu
+    interactive_menu()
+
+
+@app.command(name="hub")
+def cli_hub():
+    """Browse command domains without running a workflow (alias for menu)."""
+    from iints.cli.menu import interactive_menu
+    interactive_menu()
+
+
 @app.command(name="guide")
 def guide():
-    """Friendly entry point that helps beginners choose the right first command."""
+    """Friendly entry point that helps users choose the right command."""
     console = Console()
     console.print(
         Panel(
             "\n".join(
                 [
-                    "1. Quick demo (recommended first run)",
-                    "2. Build a custom run interactively",
-                    "3. Scaffold a project folder",
-                    "4. Raspberry Pi / Maker Faire path",
+                    "1. Quick demo run (recommended first action)",
+                    "2. Interactive command navigation",
+                    "3. View Full Architecture Map & Command Cheat Sheet",
+                    "4. Step-by-step simulation wizard",
+                    "5. Scaffold a project folder",
+                    "6. Raspberry Pi / Maker Faire path",
                 ]
             ),
-            title="IINTS Guide",
+            title="IINTS Guide & Navigation",
             border_style="blue",
         )
     )
-    choice = typer.prompt("Choose 1, 2, 3, or 4", default="1").strip()
+    choice = typer.prompt("Choose an option [1-6]", default="1").strip()
     if choice == "1":
         demo()
         return
     if choice == "2":
-        run_wizard()
+        from iints.cli.menu import interactive_menu
+        interactive_menu()
         return
     if choice == "3":
+        from iints.cli.menu import show_command_map
+        show_command_map()
+        return
+    if choice == "4":
+        run_wizard()
+        return
+    if choice == "5":
         project_name = typer.prompt("Project folder name", default="iints_quickstart").strip() or "iints_quickstart"
         quickstart(project_name=project_name)
         return
-    if choice == "4":
+    if choice == "6":
         console.print(
             Panel(
                 "\n".join(
@@ -4521,7 +4737,7 @@ def guide():
             )
         )
         return
-    console.print("[bold red]Unknown choice. Please rerun `iints guide` and choose 1, 2, 3, or 4.[/bold red]")
+    console.print("[bold red]Unknown choice. Please rerun `iints guide` and choose 1, 2, 3, 4, 5, or 6.[/bold red]")
     raise typer.Exit(code=1)
 
 
@@ -8601,6 +8817,226 @@ def mdmp_synthetic_mirror(
         min_mdmp_grade=min_mdmp_grade,
         fail_on_noncompliant=fail_on_noncompliant,
     )
+
+
+def _read_mdmp_encryption_secret(
+    *,
+    key: Optional[str],
+    key_file: Optional[Path],
+    prompt_label: str,
+    console: Console,
+) -> str | bytes:
+    if key is not None and key_file is not None:
+        console.print("[bold red]Use either --key or --key-file, not both.[/bold red]")
+        raise typer.Exit(code=1)
+    if key is not None:
+        console.print(
+            "[yellow]Warning: --key may expose the passphrase in shell history "
+            "and process listings.[/yellow]"
+        )
+        secret: str | bytes = key
+    elif key_file is not None:
+        try:
+            raw_secret = key_file.expanduser().read_bytes()
+        except OSError as exc:
+            console.print(f"[bold red]Could not read key file:[/bold red] {exc}")
+            raise typer.Exit(code=1) from exc
+        if len(raw_secret) == 32:
+            secret = raw_secret
+        else:
+            try:
+                secret = raw_secret.decode("utf-8").rstrip("\r\n")
+            except UnicodeDecodeError as exc:
+                console.print(
+                    "[bold red]Key files must contain UTF-8 passphrase text or exactly "
+                    "32 raw key bytes.[/bold red]"
+                )
+                raise typer.Exit(code=1) from exc
+    else:
+        secret = typer.prompt(prompt_label, hide_input=True).strip()
+
+    if not secret:
+        console.print("[bold red]Passphrase cannot be empty.[/bold red]")
+        raise typer.Exit(code=1)
+    if isinstance(secret, str) and len(secret) < 12:
+        console.print("[bold red]Use a passphrase containing at least 12 characters.[/bold red]")
+        raise typer.Exit(code=1)
+    return secret
+
+
+@mdmp_app.command(name="encrypt-data")
+def mdmp_encrypt_data(
+    input_file: Annotated[Path, typer.Option("--input", "-i", help="Path to input dataset file (CSV/JSON/Parquet)")],
+    output_file: Annotated[Optional[Path], typer.Option("--output", "-o", help="Path to encrypted output file (.enc)")] = None,
+    key: Annotated[Optional[str], typer.Option("--key", "-k", help="Passphrase value (discouraged: visible in shell history; prompt or --key-file is safer)")] = None,
+    key_file: Annotated[Optional[Path], typer.Option("--key-file", help="File containing a passphrase or exactly 32 raw key bytes")] = None,
+    aad: Annotated[Optional[str], typer.Option("--aad", help="Optional Associated Authenticated Data (e.g. study-ID)")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Allow replacing an existing encrypted output file")] = False,
+):
+    """Encrypt a local dataset with scrypt and ChaCha20-Poly1305 AEAD."""
+    console = Console()
+    if not input_file.is_file():
+        console.print(f"[bold red]Input file not found:[/bold red] {input_file}")
+        raise typer.Exit(code=1)
+
+    secret = _read_mdmp_encryption_secret(
+        key=key,
+        key_file=key_file,
+        prompt_label="Enter encryption passphrase",
+        console=console,
+    )
+
+    target_out = output_file or Path(f"{input_file}.enc")
+    from mdmp_core.crypto import encrypt_cgm_dataset_file
+    try:
+        res = encrypt_cgm_dataset_file(input_file, target_out, secret, associated_data=aad, overwrite=force)
+        console.print(
+            Panel(
+                f"[bold green]✓ File Encrypted Successfully[/bold green]\n\n"
+                f"• Input: [white]{res['input_path']}[/white]\n"
+                f"• Output: [cyan]{res['output_path']}[/cyan]\n"
+                f"• Original SHA-256: [dim]{res['original_sha256']}[/dim]\n"
+                f"• Algorithm: [bold yellow]ChaCha20-Poly1305 AEAD[/bold yellow]",
+                title="MDMP Authenticated Encryption",
+                border_style="green",
+            )
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Encryption failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@mdmp_app.command(name="decrypt-data")
+def mdmp_decrypt_data(
+    input_file: Annotated[Path, typer.Option("--input", "-i", help="Path to encrypted .enc file")],
+    output_file: Annotated[Path, typer.Option("--output", "-o", help="Path to restored output file")],
+    key: Annotated[Optional[str], typer.Option("--key", "-k", help="Passphrase value (discouraged: visible in shell history; prompt or --key-file is safer)")] = None,
+    key_file: Annotated[Optional[Path], typer.Option("--key-file", help="File containing a passphrase or exactly 32 raw key bytes")] = None,
+    aad: Annotated[Optional[str], typer.Option("--aad", help="Associated Authenticated Data used during encryption")] = None,
+    force: Annotated[bool, typer.Option("--force", help="Allow replacing an existing decrypted output file")] = False,
+):
+    """Decrypt and verify a ChaCha20-Poly1305 AEAD encrypted dataset file."""
+    console = Console()
+    if not input_file.is_file():
+        console.print(f"[bold red]Encrypted input file not found:[/bold red] {input_file}")
+        raise typer.Exit(code=1)
+
+    secret = _read_mdmp_encryption_secret(
+        key=key,
+        key_file=key_file,
+        prompt_label="Enter decryption passphrase",
+        console=console,
+    )
+
+    from mdmp_core.crypto import decrypt_cgm_dataset_file
+    try:
+        res = decrypt_cgm_dataset_file(input_file, output_file, secret, associated_data=aad, overwrite=force)
+        console.print(
+            Panel(
+                f"[bold green]✓ File Decrypted & Authenticated Successfully[/bold green]\n\n"
+                f"• Restored File: [cyan]{res['output_path']}[/cyan]\n"
+                f"• Decrypted SHA-256: [dim]{res['decrypted_sha256']}[/dim]\n"
+                f"• Authentication tag: [bold green]valid[/bold green]",
+                title="MDMP Authenticated Decryption",
+                border_style="green",
+            )
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Decryption / Authentication failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@mdmp_app.command(name="sign")
+def mdmp_sign_card(
+    card_file: Annotated[Path, typer.Option("--card", "-c", help="Path to JSON data card / passport")],
+    private_key: Annotated[Path, typer.Option("--key", "-k", help="Path to Ed25519 private key PEM")],
+    output_file: Annotated[Optional[Path], typer.Option("--output", "-o", help="Path to signed output JSON")] = None,
+    signer_name: Annotated[str, typer.Option("--signer", help="Authority name / signer identity")] = "MDMP-Authority-v1",
+    key_id: Annotated[str, typer.Option("--key-id", help="Key identifier")] = "mdmp_pub_v1",
+    post_quantum: Annotated[bool, typer.Option("--pqc", "--hybrid", help="Reserved compatibility flag; real ML-DSA signing is not implemented")] = False,
+):
+    """Sign an MDMP dataset passport card with Ed25519."""
+    console = Console()
+    if not card_file.is_file():
+        console.print(f"[bold red]Card file not found:[/bold red] {card_file}")
+        raise typer.Exit(code=1)
+    if not private_key.is_file():
+        console.print(f"[bold red]Private key not found:[/bold red] {private_key}")
+        raise typer.Exit(code=1)
+    if post_quantum:
+        console.print(
+            "[bold red]Post-quantum signing is unavailable.[/bold red] "
+            "A hash commitment is not an ML-DSA signature, so the SDK refuses to label it quantum-safe."
+        )
+        raise typer.Exit(code=2)
+
+    import json
+    from mdmp_core.crypto import MDMPSigner
+    try:
+        card = json.loads(card_file.read_text(encoding="utf-8"))
+        signer = MDMPSigner(private_key_path=private_key, signed_by=signer_name, key_id=key_id)
+        algo = "ed25519+sha256"
+        signed = signer.sign_card(card, algorithm=algo)
+        out_p = output_file or card_file
+        out_p.write_text(json.dumps(signed, indent=2), encoding="utf-8")
+        console.print(
+            Panel(
+                f"[bold green]✓ MDMP Passport Signed Successfully[/bold green]\n\n"
+                f"• Output: [cyan]{out_p}[/cyan]\n"
+                f"• Signer: [white]{signer_name}[/white]\n"
+                f"• Algorithm: [bold yellow]{algo}[/bold yellow]\n"
+                "• Signature format: [white]v2 (metadata authenticated)[/white]\n"
+                "• Post-quantum security: [dim]not claimed[/dim]",
+                title="MDMP Digital Passport",
+                border_style="green",
+            )
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Signing failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+
+@mdmp_app.command(name="verify")
+def mdmp_verify_card(
+    card_file: Annotated[Path, typer.Argument(help="Path to signed JSON data card / passport")],
+    public_key: Annotated[Optional[Path], typer.Option("--key", "-k", help="Optional explicit public key PEM")] = None,
+    dataset_path: Annotated[Optional[Path], typer.Option("--dataset", "-d", help="Optional dataset file to verify fingerprint match")] = None,
+):
+    """Verify an MDMP dataset passport card signature, expiration, and fingerprint."""
+    console = Console()
+    if not card_file.is_file():
+        console.print(f"[bold red]Card file not found:[/bold red] {card_file}")
+        raise typer.Exit(code=1)
+
+    import json
+    from mdmp_core.crypto import MDMPVerifier
+    try:
+        card = json.loads(card_file.read_text(encoding="utf-8"))
+        verifier = MDMPVerifier(public_key_path=public_key)
+        res = verifier.verify(card, dataset_path=dataset_path)
+    except Exception as exc:
+        console.print(f"[bold red]Verification error:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    is_valid = bool(res.get("valid", False))
+    status_color = "green" if is_valid else "red"
+    console.print(
+        Panel(
+            f"[bold {status_color}]Verification Status: {'VALID ✓' if is_valid else 'FAILED ✗'}[/bold {status_color}]\n\n"
+            f"• Signature Valid: [bold {status_color}]{res.get('signature_valid')}[/bold {status_color}]\n"
+            f"• Algorithm: [yellow]{res.get('signature_algorithm', 'ed25519+sha256')}[/yellow]\n"
+            f"• Signature format: [white]v{res.get('signature_format_version', 1)}[/white]\n"
+            "• Signature scope: [dim]Ed25519 authenticity and integrity; no post-quantum claim[/dim]\n"
+            f"• Signed By: [white]{res.get('issued_by')}[/white]\n"
+            f"• Tampered: [bold {'red' if res.get('tampered') else 'green'}]{res.get('tampered')}[/bold]\n"
+            f"• Expired: [{ 'red' if res.get('expired') else 'green' }]{res.get('expired')}[/]\n"
+            f"• Error: [dim]{res.get('error', 'None')}[/dim]",
+            title="MDMP Verification Report",
+            border_style=status_color,
+        )
+    )
+    if not is_valid:
+        raise typer.Exit(code=1)
 
 
 @app.command(name="sources")

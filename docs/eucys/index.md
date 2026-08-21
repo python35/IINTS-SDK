@@ -3,7 +3,7 @@
 **Project:** IINTS-AF SDK<br>
 **Author:** Runebob Baers<br>
 **Purpose:** A browsable scientific and technical guide for EUCYS review<br>
-**Software snapshot:** IINTS-AF SDK `1.5.33`
+**Software snapshot:** IINTS-AF SDK `1.5.34`
 
 !!! warning "Research boundary"
     IINTS-AF is an open-source research and educational simulator. It is not a

@@ -5,57 +5,37 @@
 [![CI](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml/badge.svg)](https://github.com/python35/IINTS-SDK/actions/workflows/python-package.yml)
 [![Docs](https://img.shields.io/badge/docs-IINTS--AF-0a66c2?style=flat)](https://python35.github.io/IINTS-SDK/)
 
-IINTS-AF is an open-source research SDK for diabetes technology simulation.
+IINTS-AF is an open-source research SDK for diabetes-technology simulation. It provides virtual-patient scenarios, algorithm experiments, deterministic safety checks, data-assurance tools, glucose-forecasting research, and reproducible reports.
 
-The SDK lets researchers, students, and developers test diabetes-algorithm ideas in a virtual environment. It can simulate digital patients, meals, insulin delivery, CGM/sensor behavior, safety checks, glucose-prediction experiments, and generated reports.
-
-The purpose of IINTS-AF is to make algorithm behavior easier to inspect and discuss before anything is connected to a real person.
+Its purpose is to make diabetes-technology behavior easier to inspect, test, and discuss before anything is connected to a real person.
 
 IINTS-AF is not a medical device. It must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
 
-## Links
+## Start
 
-- Website: [iints.org](https://iints.org)
-- Documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
-- Rust research workbench: [latest beta](https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest)
-- Classic desktop app: [latest Qt beta](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest)
+```bash
+python -m pip install -U "iints-sdk-python35[full,mdmp,research,edge]"
+iints demo
+iints menu
+iints version --refresh
+```
 
-## Rust Research Workbench
+## Desktop App
 
-The new native research workbench uses a Rust/Tauri security boundary around the Python scientific engine. It provides guided simulation workflows, result inspection, reproducibility records, local Ollama review, MDMP evidence tools, and audited research connectors.
+The optional Rust/Tauri research workbench offers guided runs, result inspection, local AI review, and data-assurance tools.
 
-Current Rust/Tauri beta downloads:
-
-| Platform | Download |
+| Platform | Latest beta |
 | --- | --- |
 | Windows | [`.exe` installer](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-windows-x64-setup.exe) |
 | macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
 | Linux | [`.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
 
-The beta delegates scientific operations to the IINTS-AF Python engine. On first launch, choose
-**Install Python engine** if the bridge is unavailable; the app creates a private engine and keeps
-its setup visible in a terminal.
+## Links
 
-See the [Tauri workbench documentation](https://python35.github.io/IINTS-SDK/TAURI_DESKTOP/) for architecture, security boundaries, and development instructions.
-
-## Classic Desktop App
-
-IINTS-AF also has a native Qt desktop app for running demos, reviewing results, certifying data, and using the research workbench without memorising terminal commands. The packaged Windows, macOS, and Linux betas include their Python runtime and supported Python-side research engines.
-
-Current beta downloads:
-
-| Platform | Download |
-| --- | --- |
-| Windows | [`.exe`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-windows-x64.exe) |
-| macOS | [`.dmg`](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) |
-| Linux | [executable](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) |
-
-Python install, including the PySide6 desktop runtime:
-
-```bash
-python -m pip install -U "iints-sdk-python35[desktop-all]"
-iints-desktop
-```
+- Website: [iints.org](https://iints.org)
+- Documentation: [python35.github.io/IINTS-SDK](https://python35.github.io/IINTS-SDK/)
+- Source: [github.com/python35/IINTS-SDK](https://github.com/python35/IINTS-SDK)
+- Desktop guide: [Tauri research workbench](https://python35.github.io/IINTS-SDK/TAURI_DESKTOP/)
 
 ## License
 

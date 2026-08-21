@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "iints-sdk-python35" 
-version = "1.5.33"
+version = "1.5.34"
 authors = [
   { name="Rune Bobbaers", email="rune.bobbaers@gmail.com" },
 ]
@@ -29,6 +29,7 @@ dependencies = [
     "defusedxml>=0.7.1,<1.0.0",
     "fastapi>=0.115.0,!=0.136.3,<0.141.2",
     "numpy>=1.24.0,<3.0.0",
+    "packaging>=23.0,<27.0",
     "pandas>=2.0.0,<3.0.0",
     "pydantic>=2.0.0,<3.0.0",
     "PyYAML>=6.0.0,<7.0.0",
@@ -143,12 +144,12 @@ iints-tauri-bridge = "iints_desktop.tauri_bridge:main"
 iints-sdk-doctor = "iints_sdk_python35_doctor:main"
 
 [project.entry-points."iints.algorithms"]
-"PID Controller" = "iints.core.algorithms.pid_controller:PIDController"
-"Fixed Basal Bolus" = "iints.core.algorithms.fixed_basal_bolus:FixedBasalBolus"
-"Correction Bolus" = "iints.core.algorithms.correction_bolus:CorrectionBolus"
-"Standard Pump" = "iints.core.algorithms.standard_pump_algo:StandardPumpAlgorithm"
-"Mock Constant Dose" = "iints.core.algorithms.mock_algorithms:ConstantDoseAlgorithm"
-"Mock Random Dose" = "iints.core.algorithms.mock_algorithms:RandomDoseAlgorithm"
+pid-controller = "iints.core.algorithms.pid_controller:PIDController"
+fixed-basal-bolus = "iints.core.algorithms.fixed_basal_bolus:FixedBasalBolus"
+correction-bolus = "iints.core.algorithms.correction_bolus:CorrectionBolus"
+standard-pump = "iints.core.algorithms.standard_pump_algo:StandardPumpAlgorithm"
+mock-constant-dose = "iints.core.algorithms.mock_algorithms:ConstantDoseAlgorithm"
+mock-random-dose = "iints.core.algorithms.mock_algorithms:RandomDoseAlgorithm"
 
 [project.urls]
 "Homepage" = "https://github.com/python35/IINTS-SDK"

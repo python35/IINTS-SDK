@@ -8,24 +8,35 @@ This page assumes the full workstation install. If you are updating a Raspberry 
 
 ## Fast path: `iints update`
 
-If IINTS is already installed in the environment you are using, run:
+First inspect the active environment and the latest stable PyPI release:
 
 ```bash
 source .venv/bin/activate
-iints update
-hash -r
-iints --version
+iints version --refresh
+iints update --check
 ```
 
-By default `iints update` uses `--source auto`: it tries PyPI first and falls back to GitHub `main` if the release has not propagated yet.
+`iints version` reports the installed distribution, active source-code version, Python executable, CLI path, package location, release source, and check time. It uses PEP 440 version comparison and a six-hour cache. If release services are unavailable and no cache exists, it reports `unknown`; it never presents an unverified result as current.
 
-For the newest GitHub version directly:
+To update the active environment:
 
 ```bash
-iints update --source github --yes
+iints update
 hash -r
-iints --version
+iints version --refresh
 ```
+
+By default `iints update` uses the stable PyPI release channel. It does not silently fall back to the unreleased GitHub `main` branch.
+
+For a deliberate source install from the latest stable version tag:
+
+```bash
+iints update --source github --github-ref stable --yes
+hash -r
+iints version --refresh
+```
+
+For development only, name an explicit branch or commit with `--github-ref`. Record that ref in research provenance because it is not a stable package release.
 
 Use a dry run when you want to see exactly what will happen:
 
@@ -47,7 +58,18 @@ If pip seems to reuse stale wheels/caches:
 iints update --no-cache-dir --force-reinstall --yes
 ```
 
-The updater uses the same Python executable that launched `iints`, so it updates the virtual environment you are currently inside.
+The updater uses the same Python executable that launched `iints`, so it updates the virtual environment you are currently inside. It verifies the resulting package version after a stable PyPI update.
+
+Useful machine-readable checks:
+
+```bash
+iints version --offline --json
+iints version --refresh --fail-if-outdated --fail-if-unknown --fail-if-mismatch
+```
+
+`--fail-if-outdated` exits with code `2` only when a newer stable release was verified. `--fail-if-unknown` exits with code `3` when release metadata could not be verified. `--fail-if-mismatch` exits with code `4` when installed distribution metadata and imported SDK source disagree. `iints update --check` applies the same `2`/`3`/`4` distinction automatically.
+
+After installation, the updater verifies both the distribution version and `iints.__version__`, and prints the imported module path. If stale editable source code shadows the installed package, the updater forces a reinstall and fails verification instead of reporting a misleading success.
 
 ## Clean removal: `iints delete`
 
@@ -117,7 +139,7 @@ iints --help
 If you want a reproducible environment for a paper, demo, or audit, you can still pin an exact version explicitly, for example:
 
 ```bash
-python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.33"
+python -m pip install -U "iints-sdk-python35[full,mdmp]==1.5.34"
 ```
 
 ## If you installed from source
@@ -211,7 +233,7 @@ iints demo-booth --output-dir results/booth_demo
 - upgraded `pip`
 - installed the latest `iints-sdk-python35[full,mdmp]` release
 - ran `hash -r`
-- confirmed `python -c "import iints; print(iints.__version__)"`
+- confirmed `iints version --refresh`
 - ran `iints --help`
 
 If all six are true, the SDK should be up to date on that machine.

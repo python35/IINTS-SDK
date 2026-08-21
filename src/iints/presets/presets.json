@@ -1,14 +1,15 @@
 [
   {
     "name": "realistic_reference_day",
-    "description": "Reference full-day demo calibrated against the empirical free-living T1D envelope from the bundled real-data packs.",
+    "aliases": ["calibrated_free_living_reference_day"],
+    "description": "Full-day simulation evaluated against bundled free-living T1D reference envelopes; it is not a subject-specific clinical calibration.",
     "patient_config": "reference_free_living_t1d",
     "duration_minutes": 1440,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Realistic Reference Day",
+      "scenario_name": "Free-Living Reference Simulation",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -60,14 +61,15 @@
   },
   {
     "name": "realistic_azt1d_day",
-    "description": "Reference full-day demo calibrated specifically to the AZT1D daily envelope.",
+    "aliases": ["azt1d_cohort_calibrated_reference_day"],
+    "description": "Full-day simulation configured for comparison with the AZT1D daily envelope; it is not a personalized clinical calibration.",
     "patient_config": "reference_azt1d_t1d",
     "duration_minutes": 1440,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "AZT1D-Calibrated Reference Day",
+      "scenario_name": "AZT1D Envelope Reference Simulation",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -119,14 +121,15 @@
   },
   {
     "name": "realistic_hupa_ucm_day",
-    "description": "Reference full-day demo calibrated specifically to the HUPA-UCM daily envelope.",
+    "aliases": ["hupa_ucm_cohort_calibrated_reference_day"],
+    "description": "Full-day simulation configured for comparison with the HUPA-UCM daily envelope; it is not a personalized clinical calibration.",
     "patient_config": "reference_hupa_ucm_t1d",
     "duration_minutes": 1440,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "HUPA-UCM-Calibrated Reference Day",
+      "scenario_name": "HUPA-UCM Envelope Reference Simulation",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -178,45 +181,39 @@
   },
   {
     "name": "quickstart_meal",
-    "description": "Short realistic breakfast-window demo with an early meal so three-hour walkthroughs show an actual glucose excursion.",
+    "aliases": ["acute_postprandial_excursion"],
+    "description": "Short breakfast-window simulation with controlled carbohydrate under-reporting for a visible postprandial excursion.",
     "patient_config": "clinic_safe_baseline",
     "duration_minutes": 180,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Quickstart Breakfast Window",
+      "scenario_name": "Acute Postprandial Glycemic Excursion (180 min)",
       "scenario_version": "1.0",
       "stress_events": [
         {
-          "start_time": 30,
+          "start_time": 25,
           "event_type": "meal",
-          "value": 60,
-          "reported_value": 35,
+          "value": 65,
+          "reported_value": 40,
           "absorption_delay_minutes": 10,
-          "duration": 55
-        },
-        {
-          "start_time": 150,
-          "event_type": "meal",
-          "value": 8,
-          "reported_value": 8,
-          "absorption_delay_minutes": 5,
-          "duration": 20
+          "duration": 50
         }
       ]
     }
   },
   {
     "name": "free_living_t1d",
-    "description": "Free-living reference day with mild carb-count error, mixed absorption, and exercise calibrated for realistic daily behavior.",
+    "aliases": ["empirical_free_living_t1d_reference"],
+    "description": "Free-living reference simulation with carbohydrate-count mismatch, mixed absorption, and a bounded exercise event.",
     "patient_config": "reference_free_living_t1d",
     "duration_minutes": 1440,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Free-Living T1D Day",
+      "scenario_name": "Empirical Free-Living T1D Daily Protocol",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -269,7 +266,8 @@
   },
   {
     "name": "free_living_t1d_empirical",
-    "description": "Optional free-living variant that overlays subtle empirical CGM residual templates on the calibrated mechanistic day.",
+    "aliases": ["empirical_free_living_t1d_with_residuals"],
+    "description": "Mechanistic free-living simulation with a low-amplitude empirical CGM residual overlay; it is simulated data, not a patient replay.",
     "patient_config": "reference_free_living_t1d",
     "physiology_variation_profile": "free_living_t1d",
     "physiology_variation_scale": 0.1,
@@ -278,7 +276,7 @@
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Free-Living T1D Day + Empirical Residuals",
+      "scenario_name": "Empirical Free-Living T1D Daily Protocol + Stochastic Residuals",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -331,14 +329,15 @@
   },
   {
     "name": "baseline_t1d",
-    "description": "Empirically calibrated full-day baseline with realistic breakfast, lunch, dinner, and a light evening snack.",
+    "aliases": ["standard_free_living_t1d_day"],
+    "description": "Full-day baseline simulation with meals, bounded activity, carbohydrate-count error, and an evening stress disturbance.",
     "patient_config": "reference_free_living_t1d",
     "duration_minutes": 1440,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Clinic Safe Baseline",
+      "scenario_name": "Standard In-Silico Reference Day (Free-Living T1D)",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -390,14 +389,15 @@
   },
   {
     "name": "stress_test_meal",
-    "description": "Clinic-safe meal stress test with larger lunch and safety clamps enabled.",
+    "aliases": ["prandial_carbohydrate_stress_protocol"],
+    "description": "Multi-meal stress simulation with large carbohydrate loads and controlled carbohydrate under-reporting.",
     "patient_config": "clinic_safe_stress_meal",
     "duration_minutes": 720,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Clinic Safe Meal Stress",
+      "scenario_name": "Prandial Carbohydrate Stress Protocol",
       "scenario_version": "1.0",
       "stress_events": [
         {
@@ -405,121 +405,122 @@
           "event_type": "meal",
           "value": 55,
           "absorption_delay_minutes": 15,
-          "duration": 60
+          "duration": 60,
+          "reported_value": 50
         },
         {
           "start_time": 300,
           "event_type": "meal",
-          "value": 90,
-          "absorption_delay_minutes": 20,
-          "duration": 90
+          "value": 100,
+          "absorption_delay_minutes": 15,
+          "duration": 75,
+          "reported_value": 75
         },
         {
-          "start_time": 600,
+          "start_time": 560,
           "event_type": "meal",
           "value": 60,
           "absorption_delay_minutes": 15,
-          "duration": 60
+          "duration": 60,
+          "reported_value": 55
         }
       ]
     }
   },
   {
     "name": "hypo_prone_night",
-    "description": "Overnight hypo-risk scenario with temporary basal pressure, post-exercise insulin sensitivity, and rescue/late-carbohydrate dynamics; the goal is near-low risk that safety logic can discuss before severe hypoglycemia.",
+    "aliases": ["nocturnal_post_exercise_hypoglycemia"],
+    "description": "Overnight near-low challenge combining temporary basal pressure, exercise sensitivity, and a rescue carbohydrate event.",
     "patient_config": "clinic_safe_hypo_prone",
     "duration_minutes": 720,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Hypo-Prone Overnight",
+      "scenario_name": "Nocturnal Post-Exercise Hypoglycemia Assessment",
       "scenario_version": "1.0",
       "stress_events": [
         {
           "start_time": 0,
           "event_type": "ratio_change",
           "basal_rate": 1.4,
-          "duration": 360
+          "duration": 300
         },
         {
           "start_time": 60,
           "event_type": "meal",
-          "value": 35,
-          "reported_value": 23,
+          "value": 20,
+          "reported_value": 25,
           "absorption_delay_minutes": 10,
-          "duration": 45
+          "duration": 35
         },
         {
-          "start_time": 190,
+          "start_time": 150,
           "event_type": "exercise",
-          "value": 1.0,
-          "duration": 150
+          "value": 0.90,
+          "duration": 90
         },
         {
           "start_time": 330,
-          "event_type": "exercise",
-          "value": 0.45,
-          "duration": 100
-        },
-        {
-          "start_time": 420,
           "event_type": "meal",
-          "value": 70,
-          "reported_value": 52,
-          "absorption_delay_minutes": 15,
-          "duration": 60
+          "value": 25,
+          "reported_value": 25,
+          "absorption_delay_minutes": 5,
+          "duration": 25
         }
       ]
     }
   },
   {
     "name": "hyper_challenge",
-    "description": "Post-prandial hyperglycemia challenge with a large meal.",
+    "aliases": ["acute_hyperglycemia_underdosing_challenge"],
+    "description": "Acute postprandial hyperglycemia challenge with deliberate carbohydrate under-reporting for controller stress testing.",
     "patient_config": "clinic_safe_hyper_challenge",
     "duration_minutes": 480,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Hyper Challenge",
+      "scenario_name": "Acute Postprandial Hyperglycemia Challenge",
       "scenario_version": "1.0",
       "stress_events": [
         {
-          "start_time": 90,
+          "start_time": 60,
           "event_type": "meal",
           "value": 110,
+          "reported_value": 65,
           "absorption_delay_minutes": 15,
-          "duration": 90
+          "duration": 75
         }
       ]
     }
   },
   {
     "name": "pizza_paradox",
-    "description": "Delayed high-fat-meal scenario with an early visible meal wave and a second delayed/unannounced absorption wave.",
+    "aliases": ["biphasic_macronutrient_absorption"],
+    "description": "Dual-wave mixed-meal challenge approximating early carbohydrate appearance and delayed high-fat/high-protein absorption.",
     "patient_config": "clinic_safe_pizza",
     "duration_minutes": 900,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "The Pizza Paradox",
+      "scenario_name": "Biphasic High-Fat Protein Macronutrient Excursion",
       "scenario_version": "1.0",
       "stress_events": [
         {
-          "start_time": 240,
+          "start_time": 60,
           "event_type": "meal",
-          "value": 40,
-          "reported_value": 90,
-          "absorption_delay_minutes": 30,
-          "duration": 90
+          "value": 45,
+          "reported_value": 85,
+          "absorption_delay_minutes": 20,
+          "duration": 60
         },
         {
-          "start_time": 390,
+          "start_time": 210,
           "event_type": "missed_meal",
-          "value": 80,
-          "absorption_delay_minutes": 120,
+          "value": 70,
+          "absorption_delay_minutes": 45,
           "duration": 240
         }
       ]
@@ -527,43 +528,44 @@
   },
   {
     "name": "midnight_crash",
-    "description": "Overnight crash-risk scenario after evening activity: a carbohydrate rise is followed by higher basal pressure, prolonged exercise sensitivity, and a later rescue meal so the trace shows a realistic near-low dip without impossible drops.",
+    "aliases": ["nocturnal_insulin_stacking_challenge"],
+    "description": "Overnight near-low challenge combining carbohydrate over-reporting, temporary basal pressure, and exercise sensitivity.",
     "patient_config": "clinic_safe_midnight",
     "duration_minutes": 720,
     "time_step_minutes": 5,
     "critical_glucose_threshold": 40.0,
     "critical_glucose_duration_minutes": 30,
     "scenario": {
-      "scenario_name": "Midnight Crash",
+      "scenario_name": "Nocturnal Insulin Stacking & Physical Recovery Challenge",
       "scenario_version": "1.0",
       "stress_events": [
         {
           "start_time": 0,
           "event_type": "ratio_change",
-          "basal_rate": 1.2,
-          "duration": 360
+          "basal_rate": 1.35,
+          "duration": 270
         },
         {
-          "start_time": 90,
+          "start_time": 45,
           "event_type": "meal",
-          "value": 45,
-          "reported_value": 35,
+          "value": 20,
+          "reported_value": 45,
           "absorption_delay_minutes": 10,
-          "duration": 50
+          "duration": 35
         },
         {
-          "start_time": 220,
+          "start_time": 120,
           "event_type": "exercise",
-          "value": 1.0,
-          "duration": 180
+          "value": 0.75,
+          "duration": 60
         },
         {
-          "start_time": 430,
+          "start_time": 300,
           "event_type": "meal",
-          "value": 70,
-          "reported_value": 52,
-          "absorption_delay_minutes": 15,
-          "duration": 60
+          "value": 25,
+          "reported_value": 25,
+          "absorption_delay_minutes": 5,
+          "duration": 25
         }
       ]
     }

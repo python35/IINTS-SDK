@@ -1,14 +1,44 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
 from typer.testing import CliRunner
 
 from iints.cli.cli import app
+from iints.versioning import ComponentVersionStatus
 
 
 runner = CliRunner()
+
+
+def _version_environment(*, matches: bool) -> dict[str, object]:
+    return {
+        "python_executable": "/example/venv/bin/python",
+        "python_version": "3.11.0",
+        "distribution_version": "1.5.34",
+        "code_version": "1.5.33" if not matches else "1.5.34",
+        "version_metadata_matches_code": matches,
+        "cli_path": "/example/venv/bin/iints",
+        "cli_shebang": "/example/venv/bin/python",
+        "cli_matches_python": True,
+        "package_location": "/example/venv/site-packages",
+        "module_location": "/example/checkout/src/iints/__init__.py",
+    }
+
+
+def _current_release() -> ComponentVersionStatus:
+    return ComponentVersionStatus(
+        component="sdk",
+        installed_version="1.5.34",
+        latest_version="1.5.34",
+        status="current",
+        update_available=False,
+        source="cache",
+        checked_at="2026-08-21T10:00:00Z",
+        release_url="https://pypi.org/project/iints-sdk-python35/",
+    )
 
 
 def _compact_stdout(text: str) -> str:
@@ -30,7 +60,74 @@ def test_update_dry_run_prints_current_environment_command() -> None:
     assert "python" in result.stdout.lower()
     assert "pip install -U" in result.stdout
     assert "iints-sdk-python35[full,mdmp,research,edge]" in result.stdout
-    assert "Auto fallback command" in result.stdout
+    assert "Update source: auto" in result.stdout
+    assert "git+https://github.com" not in result.stdout
+
+
+def test_version_command_reports_explicit_offline_state(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("IINTS_VERSION_CACHE", str(tmp_path / "version-cache.json"))
+
+    result = runner.invoke(app, ["version", "--offline", "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["sdk"]["installed_version"]
+    assert payload["sdk"]["status"] == "unknown"
+    assert payload["sdk"]["source"] == "offline"
+    assert payload["environment"]["python_executable"]
+
+
+def test_command_map_is_navigation_only_and_uses_real_namespaces() -> None:
+    result = runner.invoke(app, ["map"])
+
+    assert result.exit_code == 0
+    assert "Simulation and studies" in result.stdout
+    assert "MDMP data assurance" in result.stdout
+    assert "iints version" in result.stdout
+    assert "ML-DSA" not in result.stdout
+
+
+def test_version_command_can_fail_distinctly_when_release_is_unknown(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("IINTS_VERSION_CACHE", str(tmp_path / "version-cache.json"))
+
+    result = runner.invoke(app, ["version", "--offline", "--fail-if-unknown"])
+
+    assert result.exit_code == 3
+    assert "could not be verified" in result.stdout
+
+
+def test_version_command_can_fail_on_distribution_source_mismatch(monkeypatch) -> None:
+    monkeypatch.setattr("iints.cli.cli.check_sdk_version", lambda **_kwargs: _current_release())
+    monkeypatch.setattr(
+        "iints.cli.cli.installed_sdk_environment",
+        lambda: _version_environment(matches=False),
+    )
+
+    result = runner.invoke(app, ["version", "--offline", "--fail-if-mismatch"])
+
+    assert result.exit_code == 4
+    assert "different versions" in result.stdout
+
+
+def test_update_dry_run_forces_reinstall_for_distribution_source_mismatch(monkeypatch) -> None:
+    monkeypatch.setattr("iints.cli.cli.check_sdk_version", lambda **_kwargs: _current_release())
+    monkeypatch.setattr(
+        "iints.cli.cli.installed_sdk_environment",
+        lambda: _version_environment(matches=False),
+    )
+
+    result = runner.invoke(app, ["update", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Environment mismatch detected" in result.stdout
+    assert "--force-reinstall" in result.stdout
+
+
+def test_interactive_menu_can_exit_without_dispatching_a_command() -> None:
+    result = runner.invoke(app, ["menu"], input="q\n")
+
+    assert result.exit_code == 0
+    assert "IINTS-AF navigation" in result.stdout
 
 
 def test_update_repair_dry_run_prints_uninstall_and_force_reinstall() -> None:

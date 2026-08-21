@@ -40,8 +40,10 @@ set `IINTS_PYTHON` explicitly. See [Desktop App Installation](APP_INSTALL.md) fo
 COPASI, OpenCOR, Ollama, and model files remain optional external research tools. They are detected explicitly rather than installed silently.
 
 The **Settings** workspace keeps maintenance separate from experiments. It stores only local,
-non-sensitive defaults, reports the native app and Python SDK versions independently, opens a
-fixed SDK install/update command in a visible terminal, and links to the stable desktop installer release.
+non-sensitive defaults, compares the native app and Python SDK against separate maintained release
+channels, opens a fixed SDK install/update command in a visible terminal, and links to the newest
+versioned desktop installer release. Version checks use semantic comparison, bounded network access,
+and an explicit cache/offline state rather than silently assuming that an unknown version is current.
 It does not store credentials or silently replace the running executable.
 
 ### macOS integrity and Gatekeeper

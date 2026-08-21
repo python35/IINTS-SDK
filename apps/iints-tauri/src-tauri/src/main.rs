@@ -333,8 +333,16 @@ async fn desktop_diagnostics() -> Result<Value, String> {
 }
 
 #[tauri::command]
-async fn desktop_update_info() -> Result<Value, String> {
-    run_python_bridge_async(vec!["update-info".to_string()]).await
+async fn desktop_update_info(refresh: Option<bool>) -> Result<Value, String> {
+    let mut args = vec![
+        "update-info".to_string(),
+        "--app-version".to_string(),
+        env!("CARGO_PKG_VERSION").to_string(),
+    ];
+    if refresh.unwrap_or(false) {
+        args.push("--refresh".to_string());
+    }
+    run_python_bridge_async(args).await
 }
 
 #[tauri::command]

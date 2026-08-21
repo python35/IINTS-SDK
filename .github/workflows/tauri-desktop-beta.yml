@@ -281,7 +281,9 @@ jobs:
 
           This prerelease contains the native Rust/Tauri research workbench with a restrained text-only IINTS-AF identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
 
-          Version 0.2.7 accompanies SDK v1.5.33 and introduces a denser, more consistent academic desktop layout validated through direct macOS interaction and responsive screenshot review. Navigation, panel headers, controls, status output, metrics, tables, settings, local AI review, and compact-window behavior now use one restrained visual system. The release also retains the local interactive C-alpha viewer, static PNG opening, safe Finder/Explorer reveal for mmCIF coordinates, on-demand PAE generation, and allowlisted links to matching official AlphaFold entries.
+          Version 0.2.8 accompanies SDK v1.5.34. The Settings workspace now checks the installed desktop and Python SDK versions independently against their maintained release channels, uses semantic version comparison, caches successful checks, reports offline uncertainty honestly, and warns when active source code and installed package metadata disagree.
+
+          The command map and MDMP workflows were reviewed for accuracy. The workbench links to the version-specific latest beta when available, while Python updates use the stable PyPI release rather than silently switching to an unreleased source checkout.
 
           Result review now defaults to a bounded set of research-relevant columns, exposes deterministic summary metrics and threshold excursions, and clearly separates sampled safety states from intervention counts. Local Ollama output is screened against deterministic SDK facts; unsupported quantitative lines are suppressed, and CSV-based interpretation is constrained to limitations and next checks rather than treatment or causal claims.
 

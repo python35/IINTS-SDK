@@ -602,11 +602,15 @@ Quickstart project in one command:
 iints quickstart --project-name iints_quickstart
 ```
 
-New presets:
-* `hypo_prone_night`
-* `hyper_challenge`
-* `pizza_paradox`
-* `midnight_crash`
+Maintained research presets:
+* `hypo_prone_night` (descriptive alias: `nocturnal_post_exercise_hypoglycemia`)
+* `hyper_challenge` (descriptive alias: `acute_hyperglycemia_underdosing_challenge`)
+* `pizza_paradox` (descriptive alias: `biphasic_macronutrient_absorption`)
+* `midnight_crash` (descriptive alias: `nocturnal_insulin_stacking_challenge`)
+* `quickstart_meal` (descriptive alias: `acute_postprandial_excursion`)
+* `realistic_reference_day` (descriptive alias: `calibrated_free_living_reference_day`)
+
+These are in-silico research scenarios. Their names do not imply clinical validation or patient-specific calibration.
 
 Generate your own clinic-safe preset scaffold:
 

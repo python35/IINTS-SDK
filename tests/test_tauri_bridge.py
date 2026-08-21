@@ -80,7 +80,7 @@ def test_tauri_bridge_status_reports_sdk_context() -> None:
     data = payload["data"]
     assert isinstance(data, dict)
     assert data["bridge"] == "iints_desktop.tauri_bridge"
-    assert data["bridge_api_version"] == 2
+    assert data["bridge_api_version"] == 3
     assert data["medical_device"] is False
 
 
@@ -99,7 +99,7 @@ def test_tauri_bridge_reports_desktop_diagnostics() -> None:
     assert payload["ok"] is True
     data = payload["data"]
     assert data["medical_device"] is False  # type: ignore[index]
-    assert data["bridge_api_version"] == 2  # type: ignore[index]
+    assert data["bridge_api_version"] == 3  # type: ignore[index]
     assert "python_version" in data  # type: ignore[operator]
     assert "optional_modules" in data  # type: ignore[operator]
     assert "pandas" in data["optional_modules"]  # type: ignore[index]
@@ -159,13 +159,15 @@ def test_tauri_bridge_inspects_cross_scale_models_without_optional_engines(tmp_p
 
 
 def test_tauri_bridge_reports_update_info() -> None:
-    payload = _bridge("update-info")
+    payload = _bridge("update-info", "--offline", "--app-version", "0.2.7")
 
     assert payload["ok"] is True
     data = payload["data"]
     assert data["package_spec"] == "iints-sdk-python35[desktop-all]"  # type: ignore[index]
     assert "pip install -U" in str(data["pip_command"])  # type: ignore[index]
-    assert data["app_download_url"] == "https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest"  # type: ignore[index]
+    assert data["app_download_url"] == "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest"  # type: ignore[index]
+    assert data["sdk_status"] in {"current", "update_available", "ahead", "unknown"}  # type: ignore[index]
+    assert data["app_status"] in {"current", "update_available", "ahead", "unknown"}  # type: ignore[index]
     assert data["update_docs_url"] == "https://python35.github.io/IINTS-SDK/APP_INSTALL/"  # type: ignore[index]
     assert data["medical_device"] is False  # type: ignore[index]
 

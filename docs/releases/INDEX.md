@@ -3,6 +3,7 @@
 Use this page to browse previous release notes.
 
 ## Recent
+- [v1.5.34](v1.5.34.md) - reliable version checks, command architecture, and corrected MDMP cryptography
 - [v1.5.33](v1.5.33.md) - scientific consistency, calibration provenance, formula registry v5, and EUCYS dossier
 - [v1.5.32](v1.5.32.md) - patient-model baseline compatibility and interactive AlphaFold workbench
 - [v1.5.31](v1.5.31.md) - complete desktop beta runtime and cross-scale academic reference labs

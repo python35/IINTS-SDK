@@ -49,6 +49,17 @@ from .eu_ai_pact import (
     review_eu_ai_pact_readiness,
 )
 
+from mdmp_core.crypto import (
+    MDMPSigner,
+    MDMPVerifier,
+    derive_key_hkdf,
+    derive_key_scrypt,
+    encrypt_patient_payload,
+    decrypt_patient_payload,
+    encrypt_cgm_dataset_file,
+    decrypt_cgm_dataset_file,
+)
+
 __all__ = [
     "StreamSpec",
     "FeatureSpec",
@@ -87,4 +98,12 @@ __all__ = [
     "HIGH_RISK_READINESS_CONTROLS",
     "EUAIPactReadinessResult",
     "review_eu_ai_pact_readiness",
+    "MDMPSigner",
+    "MDMPVerifier",
+    "derive_key_hkdf",
+    "derive_key_scrypt",
+    "encrypt_patient_payload",
+    "decrypt_patient_payload",
+    "encrypt_cgm_dataset_file",
+    "decrypt_cgm_dataset_file",
 ]

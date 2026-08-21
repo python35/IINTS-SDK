@@ -378,7 +378,7 @@ The public `reference_free_living_t1d` profile uses a gate-compatible calibratio
 | HAAF and hypo-awareness memory | implemented as an experimental bounded memory state; not a clinically validated predictor of awareness or severe-hypoglycemia risk |
 | exogenous glucagon PK/PD for dual-hormone pumps | implemented as an experimental Hovorka-style depot/plasma/effect layer with simulator safety caps; not emergency-dose guidance |
 | illness, infection, menstrual cycle, steroid exposure | approximated through scenario disturbances and stress events; not a complete endocrine illness model |
-| fat/protein mixed-meal kinetics | approximated with delayed meal profiles such as `pizza_paradox` |
+| fat/protein mixed-meal kinetics | approximated with delayed dual-wave meal profiles such as `biphasic_macronutrient_absorption` (alias `pizza_paradox`) |
 | GLP-1 / incretin physiology | represented as a bounded meal-emptying modifier, not a personalized incretin hormone assay |
 | circadian endocrine rhythms | represented as an optional dawn EGP oscillator, not a full cortisol/growth-hormone model |
 | exercise GLUT4 translocation | represented as a bounded NIMGU state, not a calibrated muscle-biopsy model |

@@ -35,7 +35,7 @@ let runBusy = false;
 let researchBusy = false;
 let aiBusy = false;
 let engineCompatible = false;
-const REQUIRED_BRIDGE_API_VERSION = 2;
+const REQUIRED_BRIDGE_API_VERSION = 3;
 const ESSENTIAL_RESULT_COLUMNS = new Set([
   "time_minutes",
   "timestamp",
@@ -533,18 +533,62 @@ async function runDiagnostics() {
   }
 }
 
-async function loadUpdateInfo() {
+function humanVersionStatus(status) {
+  const labels = {
+    current: "up to date",
+    update_available: "update available",
+    ahead: "newer than published release",
+    development: "development checkout",
+    unknown: "not verified"
+  };
+  return labels[status] || String(status || "not verified").replaceAll("_", " ");
+}
+
+async function loadUpdateInfo(refresh = false) {
   setText("update-status", "Checking SDK/app update information...");
   try {
-    updateInfo = await call("desktop_update_info");
+    updateInfo = await call("desktop_update_info", { refresh });
     setText("settings-sdk-version", updateInfo.current_version || "Unknown");
+    setText(
+      "settings-sdk-latest",
+      `Latest stable: ${updateInfo.latest_version || "not verified"} · ${humanVersionStatus(updateInfo.sdk_status)}`
+    );
+    setText(
+      "settings-app-latest",
+      `Latest beta: ${updateInfo.app_latest_version || "not verified"} · ${humanVersionStatus(updateInfo.app_status)}`
+    );
+    $("update-terminal-btn").textContent = updateInfo.sdk_update_available === true
+      ? "Update Python SDK"
+      : updateInfo.sdk_update_available === false
+        ? "Repair or reinstall Python SDK"
+        : "Check or update Python SDK";
+    $("update-download-btn").textContent = updateInfo.app_update_available === true
+      ? "Download app update"
+      : "Open app downloads";
     setText("settings-python-path", updateInfo.python_executable || "Python path unavailable");
+    const sdkWarning = updateInfo.sdk_check_error
+      ? `SDK check warning: ${updateInfo.sdk_check_error}`
+      : "";
+    const appWarning = updateInfo.app_check_error
+      ? `App check warning: ${updateInfo.app_check_error}`
+      : "";
+    const metadataWarning = updateInfo.version_metadata_matches_code === false
+      ? `Environment warning: package metadata reports ${updateInfo.current_version}, but active code reports ${updateInfo.active_code_version}. Repair the Python SDK environment.`
+      : "";
+    const warnings = [sdkWarning, appWarning, metadataWarning].filter(Boolean);
     setText(
       "update-status",
       [
         `Installed SDK: ${updateInfo.current_version || "unknown"}`,
+        `Active SDK code: ${updateInfo.active_code_version || "unknown"}`,
+        `Latest stable SDK: ${updateInfo.latest_version || "not verified"}`,
+        `SDK status: ${humanVersionStatus(updateInfo.sdk_status)} (${updateInfo.sdk_check_source || "unknown source"})`,
+        `Installed app: ${updateInfo.app_current_version || appInfo?.app_version || "unknown"}`,
+        `Latest app beta: ${updateInfo.app_latest_version || "not verified"}`,
+        `App status: ${humanVersionStatus(updateInfo.app_status)} (${updateInfo.app_check_source || "unknown source"})`,
         `Python: ${updateInfo.python_executable || "unknown"}`,
         `Package: ${updateInfo.package_spec}`,
+        ...(warnings.length ? ["", ...warnings] : []),
         "",
         "SDK update command:",
         updateInfo.pip_command,
@@ -553,6 +597,8 @@ async function loadUpdateInfo() {
       ].join("\n")
     );
   } catch (error) {
+    setText("settings-sdk-latest", "Latest release could not be checked");
+    setText("settings-app-latest", "Latest release could not be checked");
     setText(
       "update-status",
       `${errorMessage(error)}\n\nUse 'Install or update Python SDK' to create or repair the private app engine.`
@@ -580,12 +626,12 @@ async function refreshSoftwareVersions() {
   // sequentially so removable disks and first-start caches cannot deadlock startup.
   await loadAppInfo();
   await loadStatus();
-  await loadUpdateInfo();
+  await loadUpdateInfo(true);
   await runDiagnostics();
 }
 
 async function openAppDownloads() {
-  const url = appInfo?.release_url || "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest";
+  const url = updateInfo?.app_download_url || appInfo?.release_url || "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest";
   await openExternalUrl(url, "update-status");
 }
 
