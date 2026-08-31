@@ -693,7 +693,7 @@ def import_and_validate_proteomics(
         gene_count=int(df["gene_symbol"].nunique()),
         sample_count=int(df["sample_id"].nunique()),
         group_counts=group_counts,
-        source_sha256=manifest["source_sha256"],
+        source_sha256=str(manifest["source_sha256"]),
         output_sha256=output_sha256,
         metadata_sha256=metadata_sha256,
         input_format=fmt,

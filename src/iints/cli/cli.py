@@ -11312,7 +11312,7 @@ def research_glucofm_embed(
     try:
         df = pd.read_csv(input_file)
         cgm_col = next((c for c in ["glucose", "cgm", "glucose_dexcom", "glucose_libre"] if c in df.columns), df.columns[0])
-        cgm_vals = df[cgm_col].dropna().values
+        cgm_vals = df[cgm_col].dropna().to_numpy(dtype=float)
 
         z_vec = embed_cgm_with_glucofm(cgm_vals)
         output_file.parent.mkdir(parents=True, exist_ok=True)

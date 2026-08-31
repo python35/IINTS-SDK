@@ -375,8 +375,8 @@ def _split_windows(
         max(1, int(math.ceil(collection.window_count * validation_fraction))),
     )
     return (
-        collection.subset(indices[validation_count:]),
-        collection.subset(indices[:validation_count]),
+        collection.subset(indices[validation_count:].tolist()),
+        collection.subset(indices[:validation_count].tolist()),
         "window-level-smoke-only",
     )
 

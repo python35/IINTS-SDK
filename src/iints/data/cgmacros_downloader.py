@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 import json
 import logging
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, TypedDict
 import urllib.request
 import urllib.error
 
@@ -24,18 +24,26 @@ CGMACROS_GITHUB_BASE_URL = (
     "https://raw.githubusercontent.com/PSI-TAMU/CGMacros/main"
 )
 
+class _ParticipantMeta(TypedDict):
+    id: str
+    status: str
+    hba1c: float
+    bmi: float
+    fbg: float
+
+
 # Benchmark cohort demographic distributions matching Nature Scientific Data Table 2 (45 participants)
-BENCHMARK_PARTICIPANTS_META = [
+BENCHMARK_PARTICIPANTS_META: list[_ParticipantMeta] = [
     # 15 Healthy participants (HbA1c < 5.7%, normal fasting BG)
-    {"id": f"P{i:02d}", "status": "healthy", "hba1c": round(5.0 + (i % 5) * 0.12, 1), "bmi": round(22.0 + (i % 6) * 0.8, 1), "fbg": round(82.0 + (i % 5) * 2.5, 1)}
+    _ParticipantMeta(id=f"P{i:02d}", status="healthy", hba1c=round(5.0 + (i % 5) * 0.12, 1), bmi=round(22.0 + (i % 6) * 0.8, 1), fbg=round(82.0 + (i % 5) * 2.5, 1))
     for i in range(1, 16)
 ] + [
     # 16 Prediabetes participants (5.7% <= HbA1c <= 6.4%)
-    {"id": f"P{i:02d}", "status": "prediabetes", "hba1c": round(5.8 + (i % 6) * 0.1, 1), "bmi": round(26.5 + (i % 7) * 1.1, 1), "fbg": round(104.0 + (i % 6) * 3.0, 1)}
+    _ParticipantMeta(id=f"P{i:02d}", status="prediabetes", hba1c=round(5.8 + (i % 6) * 0.1, 1), bmi=round(26.5 + (i % 7) * 1.1, 1), fbg=round(104.0 + (i % 6) * 3.0, 1))
     for i in range(16, 32)
 ] + [
     # 14 Type 2 Diabetes participants (HbA1c > 6.4%)
-    {"id": f"P{i:02d}", "status": "t2d", "hba1c": round(6.6 + (i % 7) * 0.25, 1), "bmi": round(30.0 + (i % 8) * 1.5, 1), "fbg": round(135.0 + (i % 7) * 6.0, 1)}
+    _ParticipantMeta(id=f"P{i:02d}", status="t2d", hba1c=round(6.6 + (i % 7) * 0.25, 1), bmi=round(30.0 + (i % 8) * 1.5, 1), fbg=round(135.0 + (i % 7) * 6.0, 1))
     for i in range(32, 46)
 ]
 

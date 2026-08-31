@@ -253,7 +253,7 @@ def simulate_fda_failure_scenario(
         })
 
     df = pd.DataFrame(records)
-    g_vals = df["glucose_actual_mgdl"].values
+    g_vals = df["glucose_actual_mgdl"].to_numpy(dtype=float)
     t_below_54 = float(np.mean(g_vals < 54.0) * 100.0)
     t_above_250 = float(np.mean(g_vals > 250.0) * 100.0)
     min_g = float(np.min(g_vals))

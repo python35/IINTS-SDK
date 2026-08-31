@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 import numpy as np
 import pandas as pd
@@ -85,7 +85,7 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", str(name).lower())
 
 
-def _find_col(columns: Sequence[str], candidates: Sequence[str]) -> str | None:
+def _find_col(columns: Iterable[str], candidates: Sequence[str]) -> str | None:
     norm_map = {_normalize_name(c): c for c in columns}
     for cand in candidates:
         norm_cand = _normalize_name(cand)
@@ -376,7 +376,11 @@ def import_cgmacros_dataset(
     subjects_csv = out_dir / "cgmacros_subjects.csv"
     subjects_df.to_csv(subjects_csv, index=False)
 
-    status_counts = dict(subjects_df["diabetes_status"].value_counts().to_dict()) if "diabetes_status" in subjects_df.columns else {}
+    status_counts: dict[str, int] = (
+        {str(k): int(v) for k, v in subjects_df["diabetes_status"].value_counts().items()}
+        if "diabetes_status" in subjects_df.columns
+        else {}
+    )
 
     manifest = {
         "dataset_name": "CGMacros",

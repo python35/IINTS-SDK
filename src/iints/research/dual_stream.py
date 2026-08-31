@@ -83,10 +83,10 @@ def decompose_dual_stream(
     elif filter_type == "exponential":
         alpha = 2.0 / (window_steps + 1.0)
         s = pd.Series(clean_signal)
-        baseline = s.ewm(alpha=alpha, adjust=False).mean().values
+        baseline = s.ewm(alpha=alpha, adjust=False).mean().to_numpy(dtype=float)
     else:  # rolling_mean
         s = pd.Series(clean_signal)
-        baseline = s.rolling(window=window_steps, min_periods=1, center=True).mean().values
+        baseline = s.rolling(window=window_steps, min_periods=1, center=True).mean().to_numpy(dtype=float)
 
     # Restore NaNs where original was NaN
     baseline[~valid_mask] = np.nan

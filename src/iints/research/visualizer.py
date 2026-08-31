@@ -5,12 +5,13 @@ from dataclasses import asdict, dataclass
 import io
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, cast
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
+from matplotlib.projections.polar import PolarAxes
 import numpy as np
 import pandas as pd
 
@@ -104,6 +105,7 @@ def plot_foundation_arena_radar(output_path: Path | str) -> Path:
     }
 
     fig, ax = plt.subplots(figsize=(9, 9), subplot_kw=dict(polar=True), dpi=300)
+    ax = cast(PolarAxes, ax)
     fig.patch.set_facecolor("#FFFFFF")
     ax.set_facecolor("#F8FAFC")
 
@@ -365,7 +367,7 @@ def plot_fda_safety_mitigation_timeline(output_path: Path | str) -> Path:
     # Case 1: Unmitigated Tandem Auto-Bolus Spike
     np.random.seed(42)
     unmitigated_cgm = 110.0 - (t_min / 60.0) * 45.0
-    unmitigated_cgm[t_min > 80] = 42.0 + np.random.normal(0, 1.2, np.sum(t_min > 80))
+    unmitigated_cgm[t_min > 80] = 42.0 + np.random.normal(0, 1.2, int(np.sum(t_min > 80)))
 
     # Case 2: Supervised IINTS-AF Dual-Guard Containment
     supervised_cgm = np.copy(unmitigated_cgm)
