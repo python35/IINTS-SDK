@@ -5,6 +5,8 @@ from pathlib import Path
 import tempfile
 import pytest
 
+pytest.importorskip("torch", reason="PyTorch not installed")
+
 from iints.research.eucys_playbook_generator import (
     EUCYSFigureMetadata,
     EUCYSJuryPortfolio,

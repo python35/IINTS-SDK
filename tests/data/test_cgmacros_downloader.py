@@ -24,6 +24,7 @@ def test_download_or_generate_cgmacros(tmp_path: Path):
 
 
 def test_fetch_and_import_cgmacros_pipeline(tmp_path: Path):
+    pytest.importorskip("pyarrow", reason="cgmacros_timeseries.parquet output requires pyarrow")
     raw_dir = tmp_path / "raw"
     proc_dir = tmp_path / "proc"
     result = fetch_and_import_cgmacros_pipeline(raw_dir=raw_dir, processed_dir=proc_dir, participant_count=5)
@@ -36,6 +37,7 @@ def test_fetch_and_import_cgmacros_pipeline(tmp_path: Path):
 
 
 def test_cli_download_cgmacros_command(tmp_path: Path):
+    pytest.importorskip("pyarrow", reason="cgmacros_timeseries.parquet output requires pyarrow")
     out_dir = tmp_path / "cli_cgmacros"
     res = runner.invoke(app, ["data", "download-cgmacros", "--output-dir", str(out_dir), "--participants", "3"])
     assert res.exit_code == 0

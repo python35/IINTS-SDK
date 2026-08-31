@@ -349,60 +349,109 @@ from .ppgr import (
     build_ppgr_dataset,
     run_ppgr_benchmark,
 )
-from .cgm_jepa import (
-    CGMJEPAConfig,
-    CGMJEPAEncoder,
-    load_cgm_jepa_model,
-    extract_cgm_jepa_embeddings,
-)
-from .cgm_jepa_bridge import (
-    SimulationJEPAEmbeddingResult,
-    prepare_cgm_jepa_window,
-    bridge_simulation_to_jepa,
-)
-from .cgm_jepa_experiment import (
-    PhysiologicalSensitivityResult,
-    simulate_physiological_cgm_24h,
-    add_sensor_noise_and_dropouts,
-    run_cgm_jepa_parameter_experiment,
-)
-from .cgm_jepa_confounder import (
-    ConfounderPairResult,
-    PhysiologicalConfounderStudyResult,
-    generate_confounded_physiological_pair,
-    run_physiological_confounder_experiment,
-)
-from .glucofm import (
-    GlucoFMConfig,
-    GlucoFMStreamEncoder,
-    GlucoFMDualStreamEncoder,
-    GlucoFMDownstreamProbes,
-    build_glucofm_foundation_model,
-    embed_cgm_with_glucofm,
-)
-from .foundation_arena import (
-    ModelArenaMetrics,
-    FoundationArenaReport,
-    run_foundation_model_arena,
-)
-from .visualizer import (
-    ScientificVisualizationArtifacts,
-    plot_foundation_arena_radar,
-    plot_confounder_cosine_analysis,
-    plot_glucofm_dual_stream_decomposition,
-    plot_cgmacros_dualsensor_comparison,
-    plot_fda_safety_mitigation_timeline,
-    generate_interactive_dashboard_html,
-    generate_all_scientific_visualizations,
-)
-from .eucys_playbook_generator import (
-    EUCYSFigureMetadata,
-    EUCYSJuryPortfolio,
-    plot_clarke_error_grid,
-    plot_glycemic_tir_distribution,
-    plot_sc_islet_gsis_dynamics,
-    plot_regenerative_graft_survival,
-    plot_edge_hardware_latency_budget,
-    plot_quantum_safe_mdmp_security,
-    generate_complete_eucys_jury_portfolio,
-)
+# The modules below (CGM-JEPA, GlucoFM, the foundation-model arena, and the
+# visualizer/EUCYS report generators that build on them) require torch, unlike
+# everything imported above. Torch is an optional "research" extra
+# (`pip install iints-sdk-python35[research]`), so a missing torch here must
+# not prevent the rest of iints.research from importing; the affected names
+# simply become unavailable (None) instead.
+try:
+    from .cgm_jepa import (
+        CGMJEPAConfig,
+        CGMJEPAEncoder,
+        load_cgm_jepa_model,
+        extract_cgm_jepa_embeddings,
+    )
+    from .cgm_jepa_bridge import (
+        SimulationJEPAEmbeddingResult,
+        prepare_cgm_jepa_window,
+        bridge_simulation_to_jepa,
+    )
+    from .cgm_jepa_experiment import (
+        PhysiologicalSensitivityResult,
+        simulate_physiological_cgm_24h,
+        add_sensor_noise_and_dropouts,
+        run_cgm_jepa_parameter_experiment,
+    )
+    from .cgm_jepa_confounder import (
+        ConfounderPairResult,
+        PhysiologicalConfounderStudyResult,
+        generate_confounded_physiological_pair,
+        run_physiological_confounder_experiment,
+    )
+    from .glucofm import (
+        GlucoFMConfig,
+        GlucoFMStreamEncoder,
+        GlucoFMDualStreamEncoder,
+        GlucoFMDownstreamProbes,
+        build_glucofm_foundation_model,
+        embed_cgm_with_glucofm,
+    )
+    from .foundation_arena import (
+        ModelArenaMetrics,
+        FoundationArenaReport,
+        run_foundation_model_arena,
+    )
+    from .visualizer import (
+        ScientificVisualizationArtifacts,
+        plot_foundation_arena_radar,
+        plot_confounder_cosine_analysis,
+        plot_glucofm_dual_stream_decomposition,
+        plot_cgmacros_dualsensor_comparison,
+        plot_fda_safety_mitigation_timeline,
+        generate_interactive_dashboard_html,
+        generate_all_scientific_visualizations,
+    )
+    from .eucys_playbook_generator import (
+        EUCYSFigureMetadata,
+        EUCYSJuryPortfolio,
+        plot_clarke_error_grid,
+        plot_glycemic_tir_distribution,
+        plot_sc_islet_gsis_dynamics,
+        plot_regenerative_graft_survival,
+        plot_edge_hardware_latency_budget,
+        plot_quantum_safe_mdmp_security,
+        generate_complete_eucys_jury_portfolio,
+    )
+except ImportError:
+    CGMJEPAConfig = None  # type: ignore[assignment,misc]
+    CGMJEPAEncoder = None  # type: ignore[assignment,misc]
+    load_cgm_jepa_model = None  # type: ignore[assignment]
+    extract_cgm_jepa_embeddings = None  # type: ignore[assignment]
+    SimulationJEPAEmbeddingResult = None  # type: ignore[assignment,misc]
+    prepare_cgm_jepa_window = None  # type: ignore[assignment]
+    bridge_simulation_to_jepa = None  # type: ignore[assignment]
+    PhysiologicalSensitivityResult = None  # type: ignore[assignment,misc]
+    simulate_physiological_cgm_24h = None  # type: ignore[assignment]
+    add_sensor_noise_and_dropouts = None  # type: ignore[assignment]
+    run_cgm_jepa_parameter_experiment = None  # type: ignore[assignment]
+    ConfounderPairResult = None  # type: ignore[assignment,misc]
+    PhysiologicalConfounderStudyResult = None  # type: ignore[assignment,misc]
+    generate_confounded_physiological_pair = None  # type: ignore[assignment]
+    run_physiological_confounder_experiment = None  # type: ignore[assignment]
+    GlucoFMConfig = None  # type: ignore[assignment,misc]
+    GlucoFMStreamEncoder = None  # type: ignore[assignment,misc]
+    GlucoFMDualStreamEncoder = None  # type: ignore[assignment,misc]
+    GlucoFMDownstreamProbes = None  # type: ignore[assignment,misc]
+    build_glucofm_foundation_model = None  # type: ignore[assignment]
+    embed_cgm_with_glucofm = None  # type: ignore[assignment]
+    ModelArenaMetrics = None  # type: ignore[assignment,misc]
+    FoundationArenaReport = None  # type: ignore[assignment,misc]
+    run_foundation_model_arena = None  # type: ignore[assignment]
+    ScientificVisualizationArtifacts = None  # type: ignore[assignment,misc]
+    plot_foundation_arena_radar = None  # type: ignore[assignment]
+    plot_confounder_cosine_analysis = None  # type: ignore[assignment]
+    plot_glucofm_dual_stream_decomposition = None  # type: ignore[assignment]
+    plot_cgmacros_dualsensor_comparison = None  # type: ignore[assignment]
+    plot_fda_safety_mitigation_timeline = None  # type: ignore[assignment]
+    generate_interactive_dashboard_html = None  # type: ignore[assignment]
+    generate_all_scientific_visualizations = None  # type: ignore[assignment]
+    EUCYSFigureMetadata = None  # type: ignore[assignment,misc]
+    EUCYSJuryPortfolio = None  # type: ignore[assignment,misc]
+    plot_clarke_error_grid = None  # type: ignore[assignment]
+    plot_glycemic_tir_distribution = None  # type: ignore[assignment]
+    plot_sc_islet_gsis_dynamics = None  # type: ignore[assignment]
+    plot_regenerative_graft_survival = None  # type: ignore[assignment]
+    plot_edge_hardware_latency_budget = None  # type: ignore[assignment]
+    plot_quantum_safe_mdmp_security = None  # type: ignore[assignment]
+    generate_complete_eucys_jury_portfolio = None  # type: ignore[assignment]

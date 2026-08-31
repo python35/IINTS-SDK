@@ -99,6 +99,7 @@ def test_extract_cgmacros_meal_episodes(mock_cgmacros_dir: Path):
 
 
 def test_import_cgmacros_dataset(mock_cgmacros_dir: Path, tmp_path: Path):
+    pytest.importorskip("pyarrow", reason="cgmacros_timeseries.parquet output requires pyarrow")
     out_dir = tmp_path / "standardized_cgmacros"
     res = import_cgmacros_dataset(mock_cgmacros_dir, out_dir)
 
@@ -117,6 +118,7 @@ def test_import_cgmacros_dataset(mock_cgmacros_dir: Path, tmp_path: Path):
 
 
 def test_cli_import_cgmacros(mock_cgmacros_dir: Path, tmp_path: Path):
+    pytest.importorskip("pyarrow", reason="cgmacros_timeseries.parquet output requires pyarrow")
     out_dir = tmp_path / "cli_standardized"
     result = runner.invoke(
         app,

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 import pytest
 
+pytest.importorskip("torch", reason="PyTorch not installed")
+
 from iints.research.visualizer import (
     generate_all_scientific_visualizations,
     plot_foundation_arena_radar,

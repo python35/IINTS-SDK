@@ -5,7 +5,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="PyTorch not installed")
 from typer.testing import CliRunner
 
 from iints.cli.cli import app

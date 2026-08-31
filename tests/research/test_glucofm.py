@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import torch
+
+torch = pytest.importorskip("torch", reason="PyTorch not installed")
 
 from iints.research.glucofm import (
     GlucoFMConfig,
