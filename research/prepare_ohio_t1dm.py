@@ -299,6 +299,10 @@ def _process_xml(path: Path, time_step: int, args: argparse.Namespace) -> pd.Dat
 
     # Glucose: interpolate on grid
     glucose_series = glucose_df.set_index("timestamp")["glucose"].sort_index()
+    # A grid timestamp is a real observation only if it exactly matches a raw
+    # sensor reading; everything else on the uniform grid was synthesized by
+    # interpolate/ffill/bfill below and should be flagged as such downstream.
+    observed_on_grid = grid.isin(glucose_series.index)
     # Interpolate on union of original timestamps + target grid to avoid losing all values
     glucose_series = (
         glucose_series.reindex(glucose_series.index.union(grid))
@@ -310,6 +314,7 @@ def _process_xml(path: Path, time_step: int, args: argparse.Namespace) -> pd.Dat
     )
     df["glucose_actual_mgdl"] = glucose_series
     df["glucose_to_algo_mgdl"] = df["glucose_actual_mgdl"]
+    df["glucose_interpolated"] = ~observed_on_grid
 
     # Basal rate (U/hr), forward fill
     basal_events = _events(root, "basal")
@@ -381,6 +386,19 @@ def _process_xml(path: Path, time_step: int, args: argparse.Namespace) -> pd.Dat
 
     df["effective_isf"] = float(args.isf_default)
     df["effective_icr"] = float(args.icr_default)
+    # No per-subject estimation is attempted for OhioT1DM (contrast with
+    # prepare_hupa_ucm.py): every row is the flat CLI default.
+    df["effective_isf_is_fallback"] = True
+    df["effective_icr_is_fallback"] = True
+    # basal is forward/back-filled across the entire uniform grid, so
+    # insulin_units is non-zero on nearly every row here, unlike the sparse
+    # bolus/basal events in AZT1D/HUPA-UCM's insulin_units column.
+    df["insulin_units_semantics"] = "dense_expansion"
+    # OhioT1DM's published raw timestamps are already date-shifted for
+    # de-identification (some land after the present date); this pipeline
+    # does not re-anchor them, so absolute `timestamp` is not a safe axis
+    # for cross-cohort joins — use the relative `time_minutes` column instead.
+    df["timestamp_deidentified"] = True
 
     sin_t, cos_t = _time_features(df["timestamp"])
     df["time_of_day_sin"] = sin_t
@@ -390,11 +408,14 @@ def _process_xml(path: Path, time_step: int, args: argparse.Namespace) -> pd.Dat
     columns = [
         "subject_id",
         "timestamp",
+        "timestamp_deidentified",
         "time_minutes",
         "glucose_actual_mgdl",
         "glucose_to_algo_mgdl",
+        "glucose_interpolated",
         "glucose_trend_mgdl_min",
         "insulin_units",
+        "insulin_units_semantics",
         "carb_grams",
         "carb_intake_grams",
         "derived_iob_units",
@@ -402,7 +423,9 @@ def _process_xml(path: Path, time_step: int, args: argparse.Namespace) -> pd.Dat
         "patient_iob_units",
         "patient_cob_grams",
         "effective_isf",
+        "effective_isf_is_fallback",
         "effective_icr",
+        "effective_icr_is_fallback",
         "effective_basal_rate_u_per_hr",
         "steps",
         "calories",

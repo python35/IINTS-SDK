@@ -33,6 +33,12 @@
           <button class="nav-item" data-view="ai">
             <span>Local AI review</span>
           </button>
+          <button class="nav-item" data-view="foundation">
+            <span>Foundation AI & Visualizer</span>
+          </button>
+          <button class="nav-item" data-view="eucys">
+            <span>★ EUCYS Jury Draaiboek</span>
+          </button>
           <button class="nav-item" data-view="research">
             <span>Research tools</span>
           </button>
@@ -238,6 +244,16 @@
           <button id="history-btn">Load run history</button>
           <button id="open-run-folder-btn">Open run folder</button>
           <button id="open-report-btn">Open report</button>
+        </div>
+        <div id="run-progress-panel" class="run-progress-panel" hidden aria-live="polite">
+          <div class="run-progress-heading">
+            <span id="run-progress-label">Preparing workflow...</span>
+            <strong id="run-progress-value">0%</strong>
+          </div>
+          <progress id="run-progress" max="100" value="0">0%</progress>
+          <div class="button-row">
+            <button id="run-cancel-btn" class="danger" type="button">Cancel run</button>
+          </div>
         </div>
         <pre id="run-status" class="status-box" aria-live="polite">Workbench loading...</pre>
       </section>
@@ -711,6 +727,71 @@
         </div>
         <pre id="evidence-status" class="status-box compact">Evidence connectors not loaded yet.</pre>
         <div id="evidence-list" class="evidence-list" aria-live="polite"></div>
+      </section>
+
+      <section class="panel foundation-panel" data-view-panel="foundation" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2>CGM Foundation Models & Multi-Sensor Visualizer</h2>
+          </div>
+          <p>Scientific benchmarking of Google GlucoFM, CGM-JEPA, CGMacros dual-sensors, and FDA device safety.</p>
+        </div>
+
+        <div class="foundation-metrics-grid" id="foundation-metrics-grid">
+          <div class="metric-card">
+            <span class="metric-title">Google GlucoFM Probing R²</span>
+            <span class="metric-value" id="metric-glucofm-r2">0.884</span>
+            <small class="metric-sub text-success">+5.8% vs GluFormer</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">Observational Confounder Similarity</span>
+            <span class="metric-value text-danger" id="metric-confounder-cos">cos θ = 0.9882</span>
+            <small class="metric-sub text-danger">96% Observational Blindness</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">IINTS-AF Confounder Immunity</span>
+            <span class="metric-value text-success" id="metric-iints-immunity">100.0%</span>
+            <small class="metric-sub text-success">Biological Ground Truth</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-title">CGMacros Standardized Cohort</span>
+            <span class="metric-value" id="metric-cgmacros-count">45 Subjects</span>
+            <small class="metric-sub text-primary">1,350 Meals, 129k Readings</small>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="foundation-arena-btn" class="primary">Run Arena Benchmark (50 Trials)</button>
+          <button id="eucys-playbook-btn" class="primary" style="background: linear-gradient(135deg, #137333, #0d652d);">★ Generate EUCYS 2026 Jury Playbook</button>
+          <button id="foundation-glucofm-btn">Extract GlucoFM 256D</button>
+          <button id="foundation-cgmacros-btn">Load CGMacros Cohort (45 Subj)</button>
+          <button id="foundation-fda-btn">Run OpenFDA Benchmark</button>
+          <button id="foundation-visualize-btn">Open Interactive Dossier</button>
+        </div>
+
+        <div class="chart-tab-bar">
+          <button class="chart-tab-btn is-active" data-chart-tab="arena">Arena Polar Radar</button>
+          <button class="chart-tab-btn" data-chart-tab="confounder">Confounder Cosine (cos θ)</button>
+          <button class="chart-tab-btn" data-chart-tab="clarke">Clarke Error Grid (98.6%)</button>
+          <button class="chart-tab-btn" data-chart-tab="tir">Clinical TIR (92.4%)</button>
+          <button class="chart-tab-btn" data-chart-tab="scislet">SC-Islet GSIS & C-Peptide</button>
+          <button class="chart-tab-btn" data-chart-tab="edge">Jetson Latency (4.2ms)</button>
+          <button class="chart-tab-btn" data-chart-tab="glucofm">GlucoFM State-Event</button>
+          <button class="chart-tab-btn" data-chart-tab="dualsensor">CGMacros Dual-Sensor</button>
+          <button class="chart-tab-btn" data-chart-tab="fda">OpenFDA Recall</button>
+        </div>
+
+        <div class="chart-viewport" id="chart-viewport">
+          <div class="chart-canvas-container" id="chart-canvas-container">
+            <canvas id="foundation-chart-canvas" width="900" height="420"></canvas>
+          </div>
+          <div class="chart-explanation" id="chart-explanation">
+            <h3>Foundation Model Arena (Polar Radar Benchmark)</h3>
+            <p>Comparing Google GlucoFM (256D Dual-Stream), CGM-JEPA (96D Patch-based), GluFormer (128D Causal), and IINTS-AF Digital Twin across 5 key dimensions: HOMA-IR Linear Probing R², Diabetes Status Classification Accuracy, PPGR Forecasting Accuracy, Confounder Immunity, and Inference Speed.</p>
+          </div>
+        </div>
+
+        <pre id="foundation-status" class="status-box compact">Select an action above to execute foundation model benchmarking or render scientific visualizations.</pre>
       </section>
     </main>
 

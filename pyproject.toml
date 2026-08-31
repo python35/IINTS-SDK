@@ -112,6 +112,17 @@ desktop-macos = [
   "setuptools>=83.0.0,<84.0.0",
   "pyobjc-framework-Cocoa>=10.0,<13.0",
 ]
+tauri-engine = [
+  "FMPy>=0.3.30,<0.4.0",
+  "SciencePlots>=2.1.0,<3.0.0",
+  "fpdf2>=2.8.0,<3.0.0",
+  "libroadrunner>=2.9.2,<3.0.0",
+  "matplotlib>=3.5.0,<4.0.0",
+  "openpyxl>=3.0.0,<4.0.0",
+  "pillow>=12.3.0,<13.0.0",
+  "plotly>=5.18.0,<7.0.0",
+  "seaborn>=0.11.0,<1.0.0",
+]
 desktop-all = [
   "FMPy>=0.3.30,<0.4.0",
   "SciencePlots>=2.1.0,<3.0.0",

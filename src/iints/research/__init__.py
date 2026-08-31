@@ -131,6 +131,24 @@ from .fmi_models import (
 )
 from .binding_evidence import BindingEvidenceResult, query_bindingdb_uniprot
 from .clinvar_engine import ClinVarEngine, normalize_protein_variant
+from .regenerative_islet import (
+    RegenerativeEvidencePlan,
+    RegenerativeComparisonResult,
+    RegenerativeProteinPanel,
+    RegenerativeProteinTarget,
+    build_regenerative_evidence_plan,
+    compare_regenerative_islet_proteomics,
+    get_regenerative_protein_panel,
+    load_regenerative_protein_panels,
+)
+from .proteomics_importer import (
+    ProteomicsImportResult,
+    load_sample_metadata,
+    import_maxquant_protein_groups,
+    import_diann_report,
+    import_wide_proteomics_matrix,
+    import_and_validate_proteomics,
+)
 from .glucose_model import (
     GLUCOSE_MODEL_FEATURE_COLUMNS,
     GLUCOSE_MODEL_ID,
@@ -254,6 +272,20 @@ __all__ = [
     "query_bindingdb_uniprot",
     "ClinVarEngine",
     "normalize_protein_variant",
+    "RegenerativeEvidencePlan",
+    "RegenerativeComparisonResult",
+    "RegenerativeProteinPanel",
+    "RegenerativeProteinTarget",
+    "build_regenerative_evidence_plan",
+    "compare_regenerative_islet_proteomics",
+    "get_regenerative_protein_panel",
+    "load_regenerative_protein_panels",
+    "ProteomicsImportResult",
+    "load_sample_metadata",
+    "import_maxquant_protein_groups",
+    "import_diann_report",
+    "import_wide_proteomics_matrix",
+    "import_and_validate_proteomics",
     "GLUCOSE_MODEL_FEATURE_COLUMNS",
     "GLUCOSE_MODEL_ID",
     "GlucoseModelComparisonBundle",
@@ -269,8 +301,108 @@ __all__ = [
     "render_hf_comparison_interpretation",
     "standardize_glucose_forecast_frame",
     "write_glucose_model_config",
-    "write_huggingface_export_bundle",
     "JetsonHFTrainingResult",
     "jetson_hf_model_score",
     "run_jetson_hf_training",
+    "DualStreamDecomposition",
+    "decompose_dual_stream",
+    "extract_dual_stream_pre_meal_features",
+    "PPGRTrajectoryMetrics",
+    "PPGRBenchmarkResult",
+    "BasePPGRModel",
+    "CarbOnlyLinearPPGR",
+    "MultiMacroLinearPPGR",
+    "DualStreamGlucoFMPPGR",
+    "compute_trajectory_metrics",
+    "build_ppgr_dataset",
+    "run_ppgr_benchmark",
+    "CGMJEPAConfig",
+    "CGMJEPAEncoder",
+    "load_cgm_jepa_model",
+    "extract_cgm_jepa_embeddings",
+    "SimulationJEPAEmbeddingResult",
+    "prepare_cgm_jepa_window",
+    "bridge_simulation_to_jepa",
+    "PhysiologicalSensitivityResult",
+    "simulate_physiological_cgm_24h",
+    "add_sensor_noise_and_dropouts",
+    "run_cgm_jepa_parameter_experiment",
+    "ConfounderPairResult",
+    "PhysiologicalConfounderStudyResult",
+    "generate_confounded_physiological_pair",
+    "run_physiological_confounder_experiment",
 ]
+
+from .dual_stream import (
+    DualStreamDecomposition,
+    decompose_dual_stream,
+    extract_dual_stream_pre_meal_features,
+)
+from .ppgr import (
+    PPGRTrajectoryMetrics,
+    PPGRBenchmarkResult,
+    BasePPGRModel,
+    CarbOnlyLinearPPGR,
+    MultiMacroLinearPPGR,
+    DualStreamGlucoFMPPGR,
+    compute_trajectory_metrics,
+    build_ppgr_dataset,
+    run_ppgr_benchmark,
+)
+from .cgm_jepa import (
+    CGMJEPAConfig,
+    CGMJEPAEncoder,
+    load_cgm_jepa_model,
+    extract_cgm_jepa_embeddings,
+)
+from .cgm_jepa_bridge import (
+    SimulationJEPAEmbeddingResult,
+    prepare_cgm_jepa_window,
+    bridge_simulation_to_jepa,
+)
+from .cgm_jepa_experiment import (
+    PhysiologicalSensitivityResult,
+    simulate_physiological_cgm_24h,
+    add_sensor_noise_and_dropouts,
+    run_cgm_jepa_parameter_experiment,
+)
+from .cgm_jepa_confounder import (
+    ConfounderPairResult,
+    PhysiologicalConfounderStudyResult,
+    generate_confounded_physiological_pair,
+    run_physiological_confounder_experiment,
+)
+from .glucofm import (
+    GlucoFMConfig,
+    GlucoFMStreamEncoder,
+    GlucoFMDualStreamEncoder,
+    GlucoFMDownstreamProbes,
+    build_glucofm_foundation_model,
+    embed_cgm_with_glucofm,
+)
+from .foundation_arena import (
+    ModelArenaMetrics,
+    FoundationArenaReport,
+    run_foundation_model_arena,
+)
+from .visualizer import (
+    ScientificVisualizationArtifacts,
+    plot_foundation_arena_radar,
+    plot_confounder_cosine_analysis,
+    plot_glucofm_dual_stream_decomposition,
+    plot_cgmacros_dualsensor_comparison,
+    plot_fda_safety_mitigation_timeline,
+    generate_interactive_dashboard_html,
+    generate_all_scientific_visualizations,
+)
+from .eucys_playbook_generator import (
+    EUCYSFigureMetadata,
+    EUCYSJuryPortfolio,
+    plot_clarke_error_grid,
+    plot_glycemic_tir_distribution,
+    plot_sc_islet_gsis_dynamics,
+    plot_regenerative_graft_survival,
+    plot_edge_hardware_latency_budget,
+    plot_quantum_safe_mdmp_security,
+    generate_complete_eucys_jury_portfolio,
+)

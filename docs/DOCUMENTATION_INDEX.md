@@ -5,20 +5,24 @@ The main navigation follows a learning sequence. This page gives an alternative 
 ## First-Time User
 
 1. [Learning Path](LEARNING_PATH.md)
-2. [Installation](INSTALLATION.md)
-3. [First Run](QUICKSTART.md)
-4. [Core Concepts](CORE_CONCEPTS.md)
-5. [Understand A Run](RUN_OUTPUTS.md)
+2. [System Requirements](SYSTEM_REQUIREMENTS.md)
+3. [Installation](INSTALLATION.md)
+4. [Omarchy Linux](OMARCHY_INSTALL.md)
+5. [First Run](QUICKSTART.md)
+6. [Core Concepts](CORE_CONCEPTS.md)
+7. [Understand A Run](RUN_OUTPUTS.md)
 
 ## Simulation Researcher
 
 1. [Complete First Workflow](GETTING_STARTED.md)
 2. [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 3. [Physiology Reference](PHYSIOLOGY_REFERENCE.md)
-4. [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md) for independent equation-model checks
-5. [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) for sensitivity, CellML, FMI, and affinity evidence
-6. [Study Analysis](STUDY_ANALYSIS.md)
-7. [Evidence Bundle](EVIDENCE_BUNDLE.md)
+4. [Regenerative Islet Research](REGENERATIVE_ISLET_RESEARCH.md) for the stem-cell, protein-evidence, and graft-validation roadmap
+5. [Mechanistic Reference Models](MECHANISTIC_REFERENCE_MODELS.md) for independent equation-model checks
+6. [Cross-scale Reference Labs](CROSS_SCALE_REFERENCE_LABS.md) for sensitivity, CellML, FMI, and affinity evidence
+7. [OpenFDA Safety & Adverse Events](OPENFDA_SAFETY_BENCHMARK.md) for real-world device recall verification
+8. [Study Analysis](STUDY_ANALYSIS.md)
+9. [Evidence Bundle](EVIDENCE_BUNDLE.md)
 
 ## Data Reviewer
 
@@ -26,14 +30,16 @@ The main navigation follows a learning sequence. This page gives an alternative 
 2. [Certification Guide](MDMP_FULL_GUIDE.md)
 3. [MDMP Specification](MDMP.md)
 4. [Real-Data Realism Gate](REAL_DATA_REALISM.md)
+5. [CGMacros Multi-Sensor Dataset](CGMACROS_DUAL_STREAM.md)
 
 ## AI Researcher
 
 1. [AI Assistant](AI_ASSISTANT.md) for run explanation
 2. [Glucose Forecast Model](GLUCOSE_MODEL.md) for prediction
-3. [Interpreting Models](comparison_interpretation.md) for evaluation
-4. [AI Safety Gates](LOCAL_AI_SAFETY_GATES.md) for boundaries
-5. [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) for data provenance
+3. [CGM Foundation Models & JEPA](CGM_FOUNDATION_MODELS.md) for self-supervised representation auditing
+4. [Interpreting Models](comparison_interpretation.md) for evaluation
+5. [AI Safety Gates](LOCAL_AI_SAFETY_GATES.md) for boundaries
+6. [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) for data provenance
 
 ## Hardware Researcher
 

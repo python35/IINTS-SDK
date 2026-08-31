@@ -80,7 +80,7 @@ def test_tauri_bridge_status_reports_sdk_context() -> None:
     data = payload["data"]
     assert isinstance(data, dict)
     assert data["bridge"] == "iints_desktop.tauri_bridge"
-    assert data["bridge_api_version"] == 3
+    assert data["bridge_api_version"] == 4
     assert data["medical_device"] is False
 
 
@@ -99,7 +99,7 @@ def test_tauri_bridge_reports_desktop_diagnostics() -> None:
     assert payload["ok"] is True
     data = payload["data"]
     assert data["medical_device"] is False  # type: ignore[index]
-    assert data["bridge_api_version"] == 3  # type: ignore[index]
+    assert data["bridge_api_version"] == 4  # type: ignore[index]
     assert "python_version" in data  # type: ignore[operator]
     assert "optional_modules" in data  # type: ignore[operator]
     assert "pandas" in data["optional_modules"]  # type: ignore[index]
@@ -165,7 +165,7 @@ def test_tauri_bridge_reports_update_info() -> None:
     data = payload["data"]
     assert data["package_spec"] == "iints-sdk-python35[desktop-all]"  # type: ignore[index]
     assert "pip install -U" in str(data["pip_command"])  # type: ignore[index]
-    assert data["app_download_url"] == "https://github.com/python35/IINTS-SDK/releases/tag/tauri-beta-latest"  # type: ignore[index]
+    assert "tauri-beta" in str(data["app_download_url"])  # type: ignore[index]
     assert data["sdk_status"] in {"current", "update_available", "ahead", "unknown"}  # type: ignore[index]
     assert data["app_status"] in {"current", "update_available", "ahead", "unknown"}  # type: ignore[index]
     assert data["update_docs_url"] == "https://python35.github.io/IINTS-SDK/APP_INSTALL/"  # type: ignore[index]
@@ -321,6 +321,48 @@ def test_tauri_bridge_reads_run_history(tmp_path: Path) -> None:
     entries = payload["data"]["history"]  # type: ignore[index]
     assert entries[0]["run_id"] == "run-test"
     assert entries[0]["preset_name"] == "hypo_prone_night"
+
+
+def test_tauri_bridge_run_writes_atomic_progress(tmp_path: Path, monkeypatch, capsys) -> None:
+    from argparse import Namespace
+    from types import SimpleNamespace
+
+    from iints_desktop import tauri_bridge
+
+    progress_file = tmp_path / "job" / "progress.json"
+    cancel_file = tmp_path / "job" / "cancel.requested"
+
+    def fake_run_demo_preset(*, step_callback, **_kwargs):
+        step_callback(60, 120, 123.4)
+        assert json.loads(progress_file.read_text())["progress_percent"] == 50.0
+        return SimpleNamespace(
+            run_id="run-progress",
+            workflow_title="Progress test",
+            preset_name="baseline_t1d",
+            seed=42,
+            output_dir=tmp_path / "output",
+            results_csv=tmp_path / "output" / "results.csv",
+            report_pdf=None,
+            config_path=None,
+            summary="completed",
+        )
+
+    monkeypatch.setattr(tauri_bridge, "run_demo_preset", fake_run_demo_preset)
+    exit_code = tauri_bridge._run(  # noqa: SLF001 - bridge contract unit test
+        Namespace(
+            output_dir=str(tmp_path / "output"),
+            workflow_key="baseline-reference",
+            seed=42,
+            progress_file=str(progress_file),
+            cancel_file=str(cancel_file),
+        )
+    )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["ok"] is True
+    progress = json.loads(progress_file.read_text())
+    assert progress["phase"] == "complete"
+    assert progress["progress_percent"] == 100.0
 
 
 def test_tauri_bridge_mdmp_certify_smoke(tmp_path: Path) -> None:

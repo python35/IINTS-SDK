@@ -12,7 +12,7 @@ Unsigned desktop builds are useful for internal testing, but public Windows and 
 
 ## GitHub Actions Support
 
-The `Desktop Beta Builds` workflow already contains optional signing steps. If the secrets below are not configured, the workflow skips signing and still publishes unsigned beta artifacts.
+The `Rust Desktop Beta Builds` workflow fails closed for public uploads: Windows signing and macOS signing/notarization secrets are mandatory. A manually dispatched build with release upload disabled may produce an explicitly labelled unsigned/ad-hoc CI artifact for developer testing, but that artifact cannot update `tauri-beta-latest`.
 
 ### Windows Secrets
 
@@ -23,7 +23,7 @@ Add these repository secrets:
 | `WINDOWS_SIGNING_PFX_BASE64` | Base64-encoded `.pfx` Authenticode code-signing certificate. |
 | `WINDOWS_SIGNING_PFX_PASSWORD` | Password for the `.pfx` file. |
 
-The workflow signs `dist/IINTS-AF-Desktop-Beta.exe` using `signtool`, SHA-256 file digest, and RFC 3161 timestamping before packaging the release asset.
+The workflow signs the generated Tauri NSIS installer using `signtool`, SHA-256 file digest, and RFC 3161 timestamping before packaging the release asset.
 
 ### macOS Secrets
 
@@ -46,5 +46,5 @@ The workflow imports the certificate into a temporary keychain, signs the `.app`
 - Signing reduces warnings, but Windows SmartScreen may still warn for a new publisher until enough reputation is built.
 - EV code-signing certificates can build SmartScreen trust faster, but they cost more and usually require stricter identity validation.
 - Never commit certificates, `.pfx`, `.p12`, passwords, or Apple credentials to the repository.
-- Keep unsigned beta builds clearly labelled as beta/research builds.
+- Keep unsigned developer artifacts private to CI testing; do not redistribute them as official downloads.
 - IINTS-AF remains research and education software only; signing means the binary identity is trusted, not that the software is a medical device.

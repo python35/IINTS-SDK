@@ -1,3 +1,4 @@
 include CITATION.cff
 include README.md
 include docs/*.md
+include tools/install/install_omarchy.sh

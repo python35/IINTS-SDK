@@ -238,6 +238,43 @@ Compare two study outputs.
 ### `iints poster-study`
 Generate poster-ready figures from a study.
 
+### `iints research regenerative panels`
+Inspect the bundled regenerative-islet protein panels and optionally export the
+required evidence plan:
+
+```bash
+iints research regenerative panels \
+  --panel beta_cell_identity_and_function \
+  --output-json results/regenerative/panels.json
+```
+
+### `iints research regenerative compare`
+Run a provenance-preserving descriptive protein comparison between normalized
+SC-islet and primary-islet observations:
+
+```bash
+iints research regenerative compare \
+  --dataset data/standardized_islet_proteomics.csv \
+  --panel beta_cell_identity_and_function \
+  --normalization-note "Joint normalization within one experiment" \
+  --output-dir results/regenerative/protein_comparison
+```
+
+The command does not calculate treatment efficacy, approve a cell product, or
+map protein abundance into graft-model parameters.
+
+### `iints research regenerative import-proteomics`
+Standardize MaxQuant `proteinGroups.txt`, DIA-NN `report.tsv`, or wide matrix files into the regenerative comparator contract:
+
+```bash
+iints research regenerative import-proteomics \
+  --input-file data/maxquant/proteinGroups.txt \
+  --sample-metadata data/sample_annotations.csv \
+  --source-id PXD001539 \
+  --format maxquant \
+  --output-csv data/standardized_islet_proteomics.csv
+```
+
 ## Data Commands
 
 ### `iints data list`
@@ -265,6 +302,75 @@ Supports:
 - `--output-json results/realism_report.json`
 - `--output-html results/realism_dashboard.html`
 - `--min-realism-verdict needs_review`
+
+### `iints data import-cgmacros`
+Import and standardize the multimodal **CGMacros** dataset (*Nature Scientific Data*, 2025):
+- Synchronizes Abbott FreeStyle Libre Pro and Dexcom G6 Pro sensors.
+- Extracts discrete meals with exact macronutrient breakdown (carbs, protein, fat, fiber, calories).
+- Merges participant clinical screening (`bio.csv`).
+
+```bash
+iints data import-cgmacros \
+  --input-dir data/cgmacros_raw \
+  --output-dir data/cgmacros_standardized
+```
+
+### `iints research ppgr-benchmark`
+Benchmark 2-hour Postprandial Glycemic Response (PPGR) models (Google GlucoFM style):
+- Compares Carb-Only baseline, Multi-Macronutrient biphasic regression, and Dual-Stream GlucoFM architectures.
+- Computes trajectory MAE, RMSE, Pearson $r$, Peak Glucose MAE, and Time-to-Peak error.
+
+```bash
+iints research ppgr-benchmark \
+  --meals-file data/cgmacros_standardized/cgmacros_meals.csv \
+  --sensor dexcom \
+  --output-dir results/ppgr_benchmark
+```
+
+### `iints research cgm-jepa-embed`
+Extract a 96-dimensional latent representation from a 24h simulation or CGM trace using **CGM-JEPA** (*arXiv:2605.00933*):
+
+```bash
+iints research cgm-jepa-embed \
+  --input results/baseline/results.csv \
+  --output-dir results/cgm_jepa_embedding
+```
+
+### `iints research cgm-jepa-experiment`
+Run a 100-simulation virtual patient parameter sweep (varying $S_I$) and test latent manifold alignment and sensor noise robustness ($\cos \theta$):
+
+```bash
+iints research cgm-jepa-experiment \
+  --output-dir results/cgm_jepa_study \
+  --n-simulations 100 \
+  --sweep-param insulin_sensitivity
+```
+
+### `iints research cgm-jepa-confounder`
+Run the **Physiological Confounder Benchmark** (50 paired cohorts) testing whether observational CGM foundation models confound divergent underlying biological states:
+
+```bash
+iints research cgm-jepa-confounder \
+  --output-dir results/cgm_jepa_confounder \
+  --num-pairs 50
+```
+
+## Medical Device Safety & FDA Verification Commands
+
+### `iints safety fda-list`
+List all verified medical device recall cases from the US FDA database registered in IINTS-AF:
+
+```bash
+iints safety fda-list
+```
+
+### `iints safety fda-benchmark`
+Run the complete FDA Adverse Event Benchmark evaluating unmitigated automated controllers vs the IINTS-AF Dual-Guard Safety Supervisor across real device failures (Tandem, MiniMed, Omnipod, Dexcom):
+
+```bash
+iints safety fda-benchmark \
+  --output-dir results/fda_safety_study
+```
 
 ### `iints import-carelink`, `iints import-nightscout`, `iints import-tidepool`
 Import real-world CGM sources.
@@ -709,6 +815,35 @@ Validate dataset against an MDMP contract schema and range rules:
 iints mdmp validate contracts/cgm_contract.yaml data/patient_cgm.csv --min-mdmp-grade research_grade
 ```
 
+## Foundation Models & Multi-Sensor Research Commands
+
+### `iints research glucofm-embed`
+Extract Google GlucoFM Dual-Stream 256-dimensional patient representation embeddings:
+
+```bash
+iints research glucofm-embed \
+  --input-file data/patient_run.csv \
+  --output-file results/glucofm/embedding.csv
+```
+
+### `iints research foundation-arena`
+Run head-to-head Foundation Model Arena benchmark (Google GlucoFM vs CGM-JEPA vs GluFormer vs IINTS-AF Digital Twin):
+
+```bash
+iints research foundation-arena \
+  --output-dir results/foundation_arena \
+  --n-trials 50
+```
+
+### `iints data download-cgmacros`
+Download or generate the complete 45-participant CGMacros multi-sensor open science cohort with macronutrient meal events:
+
+```bash
+iints data download-cgmacros \
+  --output-dir data/cgmacros_cohort \
+  --participants 45
+```
+
 ## Full Details
 
 For every option and advanced workflow, continue to:
@@ -716,3 +851,6 @@ For every option and advanced workflow, continue to:
 - [CLI & Advanced Reference](TECHNICAL_README.md)
 - [Scientific Workflow](SCIENTIFIC_WORKFLOW.md)
 - [Study Analysis](STUDY_ANALYSIS.md)
+- [CGM Foundation Models & Benchmarking](CGM_FOUNDATION_MODELS.md)
+- [CGMacros Multi-Sensor Pipeline](CGMACROS_DUAL_STREAM.md)
+- [OpenFDA Safety Benchmarks](OPENFDA_SAFETY_BENCHMARK.md)

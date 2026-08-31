@@ -1,11 +1,50 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::env;
+use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
+
+static WORKFLOW_JOBS: OnceLock<Mutex<HashMap<String, WorkflowJobRecord>>> = OnceLock::new();
+static NEXT_WORKFLOW_JOB_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug)]
+struct WorkflowJobRecord {
+    status: String,
+    phase: String,
+    progress_percent: f64,
+    message: String,
+    cancel_requested: bool,
+    result: Option<Value>,
+    error: Option<String>,
+    started: Instant,
+    progress_path: PathBuf,
+    cancel_path: PathBuf,
+}
+
+fn workflow_jobs() -> &'static Mutex<HashMap<String, WorkflowJobRecord>> {
+    WORKFLOW_JOBS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn workflow_job_payload(job_id: &str, record: &WorkflowJobRecord) -> Value {
+    json!({
+        "job_id": job_id,
+        "status": record.status,
+        "phase": record.phase,
+        "progress_percent": record.progress_percent,
+        "message": record.message,
+        "cancel_requested": record.cancel_requested,
+        "elapsed_seconds": record.started.elapsed().as_secs_f64(),
+        "result": record.result,
+        "error": record.error,
+    })
+}
 
 #[derive(Debug, Clone)]
 struct PythonCandidate {
@@ -739,6 +778,180 @@ async fn run_workflow(
 }
 
 #[tauri::command]
+fn start_workflow_job(
+    workflow_key: String,
+    output_dir: String,
+    seed: i64,
+) -> Result<Value, String> {
+    if workflow_key.trim().is_empty() {
+        return Err("workflow_key is required".to_string());
+    }
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    if !(0..=i32::MAX as i64).contains(&seed) {
+        return Err("seed must be between 0 and 2147483647".to_string());
+    }
+
+    let sequence = NEXT_WORKFLOW_JOB_ID.fetch_add(1, Ordering::Relaxed);
+    let job_id = format!("workflow-{}-{sequence}", std::process::id());
+    let job_dir = env::temp_dir().join("iints-af-workflow-jobs").join(&job_id);
+    fs::create_dir_all(&job_dir)
+        .map_err(|error| format!("Could not create workflow job directory: {error}"))?;
+    let progress_path = job_dir.join("progress.json");
+    let cancel_path = job_dir.join("cancel.requested");
+
+    {
+        let mut jobs = workflow_jobs()
+            .lock()
+            .map_err(|_| "Workflow job registry is unavailable".to_string())?;
+        if jobs.len() >= 64 {
+            if let Some(stale_id) = jobs
+                .iter()
+                .find(|(_, job)| {
+                    matches!(job.status.as_str(), "completed" | "failed" | "cancelled")
+                })
+                .map(|(id, _)| id.clone())
+            {
+                if let Some(stale) = jobs.remove(&stale_id) {
+                    let _ =
+                        fs::remove_dir_all(stale.progress_path.parent().unwrap_or(Path::new("")));
+                }
+            }
+        }
+        jobs.insert(
+            job_id.clone(),
+            WorkflowJobRecord {
+                status: "queued".to_string(),
+                phase: "queued".to_string(),
+                progress_percent: 0.0,
+                message: "Workflow queued".to_string(),
+                cancel_requested: false,
+                result: None,
+                error: None,
+                started: Instant::now(),
+                progress_path: progress_path.clone(),
+                cancel_path: cancel_path.clone(),
+            },
+        );
+    }
+
+    let thread_job_id = job_id.clone();
+    thread::spawn(move || {
+        if let Ok(mut jobs) = workflow_jobs().lock() {
+            if let Some(job) = jobs.get_mut(&thread_job_id) {
+                job.status = "running".to_string();
+                job.phase = "preparing".to_string();
+                job.message = "Starting Python research engine".to_string();
+            }
+        }
+        let args = vec![
+            "run".to_string(),
+            "--workflow-key".to_string(),
+            workflow_key,
+            "--output-dir".to_string(),
+            output_dir,
+            "--seed".to_string(),
+            seed.to_string(),
+            "--progress-file".to_string(),
+            progress_path.to_string_lossy().into_owned(),
+            "--cancel-file".to_string(),
+            cancel_path.to_string_lossy().into_owned(),
+        ];
+        let result = run_python_bridge(&args);
+        if let Ok(mut jobs) = workflow_jobs().lock() {
+            if let Some(job) = jobs.get_mut(&thread_job_id) {
+                match result {
+                    Ok(value) => {
+                        job.status = "completed".to_string();
+                        job.phase = "complete".to_string();
+                        job.progress_percent = 100.0;
+                        job.message = "Workflow and artifacts completed".to_string();
+                        job.result = Some(value);
+                    }
+                    Err(error)
+                        if job.cancel_requested || error.to_lowercase().contains("cancel") =>
+                    {
+                        job.status = "cancelled".to_string();
+                        job.phase = "cancelled".to_string();
+                        job.message = "Workflow cancelled; partial artifacts may remain for audit"
+                            .to_string();
+                        job.error = Some(error);
+                    }
+                    Err(error) => {
+                        job.status = "failed".to_string();
+                        job.phase = "failed".to_string();
+                        job.message = "Workflow failed".to_string();
+                        job.error = Some(error);
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(json!({"job_id": job_id, "status": "queued"}))
+}
+
+#[tauri::command]
+fn workflow_job_status(job_id: String) -> Result<Value, String> {
+    if job_id.trim().is_empty() {
+        return Err("job_id is required".to_string());
+    }
+    let progress_path = {
+        let jobs = workflow_jobs()
+            .lock()
+            .map_err(|_| "Workflow job registry is unavailable".to_string())?;
+        jobs.get(&job_id)
+            .map(|job| job.progress_path.clone())
+            .ok_or_else(|| "Unknown workflow job".to_string())?
+    };
+
+    let progress = fs::read_to_string(&progress_path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok());
+    let mut jobs = workflow_jobs()
+        .lock()
+        .map_err(|_| "Workflow job registry is unavailable".to_string())?;
+    let job = jobs
+        .get_mut(&job_id)
+        .ok_or_else(|| "Unknown workflow job".to_string())?;
+    if matches!(job.status.as_str(), "queued" | "running" | "cancelling") {
+        if let Some(progress) = progress {
+            if let Some(phase) = progress.get("phase").and_then(Value::as_str) {
+                job.phase = phase.to_string();
+            }
+            if let Some(percent) = progress.get("progress_percent").and_then(Value::as_f64) {
+                job.progress_percent = percent.clamp(0.0, 100.0);
+            }
+            if let Some(message) = progress.get("message").and_then(Value::as_str) {
+                job.message = message.to_string();
+            }
+        }
+    }
+    Ok(workflow_job_payload(&job_id, job))
+}
+
+#[tauri::command]
+fn cancel_workflow_job(job_id: String) -> Result<Value, String> {
+    let mut jobs = workflow_jobs()
+        .lock()
+        .map_err(|_| "Workflow job registry is unavailable".to_string())?;
+    let job = jobs
+        .get_mut(&job_id)
+        .ok_or_else(|| "Unknown workflow job".to_string())?;
+    if matches!(job.status.as_str(), "completed" | "failed" | "cancelled") {
+        return Ok(workflow_job_payload(&job_id, job));
+    }
+    fs::write(&job.cancel_path, b"cancel\n")
+        .map_err(|error| format!("Could not request workflow cancellation: {error}"))?;
+    job.cancel_requested = true;
+    job.status = "cancelling".to_string();
+    job.phase = "cancelling".to_string();
+    job.message = "Cancellation requested; waiting for a safe simulation boundary".to_string();
+    Ok(workflow_job_payload(&job_id, job))
+}
+
+#[tauri::command]
 async fn preview_results(csv: String, max_rows: Option<i64>) -> Result<Value, String> {
     if csv.trim().is_empty() {
         return Err("csv path is required".to_string());
@@ -926,6 +1139,91 @@ async fn ask_local_ai(
             args.push(csv_value);
         }
     }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn run_foundation_arena(output_dir: String, n_trials: Option<i64>) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let mut args = vec![
+        "foundation-arena".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ];
+    if let Some(trials) = n_trials {
+        args.push("--n-trials".to_string());
+        args.push(trials.to_string());
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn extract_glucofm_embedding(csv: Option<String>) -> Result<Value, String> {
+    let mut args = vec!["glucofm-embed".to_string()];
+    if let Some(path) = csv {
+        if !path.trim().is_empty() {
+            args.push("--csv".to_string());
+            args.push(path);
+        }
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn load_cgmacros_cohort(output_dir: String, participants: Option<i64>) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let mut args = vec![
+        "cgmacros-cohort".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ];
+    if let Some(count) = participants {
+        args.push("--participants".to_string());
+        args.push(count.to_string());
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn run_fda_safety_benchmark(output_dir: String) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let args = vec![
+        "fda-safety-benchmark".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ];
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn generate_scientific_visualizations(output_dir: String) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let args = vec![
+        "foundation-visualize".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ];
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn generate_eucys_playbook(output_dir: String) -> Result<Value, String> {
+    if output_dir.trim().is_empty() {
+        return Err("output_dir is required".to_string());
+    }
+    let args = vec![
+        "eucys-playbook".to_string(),
+        "--output-dir".to_string(),
+        output_dir,
+    ];
     run_python_bridge_async(args).await
 }
 
@@ -1487,6 +1785,9 @@ fn main() {
             run_fmi_model,
             query_bindingdb_evidence,
             run_workflow,
+            start_workflow_job,
+            workflow_job_status,
+            cancel_workflow_job,
             preview_results,
             run_history,
             certify_mdmp,
@@ -1498,7 +1799,13 @@ fn main() {
             open_path,
             reveal_path,
             open_external_url,
-            open_sdk_update_terminal
+            open_sdk_update_terminal,
+            run_foundation_arena,
+            extract_glucofm_embedding,
+            load_cgmacros_cohort,
+            run_fda_safety_benchmark,
+            generate_scientific_visualizations,
+            generate_eucys_playbook
         ])
         .run(tauri::generate_context!())
         .expect("error while running IINTS-AF Tauri desktop");

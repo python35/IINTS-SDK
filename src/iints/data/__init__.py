@@ -223,4 +223,27 @@ __all__ = [
     'MDMPGateError',
     'generate_synthetic_mirror',
     'SyntheticMirrorArtifact',
+    'CGMacrosSubjectBio',
+    'CGMacrosMealEvent',
+    'CGMacrosImportResult',
+    'parse_cgmacros_bio',
+    'parse_cgmacros_subject_timeseries',
+    'extract_cgmacros_meal_episodes',
+    'import_cgmacros_dataset',
+    'download_or_generate_cgmacros',
+    'fetch_and_import_cgmacros_pipeline',
 ]
+
+from .cgmacros import (
+    CGMacrosSubjectBio,
+    CGMacrosMealEvent,
+    CGMacrosImportResult,
+    parse_cgmacros_bio,
+    parse_cgmacros_subject_timeseries,
+    extract_cgmacros_meal_episodes,
+    import_cgmacros_dataset,
+)
+from .cgmacros_downloader import (
+    download_or_generate_cgmacros,
+    fetch_and_import_cgmacros_pipeline,
+)

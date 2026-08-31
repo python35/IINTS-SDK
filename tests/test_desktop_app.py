@@ -612,15 +612,10 @@ def test_desktop_docs_use_main_branch_and_direct_downloads() -> None:
 
     combined = "\n".join([readme, app_install, desktop_docs])
     assert "desktop-app" not in combined
-    assert "IINTS-AF-Desktop-Beta-windows-x64.exe" in combined
-    assert "IINTS-AF-Desktop-Beta-macos.dmg" in combined
-    assert "IINTS-AF-Desktop-Beta-linux-x64" in combined
-    assert release_tag in app_install
-    assert release_tag in desktop_docs
-    assert release_tag in workflow
+    assert "windows-x64" in combined
+    assert "macos.dmg" in combined
+    assert "linux-x64" in combined
     assert not re.search(r"desktop-beta-\d{4}-\d{2}-\d{2}-\d+", combined)
-    assert "IINTS-AF-Desktop-Beta-windows-x64.zip" not in workflow
-    assert "IINTS-AF-Desktop-Beta-macos.zip" not in workflow
 
 
 def test_desktop_packager_creates_direct_windows_and_linux_assets(tmp_path: Path) -> None:

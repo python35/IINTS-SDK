@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import sqlite3
 from typing import Any, cast
 
 import numpy as np
@@ -50,6 +51,8 @@ ARTIFACT_TYPES = {
     ".zip": "archive",
 }
 
+CATALOG_SCHEMA_VERSION = 1
+
 
 @dataclass(frozen=True)
 class ResultsIndexBundle:
@@ -60,10 +63,15 @@ class ResultsIndexBundle:
     artifact_inventory_csv: Path
     report_md: Path
     manifest_json: Path
+    catalog_sqlite: Path
     workbook_xlsx: Path | None
     raw_long_csv: Path | None
     run_count: int
     artifact_count: int
+    runs_updated: int
+    runs_reused: int
+    artifacts_updated: int
+    artifacts_reused: int
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -113,6 +121,79 @@ def _sha256_file(path: Path, block_size: int = 1024 * 1024) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _catalog_root_fingerprint(root: Path) -> str:
+    return hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()
+
+
+def _open_catalog(path: Path, root: Path) -> sqlite3.Connection:
+    """Open the local incremental catalogue and bind it to one results root."""
+
+    connection = sqlite3.connect(path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS runs (
+            relative_results_csv TEXT PRIMARY KEY,
+            source_size_bytes INTEGER NOT NULL,
+            source_mtime_ns INTEGER NOT NULL,
+            summary_json TEXT NOT NULL,
+            indexed_utc TEXT NOT NULL
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS artifacts (
+            relative_path TEXT PRIMARY KEY,
+            source_size_bytes INTEGER NOT NULL,
+            source_mtime_ns INTEGER NOT NULL,
+            record_json TEXT NOT NULL,
+            indexed_utc TEXT NOT NULL
+        )
+        """
+    )
+
+    fingerprint = _catalog_root_fingerprint(root)
+    existing = connection.execute(
+        "SELECT value FROM metadata WHERE key = 'root_fingerprint'"
+    ).fetchone()
+    if existing is not None and str(existing[0]) != fingerprint:
+        # Never mix records from two roots when an output folder is reused.
+        connection.execute("DELETE FROM runs")
+        connection.execute("DELETE FROM artifacts")
+    metadata = {
+        "schema_version": str(CATALOG_SCHEMA_VERSION),
+        "root_fingerprint": fingerprint,
+        "root": str(root.resolve()),
+    }
+    connection.executemany(
+        "INSERT OR REPLACE INTO metadata(key, value) VALUES (?, ?)",
+        metadata.items(),
+    )
+    connection.commit()
+    return connection
+
+
+def _decode_catalog_record(raw: Any) -> dict[str, Any] | None:
+    try:
+        value = json.loads(str(raw))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def _is_hidden_or_index_path(path: Path, output_dir: Path | None = None) -> bool:
@@ -328,12 +409,139 @@ def build_artifact_inventory(root: Path, output_dir: Path | None = None) -> list
     return rows
 
 
+def _incremental_run_records(
+    connection: sqlite3.Connection,
+    result_csvs: list[Path],
+    root: Path,
+) -> tuple[list[dict[str, Any]], int, int]:
+    cached = {
+        str(row[0]): (int(row[1]), int(row[2]), row[3])
+        for row in connection.execute(
+            "SELECT relative_results_csv, source_size_bytes, source_mtime_ns, summary_json FROM runs"
+        )
+    }
+    discovered: set[str] = set()
+    records: list[dict[str, Any]] = []
+    updated = 0
+    reused = 0
+
+    for path in result_csvs:
+        relative = _normalise_relative(path, root)
+        discovered.add(relative)
+        stat = path.stat()
+        cached_row = cached.get(relative)
+        record = None
+        if cached_row is not None and cached_row[:2] == (int(stat.st_size), int(stat.st_mtime_ns)):
+            record = _decode_catalog_record(cached_row[2])
+        if record is not None:
+            reused += 1
+        else:
+            record = summarize_results_csv(path, root=root)
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO runs(
+                    relative_results_csv, source_size_bytes, source_mtime_ns,
+                    summary_json, indexed_utc
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    relative,
+                    int(stat.st_size),
+                    int(stat.st_mtime_ns),
+                    json.dumps(record, sort_keys=True),
+                    _utc_now(),
+                ),
+            )
+            updated += 1
+        records.append(record)
+
+    stale = set(cached) - discovered
+    connection.executemany(
+        "DELETE FROM runs WHERE relative_results_csv = ?",
+        ((relative,) for relative in stale),
+    )
+    return records, updated, reused
+
+
+def _incremental_artifact_records(
+    connection: sqlite3.Connection,
+    root: Path,
+    output_dir: Path,
+) -> tuple[list[dict[str, Any]], int, int]:
+    cached = {
+        str(row[0]): (int(row[1]), int(row[2]), row[3])
+        for row in connection.execute(
+            "SELECT relative_path, source_size_bytes, source_mtime_ns, record_json FROM artifacts"
+        )
+    }
+    discovered: set[str] = set()
+    records: list[dict[str, Any]] = []
+    updated = 0
+    reused = 0
+
+    if root.exists():
+        paths = sorted(path for path in root.rglob("*") if path.is_file())
+    else:
+        paths = []
+    for path in paths:
+        if _is_hidden_or_index_path(path, output_dir):
+            continue
+        relative = _normalise_relative(path, root)
+        discovered.add(relative)
+        stat = path.stat()
+        cached_row = cached.get(relative)
+        record = None
+        if cached_row is not None and cached_row[:2] == (int(stat.st_size), int(stat.st_mtime_ns)):
+            record = _decode_catalog_record(cached_row[2])
+        if record is not None:
+            reused += 1
+        else:
+            suffix = path.suffix.lower()
+            record = {
+                "relative_path": relative,
+                "path": str(path),
+                "artifact_type": ARTIFACT_TYPES.get(suffix, "other"),
+                "extension": suffix,
+                "size_bytes": int(stat.st_size),
+                "modified_utc": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            }
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO artifacts(
+                    relative_path, source_size_bytes, source_mtime_ns,
+                    record_json, indexed_utc
+                ) VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    relative,
+                    int(stat.st_size),
+                    int(stat.st_mtime_ns),
+                    json.dumps(record, sort_keys=True),
+                    _utc_now(),
+                ),
+            )
+            updated += 1
+        records.append(record)
+
+    stale = set(cached) - discovered
+    connection.executemany(
+        "DELETE FROM artifacts WHERE relative_path = ?",
+        ((relative,) for relative in stale),
+    )
+    return records, updated, reused
+
+
 def _write_markdown_report(
     root: Path,
     output_dir: Path,
     run_df: pd.DataFrame,
     artifact_df: pd.DataFrame,
     include_raw: bool,
+    *,
+    runs_updated: int,
+    runs_reused: int,
+    artifacts_updated: int,
+    artifacts_reused: int,
 ) -> Path:
     report_path = output_dir / "RESULTS_INDEX.md"
 
@@ -363,6 +571,10 @@ def _write_markdown_report(
         f"- Generated UTC: `{datetime.now(timezone.utc).isoformat()}`",
         f"- Run folders indexed: `{len(run_df)}`",
         f"- Artifacts inventoried: `{len(artifact_df)}`",
+        f"- Run summaries recalculated: `{runs_updated}`",
+        f"- Run summaries reused from SQLite: `{runs_reused}`",
+        f"- Artifact records refreshed: `{artifacts_updated}`",
+        f"- Artifact records reused from SQLite: `{artifacts_reused}`",
         f"- Raw long-table export: `{'enabled' if include_raw else 'disabled'}`",
         "",
     ]
@@ -426,6 +638,7 @@ def _write_markdown_report(
             "",
             "- `run_index.csv`: one row per run-level `results.csv`.",
             "- `artifact_inventory.csv`: one row per file under the root.",
+            "- `results_catalog.sqlite3`: incremental machine-readable catalogue used to avoid reparsing unchanged runs.",
             "- `result_manager_manifest.json`: paths, counts, and generation metadata.",
             "- `results_index.xlsx`: workbook version when spreadsheet support is available.",
         ]
@@ -464,8 +677,22 @@ def index_results(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     result_csvs = discover_result_csvs(root, output_dir)
-    run_records = [summarize_results_csv(path, root=root) for path in result_csvs]
-    artifact_records = build_artifact_inventory(root, output_dir)
+    catalog_sqlite = output_dir / "results_catalog.sqlite3"
+    connection = _open_catalog(catalog_sqlite, root)
+    try:
+        run_records, runs_updated, runs_reused = _incremental_run_records(
+            connection,
+            result_csvs,
+            root,
+        )
+        artifact_records, artifacts_updated, artifacts_reused = _incremental_artifact_records(
+            connection,
+            root,
+            output_dir,
+        )
+        connection.commit()
+    finally:
+        connection.close()
 
     run_df = pd.DataFrame(run_records)
     artifact_df = pd.DataFrame(artifact_records)
@@ -505,7 +732,17 @@ def index_results(
     except Exception:
         workbook_xlsx = None
 
-    report_md = _write_markdown_report(root, output_dir, run_df, artifact_df, include_raw)
+    report_md = _write_markdown_report(
+        root,
+        output_dir,
+        run_df,
+        artifact_df,
+        include_raw,
+        runs_updated=runs_updated,
+        runs_reused=runs_reused,
+        artifacts_updated=artifacts_updated,
+        artifacts_reused=artifacts_reused,
+    )
     manifest_json = output_dir / "result_manager_manifest.json"
     manifest = {
         "version": 1,
@@ -514,10 +751,18 @@ def index_results(
         "output_dir": str(output_dir),
         "run_count": int(len(run_df)),
         "artifact_count": int(len(artifact_df)),
+        "incremental_index": {
+            "schema_version": CATALOG_SCHEMA_VERSION,
+            "runs_updated": runs_updated,
+            "runs_reused": runs_reused,
+            "artifacts_updated": artifacts_updated,
+            "artifacts_reused": artifacts_reused,
+        },
         "include_raw": include_raw,
         "artifacts": {
             "run_index_csv": str(run_index_csv),
             "artifact_inventory_csv": str(artifact_inventory_csv),
+            "catalog_sqlite": str(catalog_sqlite),
             "report_md": str(report_md),
             "workbook_xlsx": str(workbook_xlsx) if workbook_xlsx else None,
             "raw_long_csv": str(raw_long_csv) if raw_long_csv else None,
@@ -531,8 +776,13 @@ def index_results(
         artifact_inventory_csv=artifact_inventory_csv,
         report_md=report_md,
         manifest_json=manifest_json,
+        catalog_sqlite=catalog_sqlite,
         workbook_xlsx=workbook_xlsx,
         raw_long_csv=raw_long_csv,
         run_count=int(len(run_df)),
         artifact_count=int(len(artifact_df)),
+        runs_updated=runs_updated,
+        runs_reused=runs_reused,
+        artifacts_updated=artifacts_updated,
+        artifacts_reused=artifacts_reused,
     )

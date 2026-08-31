@@ -288,6 +288,14 @@ def main() -> None:
         df["patient_cob_grams"] = df["derived_cob_grams"]
         df["effective_isf"] = float(args.isf_default)
         df["effective_icr"] = float(args.icr_default)
+        # AZT1D has no per-subject ISF/ICR estimation (unlike prepare_hupa_ucm.py):
+        # every row uses the flat CLI default, so downstream consumers must not
+        # treat this column as a physiological signal without checking this flag.
+        df["effective_isf_is_fallback"] = True
+        df["effective_icr_is_fallback"] = True
+        # basal/bolus/correction are sparse pump events, not a densely-filled
+        # per-sample expansion (contrast with OhioT1DM's grid-wide basal fill).
+        df["insulin_units_semantics"] = "sparse_event"
 
         minutes = (
             df["timestamp"].dt.hour * 60
@@ -324,8 +332,11 @@ def main() -> None:
                     "patient_iob_units",
                     "patient_cob_grams",
                     "effective_isf",
+                    "effective_isf_is_fallback",
                     "effective_icr",
+                    "effective_icr_is_fallback",
                     "effective_basal_rate_u_per_hr",
+                    "insulin_units_semantics",
                     "steps",
                     "calories",
                     "heart_rate",

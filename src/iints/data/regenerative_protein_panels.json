@@ -1,0 +1,224 @@
+{
+  "schema_version": "1.0",
+  "title": "IINTS-AF regenerative islet research protein panels",
+  "scope": "Research-only evidence panels for stem-cell-derived islet identity, function, graft survival, immune interaction, and safety.",
+  "scientific_boundaries": {
+    "research_only": true,
+    "automatic_physiology_mapping_allowed": false,
+    "alphafold_is_structure_confidence_only": true,
+    "network_scores_are_not_causal_effects": true,
+    "protein_markers_are_not_patient_outcomes": true,
+    "unknown_or_conflicting_evidence_fails_closed": true
+  },
+  "forbidden_inferences": [
+    "AlphaFold pLDDT or PAE to treatment efficacy",
+    "AlphaFold pLDDT or PAE to insulin sensitivity",
+    "STRING confidence to causal effect size",
+    "protein abundance to clinical benefit without functional validation",
+    "variant classification to physiological effect size without functional evidence",
+    "immune-evasion marker to transplant safety",
+    "any single score to a cure claim"
+  ],
+  "evidence_sources": {
+    "canonical_annotation": ["UniProt"],
+    "experimental_structure": ["RCSB PDB"],
+    "predicted_structure": ["AlphaFold Protein Structure Database"],
+    "single_cell_expression": ["CELLxGENE Discover", "Human Pancreas Analysis Program"],
+    "tissue_expression": ["Human Protein Atlas", "Bgee", "GTEx"],
+    "quantitative_proteomics": ["PRIDE Archive", "ProteomeXchange"],
+    "pathway_context": ["Reactome", "STRING"],
+    "measured_binding": ["BindingDB", "ChEMBL"],
+    "functional_assay": ["Curated primary literature", "Independent laboratory assay"],
+    "immune_challenge_assay": ["Curated primary literature", "Independent immune-cell assay"],
+    "in_vivo_graft_evidence": ["Curated primary literature", "Registered pre-clinical study"],
+    "clinical_evidence": ["ClinicalTrials.gov", "Peer-reviewed clinical publication"],
+    "tumorigenicity_assay": ["Independent laboratory assay", "Registered pre-clinical study"],
+    "longitudinal_stability": ["Independent laboratory assay", "Longitudinal graft study"]
+  },
+  "seed_datasets": [
+    {
+      "accession": "PXD001539",
+      "repository": "ProteomeXchange/PRIDE",
+      "title": "Quantitative proteomics of human pancreatic beta cells",
+      "use": "Adult human beta-cell proteome reference"
+    },
+    {
+      "accession": "PXD064528",
+      "repository": "ProteomeXchange/PRIDE",
+      "title": "A Cross-Species Subcellular Proteomic Atlas Reveals Pancreatic Islet Cytoarchitecture and Remodeling in Type 2 Diabetes",
+      "use": "Subcellular localization context; not a direct type 1 diabetes efficacy reference"
+    }
+  ],
+  "panels": {
+    "beta_cell_identity_and_function": {
+      "question": "Do the cells resemble mature human beta cells and perform glucose-stimulated insulin secretion through the expected machinery?",
+      "targets": [
+        {
+          "gene_symbol": "INS",
+          "uniprot_accession": "P01308",
+          "role": "Insulin precursor and secreted beta-cell product",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "PDX1",
+          "uniprot_accession": "P52945",
+          "role": "Pancreatic lineage and beta-cell identity transcription factor",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "pathway_context"]
+        },
+        {
+          "gene_symbol": "NKX6-1",
+          "uniprot_accession": "P78426",
+          "role": "Beta-cell lineage specification and identity transcription factor",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "pathway_context"]
+        },
+        {
+          "gene_symbol": "MAFA",
+          "uniprot_accession": "Q8NHW3",
+          "role": "Adult beta-cell maturation and insulin transcription marker",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "GCK",
+          "uniprot_accession": "P35557",
+          "role": "Glucose sensing and stimulus-secretion coupling",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "predicted_structure", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "ABCC8",
+          "uniprot_accession": "Q09428",
+          "role": "SUR1 component of the ATP-sensitive potassium channel",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "predicted_structure", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "KCNJ11",
+          "uniprot_accession": "Q14654",
+          "role": "Kir6.2 pore-forming component of the ATP-sensitive potassium channel",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "predicted_structure", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "PCSK1",
+          "uniprot_accession": "P29120",
+          "role": "Proinsulin processing enzyme",
+          "evidence_requirements": ["canonical_annotation", "predicted_structure", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "PCSK2",
+          "uniprot_accession": "P16519",
+          "role": "Prohormone processing enzyme",
+          "evidence_requirements": ["canonical_annotation", "predicted_structure", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "SLC30A8",
+          "uniprot_accession": "Q8IWU4",
+          "role": "Zinc transport into insulin secretory granules",
+          "evidence_requirements": ["canonical_annotation", "predicted_structure", "single_cell_expression", "quantitative_proteomics", "functional_assay"]
+        }
+      ]
+    },
+    "immune_visibility_and_evasion": {
+      "question": "How do graft cells signal to adaptive and innate immunity, and what safety trade-offs arise when immune visibility is reduced?",
+      "targets": [
+        {
+          "gene_symbol": "B2M",
+          "uniprot_accession": "P61769",
+          "role": "MHC class I surface-expression component",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "single_cell_expression", "immune_challenge_assay", "in_vivo_graft_evidence"]
+        },
+        {
+          "gene_symbol": "CIITA",
+          "uniprot_accession": "P33076",
+          "role": "Master regulator of MHC class II expression",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "pathway_context", "immune_challenge_assay", "in_vivo_graft_evidence"]
+        },
+        {
+          "gene_symbol": "CXCL10",
+          "uniprot_accession": "P02778",
+          "role": "Interferon-inducible chemokine linked to immune-cell recruitment",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "pathway_context", "immune_challenge_assay"]
+        },
+        {
+          "gene_symbol": "CD274",
+          "uniprot_accession": "Q9NZQ7",
+          "role": "PD-L1 immune-checkpoint ligand",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "single_cell_expression", "immune_challenge_assay", "in_vivo_graft_evidence", "longitudinal_stability"]
+        },
+        {
+          "gene_symbol": "CD47",
+          "uniprot_accession": "Q08722",
+          "role": "Innate immune-recognition modulator with immune-surveillance trade-offs",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "single_cell_expression", "immune_challenge_assay", "in_vivo_graft_evidence", "tumorigenicity_assay", "longitudinal_stability"]
+        },
+        {
+          "gene_symbol": "HLA-E",
+          "uniprot_accession": "P13747",
+          "role": "Non-classical MHC class I molecule relevant to NK-cell recognition",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "single_cell_expression", "immune_challenge_assay", "in_vivo_graft_evidence"]
+        }
+      ]
+    },
+    "stress_survival_and_graft_support": {
+      "question": "Can the graft survive hypoxia, inflammatory stress, metabolic demand, and delayed vascularization without losing beta-cell function?",
+      "targets": [
+        {
+          "gene_symbol": "HIF1A",
+          "uniprot_accession": "Q16665",
+          "role": "Hypoxia-response transcription factor",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "pathway_context", "functional_assay", "in_vivo_graft_evidence"]
+        },
+        {
+          "gene_symbol": "VEGFA",
+          "uniprot_accession": "P15692",
+          "role": "Vascular growth and graft-perfusion signaling",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "measured_binding", "single_cell_expression", "quantitative_proteomics", "in_vivo_graft_evidence"]
+        },
+        {
+          "gene_symbol": "HSPA5",
+          "uniprot_accession": "P11021",
+          "role": "Endoplasmic-reticulum protein-folding stress marker",
+          "evidence_requirements": ["canonical_annotation", "experimental_structure", "single_cell_expression", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "TXNIP",
+          "uniprot_accession": "Q9H3M7",
+          "role": "Glucose and oxidative-stress response regulator",
+          "evidence_requirements": ["canonical_annotation", "predicted_structure", "single_cell_expression", "quantitative_proteomics", "functional_assay"]
+        },
+        {
+          "gene_symbol": "NFE2L2",
+          "uniprot_accession": "Q16236",
+          "role": "NRF2 oxidative-stress response regulator",
+          "evidence_requirements": ["canonical_annotation", "predicted_structure", "single_cell_expression", "quantitative_proteomics", "pathway_context", "functional_assay"]
+        }
+      ]
+    },
+    "residual_pluripotency_and_growth_safety": {
+      "question": "Are residual undifferentiated or abnormally proliferating cells detectable, and is long-term graft growth controlled?",
+      "targets": [
+        {
+          "gene_symbol": "POU5F1",
+          "uniprot_accession": "Q01860",
+          "role": "OCT4 residual pluripotency marker",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "tumorigenicity_assay", "longitudinal_stability"]
+        },
+        {
+          "gene_symbol": "NANOG",
+          "uniprot_accession": "Q9H9S0",
+          "role": "Residual pluripotency and self-renewal marker",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "tumorigenicity_assay", "longitudinal_stability"]
+        },
+        {
+          "gene_symbol": "SOX2",
+          "uniprot_accession": "P48431",
+          "role": "Pluripotency and lineage-state marker",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "tumorigenicity_assay", "longitudinal_stability"]
+        },
+        {
+          "gene_symbol": "MKI67",
+          "uniprot_accession": "P46013",
+          "role": "Cell-proliferation marker",
+          "evidence_requirements": ["canonical_annotation", "single_cell_expression", "quantitative_proteomics", "tumorigenicity_assay", "longitudinal_stability"]
+        }
+      ]
+    }
+  }
+}

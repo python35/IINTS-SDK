@@ -215,6 +215,10 @@ u_I = u_{max}M_{functional}O(1-0.55F)\sigma((G-G_{threshold})/slope)
 
 The runner couples this graft output back into a Bergman virtual patient. Portal-style release is added to plasma insulin; delayed/subcutaneous release goes through the two-depot insulin absorption chain. This is much closer to a transplant stress simulator, but it remains pre-clinical research software, not a therapy predictor.
 
+For the evidence architecture, protein panels, validation gates, and explicit
+rules that prevent AlphaFold or network scores from becoming unsupported model
+parameters, see [Regenerative Islet Research](REGENERATIVE_ISLET_RESEARCH.md).
+
 ## 8. A Full Day That Actually Means Something
 
 The current realistic day presets are intentionally not flat. They encode meals, delays, exercise, and a snack so that a glucose plot has a plausible daily story.
