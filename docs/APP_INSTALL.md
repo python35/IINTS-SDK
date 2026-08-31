@@ -41,21 +41,21 @@ Advanced users may prepare the engine manually:
 
     ```bash
     python3 -m venv "$HOME/.iints-af/python-engine"
-    "$HOME/.iints-af/python-engine/bin/python" -m pip install --upgrade pip "iints-sdk-python35[desktop-all]"
+    "$HOME/.iints-af/python-engine/bin/python" -m pip install --upgrade pip "iints-sdk-python35[tauri-engine]"
     ```
 
 === "Windows PowerShell"
 
     ```powershell
     py -3 -m venv "$HOME\.iints-af\python-engine"
-    & "$HOME\.iints-af\python-engine\Scripts\python.exe" -m pip install --upgrade pip "iints-sdk-python35[desktop-all]"
+    & "$HOME\.iints-af\python-engine\Scripts\python.exe" -m pip install --upgrade pip "iints-sdk-python35[tauri-engine]"
     ```
 
 ## macOS Security Messages
 
 The CI pipeline verifies the complete app bundle inside the finished DMG. Public downloads still require Apple Developer ID signing and notarization to avoid all Gatekeeper warnings.
 
-If an official beta is ad-hoc signed, macOS may report an unidentified developer. Use Finder's **Open** context-menu action once. Do not disable Gatekeeper system-wide. If macOS reports that the app is damaged, download the newest DMG again and verify its SHA-256 value; do not bypass a failed integrity check.
+The stable beta channel publishes only Developer ID signed and notarized macOS installers. If macOS reports that an official download is damaged, stop, download the newest DMG again, and verify its SHA-256 value; do not bypass a failed integrity or signature check and do not disable Gatekeeper system-wide.
 
 ## Linux AppImage
 
@@ -67,6 +67,19 @@ chmod +x IINTS-AF-Research-Workbench-linux-x64.AppImage
 ```
 
 The private Python engine still needs a system Python with `venv` support. On Debian or Ubuntu, a missing `venv` module is normally supplied by the distribution's `python3-venv` package.
+
+### Omarchy Linux
+
+Omarchy users can install the AppImage, verified checksum, private Python engine, launcher, icon, and application-menu entry in one flow:
+
+```bash
+omarchy update
+curl -fsSLO https://raw.githubusercontent.com/python35/IINTS-SDK/main/tools/install/install_omarchy.sh
+less install_omarchy.sh
+bash install_omarchy.sh --profile desktop
+```
+
+The script uses `omarchy pkg add` and Mise rather than direct `pacman` commands. See [Install On Omarchy Linux](OMARCHY_INSTALL.md) for the dry run, exact changes, profile selection, and troubleshooting.
 
 ## Optional External Tools
 
@@ -88,7 +101,7 @@ python -m pip install --upgrade "iints-sdk-python35[desktop-all]"
 iints-desktop
 ```
 
-The classic packaged beta remains available from the [`desktop-beta-latest` release](https://github.com/python35/IINTS-SDK/releases/tag/desktop-beta-latest), but the Rust/Tauri workbench is the recommended desktop route.
+The classic Qt source remains available for compatibility testing, but it is no longer published as a separate desktop product. New users should install the Rust/Tauri workbench above.
 
 ## Troubleshooting
 

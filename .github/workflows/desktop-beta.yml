@@ -1,36 +1,20 @@
-name: Desktop Beta Builds
+name: Legacy Qt Desktop Validation
 
+# The Rust/Tauri workbench is the only published desktop application.
+# This manual workflow retains packaging regression coverage for legacy source.
 on:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: "GitHub prerelease tag to create/update"
-        required: true
-        default: "desktop-beta-latest"
-      draft:
-        description: "Create the GitHub release as a draft"
-        type: boolean
-        required: true
-        default: true
-      upload_release:
-        description: "Upload build artifacts to a GitHub prerelease"
-        type: boolean
-        required: true
-        default: true
-  push:
-    tags:
-      - "desktop-beta*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: desktop-beta-${{ github.ref }}
+  group: legacy-qt-desktop-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.11"
-  APP_NAME: "IINTS-AF-Desktop-Beta"
+  APP_NAME: "IINTS-AF-Desktop-Legacy"
 
 jobs:
   build:
@@ -349,65 +333,3 @@ jobs:
           path: desktop-debug/*
           if-no-files-found: ignore
 
-  release:
-    name: Publish desktop prerelease
-    needs: build
-    runs-on: ubuntu-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/desktop-beta') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v8
-        with:
-          path: release-assets
-          merge-multiple: true
-
-      - name: Resolve release tag
-        id: release
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-            echo "draft=${{ inputs.draft }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "draft=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Write release notes
-        shell: bash
-        run: |
-          cat > desktop-beta-release-notes.md <<'EOF'
-          # IINTS-AF Desktop Beta
-
-          This prerelease contains experimental native desktop builds for the IINTS-AF SDK research workbench.
-
-          ## Downloads
-
-          - `IINTS-AF-Desktop-Beta-windows-x64.exe` is the Windows executable.
-          - `IINTS-AF-Desktop-Beta-macos.dmg` is the macOS disk image containing the app.
-          - `IINTS-AF-Desktop-Beta-linux-x64` is the Linux executable.
-
-          Builds are signed/notarized automatically when the repository signing secrets are configured.
-
-          ## Scope
-
-          The desktop app is a native Qt workbench around the SDK engine on Windows, macOS, and Linux. The packaged builds include the Python/Qt runtime, reports, MDMP support, research plotting, serial/edge support, libRoadRunner, and FMPy. Users do not install those Python components separately. The macOS build also verifies that bundled FMPy/SUNDIALS libraries use relocatable app-bundle paths.
-
-          COPASI, OpenCOR, and Ollama are external system applications. Their audited connectors and readiness checks are included, but the external binaries and AI model files are not silently installed. The app detects them and explains the remaining setup when a workflow needs one.
-
-          ## Safety
-
-          Research and education only. This is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
-          EOF
-
-      - name: Create or update GitHub prerelease
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.release.outputs.tag }}
-          name: IINTS-AF Desktop Beta (${{ steps.release.outputs.tag }})
-          body_path: desktop-beta-release-notes.md
-          files: release-assets/*
-          overwrite_files: true
-          draft: ${{ steps.release.outputs.draft }}
-          prerelease: true
-          make_latest: false

@@ -2,6 +2,8 @@
 
 IINTS-AF supports Python 3.10 through 3.14 on Windows, macOS, and Linux. Use a virtual environment so the SDK and its dependencies remain isolated from the system Python.
 
+Check [System Requirements](SYSTEM_REQUIREMENTS.md) before selecting a research, local-AI, desktop, or large-study profile. Omarchy users should follow the dedicated [Omarchy Linux installation](OMARCHY_INSTALL.md), which uses Omarchy package tools and Mise.
+
 ## Choose An Install
 
 | Need | Install | Recommended for |
@@ -25,6 +27,19 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install "iints-sdk-python35[full,mdmp]"
 ```
+
+### Omarchy Linux
+
+Use the supported Omarchy installer rather than modifying its system Python:
+
+```bash
+omarchy update
+curl -fsSLO https://raw.githubusercontent.com/python35/IINTS-SDK/main/tools/install/install_omarchy.sh
+less install_omarchy.sh
+bash install_omarchy.sh --profile standard
+```
+
+Use `--profile desktop` for the native workbench and complete Python engine. The [Omarchy guide](OMARCHY_INSTALL.md) documents profiles, integrity verification, updates, and every path changed by the script.
 
 ### Windows PowerShell
 

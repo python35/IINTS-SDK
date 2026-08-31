@@ -61,7 +61,9 @@ nav:
       - Choose By Goal: USER_GUIDE_MAP.md
       - Plain-Language Overview: PLAIN_LANGUAGE_GUIDE.md
       - Project Boundaries: PROJECT_BOUNDARIES.md
+      - System Requirements: SYSTEM_REQUIREMENTS.md
       - Installation: INSTALLATION.md
+      - Omarchy Linux: OMARCHY_INSTALL.md
       - First Run: QUICKSTART.md
       - Core Concepts: CORE_CONCEPTS.md
       - Complete First Workflow: GETTING_STARTED.md
@@ -88,6 +90,7 @@ nav:
   - Research:
       - EUCYS Jury Dossier:
           - Start Here: eucys/index.md
+          - Scientific Playbook & Results Dossier: EUCYS_JURY_PLAYBOOK.md
           - Project And Research Question: eucys/01_PROJECT_AND_QUESTION.md
           - System Architecture: eucys/02_SYSTEM_ARCHITECTURE.md
           - Scientific Model And Formulas: eucys/03_SCIENTIFIC_MODEL.md
@@ -106,14 +109,17 @@ nav:
           - Numeric Authority: NUMERIC_AUTHORITY.md
           - Hypoglycemia Model: HYPOGLYCEMIA_SCIENCE_MODEL.md
           - Digital Twin Biology: DIGITAL_TWIN_BIOLOGY.md
+          - Regenerative Islet Research: REGENERATIVE_ISLET_RESEARCH.md
           - Complete Science List: ALL_SCIENTIFIC_THEORIES.md
           - Emulation Notes: emulation_references.md
           - Paper Technical Dossier: PAPER_TECHNICAL_DOSSIER.md
       - Data And Realism:
           - Real-Data Realism Gate: REAL_DATA_REALISM.md
           - Diabetes Research Datasets: DIABETES_RESEARCH_DATASETS.md
+          - CGMacros Multi-Sensor & PPGR: CGMACROS_DUAL_STREAM.md
       - Glucose AI:
           - Glucose Forecast Model: GLUCOSE_MODEL.md
+          - CGM Foundation Models & JEPA: CGM_FOUNDATION_MODELS.md
           - Interpreting Models: comparison_interpretation.md
           - Local AI Research: LOCAL_AI_RESEARCH.md
           - AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
@@ -121,6 +127,7 @@ nav:
       - Evidence And Sources:
           - Complete Source Library: SOURCE_LIBRARY.md
           - Evidence Base: EVIDENCE_BASE.md
+          - OpenFDA Safety & Adverse Events: OPENFDA_SAFETY_BENCHMARK.md
       - Governance:
           - Intended Use And Claims: governance/INTENDED_USE_AND_CLAIMS.md
           - EU Research Software Compliance: governance/EU_RESEARCH_SOFTWARE_COMPLIANCE.md

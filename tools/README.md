@@ -8,8 +8,9 @@ This repository uses the same tool layout rules as the standalone MDMP repositor
 - `tools/data/`: dataset import and conversion utilities
 - `tools/analysis/`: plotting, diagnostics, and report helpers
 - `tools/assets/`: branding and asset generation helpers
+- `tools/install/`: reviewed platform installers, currently including Omarchy Linux
 
-User-facing entrypoints stay in `scripts/`.
+Normal user-facing workflows stay in the `iints` CLI. Platform bootstrap scripts live under `tools/install/` so they can be downloaded and inspected independently.
 
 Common maintainer commands:
 

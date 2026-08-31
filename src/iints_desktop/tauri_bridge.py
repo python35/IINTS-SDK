@@ -31,7 +31,7 @@ from iints_desktop.results import load_results_preview
 from iints_desktop.update import get_desktop_update_info
 
 
-DESKTOP_BRIDGE_API_VERSION = 3
+DESKTOP_BRIDGE_API_VERSION = 4
 
 
 def _json_safe(value: Any) -> Any:
@@ -59,6 +59,15 @@ def _ok(data: dict[str, Any]) -> int:
 
 def _fail(message: str, *, details: str | None = None) -> int:
     return _emit({"ok": False, "error": message, "details": details})
+
+
+def _write_progress(path: Path | None, payload: dict[str, Any]) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(_json_safe(payload)), encoding="utf-8")
+    os.replace(temporary, path)
 
 
 def _status(_args: argparse.Namespace) -> int:
@@ -111,18 +120,18 @@ def _diagnostics(_args: argparse.Namespace) -> int:
     }
     recommended_checks = []
     if not optional_modules["pandas"]:
-        recommended_checks.append("Install the SDK with the desktop-all extra so CSV previews can load.")
+        recommended_checks.append("Install the SDK with the tauri-engine extra so CSV previews can load.")
     if not optional_modules["matplotlib"]:
         recommended_checks.append("Install matplotlib for generated preview graphs.")
     if not optional_modules["mdmp_core.crypto"]:
         recommended_checks.append("Install the mdmp extra before creating signed MDMP certificates.")
     if not optional_modules["roadrunner"]:
         recommended_checks.append(
-            "Install the desktop-all or mechanistic extra to execute SBML models; safe structural inspection remains available."
+            "Install the tauri-engine or mechanistic extra to execute SBML models; safe structural inspection remains available."
         )
     if not optional_modules["fmpy"]:
         recommended_checks.append(
-            "Install the desktop-all or fmi extra only when trusted FMU execution is needed; static inspection remains available."
+            "Install the tauri-engine or fmi extra only when trusted FMU execution is needed; static inspection remains available."
         )
     ollama_path = shutil.which("ollama")
     if ollama_path is None:
@@ -444,10 +453,47 @@ def _binding_query(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    progress_path = Path(args.progress_file).expanduser().resolve() if args.progress_file else None
+    cancel_path = Path(args.cancel_file).expanduser().resolve() if args.cancel_file else None
+    _write_progress(
+        progress_path,
+        {
+            "phase": "preparing",
+            "progress_percent": 0.0,
+            "message": "Preparing deterministic SDK workflow",
+        },
+    )
+
+    def step_callback(step: int, duration: int, glucose_mgdl: float) -> None:
+        if cancel_path is not None and cancel_path.exists():
+            raise RuntimeError("Workflow cancelled by the desktop user.")
+        duration_value = max(1, int(duration))
+        progress = min(99.0, max(0.0, float(step) / float(duration_value) * 100.0))
+        _write_progress(
+            progress_path,
+            {
+                "phase": "simulation",
+                "progress_percent": round(progress, 2),
+                "simulated_minutes": int(step),
+                "duration_minutes": duration_value,
+                "glucose_mgdl": round(float(glucose_mgdl), 2),
+                "message": f"Simulated minute {int(step)} of {duration_value}",
+            },
+        )
+
     result = run_demo_preset(
         output_dir=Path(args.output_dir),
         desktop_preset_key=args.workflow_key,
         seed=int(args.seed),
+        step_callback=step_callback,
+    )
+    _write_progress(
+        progress_path,
+        {
+            "phase": "complete",
+            "progress_percent": 100.0,
+            "message": "Workflow and research artifacts completed",
+        },
     )
     return _ok(
         {
@@ -587,6 +633,72 @@ def _ai_ask(args: argparse.Namespace) -> int:
     )
 
 
+def _foundation_arena(args: argparse.Namespace) -> int:
+    from iints.research.foundation_arena import run_foundation_model_arena
+    out_dir = Path(args.output_dir).expanduser().resolve()
+    report = run_foundation_model_arena(output_dir=out_dir, n_benchmark_trials=args.n_trials)
+    return _ok(report.to_dict())
+
+
+def _glucofm_embed(args: argparse.Namespace) -> int:
+    import numpy as np
+    import pandas as pd
+    from iints.research.glucofm import embed_cgm_with_glucofm
+    if args.csv:
+        df = pd.read_csv(args.csv)
+        col = next((c for c in ["glucose", "cgm", "glucose_dexcom", "glucose_libre"] if c in df.columns), df.columns[0])
+        cgm_vals = df[col].dropna().values
+    else:
+        # Default 24-hour trace
+        cgm_vals = np.linspace(100, 140, 288)
+    z_vec = embed_cgm_with_glucofm(cgm_vals)
+    return _ok({
+        "latent_dim": len(z_vec),
+        "embedding": [round(float(v), 5) for v in z_vec[:24]], # First 24 dimensions for display
+        "full_embedding_sample": [round(float(v), 5) for v in z_vec],
+        "model": "Google GlucoFM Dual-Stream Transformer (256D)",
+        "streams": {"state_dim": 128, "event_dim": 128},
+    })
+
+
+def _cgmacros_cohort(args: argparse.Namespace) -> int:
+    from iints.data.cgmacros_downloader import fetch_and_import_cgmacros_pipeline
+    out_dir = Path(args.output_dir).expanduser().resolve()
+    raw_dir = out_dir / "raw"
+    proc_dir = out_dir / "standardized"
+    result = fetch_and_import_cgmacros_pipeline(raw_dir=raw_dir, processed_dir=proc_dir, participant_count=args.participants)
+    return _ok({
+        "subject_count": result.subject_count,
+        "meal_count": result.meal_count,
+        "time_series_rows": result.time_series_rows,
+        "dexcom_readings": result.dexcom_measurements,
+        "libre_readings": result.libre_measurements,
+        "status_distribution": dict(result.status_distribution),
+        "manifest_path": str(result.manifest_path),
+    })
+
+
+def _fda_safety_benchmark(args: argparse.Namespace) -> int:
+    from iints.safety.openfda_safety import run_fda_safety_benchmark
+    out_dir = Path(args.output_dir).expanduser().resolve()
+    report = run_fda_safety_benchmark(output_dir=out_dir)
+    return _ok(report.to_dict())
+
+
+def _foundation_visualize(args: argparse.Namespace) -> int:
+    from iints.research.visualizer import generate_all_scientific_visualizations
+    out_dir = Path(args.output_dir).expanduser().resolve()
+    artifacts = generate_all_scientific_visualizations(output_dir=out_dir)
+    return _ok(artifacts.to_dict())
+
+
+def _eucys_playbook(args: argparse.Namespace) -> int:
+    from iints.research.eucys_playbook_generator import generate_complete_eucys_jury_portfolio
+    out_dir = Path(args.output_dir).expanduser().resolve()
+    portfolio = generate_complete_eucys_jury_portfolio(output_dir=out_dir)
+    return _ok(portfolio.to_dict())
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m iints_desktop.tauri_bridge",
@@ -714,6 +826,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--workflow-key", required=True)
     run.add_argument("--output-dir", required=True)
     run.add_argument("--seed", type=int, default=42)
+    run.add_argument("--progress-file", default=None)
+    run.add_argument("--cancel-file", default=None)
     run.set_defaults(func=_run)
 
     preview = subcommands.add_parser("preview")
@@ -763,6 +877,32 @@ def build_parser() -> argparse.ArgumentParser:
     ai_ask.add_argument("--host", default=None)
     ai_ask.add_argument("--csv", default=None)
     ai_ask.set_defaults(func=_ai_ask)
+
+    arena = subcommands.add_parser("foundation-arena")
+    arena.add_argument("--output-dir", required=True)
+    arena.add_argument("--n-trials", type=int, default=50)
+    arena.set_defaults(func=_foundation_arena)
+
+    glucofm = subcommands.add_parser("glucofm-embed")
+    glucofm.add_argument("--csv", default=None)
+    glucofm.set_defaults(func=_glucofm_embed)
+
+    cgmacros = subcommands.add_parser("cgmacros-cohort")
+    cgmacros.add_argument("--output-dir", required=True)
+    cgmacros.add_argument("--participants", type=int, default=45)
+    cgmacros.set_defaults(func=_cgmacros_cohort)
+
+    fda = subcommands.add_parser("fda-safety-benchmark")
+    fda.add_argument("--output-dir", required=True)
+    fda.set_defaults(func=_fda_safety_benchmark)
+
+    visualize = subcommands.add_parser("foundation-visualize")
+    visualize.add_argument("--output-dir", required=True)
+    visualize.set_defaults(func=_foundation_visualize)
+
+    eucys = subcommands.add_parser("eucys-playbook")
+    eucys.add_argument("--output-dir", required=True)
+    eucys.set_defaults(func=_eucys_playbook)
     return parser
 
 

@@ -31,6 +31,7 @@ concurrency:
 env:
   NODE_VERSION: "22"
   PYTHON_VERSION: "3.11"
+  PUBLIC_RELEASE: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
 
 jobs:
   build:
@@ -88,6 +89,16 @@ jobs:
         working-directory: apps/iints-tauri
         run: npm ci
 
+      - name: Audit frontend dependencies
+        working-directory: apps/iints-tauri
+        run: npm audit --audit-level=high
+
+      - name: Audit Rust dependencies
+        shell: bash
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit --file apps/iints-tauri/src-tauri/Cargo.lock
+
       - name: Validate frontend and Rust boundary
         shell: bash
         run: |
@@ -107,10 +118,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$MACOS_CERTIFICATE_P12_BASE64" ]]; then
-            # Apple Silicon requires a coherent signature over the complete
-            # bundle. Ad-hoc signing prevents Gatekeeper from interpreting an
-            # otherwise valid downloaded app as a damaged partial bundle.
-            echo "Developer ID not configured; sealing the complete app bundle with an ad-hoc signature."
+            if [[ "$PUBLIC_RELEASE" == "true" ]]; then
+              echo "A Developer ID certificate is mandatory for public macOS installers."
+              exit 1
+            fi
+            echo "Developer artifact only: using an ad-hoc signature because release upload is disabled."
             echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -178,7 +190,10 @@ jobs:
           WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: |
           if (-not $env:WINDOWS_SIGNING_PFX_BASE64) {
-            Write-Host "Signing certificate not configured; producing an unsigned Windows beta."
+            if ($env:PUBLIC_RELEASE -eq "true") {
+              throw "An Authenticode certificate is mandatory for public Windows installers."
+            }
+            Write-Host "Developer artifact only: producing an unsigned installer because release upload is disabled."
             exit 0
           }
           if (-not $env:WINDOWS_SIGNING_PFX_PASSWORD) {
@@ -213,7 +228,11 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
-            echo "Notary credentials not configured; skipping notarization."
+            if [[ "$PUBLIC_RELEASE" == "true" ]]; then
+              echo "Apple notarization credentials are mandatory for public macOS installers."
+              exit 1
+            fi
+            echo "Developer artifact only: skipping notarization because release upload is disabled."
             exit 0
           fi
           dmg_path="$(find apps/iints-tauri/src-tauri/target/release/bundle/dmg -type f -name '*.dmg' -print -quit)"
@@ -299,7 +318,7 @@ jobs:
           - `IINTS-AF-Research-Workbench-macos.dmg`
           - `IINTS-AF-Research-Workbench-linux-x64.AppImage`
 
-          Matching `.sha256` files are included for integrity verification. The complete macOS app bundle is always sealed and strictly verified. It uses a Developer ID signature and notarization when repository credentials are configured; otherwise the beta uses a coherent ad-hoc signature.
+          Matching `.sha256` files are included for integrity verification. Public macOS downloads are Developer ID signed, notarized, and stapled. Public Windows downloads are Authenticode signed and timestamped. The workflow fails closed instead of publishing unsigned installers.
 
           ## Required scientific engine
 

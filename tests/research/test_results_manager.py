@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 
 import pandas as pd
 from typer.testing import CliRunner
@@ -62,6 +63,7 @@ def test_index_results_writes_catalogue_and_optional_raw_table(tmp_path) -> None
     assert bundle.artifact_inventory_csv.exists()
     assert bundle.report_md.exists()
     assert bundle.manifest_json.exists()
+    assert bundle.catalog_sqlite.exists()
     assert bundle.raw_long_csv is not None and bundle.raw_long_csv.exists()
 
     run_index = pd.read_csv(bundle.run_index_csv)
@@ -75,6 +77,29 @@ def test_index_results_writes_catalogue_and_optional_raw_table(tmp_path) -> None
     manifest = json.loads(bundle.manifest_json.read_text())
     assert manifest["run_count"] == 2
     assert manifest["artifacts"]["raw_long_csv"] == str(bundle.raw_long_csv)
+    assert manifest["artifacts"]["catalog_sqlite"] == str(bundle.catalog_sqlite)
+
+
+def test_results_catalog_reuses_unchanged_run_summaries(tmp_path, monkeypatch) -> None:
+    from iints.research import results_manager
+
+    root = tmp_path / "results"
+    _write_run(root / "run_a", [110, 122, 134, 145, 132, 120])
+
+    first = index_results(root)
+    assert first.runs_updated == 1
+    assert first.runs_reused == 0
+
+    def fail_if_reparsed(*_args, **_kwargs):
+        raise AssertionError("unchanged results.csv should be loaded from the SQLite catalogue")
+
+    monkeypatch.setattr(results_manager, "summarize_results_csv", fail_if_reparsed)
+    second = index_results(root)
+
+    assert second.runs_updated == 0
+    assert second.runs_reused == 1
+    with sqlite3.connect(second.catalog_sqlite) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM runs").fetchone()[0] == 1
 
 
 def test_results_cli_indexes_a_results_root(tmp_path) -> None:

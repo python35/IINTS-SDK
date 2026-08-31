@@ -79,11 +79,35 @@ def test_plugin_cli_registers_algorithm_and_patient_model(tmp_path, monkeypatch)
 
 
 def test_run_metadata_exposes_data_format_versions(tmp_path) -> None:
+    results = tmp_path / "results.csv"
+    results.write_text("time_minutes,glucose_actual_mgdl\n0,110\n", encoding="utf-8")
     metadata = build_run_metadata("run-1", 42, {"demo": True}, tmp_path)
-    manifest = build_run_manifest(tmp_path, {})
+    manifest = build_run_manifest(tmp_path, {"results": results})
 
     assert metadata["schema_version"] == "1.0"
     assert metadata["format_versions"]["results_csv"] == RESULTS_CSV_FORMAT_VERSION
+    assert metadata["output_dir"] == "."
+    assert metadata["formula_registry"]["formula_count"] == 15
+    assert metadata["formula_registry"]["ai_numeric_authority"] is False
+    assert "dirty" in metadata["source_control"]
     assert manifest["schema_version"] == "1.0"
+    assert manifest["output_dir"] == "."
+    assert manifest["files"]["results"]["path"] == "results.csv"
+    assert manifest["files"]["results"]["path_scope"] == "run_relative"
+    assert len(manifest["files"]["results"]["sha256"]) == 64
     json.dumps(metadata)
     json.dumps(manifest)
+
+
+def test_run_manifest_redacts_external_host_paths(tmp_path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    external = tmp_path / "private" / "model.pt"
+    external.parent.mkdir()
+    external.write_bytes(b"model")
+
+    manifest = build_run_manifest(run_dir, {"model": external})
+
+    assert manifest["files"]["model"]["path"] == "model.pt"
+    assert manifest["files"]["model"]["path_scope"] == "external_path_redacted"
+    assert str(tmp_path) not in json.dumps(manifest)

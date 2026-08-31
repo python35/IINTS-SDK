@@ -80,7 +80,8 @@ class BergmanParameters:
     S_glucagon: float = 1.0       # maximum fractional EGP increase
 
     # --- Stem Cell Graft (Research) ---
-    stem_cell_engraftment_percent: float = 0.0 # 0 for T1D, 100 for cure
+    # Abstract functional graft fraction; 100% is not a clinical cure claim.
+    stem_cell_engraftment_percent: float = 0.0
     stem_cell_subq_fraction: float = 0.0       # 0.0 = PV (immediate), 1.0 = subQ (delayed via S1)
     immune_rejection_rate: float = 0.0         # 1/min decay of graft mass
 

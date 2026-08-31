@@ -284,7 +284,10 @@ def _json_safe(value: Any) -> Any:
 def _resolve_local_ai_review_mode(local_ai_review: bool | str | None) -> str:
     raw_value: bool | str | None = local_ai_review
     if raw_value is None:
-        raw_value = os.getenv(LOCAL_AI_REVIEW_ENV, "auto")
+        # A reachable Ollama server must never turn an ordinary deterministic
+        # simulation into a network-bound operation. AI review is therefore an
+        # explicit post-processing choice, not an implicit part of every run.
+        raw_value = os.getenv(LOCAL_AI_REVIEW_ENV, "off")
     if isinstance(raw_value, bool):
         return "auto" if raw_value else "off"
     normalized = str(raw_value).strip().lower()
@@ -296,7 +299,7 @@ def _resolve_local_ai_review_mode(local_ai_review: bool | str | None) -> str:
         return "required"
     if normalized == "auto":
         return "auto"
-    return "auto"
+    return "off"
 
 
 def _local_ai_timeout_seconds(default: float) -> float:
@@ -433,7 +436,10 @@ def _write_local_ai_run_verification(
             metadata_path,
             status="skipped",
             model=local_ai_model,
-            reason=f"disabled via {LOCAL_AI_REVIEW_ENV}",
+            reason=(
+                "local AI review is opt-in; pass local_ai_review='auto' or set "
+                f"{LOCAL_AI_REVIEW_ENV}=auto to request explanatory post-processing"
+            ),
         )
         return {
             "local_ai_review_status": metadata["status"],
@@ -549,14 +555,14 @@ def write_run_quality_artifacts(
     realism_reference: Optional[str] = "auto",
     local_ai_review: bool | str | None = None,
     local_ai_model: str | None = None,
-    local_ai_timeout_seconds: float = 90.0,
+    local_ai_timeout_seconds: float = 15.0,
     ollama_host: str | None = None,
 ) -> Dict[str, Any]:
     """Write reviewer-facing quality artifacts for one run.
 
-    The artifacts are intentionally non-blocking: if realism scoring cannot run
-    because a CSV is incomplete, the simulation still completes and a warning is
-    returned to the caller.
+    Deterministic artifacts are always produced without contacting a model.
+    Local-AI explanation is opt-in; if requested in ``auto`` mode, an unavailable
+    or failing model is reported without failing the simulation.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)

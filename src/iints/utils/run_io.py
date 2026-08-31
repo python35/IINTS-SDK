@@ -15,6 +15,8 @@ from typing import Mapping, cast
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
+from iints.core.formula_registry import FORMULAS, FORMULA_REGISTRY_VERSION
+
 try:
     from importlib.metadata import version as pkg_version
 except Exception:  # pragma: no cover - stdlib fallback
@@ -72,6 +74,117 @@ def get_sdk_version(package_name: str = "iints-sdk-python35") -> str:
         return "unknown"
 
 
+def _git_provenance() -> Dict[str, Any]:
+    candidates = [Path.cwd(), Path(__file__).resolve().parents[3]]
+    for candidate in candidates:
+        try:
+            root_result = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=candidate,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if root_result.returncode != 0:
+                continue
+            repository_root = Path(root_result.stdout.strip())
+            sha_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repository_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            branch_result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                cwd=repository_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            status_result = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=repository_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return {
+                "available": sha_result.returncode == 0,
+                "sha": sha_result.stdout.strip() if sha_result.returncode == 0 else "unknown",
+                "branch": branch_result.stdout.strip() if branch_result.returncode == 0 else "unknown",
+                "dirty": bool(status_result.stdout.strip()) if status_result.returncode == 0 else None,
+                "repository_path_recorded": False,
+            }
+        except (OSError, ValueError):
+            continue
+    return {
+        "available": False,
+        "sha": "unknown",
+        "branch": "unknown",
+        "dirty": None,
+        "repository_path_recorded": False,
+    }
+
+
+def _formula_provenance() -> Dict[str, Any]:
+    evidence_counts: Dict[str, int] = {}
+    for formula in FORMULAS:
+        evidence_counts[formula.evidence_class] = evidence_counts.get(formula.evidence_class, 0) + 1
+    return {
+        "registry_version": FORMULA_REGISTRY_VERSION,
+        "formula_count": len(FORMULAS),
+        "evidence_class_counts": evidence_counts,
+        "ai_numeric_authority": False,
+    }
+
+
+def _configured_evidence_files(config: Dict[str, Any], output_dir: Path) -> list[Dict[str, Any]]:
+    records: list[Dict[str, Any]] = []
+    seen: set[Path] = set()
+
+    def visit(value: Any, key_path: tuple[str, ...]) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                visit(item, (*key_path, str(key)))
+            return
+        if isinstance(value, (list, tuple)):
+            for index, item in enumerate(value):
+                visit(item, (*key_path, str(index)))
+            return
+        if not key_path or not isinstance(value, (str, Path)):
+            return
+        evidence_key = key_path[-1].lower()
+        if not any(token in evidence_key for token in ("manifest", "checkpoint", "model_path", "calibration")):
+            return
+        candidate = Path(value).expanduser()
+        try:
+            resolved = candidate.resolve()
+        except (OSError, RuntimeError):
+            return
+        if resolved in seen or not resolved.is_file():
+            return
+        seen.add(resolved)
+        try:
+            display_path = resolved.relative_to(output_dir.resolve()).as_posix()
+            scope = "run_relative"
+        except ValueError:
+            display_path = resolved.name
+            scope = "external_path_redacted"
+        records.append(
+            {
+                "config_key": ".".join(key_path),
+                "path": display_path,
+                "path_scope": scope,
+                "sha256": compute_sha256(resolved),
+                "size_bytes": resolved.stat().st_size,
+            }
+        )
+
+    visit(config, ())
+    return records
+
+
 def build_run_metadata(run_id: str, seed: int, config: Dict[str, Any], output_dir: Path) -> Dict[str, Any]:
     dependencies = []
     try:
@@ -84,25 +197,15 @@ def build_run_metadata(run_id: str, seed: int, config: Dict[str, Any], output_di
     except Exception:
         dependencies = []
 
-    git_sha = "unknown"
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode == 0:
-            git_sha = result.stdout.strip()
-    except Exception:
-        git_sha = "unknown"
+    git = _git_provenance()
 
     return {
         "schema_version": RUN_METADATA_FORMAT_VERSION,
         "run_id": run_id,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "seed": seed,
-        "output_dir": str(output_dir),
+        "output_dir": ".",
+        "output_path_policy": "run-relative; host filesystem path intentionally omitted",
         "sdk_version": get_sdk_version(),
         "format_versions": {
             "run_metadata": RUN_METADATA_FORMAT_VERSION,
@@ -111,7 +214,16 @@ def build_run_metadata(run_id: str, seed: int, config: Dict[str, Any], output_di
         },
         "python_version": sys.version.split()[0],
         "platform": platform.platform(),
-        "git_sha": git_sha,
+        # Keep git_sha for consumers of the v1 schema and provide the richer,
+        # privacy-preserving source-control record alongside it.
+        "git_sha": git["sha"],
+        "source_control": git,
+        "formula_registry": _formula_provenance(),
+        "parameter_provenance": {
+            "patient_parameters": "resolved configuration embedded in config",
+            "scenario_parameters": "resolved configuration embedded in config",
+            "configured_evidence_files": _configured_evidence_files(config, output_dir),
+        },
         "dependencies": dependencies,
         "config": config,
     }
@@ -129,14 +241,24 @@ def build_run_manifest(output_dir: Path, files: Dict[str, Path]) -> Dict[str, An
     manifest: Dict[str, Any] = {
         "schema_version": RUN_MANIFEST_FORMAT_VERSION,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "output_dir": str(output_dir),
+        "output_dir": ".",
+        "path_policy": "paths are relative to the run root; external host paths are redacted",
         "files": {},
     }
     for label, path in files.items():
-        entry: Dict[str, Any] = {"path": str(path)}
-        if path.exists():
-            entry["sha256"] = compute_sha256(path)
-            entry["size_bytes"] = path.stat().st_size
+        resolved = path.expanduser().resolve()
+        try:
+            manifest_path = resolved.relative_to(output_dir.expanduser().resolve()).as_posix()
+            path_scope = "run_relative"
+        except ValueError:
+            manifest_path = resolved.name
+            path_scope = "external_path_redacted"
+        entry: Dict[str, Any] = {"path": manifest_path, "path_scope": path_scope}
+        if resolved.is_file():
+            entry["sha256"] = compute_sha256(resolved)
+            entry["size_bytes"] = resolved.stat().st_size
+        elif resolved.exists():
+            entry["invalid_type"] = "not_a_regular_file"
         else:
             entry["missing"] = True
         manifest["files"][label] = entry

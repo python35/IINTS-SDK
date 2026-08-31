@@ -111,13 +111,13 @@ def _estimate_basal_rate(
     carbs_grams: pd.Series,
     time_step: float,
     default_basal: float,
-) -> Tuple[float, int]:
+) -> Tuple[float, int, bool]:
     nonzero = (insulin_units > 0) & (carbs_grams <= 0)
     if nonzero.mean() < 0.5:
-        return default_basal, int(nonzero.sum())
+        return default_basal, int(nonzero.sum()), True
     median_units = float(insulin_units.loc[nonzero].median())
     basal_rate = median_units * (60.0 / time_step)
-    return basal_rate, int(nonzero.sum())
+    return basal_rate, int(nonzero.sum()), False
 
 
 def _estimate_icr(
@@ -126,10 +126,10 @@ def _estimate_icr(
     min_meal_carbs: float,
     min_bolus: float,
     default_icr: float,
-) -> Tuple[float, int]:
+) -> Tuple[float, int, bool]:
     meals = df[df["carb_grams"] >= min_meal_carbs]
     if meals.empty:
-        return default_icr, 0
+        return default_icr, 0, True
 
     ratios: List[float] = []
     for _, meal in meals.iterrows():
@@ -144,11 +144,11 @@ def _estimate_icr(
             ratios.append(float(meal["carb_grams"] / insulin_window))
 
     if not ratios:
-        return default_icr, 0
+        return default_icr, 0, True
 
     icr = float(np.median(ratios))
     icr = float(np.clip(icr, 2.0, 30.0))
-    return icr, len(ratios)
+    return icr, len(ratios), False
 
 
 def _estimate_isf(
@@ -158,7 +158,7 @@ def _estimate_isf(
     min_bolus: float,
     min_meal_carbs: float,
     default_isf: float,
-) -> Tuple[float, int]:
+) -> Tuple[float, int, bool]:
     step = max(1, int(round(isf_window_min / time_step)))
     ratios: List[float] = []
 
@@ -177,11 +177,11 @@ def _estimate_isf(
         ratios.append(delta / insulin)
 
     if not ratios:
-        return default_isf, 0
+        return default_isf, 0, True
 
     isf = float(np.median(ratios))
     isf = float(np.clip(isf, 10.0, 200.0))
-    return isf, len(ratios)
+    return isf, len(ratios), False
 
 
 def _normalize_sleep_minutes(series: pd.Series) -> pd.Series:
@@ -268,6 +268,10 @@ def main() -> None:
             df["sleep_minutes"] = 0.0
 
         df = df.sort_values("timestamp").reset_index(drop=True)
+        df["time_minutes"] = (
+            (df["timestamp"] - df["timestamp"].iloc[0]).dt.total_seconds() / 60.0
+        )
+        df["insulin_units_semantics"] = "sparse_event"
         df["delta_min"] = df["timestamp"].diff().dt.total_seconds() / 60.0
         max_gap = args.time_step * args.max_gap_multiplier
         segment_break = df["delta_min"].isna() | (df["delta_min"] <= 0) | (df["delta_min"] > max_gap)
@@ -297,17 +301,17 @@ def main() -> None:
         df["time_of_day_sin"] = np.sin(2 * np.pi * minutes / 1440.0)
         df["time_of_day_cos"] = np.cos(2 * np.pi * minutes / 1440.0)
 
-        basal_rate, basal_n = _estimate_basal_rate(
+        basal_rate, basal_n, basal_is_fallback = _estimate_basal_rate(
             df["insulin_units"], df["carb_grams"], args.time_step, args.basal_default
         )
-        icr, icr_n = _estimate_icr(
+        icr, icr_n, icr_is_fallback = _estimate_icr(
             df,
             meal_window_min=args.meal_window_min,
             min_meal_carbs=args.min_meal_carbs,
             min_bolus=args.min_bolus,
             default_icr=args.icr_default,
         )
-        isf, isf_n = _estimate_isf(
+        isf, isf_n, isf_is_fallback = _estimate_isf(
             df,
             time_step=args.time_step,
             isf_window_min=args.isf_window_min,
@@ -319,6 +323,12 @@ def main() -> None:
         df["effective_basal_rate_u_per_hr"] = basal_rate
         df["effective_icr"] = icr
         df["effective_isf"] = isf
+        # True where the per-subject estimation had too little signal and fell
+        # back to the flat CLI default (matches AZT1D/OhioT1DM's always-fallback
+        # columns) — lets downstream consumers tell real vs. filler ISF/ICR apart.
+        df["effective_basal_rate_is_fallback"] = basal_is_fallback
+        df["effective_icr_is_fallback"] = icr_is_fallback
+        df["effective_isf_is_fallback"] = isf_is_fallback
 
         subject_params[subject_id] = {
             "effective_basal_rate_u_per_hr": float(basal_rate),
@@ -374,15 +384,20 @@ def main() -> None:
     output_cols = [
         "subject_id",
         "timestamp",
+        "time_minutes",
         "glucose_actual_mgdl",
         "glucose_trend_mgdl_min",
         "insulin_units",
+        "insulin_units_semantics",
         "carb_grams",
         "patient_iob_units",
         "patient_cob_grams",
         "effective_isf",
+        "effective_isf_is_fallback",
         "effective_icr",
+        "effective_icr_is_fallback",
         "effective_basal_rate_u_per_hr",
+        "effective_basal_rate_is_fallback",
         "steps",
         "calories",
         "heart_rate",

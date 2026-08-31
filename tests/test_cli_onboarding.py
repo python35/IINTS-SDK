@@ -82,7 +82,7 @@ def test_command_map_is_navigation_only_and_uses_real_namespaces() -> None:
 
     assert result.exit_code == 0
     assert "Simulation and studies" in result.stdout
-    assert "MDMP data assurance" in result.stdout
+    assert "Data and MDMP" in result.stdout
     assert "iints version" in result.stdout
     assert "ML-DSA" not in result.stdout
 

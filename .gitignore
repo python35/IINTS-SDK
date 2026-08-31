@@ -48,6 +48,8 @@ models/
 # Private/gated diabetes datasets. Keep raw data local; never commit these.
 OhioT1DM-volledig/
 **/OhioT1DM-volledig/
+# CGMacros cohort (raw + standardized per-subject CGM data)
+data/cgmacros_cohort/
 
 # Coverage
 .coverage

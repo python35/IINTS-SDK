@@ -22,7 +22,7 @@ User documentation: [Research Workbench User Guide](../../docs/RESEARCH_WORKBENC
 From the repository root:
 
 ```bash
-python -m pip install -U -e ".[desktop-all]"
+python -m pip install -U -e ".[tauri-engine]"
 cd apps/iints-tauri
 npm install
 npm run check
@@ -76,7 +76,7 @@ the text-only `IINTS-AF` name so the application identity stays legible at every
   versioned Tauri app release and documentation; and launch a fixed maintenance terminal.
 - Run a readiness diagnostics check for Python, optional SDK modules, MDMP, Plotly/Matplotlib, and Ollama.
 - List curated desktop workflows.
-- Run a workflow through the normal Python SDK engine.
+- Run a workflow as a monitored background job with progress and safe-boundary cancellation.
 - Preview generated `results.csv` files.
 - Show persisted run history for the chosen output folder.
 - Open generated folders/reports/certificates through an allowlisted native opener.
@@ -116,18 +116,16 @@ The workbench does not present a portal link as an implemented scientific pipeli
 
 ## Security Notes
 
-- The macOS release pipeline signs the complete `.app` bundle, including its `Info.plist` and icon
-  resources. Without a configured Developer ID it uses a coherent ad-hoc signature and validates it
-  with `codesign --verify --deep --strict` from inside the generated DMG.
-- A Developer ID certificate and Apple notarization credentials are still required to eliminate the
-  normal "unidentified developer" warning for public macOS downloads.
+- Public macOS releases require a Developer ID signature and successful Apple notarization.
+- Public Windows releases require an Authenticode signature with timestamp verification.
+- Unsigned/ad-hoc builds are allowed only as explicitly labelled, non-release CI artifacts.
 - No shell plugin.
 - No arbitrary command execution from the frontend.
 - No broad filesystem plugin.
 - Native selectors use only Tauri's user-mediated open-dialog permission; they do not grant the
   frontend general filesystem read or write access.
 - The SDK maintenance terminal is a fixed Rust-owned command, not user-provided shell text. It may
-  create `~/.iints-af/python-engine` and installs only the allowlisted `iints-sdk-python35[desktop-all]`
+  create `~/.iints-af/python-engine` and installs only the allowlisted `iints-sdk-python35[tauri-engine]`
   package specification.
 - Native file opening is limited to existing folders and safe evidence/report file types.
 - Structural evidence opening is limited to bundled/report artifacts such as PNG, HTML, and mmCIF.

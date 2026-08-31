@@ -19,24 +19,23 @@ flowchart LR
 
 ## Install Or Download
 
-Packaged beta downloads use the stable `desktop-beta-latest` release tag:
+Packaged beta downloads use the maintained `tauri-beta-latest` release tag:
 
 | Platform | Direct download |
 | --- | --- |
-| Windows | [IINTS-AF-Desktop-Beta-windows-x64.exe](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-windows-x64.exe) |
-| macOS | [IINTS-AF-Desktop-Beta-macos.dmg](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-macos.dmg) |
-| Linux | [IINTS-AF-Desktop-Beta-linux-x64](https://github.com/python35/IINTS-SDK/releases/download/desktop-beta-latest/IINTS-AF-Desktop-Beta-linux-x64) |
+| Windows | [IINTS-AF Research Workbench `.exe`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-windows-x64-setup.exe) |
+| macOS | [IINTS-AF Research Workbench `.dmg`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-macos.dmg) |
+| Linux | [IINTS-AF Research Workbench `.AppImage`](https://github.com/python35/IINTS-SDK/releases/download/tauri-beta-latest/IINTS-AF-Research-Workbench-linux-x64.AppImage) |
 
 For platform-specific startup and security guidance, use [Desktop App Installation](APP_INSTALL.md).
 
-For a Python installation:
+For Tauri development, install the private-engine dependency profile:
 
 ```bash
-python -m pip install --upgrade "iints-sdk-python35[desktop-all]"
-iints-desktop
+python -m pip install --upgrade "iints-sdk-python35[tauri-engine]"
 ```
 
-The `desktop-all` extra installs PySide6, reports, MDMP, research/AI libraries, edge/serial support, libRoadRunner, and FMPy. Packaged `.exe`, `.dmg`, and Linux builds contain the supported Python-side runtime already; do not install PySide6 or these libraries into a packaged app.
+The `tauri-engine` extra installs reporting, Plotly, libRoadRunner, and FMPy support without pulling in the legacy Qt packager or model-training stack. The app can create this private engine from Settings.
 
 COPASI, OpenCOR, and Ollama are separate system applications. Their connectors, validation boundaries, and readiness checks ship with the app, but their binaries and model files are not silently downloaded. This keeps licences, native-code trust, model size, and reproducibility decisions visible to the researcher.
 
@@ -53,7 +52,7 @@ COPASI, OpenCOR, and Ollama are separate system applications. Their connectors, 
 | Biology/Research | view structures and run independent SBML, COPASI, CellML, FMI, and BindingDB workflows | explanatory, mechanistic, device-physics, and assay-evidence artifacts |
 | Methods/Updates | inspect versions, diagnostics, logs, and update routes | transparent maintenance output |
 
-The exact tab names can differ between the current Qt beta and the newer Tauri prototype. Both must call SDK functions or the fixed bridge rather than reimplementing formulas in the interface.
+The maintained Tauri workbench calls SDK functions through the fixed bridge and never reimplements physiological formulas in the interface.
 
 ## Run A Workflow
 
@@ -61,8 +60,9 @@ The exact tab names can differ between the current Qt beta and the newer Tauri p
 2. Select a protocol and read its patient, scenario, duration, and expected output.
 3. Set or record the seed.
 4. Start the run and keep the execution log.
-5. Open the Results area only after the run reports completion or a recorded failure.
-6. Inspect the CSV, metadata, report, and safety events together.
+5. Follow the live progress indicator; **Cancel run** requests shutdown at a deterministic simulation boundary.
+6. Open the Results area only after the run reports completion or a recorded failure.
+7. Inspect the CSV, metadata, report, and safety events together.
 
 Curated protocols include baseline, meal stress, delayed absorption, clinical discussion, jury, and public-demo routes. They are starting points, not claims that every virtual trajectory is clinically representative.
 
@@ -161,10 +161,9 @@ Read [Update The SDK](UPDATING.md).
 
 | Implementation | Status | Role |
 | --- | --- | --- |
-| PySide6/Qt | current rich Python workbench | main results, AI, and research UI |
-| Cocoa | compact macOS packaging fallback | reliable native beta shell |
-| Tauri + Rust | next-generation prototype | smaller audited native boundary around the Python SDK |
-| Tkinter | compatibility fallback | minimal launcher when Qt is unavailable |
+| Tauri + Rust | maintained desktop workbench | audited native boundary around the Python SDK |
+| PySide6/Qt | legacy source compatibility | historical interface; no separate public beta |
+| Cocoa/Tkinter | legacy fallback source | troubleshooting and historical compatibility only |
 
 For implementation and security details, see [Tauri Desktop Shell](TAURI_DESKTOP.md), [Desktop Signing](DESKTOP_SIGNING.md), and [Developer Portal](DEVELOPER_PORTAL.md).
 

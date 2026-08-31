@@ -262,8 +262,12 @@ def run_simulation(
         for manifest_key, output_key in {
             "realism_report": "realism_report_json",
             "realism_dashboard": "realism_dashboard_html",
+            "run_quality_review": "run_quality_review_md",
+            "run_quality_summary": "run_quality_summary_json",
             "safety_visualizer": "safety_visualizer_html",
             "safety_visualizer_json": "safety_visualizer_json",
+            "local_ai_review": "local_ai_review_md",
+            "local_ai_review_metadata": "local_ai_review_json",
         }.items():
             output_value = quality_outputs.get(output_key)
             if output_value:
@@ -438,8 +442,12 @@ def run_full(
         for manifest_key, output_key in {
             "realism_report": "realism_report_json",
             "realism_dashboard": "realism_dashboard_html",
+            "run_quality_review": "run_quality_review_md",
+            "run_quality_summary": "run_quality_summary_json",
             "safety_visualizer": "safety_visualizer_html",
             "safety_visualizer_json": "safety_visualizer_json",
+            "local_ai_review": "local_ai_review_md",
+            "local_ai_review_metadata": "local_ai_review_json",
         }.items():
             output_value = quality_outputs.get(output_key)
             if output_value:

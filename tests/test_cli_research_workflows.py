@@ -310,6 +310,33 @@ def test_run_quality_artifacts_write_realism_and_safety_outputs(tmp_path) -> Non
     assert "Max glucose rate" in review_text
 
 
+def test_run_quality_artifacts_do_not_contact_ollama_by_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("IINTS_LOCAL_AI_REVIEW", raising=False)
+
+    class UnexpectedOllamaBackend:
+        def __init__(self, **_: object) -> None:
+            raise AssertionError("Ollama must be opt-in for deterministic runs")
+
+    monkeypatch.setattr("iints.analysis.run_quality.OllamaBackend", UnexpectedOllamaBackend)
+    frame = pd.DataFrame(
+        {
+            "time_minutes": [0, 5, 10],
+            "glucose_actual_mgdl": [110.0, 112.0, 115.0],
+            "carb_intake_grams": [0.0, 0.0, 0.0],
+            "delivered_insulin_units": [0.0, 0.0, 0.0],
+        }
+    )
+
+    outputs = write_run_quality_artifacts(frame, tmp_path, safety_report={})
+
+    assert outputs["local_ai_review_status"] == "skipped"
+    metadata = json.loads(Path(outputs["local_ai_review_json"]).read_text())
+    assert "opt-in" in metadata["reason"]
+
+
 def test_run_quality_artifacts_can_write_local_ai_verification(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -575,6 +602,84 @@ def test_research_glucose_model_commands_are_available() -> None:
     assert "compare" in result.stdout
     assert "export-hf" in result.stdout
     assert "jetson-train-hf" in result.stdout
+
+
+def test_research_regenerative_commands_are_available() -> None:
+    result = runner.invoke(app, ["research", "regenerative", "--help"])
+
+    assert result.exit_code == 0
+    assert "panels" in result.stdout
+    assert "compare" in result.stdout
+
+
+def test_research_regenerative_panels_writes_evidence_plan(tmp_path) -> None:
+    output_json = tmp_path / "panels.json"
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "regenerative",
+            "panels",
+            "--panel",
+            "beta_cell_identity_and_function",
+            "--output-json",
+            str(output_json),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert output_json.is_file()
+    payload = json.loads(output_json.read_text(encoding="utf-8"))
+    assert payload["plans"][0]["scientific_boundaries"][
+        "automatic_physiology_mapping_allowed"
+    ] is False
+
+
+def test_research_regenerative_compare_writes_review_bundle(tmp_path) -> None:
+    dataset = tmp_path / "proteomics.csv"
+    output_dir = tmp_path / "comparison"
+    rows = []
+    for group, multiplier in (("sc_islet", 1.2), ("primary_islet", 1.0)):
+        for replicate in range(3):
+            rows.append(
+                {
+                    "gene_symbol": "INS",
+                    "group": group,
+                    "sample_id": f"{group}-{replicate}",
+                    "value": 100.0 * multiplier + replicate,
+                    "unit": "normalized_intensity",
+                    "scale": "linear",
+                    "source_id": "study-1",
+                    "batch_id": f"batch-{replicate}",
+                }
+            )
+    pd.DataFrame(rows).to_csv(dataset, index=False)
+
+    result = runner.invoke(
+        app,
+        [
+            "research",
+            "regenerative",
+            "compare",
+            "--dataset",
+            str(dataset),
+            "--panel",
+            "beta_cell_identity_and_function",
+            "--normalization-note",
+            "Joint normalization within study-1.",
+            "--bootstrap-samples",
+            "20",
+            "--output-dir",
+            str(output_dir),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert (output_dir / "protein_comparison.csv").is_file()
+    report = json.loads((output_dir / "comparison_report.json").read_text())
+    assert report["status"] == "review_required"
+    assert report["observed_target_count"] == 1
+    assert report["automatic_physiology_mapping_performed"] is False
 
 
 def test_research_glucose_model_init_writes_config(tmp_path) -> None:

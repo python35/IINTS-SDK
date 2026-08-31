@@ -95,6 +95,21 @@ If you only remember four ideas from this manual, make them these:
 
 ## Getting Started
 
+### System Requirements
+
+The supported Python range is **3.10 through 3.14** on 64-bit Windows, macOS, and Linux. Ordinary simulation does not require a GPU.
+
+| Workload | Practical minimum | Recommended | Storage reserve |
+|---|---|---|---|
+| CLI, small simulations, validation | 2 CPU cores, 4 GB RAM | 4 CPU cores, 8 GB RAM | 2-5 GB |
+| Reports and desktop workbench | 4 CPU cores, 8 GB RAM | 4-8 CPU cores, 16 GB RAM | 5-10 GB |
+| Local Ollama explanation | 4 CPU cores, 8 GB RAM | 8 CPU cores or supported GPU, 16 GB RAM | 10-30 GB |
+| AI training and large studies | 8 CPU cores, 16 GB RAM | 8+ CPU cores, 32 GB RAM, optional GPU | 25-100+ GB |
+
+These are planning values, not clinical or benchmark-certified thresholds. Private datasets, model weights, checkpoints, and accumulated result bundles require additional storage. The current Linux desktop beta is x86_64-only.
+
+For the maintained compatibility matrix, external-tool boundaries, and machine checks, read the public **System Requirements** page.
+
 ### Installation Guide
 
 Choose the smallest path that matches what you want to do.
@@ -142,6 +157,19 @@ python -m pip install -U -e ".[full,mdmp]"
 ```
 
 Use the development install when you are modifying the SDK itself or running the full test/documentation toolchain.
+
+#### Option 4: Omarchy Linux
+
+Omarchy users should keep the system managed through Omarchy and install the SDK into its own Mise-backed environment:
+
+```bash
+omarchy update
+curl -fsSLO https://raw.githubusercontent.com/python35/IINTS-SDK/main/tools/install/install_omarchy.sh
+less install_omarchy.sh
+bash install_omarchy.sh --profile desktop
+```
+
+This installs the private Python engine, verified x64 AppImage, launcher, icon, and application-menu entry. Use `--dry-run` first to inspect every action, or `--profile standard` for a CLI-only installation. The script never runs `pacman` or `yay` directly.
 
 #### Optional: Add Ollama For Local AI
 
