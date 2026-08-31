@@ -55,5 +55,5 @@ def test_generate_all_scientific_visualizations(tmp_path: Path):
     assert artifacts.interactive_dashboard_html.exists()
 
     content = artifacts.interactive_dashboard_html.read_text(encoding="utf-8")
-    assert "IINTS-AF Scientific Research Visualizer" in content
+    assert "IINTS-AF" in content and "Scientific Visualization Suite" in content
     assert "data:image/png;base64," in content

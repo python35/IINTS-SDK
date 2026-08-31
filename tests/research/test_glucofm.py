@@ -27,7 +27,7 @@ def test_glucofm_signal_decomposition():
 
 
 def test_glucofm_forward_pass_and_embedding_dimension():
-    config = GlucoFMConfig(d_model=64, fused_dim=128, n_layers=2, n_heads=4)
+    config = GlucoFMConfig(stream_dimension=64, fused_dimension=128, encoder_layers=2, attention_heads=4)
     encoder = GlucoFMDualStreamEncoder(config)
 
     cgm_input = torch.randn(3, 288) * 30.0 + 120.0
@@ -58,9 +58,14 @@ def test_glucofm_downstream_probes():
 
 
 def test_embed_cgm_with_glucofm():
+    # Architecture smoke test only (see embed_cgm_with_glucofm's docstring):
+    # untrained weights cannot produce research-grade embeddings, so this
+    # must go through the explicit encoder + allow_untrained=True path
+    # rather than the checkpoint-required default.
     raw_series = [100.0 + 10.0 * np.sin(i / 10.0) for i in range(288)]
-    embedding = embed_cgm_with_glucofm(raw_series)
+    encoder = GlucoFMDualStreamEncoder()
+    embedding = embed_cgm_with_glucofm(raw_series, encoder=encoder, allow_untrained=True)
 
     assert isinstance(embedding, np.ndarray)
-    assert embedding.shape == (256,)
+    assert embedding.shape == (encoder.config.fused_dimension,)
     assert not np.isnan(embedding).any()
