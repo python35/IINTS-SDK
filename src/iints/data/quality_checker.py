@@ -342,8 +342,13 @@ class DataQualityChecker:
                     actual_rate = rate_of_change.loc[idx] # type: ignore
                     
                     direction = "rise" if change > 0 else "drop"
-                    description = (f"Impossible glucose {direction} of {actual_rate:.1f} mg/dL/min "
-                                   f"(changed by {change:.1f} in {time_delta:.1f} min)")
+                    # "Implausible", not "impossible": the ceiling is set above the
+                    # 99.9th percentile of real 5-minute steps in the prepared
+                    # cohorts, so a flagged row is unusual and worth review, not
+                    # proof that the measurement cannot have happened.
+                    description = (f"Implausible glucose {direction} of {actual_rate:.1f} mg/dL/min "
+                                   f"(changed by {change:.1f} in {time_delta:.1f} min, "
+                                   f"ceiling {max_rate:.1f} mg/dL/min)")
 
                     anomalies.append(DataAnomaly(
                         index=int(idx), # type: ignore

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 import numpy as np
 import torch
@@ -12,7 +12,7 @@ import torch.nn.functional as F
 
 @dataclass(frozen=True)
 class CGMJEPAConfig:
-    """Architecture configuration matching the official CGM-JEPA (arXiv:2605.00933)."""
+    """Independent architecture reproduction based on arXiv:2605.00933."""
 
     seq_length: int = 288  # 24 hours at 5-minute sampling
     patch_size: int = 12   # 1 hour per patch (12 timesteps)
@@ -74,13 +74,15 @@ class TransformerBlock(nn.Module):
 
 class CGMJEPAEncoder(nn.Module):
     """
-    Official CGM-JEPA Context Encoder Architecture.
+    IINTS implementation of the published CGM-JEPA context architecture.
     Processes 288-point 24h CGM windows and produces 96-dimensional latent representations.
     """
 
     def __init__(self, config: CGMJEPAConfig | None = None):
         super().__init__()
         self.config = config or CGMJEPAConfig()
+        self.checkpoint_loaded = False
+        self.checkpoint_path: Path | None = None
         self.patch_embed = PatchEmbed1D(
             patch_size=self.config.patch_size,
             in_chans=1,
@@ -141,22 +143,64 @@ class CGMJEPAEncoder(nn.Module):
 def load_cgm_jepa_model(
     checkpoint_path: Path | str | None = None,
     device: str = "cpu",
+    *,
+    allow_untrained: bool = False,
 ) -> CGMJEPAEncoder:
     """
-    Instantiate and load pre-trained weights for the CGM-JEPA Context Encoder.
-    If checkpoint is None, initializes calibrated self-supervised weights.
+    Load explicit CGM-JEPA weights.
+
+    Random initialization is available only for architecture smoke tests via
+    ``allow_untrained=True``. It is never a calibrated or pretrained model.
     """
     model = CGMJEPAEncoder(CGMJEPAConfig())
-    if checkpoint_path is not None:
-        p = Path(checkpoint_path).expanduser().resolve()
-        if p.is_file():
-            state_dict = torch.load(p, map_location=device)
-            # Handle possible 'encoder.' or 'context_encoder.' prefixes
-            clean_dict = {}
-            for k, v in state_dict.items():
-                clean_k = k.replace("context_encoder.", "").replace("encoder.", "").replace("module.", "")
-                clean_dict[clean_k] = v
-            model.load_state_dict(clean_dict, strict=False)
+    if checkpoint_path is None:
+        if not allow_untrained:
+            raise ValueError(
+                "A trained CGM-JEPA checkpoint is required for research embeddings. "
+                "Random weights are permitted only in explicit software smoke tests."
+            )
+        model.to(device)
+        model.eval()
+        return model
+
+    p = Path(checkpoint_path).expanduser().resolve()
+    if not p.is_file():
+        raise FileNotFoundError(f"CGM-JEPA checkpoint not found: {p}")
+    try:
+        payload = torch.load(p, map_location=device, weights_only=True)
+    except TypeError as exc:
+        raise RuntimeError(
+            "Secure CGM-JEPA loading requires torch.load(weights_only=True); upgrade PyTorch."
+        ) from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("CGM-JEPA checkpoint must contain a tensor state mapping")
+    raw_state = payload.get("state_dict", payload)
+    if not isinstance(raw_state, Mapping):
+        raise ValueError("CGM-JEPA checkpoint is missing state_dict")
+    clean_dict: dict[str, torch.Tensor] = {}
+    model_keys = set(model.state_dict())
+    for raw_key, value in raw_state.items():
+        if not isinstance(raw_key, str) or not isinstance(value, torch.Tensor):
+            continue
+        clean_key = raw_key
+        prefixes = ("context_encoder.", "encoder.", "module.")
+        while any(clean_key.startswith(prefix) for prefix in prefixes):
+            for prefix in prefixes:
+                if clean_key.startswith(prefix):
+                    clean_key = clean_key[len(prefix):]
+                    break
+        if clean_key in model_keys:
+            clean_dict[clean_key] = value
+    if not clean_dict:
+        raise ValueError("CGM-JEPA checkpoint contains no compatible encoder tensors")
+    incompatible = model.load_state_dict(clean_dict, strict=False)
+    if incompatible.missing_keys:
+        raise ValueError(
+            "CGM-JEPA checkpoint is incomplete; missing encoder tensors: "
+            + ", ".join(incompatible.missing_keys[:8])
+        )
+    model.checkpoint_loaded = True
+    model.checkpoint_path = p
     model.to(device)
     model.eval()
     return model
@@ -166,6 +210,9 @@ def extract_cgm_jepa_embeddings(
     glucose_traces: np.ndarray | Sequence[Sequence[float]],
     model: CGMJEPAEncoder | None = None,
     device: str = "cpu",
+    *,
+    checkpoint_path: Path | str | None = None,
+    allow_untrained: bool = False,
 ) -> np.ndarray:
     """
     Extract 96-dimensional latent embeddings from one or more 288-point CGM windows.
@@ -173,7 +220,13 @@ def extract_cgm_jepa_embeddings(
     Returns: numpy array of shape (96,) or (N, 96).
     """
     if model is None:
-        model = load_cgm_jepa_model(device=device)
+        model = load_cgm_jepa_model(
+            checkpoint_path, device=device, allow_untrained=allow_untrained
+        )
+    elif not model.checkpoint_loaded and not allow_untrained:
+        raise ValueError(
+            "Untrained CGM-JEPA weights cannot produce research embeddings"
+        )
 
     arr = np.asarray(glucose_traces, dtype=np.float32)
     single_window = arr.ndim == 1

@@ -266,6 +266,7 @@ def _build_split_sequences(
             feature_columns=predictor_cfg.feature_columns,
             target_column=predictor_cfg.target_column,
             segment_column=segment_column,
+            predict_delta=predictor_cfg.predict_delta,
         )
         X_val, y_val = build_sequences(
             val_df,
@@ -274,6 +275,7 @@ def _build_split_sequences(
             feature_columns=predictor_cfg.feature_columns,
             target_column=predictor_cfg.target_column,
             segment_column=segment_column,
+            predict_delta=predictor_cfg.predict_delta,
         )
         X_test, y_test = build_sequences(
             test_df,
@@ -282,6 +284,7 @@ def _build_split_sequences(
             feature_columns=predictor_cfg.feature_columns,
             target_column=predictor_cfg.target_column,
             segment_column=segment_column,
+            predict_delta=predictor_cfg.predict_delta,
         )
     except ValueError as exc:
         if "Not enough rows" not in str(exc):
@@ -330,8 +333,38 @@ def _update_registry(registry_path: Path, entry: dict) -> None:
 # Evaluation helper
 # ---------------------------------------------------------------------------
 
+def _resolve_anchor_index(predictor_cfg: PredictorConfig) -> Optional[int]:
+    """Where the loss finds the glucose level a delta target refers to.
+
+    Returns ``None`` for absolute targets, which leaves every loss on its
+    historical path. For delta targets it returns the position of the glucose
+    column in the feature window, so a level-threshold loss can reconstruct
+    ``G_t + delta`` instead of comparing a change against 70 mg/dL.
+    """
+    if not predictor_cfg.predict_delta:
+        return None
+    if predictor_cfg.target_column not in predictor_cfg.feature_columns:
+        raise ValueError(
+            f"predict_delta requires the target column "
+            f"'{predictor_cfg.target_column}' to be among the feature columns, "
+            "because the delta is measured against the last observed value in the "
+            "input window. Without it a level-threshold loss cannot know what "
+            "glucose level a predicted change refers to."
+        )
+    return predictor_cfg.feature_columns.index(predictor_cfg.target_column)
+
+
 def _loss_needs_inputs(criterion: nn.Module) -> bool:
-    return isinstance(criterion, (PhysiologicalPINNLoss, BandWeightedPINNLoss))
+    """Whether this loss must be handed the unscaled input window.
+
+    The physiology losses always need it. The band/safety weighted losses need it
+    only when they are anchoring delta targets back to glucose levels -- without
+    the window their thresholds would be applied to a change in mg/dL, which
+    silently turns the weighting into a constant.
+    """
+    if isinstance(criterion, (PhysiologicalPINNLoss, BandWeightedPINNLoss)):
+        return True
+    return getattr(criterion, "anchor_index", None) is not None
 
 
 def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) -> float:
@@ -340,7 +373,18 @@ def _evaluate(model: LSTMPredictor, loader: DataLoader, criterion: nn.Module) ->
     with torch.no_grad():
         for batch in loader:
             batch_x, batch_y = batch[0], batch[1]
-            physiology_x = batch[2] if len(batch) > 2 else batch_x
+            if len(batch) > 2:
+                physiology_x = batch[2]
+            elif _loss_needs_inputs(criterion):
+                # batch_x is scaled; thresholds and rate limits are in mg/dL, so
+                # falling back to it would apply physical limits to normalized
+                # numbers without failing.
+                raise ValueError(
+                    f"{type(criterion).__name__} needs the unscaled input window, "
+                    "but this loader yields no third tensor."
+                )
+            else:
+                physiology_x = batch_x
             preds = model(batch_x)
             if _loss_needs_inputs(criterion):
                 loss = criterion(preds, batch_y, physiology_x)
@@ -554,6 +598,23 @@ def main() -> None:
     )
 
     # P3-12: Choose loss function
+    #
+    # Level-threshold losses (safety_weighted, band_weighted, band_pinn) judge a
+    # sample by where it sits on the glucose scale. When the model is trained on
+    # deltas those thresholds no longer apply to the target, so the loss is given
+    # the index of the glucose column and reconstructs the level from the input
+    # window. This is wired here rather than left to the config, because a
+    # forgotten flag does not fail: it silently flattens the weighting to a
+    # constant and the run still reports the loss name it was asked for.
+    anchor_index = _resolve_anchor_index(predictor_cfg)
+    if anchor_index is not None:
+        # Printed because it changes what the thresholds above mean, and a reader
+        # comparing two runs cannot tell from the loss name alone.
+        print(
+            f"Targets are deltas; level thresholds are anchored on "
+            f"'{predictor_cfg.target_column}' (feature index {anchor_index})"
+        )
+
     if training_cfg.loss == "quantile":
         q = training_cfg.quantile
         if q is None:
@@ -565,6 +626,7 @@ def main() -> None:
             low_threshold=training_cfg.safety_weighted_low_threshold,
             alpha=training_cfg.safety_weighted_alpha,
             max_weight=training_cfg.safety_weighted_max_weight,
+            anchor_index=anchor_index,
         ))
         print(
             "Loss: safety_weighted "
@@ -579,6 +641,7 @@ def main() -> None:
             low_weight=training_cfg.band_weighted_low_weight,
             high_weight=training_cfg.band_weighted_high_weight,
             max_weight=training_cfg.band_weighted_max_weight,
+            anchor_index=anchor_index,
         ))
         print(
             "Loss: band_weighted "
@@ -594,6 +657,7 @@ def main() -> None:
             pinn_lambda=training_cfg.pinn_lambda,
             pinn_max_roc=training_cfg.pinn_max_roc,
             time_step_minutes=predictor_cfg.time_step_minutes,
+            predict_delta=predictor_cfg.predict_delta,
         ))
         print(
             "Loss: pinn "
@@ -611,6 +675,7 @@ def main() -> None:
             low_weight=training_cfg.band_weighted_low_weight,
             high_weight=training_cfg.band_weighted_high_weight,
             max_weight=training_cfg.band_weighted_max_weight,
+            anchor_index=anchor_index,
         ))
         print(
             "Loss: band_pinn "
@@ -720,16 +785,31 @@ def main() -> None:
     test_preds = np.concatenate(test_pred_batches, axis=0)
     test_targets = np.concatenate(test_target_batches, axis=0)
     test_summary = regression_metrics(test_targets, test_preds)
-    test_band_metrics = band_regression_metrics(test_targets, test_preds)
     test_mse = float(np.mean((test_preds - test_targets) ** 2))
     test_mae = test_summary["mae"]
+
+    # MAE, RMSE and bias are functions of (pred - target) alone, so a shared
+    # anchor cancels and they read in mg/dL either way. The band metrics and the
+    # baselines do not: they ask which glucose *band* a sample falls in, and which
+    # level a naive rule would have predicted. On delta targets those questions
+    # are only answerable after reconstructing the trajectory -- otherwise a +5
+    # mg/dL change is filed as severe hypoglycemia, and the naive baselines are
+    # scored against a quantity they never tried to predict.
+    if anchor_index is not None:
+        anchor = X_test_raw[:, -1, anchor_index][:, None]
+        level_targets = test_targets + anchor
+        level_preds = test_preds + anchor
+    else:
+        level_targets, level_preds = test_targets, test_preds
+
+    test_band_metrics = band_regression_metrics(level_targets, level_preds)
 
     # -----------------------------------------------------------------------
     # P3-11: Baseline comparison on test set
     # -----------------------------------------------------------------------
     baselines = evaluate_baselines(
         X_test_raw,
-        y_test,
+        level_targets,
         horizon_steps=predictor_cfg.horizon_steps,
         time_step_minutes=predictor_cfg.time_step_minutes,
         feature_columns=predictor_cfg.feature_columns,
@@ -756,6 +836,7 @@ def main() -> None:
             "time_step_minutes": predictor_cfg.time_step_minutes,
             "feature_columns": predictor_cfg.feature_columns,
             "target_column": predictor_cfg.target_column,
+            "predict_delta": predictor_cfg.predict_delta,
             "scaler": scaler.to_dict(),   # P3-10: embed scaler for inference
             "dataset_schema_id": dataset_lineage["schema_id"],
             "uncertainty_seed": training_cfg.seed,

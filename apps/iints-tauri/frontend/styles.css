@@ -1440,6 +1440,146 @@ textarea[aria-invalid="true"] {
   font-size: 13px;
 }
 
+#compartment-diagram {
+  width: 100%;
+  min-height: 420px;
+  margin-top: 11px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  shape-rendering: geometricPrecision;
+}
+
+#compartment-diagram line,
+#compartment-diagram rect {
+  animation: none;
+  transition: none;
+  vector-effect: non-scaling-stroke;
+}
+
+#compartment-diagram text {
+  fill: #60717b;
+  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+}
+
+.compartment-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 11px;
+}
+
+.compartment-controls .field-control {
+  flex: 1 1 260px;
+}
+
+.compartment-controls output {
+  min-width: 72px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted, #60717b);
+}
+
+#compartment-caption {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.digital-twin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin: 11px 0;
+}
+
+.digital-twin-controls .field-control {
+  flex: 1 1 220px;
+}
+
+.digital-twin-controls output {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted, #60717b);
+}
+
+.digital-twin-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+
+#digital-twin-canvas {
+  width: 100%;
+  height: clamp(340px, 48vw, 560px);
+  display: block;
+  background: #0f172a;
+  border: 1px solid var(--line);
+  cursor: grab;
+  touch-action: none;
+}
+
+#digital-twin-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+/* The card overlays the dark canvas, so it deliberately breaks from the rest
+   of the app's white-surface panel look -- this is the one place in the app
+   that needs a translucent, blurred surface to stay legible over a 3D scene. */
+.digital-twin-card {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  max-width: min(300px, 80%);
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.digital-twin-card h4 {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: #ffffff;
+}
+
+.digital-twin-card code {
+  display: block;
+  margin: 6px 0;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: #7dd3fc;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Always-present click targets for flux streams (fluxes aren't raycast --
+   see digital-twin-scene.js). Positioned in JS via style.left/top, which is
+   why this isn't in the global animation-ban's path: it's a per-frame
+   position write, not a CSS transition. */
+.digital-twin-chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 10.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.digital-twin-chip:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
 .table-wrap {
   max-width: 100%;
   min-height: 55px;

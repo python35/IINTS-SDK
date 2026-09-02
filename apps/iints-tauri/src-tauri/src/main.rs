@@ -968,6 +968,22 @@ async fn preview_results(csv: String, max_rows: Option<i64>) -> Result<Value, St
 }
 
 #[tauri::command]
+async fn compartment_timeline(csv: String, max_points: Option<i64>) -> Result<Value, String> {
+    if csv.trim().is_empty() {
+        return Err("csv path is required".to_string());
+    }
+    let bounded_points = max_points.unwrap_or(400).clamp(2, 2000);
+    run_python_bridge_async(vec![
+        "compartments".to_string(),
+        "--csv".to_string(),
+        csv,
+        "--max-points".to_string(),
+        bounded_points.to_string(),
+    ])
+    .await
+}
+
+#[tauri::command]
 async fn run_history(output_dir: String, limit: Option<i64>) -> Result<Value, String> {
     if output_dir.trim().is_empty() {
         return Err("output_dir is required".to_string());
@@ -1143,7 +1159,7 @@ async fn ask_local_ai(
 }
 
 #[tauri::command]
-async fn run_foundation_arena(output_dir: String, n_trials: Option<i64>) -> Result<Value, String> {
+async fn run_foundation_arena(output_dir: String, result_files: Vec<String>) -> Result<Value, String> {
     if output_dir.trim().is_empty() {
         return Err("output_dir is required".to_string());
     }
@@ -1152,20 +1168,85 @@ async fn run_foundation_arena(output_dir: String, n_trials: Option<i64>) -> Resu
         "--output-dir".to_string(),
         output_dir,
     ];
-    if let Some(trials) = n_trials {
-        args.push("--n-trials".to_string());
-        args.push(trials.to_string());
+    if result_files.is_empty() {
+        return Err("Select at least one measured foundation evaluation JSON".to_string());
+    }
+    for result_file in result_files {
+        if result_file.trim().is_empty() {
+            continue;
+        }
+        args.push("--result".to_string());
+        args.push(result_file);
     }
     run_python_bridge_async(args).await
 }
 
 #[tauri::command]
-async fn extract_glucofm_embedding(csv: Option<String>) -> Result<Value, String> {
-    let mut args = vec!["glucofm-embed".to_string()];
-    if let Some(path) = csv {
-        if !path.trim().is_empty() {
-            args.push("--csv".to_string());
-            args.push(path);
+async fn extract_glucofm_embedding(
+    csv: String,
+    checkpoint: String,
+    glucose_column: Option<String>,
+    timestamp_column: Option<String>,
+) -> Result<Value, String> {
+    if csv.trim().is_empty() || checkpoint.trim().is_empty() {
+        return Err("A CGM CSV and trained GlucoFM checkpoint are required".to_string());
+    }
+    let mut args = vec![
+        "glucofm-embed".to_string(),
+        "--csv".to_string(),
+        csv,
+        "--checkpoint".to_string(),
+        checkpoint,
+    ];
+    if let Some(column) = glucose_column.filter(|value| !value.trim().is_empty()) {
+        args.push("--glucose-column".to_string());
+        args.push(column);
+    }
+    if let Some(column) = timestamp_column.filter(|value| !value.trim().is_empty()) {
+        args.push("--timestamp-column".to_string());
+        args.push(column);
+    }
+    run_python_bridge_async(args).await
+}
+
+#[tauri::command]
+async fn pretrain_glucofm(
+    source: String,
+    output_dir: String,
+    glucose_column: Option<String>,
+    timestamp_column: Option<String>,
+    subject_column: Option<String>,
+    epochs: Option<i64>,
+    batch_size: Option<i64>,
+    device: Option<String>,
+    seed: Option<i64>,
+) -> Result<Value, String> {
+    if source.trim().is_empty() || output_dir.trim().is_empty() {
+        return Err("A CGM dataset and output directory are required".to_string());
+    }
+    let mut args = vec![
+        "glucofm-pretrain".to_string(),
+        "--source".to_string(),
+        source,
+        "--output-dir".to_string(),
+        output_dir,
+        "--epochs".to_string(),
+        epochs.unwrap_or(120).max(1).to_string(),
+        "--batch-size".to_string(),
+        batch_size.unwrap_or(128).max(1).to_string(),
+        "--device".to_string(),
+        device.unwrap_or_else(|| "auto".to_string()),
+        "--seed".to_string(),
+        seed.unwrap_or(42).to_string(),
+    ];
+    for (flag, value) in [
+        ("--glucose-column", glucose_column),
+        ("--timestamp-column", timestamp_column),
+        ("--subject-column", subject_column),
+    ] {
+        if let Some(column) = value.filter(|candidate| !candidate.trim().is_empty()) {
+            args.push(flag.to_string());
+            args.push(column);
         }
     }
     run_python_bridge_async(args).await
@@ -1789,6 +1870,7 @@ fn main() {
             workflow_job_status,
             cancel_workflow_job,
             preview_results,
+            compartment_timeline,
             run_history,
             certify_mdmp,
             export_academic_bundle,
@@ -1802,6 +1884,7 @@ fn main() {
             open_sdk_update_terminal,
             run_foundation_arena,
             extract_glucofm_embedding,
+            pretrain_glucofm,
             load_cgmacros_cohort,
             run_fda_safety_benchmark,
             generate_scientific_visualizations,

@@ -28,6 +28,9 @@ class SimulationJEPAEmbeddingResult:
     embedding_dim: int
     embedding_vector: tuple[float, ...]  # 96 dimensions
     patch_count: int
+    checkpoint_path: str | None
+    checkpoint_sha256: str | None
+    trained_checkpoint: bool
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -64,11 +67,13 @@ def prepare_cgm_jepa_window(
                 col_t = c
                 break
 
-    raw_glucose = pd.to_numeric(df[col_g], errors="coerce").values
+    raw_glucose = np.asarray(
+        pd.to_numeric(df[col_g], errors="coerce"), dtype=float
+    )
     if col_t and col_t in df.columns:
-        raw_t = pd.to_numeric(df[col_t], errors="coerce").values
+        raw_t = np.asarray(pd.to_numeric(df[col_t], errors="coerce"), dtype=float)
     else:
-        raw_t = np.arange(len(raw_glucose)) * step_minutes
+        raw_t = np.arange(len(raw_glucose), dtype=float) * step_minutes
 
     valid = np.isfinite(raw_glucose) & np.isfinite(raw_t)
     if not np.any(valid):
@@ -89,6 +94,8 @@ def bridge_simulation_to_jepa(
     output_dir: Path | str | None = None,
     model: CGMJEPAEncoder | None = None,
     device: str = "cpu",
+    checkpoint_path: Path | str | None = None,
+    allow_untrained: bool = False,
 ) -> SimulationJEPAEmbeddingResult:
     """
     Bridge an IINTS-AF simulation result into a 96-dimensional CGM-JEPA representation.
@@ -115,8 +122,19 @@ def bridge_simulation_to_jepa(
         else:
             raise FileNotFoundError(f"simulation input path not found: {p}")
 
+    if model is None:
+        model = load_cgm_jepa_model(
+            checkpoint_path,
+            device=device,
+            allow_untrained=allow_untrained,
+        )
     window_288 = prepare_cgm_jepa_window(df)
-    emb = extract_cgm_jepa_embeddings(window_288, model=model, device=device)
+    emb = extract_cgm_jepa_embeddings(
+        window_288,
+        model=model,
+        device=device,
+        allow_untrained=allow_untrained,
+    )
 
     # Compute descriptive summary metrics
     g_mean = float(np.mean(window_288))
@@ -132,6 +150,13 @@ def bridge_simulation_to_jepa(
         embedding_dim=len(emb),
         embedding_vector=tuple(float(v) for v in emb),
         patch_count=24,
+        checkpoint_path=str(model.checkpoint_path) if model.checkpoint_path else None,
+        checkpoint_sha256=(
+            hashlib.sha256(model.checkpoint_path.read_bytes()).hexdigest()
+            if model.checkpoint_path
+            else None
+        ),
+        trained_checkpoint=model.checkpoint_loaded,
     )
 
     if output_dir is not None:

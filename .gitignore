@@ -63,6 +63,10 @@ local/
 scratch/
 .agents/
 .DS_Store
+# macOS AppleDouble sidecar files (created on non-HFS+ volumes like exFAT)
+._*
+# Atomic-write temp files left behind by interrupted saves
+*.operon-tmp-*
 .mplt_demo/
 .mplt_test/
 .mplt_patient/

@@ -14,7 +14,7 @@ from iints.research.dual_stream import (
 )
 from iints.research.ppgr import (
     CarbOnlyLinearPPGR,
-    DualStreamGlucoFMPPGR,
+    ContextFeatureRidgePPGR,
     MultiMacroLinearPPGR,
     compute_trajectory_metrics,
     run_ppgr_benchmark,
@@ -77,14 +77,14 @@ def test_ppgr_models_and_metrics():
     pred_macro = m_macro.predict(X)
     metrics_macro = compute_trajectory_metrics(y, pred_macro)
 
-    m_gluco = DualStreamGlucoFMPPGR()
-    m_gluco.fit(X, y)
-    pred_gluco = m_gluco.predict(X)
-    metrics_gluco = compute_trajectory_metrics(y, pred_gluco)
+    m_context = ContextFeatureRidgePPGR()
+    m_context.fit(X, y)
+    pred_context = m_context.predict(X)
+    metrics_context = compute_trajectory_metrics(y, pred_context)
 
     assert metrics_carb.mae_mgdl > 0.0
     assert metrics_macro.mae_mgdl <= metrics_carb.mae_mgdl + 1.0
-    assert metrics_gluco.mae_mgdl < metrics_carb.mae_mgdl
+    assert metrics_context.mae_mgdl < metrics_carb.mae_mgdl
 
 
 def test_run_ppgr_benchmark(tmp_path: Path):
@@ -126,7 +126,11 @@ def test_run_ppgr_benchmark(tmp_path: Path):
 
     assert res.sample_count == 16
     assert "Carb-Only Baseline" in res.models
-    assert "Dual-Stream GlucoFM" in res.models
+    assert "Meal + Subject Covariate Ridge" in res.models
+    assert not any("GlucoFM" in name for name in res.models)
+    assert res.group_disjoint is True
+    assert res.train_subject_count == 3
+    assert res.test_subject_count == 1
     assert res.report_json.is_file()
     assert res.report_md.is_file()
 

@@ -27,7 +27,7 @@ from iints_desktop.local_ai import (
     list_local_ai_models,
     start_local_ai_stack,
 )
-from iints_desktop.results import load_results_preview
+from iints_desktop.results import load_compartment_timeline, load_results_preview
 from iints_desktop.update import get_desktop_update_info
 
 
@@ -524,6 +524,26 @@ def _preview(args: argparse.Namespace) -> int:
     )
 
 
+def _compartments(args: argparse.Namespace) -> int:
+    timeline = load_compartment_timeline(Path(args.csv), max_points=int(args.max_points))
+    return _ok(
+        {
+            "available": timeline.available,
+            "reason": timeline.reason,
+            "schema": timeline.schema,
+            "times": timeline.times,
+            "compartments": timeline.compartments,
+            "fluxes": timeline.fluxes,
+            "flux_extremes": {
+                key: list(value) for key, value in timeline.flux_extremes.items()
+            },
+            "step_count": timeline.step_count,
+            "stride": timeline.stride,
+            "plasma_glucose_mgdl": timeline.plasma_glucose_mgdl,
+        }
+    )
+
+
 def _history(args: argparse.Namespace) -> int:
     limit = max(1, min(int(args.limit), 200))
     entries = read_run_history(Path(args.output_dir), limit=limit)
@@ -636,29 +656,57 @@ def _ai_ask(args: argparse.Namespace) -> int:
 def _foundation_arena(args: argparse.Namespace) -> int:
     from iints.research.foundation_arena import run_foundation_model_arena
     out_dir = Path(args.output_dir).expanduser().resolve()
-    report = run_foundation_model_arena(output_dir=out_dir, n_benchmark_trials=args.n_trials)
+    report = run_foundation_model_arena(
+        output_dir=out_dir,
+        evaluation_artifacts=args.result,
+    )
     return _ok(report.to_dict())
 
 
 def _glucofm_embed(args: argparse.Namespace) -> int:
-    import numpy as np
     import pandas as pd
-    from iints.research.glucofm import embed_cgm_with_glucofm
-    if args.csv:
-        df = pd.read_csv(args.csv)
-        col = next((c for c in ["glucose", "cgm", "glucose_dexcom", "glucose_libre"] if c in df.columns), df.columns[0])
-        cgm_vals = df[col].dropna().values
-    else:
-        # Default 24-hour trace
-        cgm_vals = np.linspace(100, 140, 288)
-    z_vec = embed_cgm_with_glucofm(cgm_vals)
+    from iints.research.glucofm import embed_cgm_with_glucofm_result
+
+    df = pd.read_csv(args.csv)
+    candidates = ["glucose", "cgm", "glucose_mgdl", "glucose_dexcom", "glucose_libre"]
+    column = args.glucose_column or next((name for name in candidates if name in df.columns), None)
+    if column is None or column not in df.columns:
+        raise ValueError("Could not infer glucose column")
+    if args.timestamp_column and args.timestamp_column not in df.columns:
+        raise ValueError(f"Timestamp column not found: {args.timestamp_column}")
+    result = embed_cgm_with_glucofm_result(
+        df[column],
+        checkpoint=args.checkpoint,
+        timestamps=df[args.timestamp_column] if args.timestamp_column else None,
+    )
+    z_vec = result.embedding
     return _ok({
         "latent_dim": len(z_vec),
-        "embedding": [round(float(v), 5) for v in z_vec[:24]], # First 24 dimensions for display
-        "full_embedding_sample": [round(float(v), 5) for v in z_vec],
-        "model": "Google GlucoFM Dual-Stream Transformer (256D)",
-        "streams": {"state_dim": 128, "event_dim": 128},
+        "embedding_preview": [round(float(v), 5) for v in z_vec[:12]],
+        "embedding": [round(float(v), 5) for v in z_vec],
+        "model": "IINTS GlucoFM v2 independent reproduction",
+        "official_google_checkpoint": False,
+        "checkpoint_sha256": result.checkpoint_sha256,
+        "input_coverage": result.input_coverage,
+        "observed_count": result.input_observed_count,
     })
+
+
+def _glucofm_pretrain(args: argparse.Namespace) -> int:
+    from iints.research.glucofm_training import pretrain_glucofm
+
+    result = pretrain_glucofm(
+        args.source,
+        args.output_dir,
+        glucose_column=args.glucose_column,
+        timestamp_column=args.timestamp_column,
+        subject_column=args.subject_column,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        device=args.device,
+        seed=args.seed,
+    )
+    return _ok(result.to_dict())
 
 
 def _cgmacros_cohort(args: argparse.Namespace) -> int:
@@ -835,6 +883,11 @@ def build_parser() -> argparse.ArgumentParser:
     preview.add_argument("--max-rows", type=int, default=80)
     preview.set_defaults(func=_preview)
 
+    compartments = subcommands.add_parser("compartments")
+    compartments.add_argument("--csv", required=True)
+    compartments.add_argument("--max-points", type=int, default=400)
+    compartments.set_defaults(func=_compartments)
+
     history = subcommands.add_parser("history")
     history.add_argument("--output-dir", required=True)
     history.add_argument("--limit", type=int, default=25)
@@ -880,12 +933,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     arena = subcommands.add_parser("foundation-arena")
     arena.add_argument("--output-dir", required=True)
-    arena.add_argument("--n-trials", type=int, default=50)
+    arena.add_argument("--result", action="append", required=True)
     arena.set_defaults(func=_foundation_arena)
 
     glucofm = subcommands.add_parser("glucofm-embed")
-    glucofm.add_argument("--csv", default=None)
+    glucofm.add_argument("--csv", required=True)
+    glucofm.add_argument("--checkpoint", required=True)
+    glucofm.add_argument("--glucose-column", default=None)
+    glucofm.add_argument("--timestamp-column", default=None)
     glucofm.set_defaults(func=_glucofm_embed)
+
+    glucofm_train = subcommands.add_parser("glucofm-pretrain")
+    glucofm_train.add_argument("--source", required=True)
+    glucofm_train.add_argument("--output-dir", required=True)
+    glucofm_train.add_argument("--glucose-column", default=None)
+    glucofm_train.add_argument("--timestamp-column", default=None)
+    glucofm_train.add_argument("--subject-column", default="subject_id")
+    glucofm_train.add_argument("--epochs", type=int, default=120)
+    glucofm_train.add_argument("--batch-size", type=int, default=128)
+    glucofm_train.add_argument("--device", default="auto")
+    glucofm_train.add_argument("--seed", type=int, default=42)
+    glucofm_train.set_defaults(func=_glucofm_pretrain)
 
     cgmacros = subcommands.add_parser("cgmacros-cohort")
     cgmacros.add_argument("--output-dir", required=True)

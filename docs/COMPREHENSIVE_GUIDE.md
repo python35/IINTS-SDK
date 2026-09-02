@@ -430,7 +430,10 @@ The safety report includes:
 
 ### 10.1 Formal Safety Contract (Logic Validation)
 
-Because the supervisor is deterministic, the SDK ships with a **formal safety contract** you can test exhaustively.
+Because the supervisor is deterministic, the SDK ships with an explicit **inhibition contract**: a stated rule
+about what the supervisor must refuse, which the test suite checks by sampling the input space rather than by
+formal verification. There is no machine-checked proof, and the contract is a property of the supervisor, not a
+guarantee about the simulated patient — a dose the supervisor blocks now cannot undo insulin already on board.
 By default, insulin is inhibited when:
 
 ```
@@ -449,7 +452,10 @@ config = SafetyConfig(
 )
 ```
 
-Unit tests iterate across glucose/trend grids to prove no unsafe dose can pass this contract.
+Property-based tests (`tests/core/test_supervisor_property.py`, using Hypothesis) draw glucose, trend, dose and
+IOB values from the stated ranges and check that no sampled input in the low-and-falling region receives a
+non-zero dose; `tests/core/test_safety_contract.py` pins the boundary cases and the disabled-contract path.
+Sampling a continuous space raises confidence, it does not prove the property.
 
 ### 10.2 Red‑Team Scenarios (Chaos Testing)
 

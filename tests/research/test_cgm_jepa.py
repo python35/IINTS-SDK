@@ -39,14 +39,20 @@ def test_cgm_jepa_encoder_forward():
 
 
 def test_extract_cgm_jepa_embeddings():
+    """Architecture smoke test: shapes only, on deliberately untrained weights.
+
+    `allow_untrained=True` is required and is the honest flag here — this test
+    checks tensor plumbing, not embedding quality. Any claim about what these
+    embeddings mean needs a trained checkpoint.
+    """
     # Single trace
     trace_1d = np.random.uniform(70, 180, size=288)
-    emb_1d = extract_cgm_jepa_embeddings(trace_1d)
+    emb_1d = extract_cgm_jepa_embeddings(trace_1d, allow_untrained=True)
     assert emb_1d.shape == (96,)
 
     # Batch of traces
     trace_2d = np.random.uniform(70, 180, size=(5, 288))
-    emb_2d = extract_cgm_jepa_embeddings(trace_2d)
+    emb_2d = extract_cgm_jepa_embeddings(trace_2d, allow_untrained=True)
     assert emb_2d.shape == (5, 96)
 
 
@@ -71,7 +77,8 @@ def test_bridge_simulation_to_jepa(tmp_path: Path):
     steps_df.to_csv(sim_dir / "results.csv", index=False)
 
     out_dir = tmp_path / "jepa_embedding_out"
-    res = bridge_simulation_to_jepa(sim_dir, output_dir=out_dir)
+    # Untrained weights: this asserts wiring and output files, not embedding content.
+    res = bridge_simulation_to_jepa(sim_dir, output_dir=out_dir, allow_untrained=True)
 
     assert res.embedding_dim == 96
     assert len(res.embedding_vector) == 96
@@ -94,12 +101,21 @@ def test_simulate_physiological_cgm_and_noise():
 
 
 def test_run_cgm_jepa_parameter_experiment(tmp_path: Path):
+    """Records the random-feature baseline of the sweep probe.
+
+    These thresholds are reached by an UNTRAINED encoder, so they are a floor a
+    trained checkpoint must beat -- not evidence that the model learned anything.
+    A random projection of a 288-point trace retains enough of a smoothly varying
+    sweep parameter for a linear probe to recover it, which is why the numbers
+    look high here. Read them as the null model for this experiment.
+    """
     out_dir = tmp_path / "cgm_jepa_study_test"
     res = run_cgm_jepa_parameter_experiment(
         output_dir=out_dir,
         num_simulations=20,
         sweep_param="insulin_sensitivity",
         param_range=(0.5, 1.8),
+        allow_untrained=True,
     )
 
     assert res.num_simulations == 20
@@ -111,8 +127,17 @@ def test_run_cgm_jepa_parameter_experiment(tmp_path: Path):
     assert (out_dir / "CGM_JEPA_SCIENTIFIC_REPORT.md").is_file()
 
 
-def test_cli_cgm_jepa_commands(tmp_path: Path):
-    # Test embed CLI
+def test_cli_cgm_jepa_commands_require_a_checkpoint(tmp_path: Path):
+    """The research CLI must refuse to emit embeddings from random weights.
+
+    This test previously asserted the opposite: that each command exited 0 with a
+    success banner and wrote a report, with no checkpoint anywhere. Those runs
+    produced files labelled as scientific output from an untrained encoder. The
+    library guard now blocks that path, and the CLI deliberately exposes no
+    override -- untrained weights are for in-process smoke tests only, where the
+    caller passes allow_untrained explicitly and no report is presented as a
+    result.
+    """
     sim_csv = tmp_path / "sim.csv"
     pd.DataFrame({
         "time_minutes": np.arange(288) * 5.0,
@@ -131,11 +156,12 @@ def test_cli_cgm_jepa_commands(tmp_path: Path):
             str(emb_out),
         ],
     )
-    assert res_embed.exit_code == 0
-    assert "CGM-JEPA Embedding Generated Successfully" in res_embed.output
-    assert (emb_out / "cgm_jepa_embedding.json").is_file()
+    assert res_embed.exit_code != 0
+    assert "checkpoint" in res_embed.output.lower()
+    assert not (emb_out / "cgm_jepa_embedding.json").exists(), (
+        "the CLI wrote an embedding file despite having no trained weights"
+    )
 
-    # Test experiment CLI
     exp_out = tmp_path / "cli_exp_out"
     res_exp = runner.invoke(
         app,
@@ -148,11 +174,11 @@ def test_cli_cgm_jepa_commands(tmp_path: Path):
             "10",
         ],
     )
-    assert res_exp.exit_code == 0
-    assert "Experiment Completed Successfully" in res_exp.output
-    assert (exp_out / "CGM_JEPA_SCIENTIFIC_REPORT.md").is_file()
+    assert res_exp.exit_code != 0
+    assert not (exp_out / "CGM_JEPA_SCIENTIFIC_REPORT.md").exists(), (
+        "a scientific report was written from untrained weights"
+    )
 
-    # Test confounder CLI
     conf_out = tmp_path / "cli_conf_out"
     res_conf = runner.invoke(
         app,
@@ -165,7 +191,10 @@ def test_cli_cgm_jepa_commands(tmp_path: Path):
             "6",
         ],
     )
-    assert res_conf.exit_code == 0
-    assert "Physiological Confounder Vulnerability Summary" in res_conf.output
-    assert (conf_out / "PHYSIOLOGICAL_CONFOUNDER_REPORT.md").is_file()
-    assert (conf_out / "confounder_benchmark_pairs.csv").is_file()
+    assert res_conf.exit_code != 0
+    assert not (conf_out / "PHYSIOLOGICAL_CONFOUNDER_REPORT.md").exists(), (
+        "a confounder report was written from untrained weights"
+    )
+    assert not (conf_out / "confounder_benchmark_pairs.csv").exists(), (
+        "benchmark pairs were written from untrained weights"
+    )

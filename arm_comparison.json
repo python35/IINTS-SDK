@@ -1,0 +1,1772 @@
+{
+  "generated_utc": "2026-09-01T12:51:19+00:00",
+  "question": "does changing the training loss change held-out forecast behaviour, on subjects no arm was trained or model-selected on",
+  "estimand": "mean over subjects of the per-subject mean; pairs are not the unit",
+  "control_arm": "band_weighted",
+  "design": {
+    "shared_test_subjects": [
+      "540",
+      "575"
+    ],
+    "shared_val_subjects": [
+      "570",
+      "588"
+    ],
+    "varied_fingerprint_keys": [
+      "loss"
+    ],
+    "held_constant": [
+      "batch_size",
+      "dropout",
+      "feature_columns",
+      "hidden_size",
+      "history_minutes",
+      "horizon_minutes",
+      "learning_rate",
+      "meal_announcement_grams",
+      "meal_announcement_minutes",
+      "normalization",
+      "num_layers",
+      "target_column"
+    ],
+    "per_arm_loss_settings": {
+      "hypo_weighted": {
+        "loss": "safety_weighted"
+      },
+      "band_weighted": {
+        "loss": "band_weighted"
+      }
+    }
+  },
+  "n_subjects": 2,
+  "n_pairs": 26072,
+  "horizon_minutes": 120,
+  "inference": {
+    "min_subjects_for_interval": 3,
+    "intervals_reported": false,
+    "note": "with a shared split the subject count is fixed by that split; widening it requires retraining every arm on further splits"
+  },
+  "offset_controls_mgdl": {
+    "hypo_weighted": -7.065119482713254
+  },
+  "arms": {
+    "persistence": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 41.454626729447554,
+          "per_subject": {
+            "540": 40.61661170335148,
+            "575": 42.29264175554362
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "clarke_hazardous": {
+          "estimate": 12.028616768490602,
+          "per_subject": {
+            "540": 10.345885420661094,
+            "575": 13.71134811632011
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_erroneous": {
+          "estimate": 12.028616768490602,
+          "per_subject": {
+            "540": 10.345885420661094,
+            "575": 13.71134811632011
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_accurate": {
+          "estimate": 69.56492102877928,
+          "per_subject": {
+            "540": 70.12807730654191,
+            "575": 69.00176475101665
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "absolute_error_mgdl": {
+          "estimate": 45.93611794308097,
+          "per_subject": {
+            "540": 43.466857793717146,
+            "575": 48.40537809244479
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "signed_error_mgdl": {
+          "estimate": -0.2630359383379351,
+          "per_subject": {
+            "540": -0.33768854112710694,
+            "575": -0.18838333554876324
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        }
+      },
+      "hypoglycemia_detection": {
+        "sensitivity_pct": 19.55278211128445,
+        "n_hypo_windows": 1923,
+        "specificity_pct": 93.55666901320966,
+        "precision_pct": 19.461697722567287,
+        "by_subject": {
+          "540": 20.96969696969697,
+          "575": 18.48816029143898
+        },
+        "report": {
+          "threshold_mgdl": 70.0,
+          "counts": {
+            "true_positive": 376,
+            "false_negative": 1547,
+            "false_positive": 1556,
+            "true_negative": 22593
+          },
+          "sensitivity": 0.1955278211128445,
+          "sensitivity_pct": 19.55278211128445,
+          "specificity": 0.9355666901320966,
+          "specificity_pct": 93.55666901320966,
+          "precision": 0.19461697722567287,
+          "precision_pct": 19.461697722567287,
+          "negative_predictive_value": 0.9359154929577465,
+          "negative_predictive_value_pct": 93.59154929577464,
+          "false_positive_rate": 0.06443330986790344,
+          "false_positive_rate_pct": 6.443330986790344,
+          "missed_hypo_rate": 0.8044721788871555,
+          "missed_hypo_rate_pct": 80.44721788871556
+        }
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.94860270227361,
+          "predicted_rate_sd_mgdl_min": 0.0,
+          "rate_attenuation": 0.0,
+          "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+          "predicted_max_abs_rate_mgdl_min": 0.0,
+          "reference_pct_moving": 22.261429886468243,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": null,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 100.0,
+          "n_reference_moving": 5804,
+          "n_sign_concordance_basis": 0,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 26072,
+          "counts": {
+            "accurate": 18137,
+            "benign": 4799,
+            "erroneous": 3136
+          },
+          "percentages": {
+            "accurate": 69.56505062902731,
+            "benign": 18.406719852715558,
+            "erroneous": 12.028229518257135
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 51.6416078551703,
+          "mean_signed_error_mgdl": -0.26305311828641376
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 1923,
+            "counts": {
+              "accurate": 479,
+              "benign": 21,
+              "erroneous": 1423
+            },
+            "percentages": {
+              "accurate": 24.908996359854395,
+              "benign": 1.0920436817472698,
+              "erroneous": 73.99895995839833
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 90.79563182527302,
+            "mean_signed_error_mgdl": 51.97099481345587
+          },
+          "target": {
+            "n_pairs": 18292,
+            "counts": {
+              "accurate": 14032,
+              "benign": 3520,
+              "erroneous": 740
+            },
+            "percentages": {
+              "accurate": 76.71113054887383,
+              "benign": 19.24338508637656,
+              "erroneous": 4.045484364749617
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 56.45090750054669,
+            "mean_signed_error_mgdl": 9.542621967283141
+          },
+          "hyper": {
+            "n_pairs": 5857,
+            "counts": {
+              "accurate": 3626,
+              "benign": 1258,
+              "erroneous": 973
+            },
+            "percentages": {
+              "accurate": 61.90882704456206,
+              "benign": 21.478572648113367,
+              "erroneous": 16.61260030732457
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 23.766433327642137,
+            "mean_signed_error_mgdl": -48.03691052617077
+          }
+        }
+      },
+      "trend_dynamics": {
+        "reference_rate_sd_mgdl_min": 0.94860270227361,
+        "predicted_rate_sd_mgdl_min": 0.0,
+        "rate_attenuation": 0.0,
+        "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+        "predicted_max_abs_rate_mgdl_min": 0.0,
+        "reference_pct_moving": 22.261429886468243,
+        "predicted_pct_moving": 0.0,
+        "sign_concordance_pct": null,
+        "sign_concordance_basis": "reference moving and forecast has a direction",
+        "predicted_no_direction_pct": 100.0,
+        "n_reference_moving": 5804,
+        "n_sign_concordance_basis": 0,
+        "flat_forecast": true,
+        "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+      }
+    },
+    "hypo_weighted": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 46.78970336863151,
+          "per_subject": {
+            "540": 46.59866554183603,
+            "575": 46.980741195426994
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "clarke_hazardous": {
+          "estimate": 10.237272117919595,
+          "per_subject": {
+            "540": 9.210829051307616,
+            "575": 11.263715184531573
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_erroneous": {
+          "estimate": 10.237272117919595,
+          "per_subject": {
+            "540": 9.210829051307616,
+            "575": 11.263715184531573
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_accurate": {
+          "estimate": 70.04439702512138,
+          "per_subject": {
+            "540": 70.45785719763785,
+            "575": 69.63093685260493
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "absolute_error_mgdl": {
+          "estimate": 38.49625508089738,
+          "per_subject": {
+            "540": 37.56407841810356,
+            "575": 39.42843174369119
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "signed_error_mgdl": {
+          "estimate": -1.345622173004833,
+          "per_subject": {
+            "540": -1.6302469041287346,
+            "575": -1.0609974418809314
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        }
+      },
+      "hypoglycemia_detection": {
+        "sensitivity_pct": 4.004160166406656,
+        "n_hypo_windows": 1923,
+        "specificity_pct": 99.63973663505735,
+        "precision_pct": 46.95121951219512,
+        "by_subject": {
+          "540": 5.454545454545454,
+          "575": 2.914389799635701
+        },
+        "report": {
+          "threshold_mgdl": 70.0,
+          "counts": {
+            "true_positive": 77,
+            "false_negative": 1846,
+            "false_positive": 87,
+            "true_negative": 24062
+          },
+          "sensitivity": 0.04004160166406656,
+          "sensitivity_pct": 4.004160166406656,
+          "specificity": 0.9963973663505735,
+          "specificity_pct": 99.63973663505735,
+          "precision": 0.4695121951219512,
+          "precision_pct": 46.95121951219512,
+          "negative_predictive_value": 0.9287478771035973,
+          "negative_predictive_value_pct": 92.87478771035973,
+          "false_positive_rate": 0.0036026336494264775,
+          "false_positive_rate_pct": 0.36026336494264777,
+          "missed_hypo_rate": 0.9599583983359334,
+          "missed_hypo_rate_pct": 95.99583983359335
+        }
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.94860270227361,
+          "predicted_rate_sd_mgdl_min": 0.0692616901964414,
+          "rate_attenuation": 0.0730144348423582,
+          "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+          "predicted_max_abs_rate_mgdl_min": 0.28051554361979164,
+          "reference_pct_moving": 22.261429886468243,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": 67.57408683666438,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 0.0,
+          "n_reference_moving": 5804,
+          "n_sign_concordance_basis": 5804,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 26072,
+          "counts": {
+            "accurate": 18262,
+            "benign": 5141,
+            "erroneous": 2669
+          },
+          "percentages": {
+            "accurate": 70.04449217551397,
+            "benign": 19.71847192390304,
+            "erroneous": 10.237035900583
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 53.48266339367904,
+          "mean_signed_error_mgdl": -1.345687674247037
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 1923,
+            "counts": {
+              "accurate": 175,
+              "benign": 6,
+              "erroneous": 1742
+            },
+            "percentages": {
+              "accurate": 9.100364014560583,
+              "benign": 0.31201248049922,
+              "erroneous": 90.5876235049402
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 99.79199167966719,
+            "mean_signed_error_mgdl": 51.043044603559046
+          },
+          "target": {
+            "n_pairs": 18292,
+            "counts": {
+              "accurate": 14296,
+              "benign": 3683,
+              "erroneous": 313
+            },
+            "percentages": {
+              "accurate": 78.15438443035207,
+              "benign": 20.134485020774108,
+              "erroneous": 1.7111305488738247
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 61.40935928274656,
+            "mean_signed_error_mgdl": 9.68337661714802
+          },
+          "hyper": {
+            "n_pairs": 5857,
+            "counts": {
+              "accurate": 3791,
+              "benign": 1452,
+              "erroneous": 614
+            },
+            "percentages": {
+              "accurate": 64.72596892607137,
+              "benign": 24.790848557281883,
+              "erroneous": 10.483182516646748
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 13.522281031244665,
+            "mean_signed_error_mgdl": -52.99109935060344
+          }
+        }
+      },
+      "trend_dynamics": {
+        "reference_rate_sd_mgdl_min": 0.94860270227361,
+        "predicted_rate_sd_mgdl_min": 0.0692616901964414,
+        "rate_attenuation": 0.0730144348423582,
+        "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+        "predicted_max_abs_rate_mgdl_min": 0.28051554361979164,
+        "reference_pct_moving": 22.261429886468243,
+        "predicted_pct_moving": 0.0,
+        "sign_concordance_pct": 67.57408683666438,
+        "sign_concordance_basis": "reference moving and forecast has a direction",
+        "predicted_no_direction_pct": 0.0,
+        "n_reference_moving": 5804,
+        "n_sign_concordance_basis": 5804,
+        "flat_forecast": true,
+        "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+      }
+    },
+    "band_weighted": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 41.0251353489008,
+          "per_subject": {
+            "540": 39.80366592530102,
+            "575": 42.246604772500575
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "clarke_hazardous": {
+          "estimate": 11.088788595289273,
+          "per_subject": {
+            "540": 9.939412531635861,
+            "575": 12.238164658942685
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_erroneous": {
+          "estimate": 11.088788595289273,
+          "per_subject": {
+            "540": 9.939412531635861,
+            "575": 12.238164658942685
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_accurate": {
+          "estimate": 69.35397644661704,
+          "per_subject": {
+            "540": 69.87499041337526,
+            "575": 68.83296247985882
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "absolute_error_mgdl": {
+          "estimate": 42.412292712437214,
+          "per_subject": {
+            "540": 42.01396557421523,
+            "575": 42.8106198506592
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "signed_error_mgdl": {
+          "estimate": 15.79976998691623,
+          "per_subject": {
+            "540": 14.687559552459284,
+            "575": 16.911980421373176
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        }
+      },
+      "hypoglycemia_detection": {
+        "sensitivity_pct": 0.93603744149766,
+        "n_hypo_windows": 1923,
+        "specificity_pct": 99.8426435877262,
+        "precision_pct": 32.142857142857146,
+        "by_subject": {
+          "540": 0.24242424242424243,
+          "575": 1.4571948998178506
+        },
+        "report": {
+          "threshold_mgdl": 70.0,
+          "counts": {
+            "true_positive": 18,
+            "false_negative": 1905,
+            "false_positive": 38,
+            "true_negative": 24111
+          },
+          "sensitivity": 0.0093603744149766,
+          "sensitivity_pct": 0.93603744149766,
+          "specificity": 0.998426435877262,
+          "specificity_pct": 99.8426435877262,
+          "precision": 0.32142857142857145,
+          "precision_pct": 32.142857142857146,
+          "negative_predictive_value": 0.9267758302583026,
+          "negative_predictive_value_pct": 92.67758302583026,
+          "false_positive_rate": 0.0015735641227380016,
+          "false_positive_rate_pct": 0.15735641227380015,
+          "missed_hypo_rate": 0.9906396255850234,
+          "missed_hypo_rate_pct": 99.06396255850234
+        }
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.94860270227361,
+          "predicted_rate_sd_mgdl_min": 0.1777269962268026,
+          "rate_attenuation": 0.18735662021711166,
+          "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+          "predicted_max_abs_rate_mgdl_min": 0.4222330729166667,
+          "reference_pct_moving": 22.261429886468243,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": 65.93728463128876,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 0.0,
+          "n_reference_moving": 5804,
+          "n_sign_concordance_basis": 5804,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 26072,
+          "counts": {
+            "accurate": 18082,
+            "benign": 5099,
+            "erroneous": 2891
+          },
+          "percentages": {
+            "accurate": 69.35409634857318,
+            "benign": 19.557379564283522,
+            "erroneous": 11.088524087143295
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 67.21003375268488,
+          "mean_signed_error_mgdl": 15.799514031768686
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 1923,
+            "counts": {
+              "accurate": 73,
+              "benign": 3,
+              "erroneous": 1847
+            },
+            "percentages": {
+              "accurate": 3.796151846073843,
+              "benign": 0.15600624024961,
+              "erroneous": 96.04784191367655
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 99.9479979199168,
+            "mean_signed_error_mgdl": 65.61003992970387
+          },
+          "target": {
+            "n_pairs": 18292,
+            "counts": {
+              "accurate": 14084,
+              "benign": 3569,
+              "erroneous": 639
+            },
+            "percentages": {
+              "accurate": 76.99540782855894,
+              "benign": 19.51126175377214,
+              "erroneous": 3.4933304176689264
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 77.31795320358627,
+            "mean_signed_error_mgdl": 27.179635447692537
+          },
+          "hyper": {
+            "n_pairs": 5857,
+            "counts": {
+              "accurate": 3925,
+              "benign": 1527,
+              "erroneous": 405
+            },
+            "percentages": {
+              "accurate": 67.01382960560014,
+              "benign": 26.07136759433157,
+              "erroneous": 6.914802800068294
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 24.89329008024586,
+            "mean_signed_error_mgdl": -36.095794529236684
+          }
+        }
+      },
+      "trend_dynamics": {
+        "reference_rate_sd_mgdl_min": 0.94860270227361,
+        "predicted_rate_sd_mgdl_min": 0.1777269962268026,
+        "rate_attenuation": 0.18735662021711166,
+        "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+        "predicted_max_abs_rate_mgdl_min": 0.4222330729166667,
+        "reference_pct_moving": 22.261429886468243,
+        "predicted_pct_moving": 0.0,
+        "sign_concordance_pct": 65.93728463128876,
+        "sign_concordance_basis": "reference moving and forecast has a direction",
+        "predicted_no_direction_pct": 0.0,
+        "n_reference_moving": 5804,
+        "n_sign_concordance_basis": 5804,
+        "flat_forecast": true,
+        "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+      }
+    },
+    "band_weighted_shifted_to_hypo_weighted": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 44.44258869449881,
+          "per_subject": {
+            "540": 43.247181532326096,
+            "575": 45.63799585667152
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "clarke_hazardous": {
+          "estimate": 10.379235370516419,
+          "per_subject": {
+            "540": 9.141805353171256,
+            "575": 11.616665387861582
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_erroneous": {
+          "estimate": 10.379235370516419,
+          "per_subject": {
+            "540": 9.141805353171256,
+            "575": 11.616665387861582
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "directional_accurate": {
+          "estimate": 69.94463610567115,
+          "per_subject": {
+            "540": 70.51921159598129,
+            "575": 69.37006061536101
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "absolute_error_mgdl": {
+          "estimate": 40.347560922311295,
+          "per_subject": {
+            "540": 40.10934698849214,
+            "575": 40.58577485613045
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "signed_error_mgdl": {
+          "estimate": 8.734650504202977,
+          "per_subject": {
+            "540": 7.622440069746031,
+            "575": 9.846860938659923
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        }
+      },
+      "hypoglycemia_detection": {
+        "sensitivity_pct": 4.05616224648986,
+        "n_hypo_windows": 1923,
+        "specificity_pct": 99.32088285229203,
+        "precision_pct": 32.231404958677686,
+        "by_subject": {
+          "540": 4.0,
+          "575": 4.098360655737705
+        },
+        "report": {
+          "threshold_mgdl": 70.0,
+          "counts": {
+            "true_positive": 78,
+            "false_negative": 1845,
+            "false_positive": 164,
+            "true_negative": 23985
+          },
+          "sensitivity": 0.0405616224648986,
+          "sensitivity_pct": 4.05616224648986,
+          "specificity": 0.9932088285229203,
+          "specificity_pct": 99.32088285229203,
+          "precision": 0.32231404958677684,
+          "precision_pct": 32.231404958677686,
+          "negative_predictive_value": 0.9285714285714286,
+          "negative_predictive_value_pct": 92.85714285714286,
+          "false_positive_rate": 0.006791171477079796,
+          "false_positive_rate_pct": 0.6791171477079796,
+          "missed_hypo_rate": 0.9594383775351014,
+          "missed_hypo_rate_pct": 95.94383775351014
+        }
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.94860270227361,
+          "predicted_rate_sd_mgdl_min": 0.1777269962268026,
+          "rate_attenuation": 0.18735662021711166,
+          "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+          "predicted_max_abs_rate_mgdl_min": 0.4222330729166667,
+          "reference_pct_moving": 22.261429886468243,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": 65.93728463128876,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 0.0,
+          "n_reference_moving": 5804,
+          "n_sign_concordance_basis": 5804,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 26072,
+          "counts": {
+            "accurate": 18236,
+            "benign": 5130,
+            "erroneous": 2706
+          },
+          "percentages": {
+            "accurate": 69.94476833384473,
+            "benign": 19.676281067812212,
+            "erroneous": 10.37895059834305
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 61.77508438171218,
+          "mean_signed_error_mgdl": 8.734394549055434
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 1923,
+            "counts": {
+              "accurate": 156,
+              "benign": 7,
+              "erroneous": 1760
+            },
+            "percentages": {
+              "accurate": 8.112324492979718,
+              "benign": 0.3640145605824233,
+              "erroneous": 91.52366094643786
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 99.27197087883516,
+            "mean_signed_error_mgdl": 58.544920446990616
+          },
+          "target": {
+            "n_pairs": 18292,
+            "counts": {
+              "accurate": 14189,
+              "benign": 3619,
+              "erroneous": 484
+            },
+            "percentages": {
+              "accurate": 77.56942925869232,
+              "benign": 19.784605291930898,
+              "erroneous": 2.6459654493767766
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 71.66520883446316,
+            "mean_signed_error_mgdl": 20.114515964979287
+          },
+          "hyper": {
+            "n_pairs": 5857,
+            "counts": {
+              "accurate": 3891,
+              "benign": 1504,
+              "erroneous": 462
+            },
+            "percentages": {
+              "accurate": 66.43332764213761,
+              "benign": 25.678675089636332,
+              "erroneous": 7.887997268226054
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 18.57606283080075,
+            "mean_signed_error_mgdl": -43.160914011949934
+          }
+        }
+      },
+      "trend_dynamics": {
+        "reference_rate_sd_mgdl_min": 0.94860270227361,
+        "predicted_rate_sd_mgdl_min": 0.1777269962268026,
+        "rate_attenuation": 0.18735662021711166,
+        "reference_max_abs_rate_mgdl_min": 10.866666666666667,
+        "predicted_max_abs_rate_mgdl_min": 0.4222330729166667,
+        "reference_pct_moving": 22.261429886468243,
+        "predicted_pct_moving": 0.0,
+        "sign_concordance_pct": 65.93728463128876,
+        "sign_concordance_basis": "reference moving and forecast has a direction",
+        "predicted_no_direction_pct": 0.0,
+        "n_reference_moving": 5804,
+        "n_sign_concordance_basis": 5804,
+        "flat_forecast": true,
+        "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+      }
+    }
+  },
+  "contrasts": {
+    "hypo_weighted_vs_band_weighted_shifted": {
+      "interpretation": "the treatment arm against the control arm moved by a single constant. A difference near zero means the training change delivered a bias, which requires no training to obtain.",
+      "offset_mgdl": -7.065119482713254,
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 2.3471146741326994,
+          "per_subject": {
+            "540": 3.3514840095099316,
+            "575": 1.3427453387554669
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "clarke_hazardous": {
+          "estimate": -0.14196325259682413,
+          "per_subject": {
+            "540": 0.06902369813636015,
+            "575": -0.3529502033300084
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": false,
+          "established_at_95pct": false
+        },
+        "directional_erroneous": {
+          "estimate": -0.14196325259682413,
+          "per_subject": {
+            "540": 0.06902369813636015,
+            "575": -0.3529502033300084
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": false,
+          "established_at_95pct": false
+        },
+        "directional_accurate": {
+          "estimate": 0.09976091945024401,
+          "per_subject": {
+            "540": -0.061354398343431246,
+            "575": 0.2608762372439193
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": false,
+          "established_at_95pct": false
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "absolute_error_mgdl": {
+          "estimate": -1.8513058414139205,
+          "per_subject": {
+            "540": -2.545268570388586,
+            "575": -1.1573431124392553
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "signed_error_mgdl": {
+          "estimate": -10.080272677207814,
+          "per_subject": {
+            "540": -9.25268697387477,
+            "575": -10.907858380540858
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        }
+      },
+      "hypoglycemia_detection": {
+        "n_hypo_windows": 1923,
+        "n_subjects_with_hypo": 2,
+        "treatment_sensitivity": {
+          "estimate": 4.184467627090577,
+          "per_subject": {
+            "540": 5.454545454545454,
+            "575": 2.914389799635701
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "control_sensitivity": {
+          "estimate": 4.049180327868852,
+          "per_subject": {
+            "540": 4.0,
+            "575": 4.098360655737705
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "paired_treatment_minus_control": {
+          "estimate": 0.13528729922172544,
+          "per_subject": {
+            "540": 1.4545454545454546,
+            "575": -1.1839708561020037
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": false,
+          "established_at_95pct": false
+        },
+        "definition": "windows whose reference endpoint is below 70 mg/dL for which the forecast endpoint is also below it"
+      }
+    },
+    "hypo_weighted_vs_band_weighted": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 5.764568019730714,
+          "per_subject": {
+            "540": 6.79499961653501,
+            "575": 4.734136422926418
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "clarke_hazardous": {
+          "estimate": -0.8515164773696782,
+          "per_subject": {
+            "540": -0.728583480328246,
+            "575": -0.9744494744111103
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_erroneous": {
+          "estimate": -0.8515164773696782,
+          "per_subject": {
+            "540": -0.728583480328246,
+            "575": -0.9744494744111103
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_accurate": {
+          "estimate": 0.6904205785043515,
+          "per_subject": {
+            "540": 0.5828667842625969,
+            "575": 0.797974372746106
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "absolute_error_mgdl": {
+          "estimate": -3.9160376315398366,
+          "per_subject": {
+            "540": -4.449887156111668,
+            "575": -3.3821881069680053
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "signed_error_mgdl": {
+          "estimate": -17.145392159921062,
+          "per_subject": {
+            "540": -16.31780645658802,
+            "575": -17.972977863254105
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        }
+      },
+      "hypoglycemia_detection": {
+        "n_hypo_windows": 1923,
+        "n_subjects_with_hypo": 2,
+        "treatment_sensitivity": {
+          "estimate": 4.184467627090577,
+          "per_subject": {
+            "540": 5.454545454545454,
+            "575": 2.914389799635701
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "control_sensitivity": {
+          "estimate": 0.8498095711210465,
+          "per_subject": {
+            "540": 0.24242424242424243,
+            "575": 1.4571948998178506
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "paired_treatment_minus_control": {
+          "estimate": 3.3346580559695314,
+          "per_subject": {
+            "540": 5.212121212121212,
+            "575": 1.4571948998178506
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "definition": "windows whose reference endpoint is below 70 mg/dL for which the forecast endpoint is also below it"
+      }
+    },
+    "hypo_weighted_vs_persistence": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": 5.33507663918396,
+          "per_subject": {
+            "540": 5.982053838484546,
+            "575": 4.688099439883373
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "clarke_hazardous": {
+          "estimate": -1.7913446505710073,
+          "per_subject": {
+            "540": -1.135056369353478,
+            "575": -2.4476329317885366
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_erroneous": {
+          "estimate": -1.7913446505710073,
+          "per_subject": {
+            "540": -1.135056369353478,
+            "575": -2.4476329317885366
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_accurate": {
+          "estimate": 0.47947599634210947,
+          "per_subject": {
+            "540": 0.32977989109594297,
+            "575": 0.629172101588276
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "absolute_error_mgdl": {
+          "estimate": -7.439862862183591,
+          "per_subject": {
+            "540": -5.902779375613582,
+            "575": -8.9769463487536
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "signed_error_mgdl": {
+          "estimate": -1.082586234666898,
+          "per_subject": {
+            "540": -1.2925583630016275,
+            "575": -0.8726141063321682
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        }
+      },
+      "hypoglycemia_detection": {
+        "n_hypo_windows": 1923,
+        "n_subjects_with_hypo": 2,
+        "treatment_sensitivity": {
+          "estimate": 4.184467627090577,
+          "per_subject": {
+            "540": 5.454545454545454,
+            "575": 2.914389799635701
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "control_sensitivity": {
+          "estimate": 19.728928630567975,
+          "per_subject": {
+            "540": 20.96969696969697,
+            "575": 18.48816029143898
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "paired_treatment_minus_control": {
+          "estimate": -15.544461003477398,
+          "per_subject": {
+            "540": -15.515151515151516,
+            "575": -15.573770491803279
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "definition": "windows whose reference endpoint is below 70 mg/dL for which the forecast endpoint is also below it"
+      }
+    },
+    "band_weighted_vs_persistence": {
+      "metrics": {
+        "clarke_zone_a": {
+          "estimate": -0.4294913805467543,
+          "per_subject": {
+            "540": -0.812945778050464,
+            "575": -0.04603698304304458
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "clarke_hazardous": {
+          "estimate": -0.9398281732013293,
+          "per_subject": {
+            "540": -0.406472889025232,
+            "575": -1.4731834573774265
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_erroneous": {
+          "estimate": -0.9398281732013293,
+          "per_subject": {
+            "540": -0.406472889025232,
+            "575": -1.4731834573774265
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "directional_accurate": {
+          "estimate": -0.210944582162242,
+          "per_subject": {
+            "540": -0.2530868931666539,
+            "575": -0.1688022711578301
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "reversed_trend": {
+          "estimate": 0.0,
+          "per_subject": {
+            "540": 0.0,
+            "575": 0.0
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "absolute_error_mgdl": {
+          "estimate": -3.5238252306437534,
+          "per_subject": {
+            "540": -1.4528922195019134,
+            "575": -5.594758241785594
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": true,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "signed_error_mgdl": {
+          "estimate": 16.062805925254168,
+          "per_subject": {
+            "540": 15.025248093586391,
+            "575": 17.10036375692194
+          },
+          "n_subjects": 2,
+          "n_pairs": 26072,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": false,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        }
+      },
+      "hypoglycemia_detection": {
+        "n_hypo_windows": 1923,
+        "n_subjects_with_hypo": 2,
+        "treatment_sensitivity": {
+          "estimate": 0.8498095711210465,
+          "per_subject": {
+            "540": 0.24242424242424243,
+            "575": 1.4571948998178506
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "control_sensitivity": {
+          "estimate": 19.728928630567975,
+          "per_subject": {
+            "540": 20.96969696969697,
+            "575": 18.48816029143898
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains"
+        },
+        "paired_treatment_minus_control": {
+          "estimate": -18.87911905944693,
+          "per_subject": {
+            "540": -20.727272727272727,
+            "575": -17.03096539162113
+          },
+          "n_subjects": 2,
+          "n_pairs": 1923,
+          "estimand": "mean over subjects of the per-subject mean",
+          "interval": null,
+          "interval_omitted_because": "2 subjects is below the minimum of 3; a cluster-level interval here would be uninformative and would read as more evidence than the design contains",
+          "higher_is_better": true,
+          "favours_treatment": false,
+          "consistent_across_subjects": true,
+          "established_at_95pct": false
+        },
+        "definition": "windows whose reference endpoint is below 70 mg/dL for which the forecast endpoint is also below it"
+      }
+    }
+  },
+  "provenance": {
+    "hypo_weighted": {
+      "model_path": "models/ohio_t1dm_full_hypo_weighted_seed42/predictor.pt",
+      "model_sha256": "f12e493305690a1162ef708df89596c5c5a6405edcf8737ec719b299511d0900",
+      "data_path": "data_packs/ohio_merged.parquet",
+      "data_sha256": "a54fdc3004dac3da1b4453581adf48d29c864d0c52b6dc44e7ea50b6702bc28f",
+      "data_sha256_at_training": "7f392c168d2396f34a6974b22f4bda0fceebfcdc1fdbfc5a9d7073c177453733",
+      "config_path": "results/ohio_t1dm_full_training_sweep/configs/hypo_weighted_seed42.yaml",
+      "config_sha256": "0ba8e012de265698d3f28b87626c7e97c0a4d434ef0f1a8222d9314c24114027",
+      "config_fingerprint": {
+        "history_minutes": 240,
+        "horizon_minutes": 120,
+        "feature_columns": [
+          "glucose_actual_mgdl",
+          "glucose_trend_mgdl_min",
+          "patient_iob_units",
+          "patient_cob_grams",
+          "effective_isf",
+          "effective_icr",
+          "effective_basal_rate_u_per_hr",
+          "steps",
+          "calories",
+          "heart_rate",
+          "sleep_minutes",
+          "time_of_day_sin",
+          "time_of_day_cos",
+          "meal_announcement_grams"
+        ],
+        "target_column": "glucose_actual_mgdl",
+        "loss": "safety_weighted",
+        "hidden_size": 96,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "normalization": "zscore",
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "meal_announcement_minutes": 15,
+        "meal_announcement_grams": null
+      },
+      "seed": 42,
+      "best_epoch": 4,
+      "epoch_cap": 12,
+      "test_subjects": [
+        "540",
+        "575"
+      ],
+      "val_subjects": [
+        "570",
+        "588"
+      ],
+      "train_subjects": [
+        "544",
+        "552",
+        "559",
+        "563",
+        "567",
+        "584",
+        "591",
+        "596"
+      ],
+      "history_minutes": 240,
+      "horizon_minutes": 120,
+      "step_minutes": 5.0,
+      "meal_announcement_minutes": 15
+    },
+    "band_weighted": {
+      "model_path": "models/ohio_t1dm_full_medium/predictor.pt",
+      "model_sha256": "1c3276056c2ce3f597ac594443bf83b8aae11af3b5c579fda271065005366880",
+      "data_path": "data_packs/ohio_merged.parquet",
+      "data_sha256": "a54fdc3004dac3da1b4453581adf48d29c864d0c52b6dc44e7ea50b6702bc28f",
+      "data_sha256_at_training": "7f392c168d2396f34a6974b22f4bda0fceebfcdc1fdbfc5a9d7073c177453733",
+      "config_path": "results/ohio_t1dm_full_results/predictor_ohio_full_medium.yaml",
+      "config_sha256": "88a152dfd7bd414adff7da6b30a509c2b745ad0aeb31fcbc1a462bc4ecea6c4b",
+      "config_fingerprint": {
+        "history_minutes": 240,
+        "horizon_minutes": 120,
+        "feature_columns": [
+          "glucose_actual_mgdl",
+          "glucose_trend_mgdl_min",
+          "patient_iob_units",
+          "patient_cob_grams",
+          "effective_isf",
+          "effective_icr",
+          "effective_basal_rate_u_per_hr",
+          "steps",
+          "calories",
+          "heart_rate",
+          "sleep_minutes",
+          "time_of_day_sin",
+          "time_of_day_cos",
+          "meal_announcement_grams"
+        ],
+        "target_column": "glucose_actual_mgdl",
+        "loss": "band_weighted",
+        "hidden_size": 96,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "normalization": "zscore",
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "meal_announcement_minutes": 15,
+        "meal_announcement_grams": null
+      },
+      "seed": 42,
+      "best_epoch": 5,
+      "epoch_cap": 12,
+      "test_subjects": [
+        "540",
+        "575"
+      ],
+      "val_subjects": [
+        "570",
+        "588"
+      ],
+      "train_subjects": [
+        "544",
+        "552",
+        "559",
+        "563",
+        "567",
+        "584",
+        "591",
+        "596"
+      ],
+      "history_minutes": 240,
+      "horizon_minutes": 120,
+      "step_minutes": 5.0,
+      "meal_announcement_minutes": 15
+    }
+  }
+}

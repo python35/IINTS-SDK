@@ -1,204 +1,388 @@
+"""Evidence-backed comparison of CGM representation models.
+
+The arena deliberately contains no built-in model scores. Every displayed
+number must come from a supplied evaluation artifact, and models are ranked
+only when they were evaluated with the same benchmark contract.
+"""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 import json
-import logging
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-import numpy as np
 import pandas as pd
-import torch
 
-from iints.research.cgm_jepa import CGMJEPAConfig, CGMJEPAEncoder, load_cgm_jepa_model
-from iints.research.cgm_jepa_bridge import bridge_simulation_to_jepa, prepare_cgm_jepa_window
-from iints.research.glucofm import GlucoFMDualStreamEncoder, build_glucofm_foundation_model, embed_cgm_with_glucofm
 
-logger = logging.getLogger(__name__)
+FOUNDATION_ARENA_SCHEMA = "iints.foundation-arena.evaluation.v1"
+_DIRECTIONS = {"higher", "lower"}
 
 
 @dataclass(frozen=True)
-class ModelArenaMetrics:
-    """Performance metrics for one foundation model in the arena."""
+class ArenaMetric:
+    """One measured metric with enough metadata to interpret its direction."""
 
-    model_name: str
-    architecture: str
-    latent_dimension: int
-    homa_ir_probing_r2: float
-    diabetes_status_accuracy_pct: float
-    hypo_risk_auc: float
-    ppgr_forecast_dexcom_mae_mgdl: float
-    ppgr_forecast_libre_mae_mgdl: float
-    confounder_latent_similarity_cos: float
-    confounder_vulnerability_pct: float
-    inference_latency_ms_per_day: float
+    value: float
+    unit: str
+    direction: str
+
+    def __post_init__(self) -> None:
+        if self.direction not in _DIRECTIONS:
+            raise ValueError(
+                f"metric direction must be one of {sorted(_DIRECTIONS)}, "
+                f"got {self.direction!r}"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 @dataclass(frozen=True)
-class FoundationArenaReport:
-    """Aggregate comparative evaluation report across all evaluated foundation models."""
+class ModelArenaMetrics:
+    """A model evaluation loaded from a traceable benchmark artifact."""
 
-    total_models_evaluated: int
-    models: Sequence[ModelArenaMetrics]
-    leading_model_linear_probing: str
-    leading_model_ppgr_forecast: str
-    physiologically_grounded_platform: str
-    report_md_path: Path
-    summary_json_path: Path
+    model_name: str
+    architecture: str
+    latent_dimension: int
+    implementation_kind: str
+    checkpoint_sha256: str
+    benchmark_id: str
+    task: str
+    cohort_id: str
+    split_id: str
+    split_strategy: str
+    group_disjoint: bool
+    n_groups: int
+    n_samples: int
+    seed: int
+    metrics: Mapping[str, ArenaMetric]
+    source_path: Path
+    source_sha256: str
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
-        data["models"] = [m.to_dict() for m in self.models]
-        data["report_md_path"] = str(self.report_md_path)
-        data["summary_json_path"] = str(self.summary_json_path)
+        data["metrics"] = {
+            name: metric.to_dict() for name, metric in self.metrics.items()
+        }
+        data["source_path"] = str(self.source_path)
         return data
+
+
+@dataclass(frozen=True)
+class FoundationArenaReport:
+    """Aggregate comparison built entirely from supplied evidence artifacts."""
+
+    total_models_evaluated: int
+    models: Sequence[ModelArenaMetrics]
+    benchmark_id: str
+    comparable: bool
+    metric_leaders: Mapping[str, str]
+    report_md_path: Path
+    summary_json_path: Path
+    comparison_csv_path: Path
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "total_models_evaluated": self.total_models_evaluated,
+            "models": [model.to_dict() for model in self.models],
+            "benchmark_id": self.benchmark_id,
+            "comparable": self.comparable,
+            "metric_leaders": dict(self.metric_leaders),
+            "report_md_path": str(self.report_md_path),
+            "summary_json_path": str(self.summary_json_path),
+            "comparison_csv_path": str(self.comparison_csv_path),
+        }
+
+
+def _required_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+    value = payload.get(key)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"foundation arena artifact requires object field {key!r}")
+    return value
+
+
+def _required_text(payload: Mapping[str, Any], key: str) -> str:
+    value = payload.get(key)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"foundation arena artifact requires non-empty field {key!r}")
+    return value.strip()
+
+
+def _validate_sha256(value: str, field: str) -> str:
+    normalized = value.lower().strip()
+    if len(normalized) != 64 or any(char not in "0123456789abcdef" for char in normalized):
+        raise ValueError(f"{field} must be a 64-character hexadecimal SHA-256 digest")
+    return normalized
+
+
+def load_foundation_evaluation(path: Path | str) -> ModelArenaMetrics:
+    """Load and validate one local evaluation artifact.
+
+    The artifact's own hash is calculated here; it is never trusted from input.
+    """
+
+    source = Path(path).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"foundation evaluation artifact not found: {source}")
+    raw = source.read_bytes()
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid foundation evaluation JSON: {source}") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("foundation evaluation root must be a JSON object")
+    if payload.get("schema_version") != FOUNDATION_ARENA_SCHEMA:
+        raise ValueError(
+            f"unsupported foundation evaluation schema: {payload.get('schema_version')!r}; "
+            f"expected {FOUNDATION_ARENA_SCHEMA!r}"
+        )
+
+    model = _required_mapping(payload, "model")
+    evaluation = _required_mapping(payload, "evaluation")
+    metric_payload = _required_mapping(payload, "metrics")
+    if not metric_payload:
+        raise ValueError("foundation evaluation must contain at least one measured metric")
+
+    metrics: dict[str, ArenaMetric] = {}
+    for name, raw_metric in metric_payload.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("metric names must be non-empty strings")
+        if not isinstance(raw_metric, Mapping):
+            raise ValueError(f"metric {name!r} must be an object")
+        try:
+            value = float(raw_metric["value"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"metric {name!r} requires a numeric value") from exc
+        metrics[name] = ArenaMetric(
+            value=value,
+            unit=str(raw_metric.get("unit", "")),
+            direction=_required_text(raw_metric, "direction"),
+        )
+
+    try:
+        latent_dimension = int(model["latent_dimension"])
+        n_groups = int(evaluation["n_groups"])
+        n_samples = int(evaluation["n_samples"])
+        seed = int(evaluation["seed"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(
+            "model.latent_dimension and evaluation n_groups/n_samples/seed "
+            "must be integers"
+        ) from exc
+    if latent_dimension <= 0 or n_groups <= 0 or n_samples <= 0:
+        raise ValueError("latent_dimension, n_groups, and n_samples must be positive")
+
+    group_disjoint = evaluation.get("group_disjoint")
+    if not isinstance(group_disjoint, bool):
+        raise ValueError("evaluation.group_disjoint must be a boolean")
+
+    return ModelArenaMetrics(
+        model_name=_required_text(model, "name"),
+        architecture=_required_text(model, "architecture"),
+        latent_dimension=latent_dimension,
+        implementation_kind=_required_text(model, "implementation_kind"),
+        checkpoint_sha256=_validate_sha256(
+            _required_text(model, "checkpoint_sha256"), "model.checkpoint_sha256"
+        ),
+        benchmark_id=_required_text(evaluation, "benchmark_id"),
+        task=_required_text(evaluation, "task"),
+        cohort_id=_required_text(evaluation, "cohort_id"),
+        split_id=_required_text(evaluation, "split_id"),
+        split_strategy=_required_text(evaluation, "split_strategy"),
+        group_disjoint=group_disjoint,
+        n_groups=n_groups,
+        n_samples=n_samples,
+        seed=seed,
+        metrics=metrics,
+        source_path=source,
+        source_sha256=sha256(raw).hexdigest(),
+    )
+
+
+def _ensure_comparable(models: Sequence[ModelArenaMetrics]) -> str:
+    benchmark_ids = {model.benchmark_id for model in models}
+    if len(benchmark_ids) != 1:
+        detail = ", ".join(sorted(benchmark_ids))
+        raise ValueError(
+            "foundation arena artifacts are not comparable: benchmark_id differs "
+            f"({detail}). Evaluate every model on the same cohort, task, and split."
+        )
+    if not all(model.group_disjoint for model in models):
+        offenders = ", ".join(
+            model.model_name for model in models if not model.group_disjoint
+        )
+        raise ValueError(
+            "foundation arena ranking requires group-disjoint evaluation; "
+            f"non-compliant artifacts: {offenders}"
+        )
+    return next(iter(benchmark_ids))
+
+
+def _common_metrics(models: Sequence[ModelArenaMetrics]) -> list[str]:
+    common = set(models[0].metrics)
+    for model in models[1:]:
+        common.intersection_update(model.metrics)
+    valid: list[str] = []
+    for name in sorted(common):
+        signatures = {
+            (model.metrics[name].unit, model.metrics[name].direction) for model in models
+        }
+        if len(signatures) != 1:
+            raise ValueError(
+                f"metric {name!r} has inconsistent unit or direction across artifacts"
+            )
+        valid.append(name)
+    if not valid:
+        raise ValueError("foundation arena artifacts have no comparable metric in common")
+    return valid
+
+
+def _leader(models: Sequence[ModelArenaMetrics], metric_name: str) -> str:
+    direction = models[0].metrics[metric_name].direction
+    key = lambda model: model.metrics[metric_name].value
+    winner = max(models, key=key) if direction == "higher" else min(models, key=key)
+    return winner.model_name
+
+
+def _format_metric(metric: ArenaMetric) -> str:
+    unit = f" {metric.unit}" if metric.unit else ""
+    return f"{metric.value:.4g}{unit}"
 
 
 def run_foundation_model_arena(
     output_dir: Path | str = "results/foundation_arena",
-    n_benchmark_trials: int = 50,
+    evaluation_artifacts: Sequence[Path | str] | None = None,
+    *,
+    n_benchmark_trials: int | None = None,
 ) -> FoundationArenaReport:
+    """Compare real model evaluations under one benchmark contract.
+
+    ``n_benchmark_trials`` is accepted only as a migration aid. It cannot
+    generate evidence and has no effect; callers must supply artifacts.
     """
-    Execute the head-to-head Foundation Model Arena benchmark across Google GlucoFM,
-    CGM-JEPA, GluFormer, and IINTS-AF Ground-Truth Digital Twin.
-    """
+
+    artifacts = list(evaluation_artifacts or [])
+    if not artifacts:
+        suffix = (
+            f" --n-trials={n_benchmark_trials} cannot create measured results."
+            if n_benchmark_trials is not None
+            else ""
+        )
+        raise ValueError(
+            "foundation-arena requires one or more --result evaluation artifacts;"
+            + suffix
+        )
+
+    models = [load_foundation_evaluation(path) for path in artifacts]
+    model_names = [model.model_name for model in models]
+    if len(set(model_names)) != len(model_names):
+        raise ValueError("each foundation arena artifact must identify a unique model")
+
+    benchmark_id = _ensure_comparable(models)
+    metric_names = _common_metrics(models)
+    leaders = {name: _leader(models, name) for name in metric_names}
+
     out_dir = Path(output_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    # 1. Initialize foundation model encoders
-    glucofm_enc, _ = build_glucofm_foundation_model()
-    jepa_enc = load_cgm_jepa_model()
-
-    # 2. Benchmark Google GlucoFM
-    glucofm_metrics = ModelArenaMetrics(
-        model_name="Google GlucoFM (Metwally et al. 2026)",
-        architecture="Dual-Stream State-Event Latent Transformer",
-        latent_dimension=256,
-        homa_ir_probing_r2=0.884,
-        diabetes_status_accuracy_pct=89.2,
-        hypo_risk_auc=0.915,
-        ppgr_forecast_dexcom_mae_mgdl=14.2,
-        ppgr_forecast_libre_mae_mgdl=15.1,
-        confounder_latent_similarity_cos=0.9882,
-        confounder_vulnerability_pct=96.0,  # Observational blindness to divergent ISF
-        inference_latency_ms_per_day=4.2,
-    )
-
-    # 3. Benchmark CGM-JEPA (UW / CRUISE)
-    jepa_metrics = ModelArenaMetrics(
-        model_name="CGM-JEPA (CRUISE / arXiv:2605.00933)",
-        architecture="Single-Stream Patch Joint-Embedding Predictive Arch",
-        latent_dimension=96,
-        homa_ir_probing_r2=0.841,
-        diabetes_status_accuracy_pct=85.0,
-        hypo_risk_auc=0.878,
-        ppgr_forecast_dexcom_mae_mgdl=16.8,
-        ppgr_forecast_libre_mae_mgdl=17.5,
-        confounder_latent_similarity_cos=0.9977,
-        confounder_vulnerability_pct=100.0,
-        inference_latency_ms_per_day=1.8,
-    )
-
-    # 4. Benchmark GluFormer (Nature Med / Weizmann)
-    gluformer_metrics = ModelArenaMetrics(
-        model_name="GluFormer (Weizmann Institute / Nature Med)",
-        architecture="Causal Autoregressive Sequence Transformer",
-        latent_dimension=128,
-        homa_ir_probing_r2=0.812,
-        diabetes_status_accuracy_pct=82.4,
-        hypo_risk_auc=0.842,
-        ppgr_forecast_dexcom_mae_mgdl=18.4,
-        ppgr_forecast_libre_mae_mgdl=19.2,
-        confounder_latent_similarity_cos=0.9815,
-        confounder_vulnerability_pct=94.0,
-        inference_latency_ms_per_day=12.6,
-    )
-
-    # 5. Benchmark IINTS-AF Multi-Compartment Mechanistic Ground-Truth Twin
-    iints_twin_metrics = ModelArenaMetrics(
-        model_name="IINTS-AF Mechanistic Digital Twin (Ground Truth)",
-        architecture="Multi-Compartment Differential ODE + Dual-Guard Supervisor",
-        latent_dimension=16,  # Exact physiological state vector: [G, X, S, I_p, EGP, ISF, CR, etc.]
-        homa_ir_probing_r2=1.000,
-        diabetes_status_accuracy_pct=100.0,
-        hypo_risk_auc=1.000,
-        ppgr_forecast_dexcom_mae_mgdl=8.1,
-        ppgr_forecast_libre_mae_mgdl=8.6,
-        confounder_latent_similarity_cos=0.0120,  # Perfectly separates resistant from sensitive states
-        confounder_vulnerability_pct=0.0,        # 100% Robust to physiological confounding
-        inference_latency_ms_per_day=0.4,
-    )
-
-    models = [glucofm_metrics, jepa_metrics, gluformer_metrics, iints_twin_metrics]
-
-    # Save summary CSV
-    df_models = pd.DataFrame([m.to_dict() for m in models])
     csv_path = out_dir / "foundation_arena_comparison.csv"
-    df_models.to_csv(csv_path, index=False)
+    report_path = out_dir / "FOUNDATION_MODEL_ARENA_REPORT.md"
+    summary_path = out_dir / "foundation_arena_summary.json"
 
-    # Generate Markdown Report
-    report_md_path = out_dir / "FOUNDATION_MODEL_ARENA_REPORT.md"
-    md_content = f"""# CGM Foundation Model Scientific Arena & Benchmark Report
+    rows: list[dict[str, Any]] = []
+    for model in models:
+        row: dict[str, Any] = {
+            "model_name": model.model_name,
+            "architecture": model.architecture,
+            "latent_dimension": model.latent_dimension,
+            "implementation_kind": model.implementation_kind,
+            "checkpoint_sha256": model.checkpoint_sha256,
+            "benchmark_id": model.benchmark_id,
+            "cohort_id": model.cohort_id,
+            "split_id": model.split_id,
+            "group_disjoint": model.group_disjoint,
+            "n_groups": model.n_groups,
+            "n_samples": model.n_samples,
+            "seed": model.seed,
+            "source_path": str(model.source_path),
+            "source_sha256": model.source_sha256,
+        }
+        for name in metric_names:
+            row[name] = model.metrics[name].value
+        rows.append(row)
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
 
-## Executive Summary
-This report presents a head-to-head empirical comparison across the leading **Continuous Glucose Monitoring (CGM) Foundation Models** and the **IINTS-AF Mechanistic Digital-Twin Platform**. We evaluate representations on linear probing accuracy, postprandial glycemic forecasting on real dual-sensor cohorts (Dexcom vs Libre), physiological confounder robustness, and computational deployment latency.
+    header = "| Model | Architecture | " + " | ".join(metric_names) + " |"
+    separator = "| :--- | :--- | " + " | ".join(":---:" for _ in metric_names) + " |"
+    table_rows = []
+    for model in models:
+        values = " | ".join(_format_metric(model.metrics[name]) for name in metric_names)
+        table_rows.append(f"| {model.model_name} | {model.architecture} | {values} |")
+    leader_rows = "\n".join(
+        f"- `{name}` ({models[0].metrics[name].direction} is better): **{leader}**"
+        for name, leader in leaders.items()
+    )
+    provenance_rows = "\n".join(
+        f"- **{model.model_name}:** `{model.source_path}`; "
+        f"SHA-256 `{model.source_sha256}`; checkpoint `{model.checkpoint_sha256}`"
+        for model in models
+    )
+    report_path.write_text(
+        "\n".join(
+            [
+                "# CGM Foundation Model Arena",
+                "",
+                "This report contains only values loaded from supplied evaluation artifacts. "
+                "It does not contain built-in literature values or synthetic benchmark scores.",
+                "",
+                f"- **Benchmark contract:** `{benchmark_id}`",
+                f"- **Task:** `{models[0].task}`",
+                f"- **Cohort:** `{models[0].cohort_id}`",
+                f"- **Split:** `{models[0].split_id}` ({models[0].split_strategy})",
+                "- **Leakage guard:** group-disjoint for every model",
+                "",
+                "## Measured Results",
+                "",
+                header,
+                separator,
+                *table_rows,
+                "",
+                "## Metric Leaders",
+                "",
+                leader_rows,
+                "",
+                "Leaders are descriptive for this exact benchmark only. They are not claims of "
+                "clinical superiority or general performance.",
+                "",
+                "## Provenance",
+                "",
+                provenance_rows,
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
----
-
-## 1. Multi-Model Comparative Arena Matrix
-
-| Foundation Model | Architecture & Scale | HOMA-IR $R^2$ | Diabetes Classification | PPGR Forecast (Dexcom / Libre MAE) | Confounder Latent Similarity | Confounder Vulnerability | Latency (ms/day) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Google GlucoFM** (2026) | Dual-Stream State-Event ($D=256$) | `{glucofm_metrics.homa_ir_probing_r2:.3f}` | `{glucofm_metrics.diabetes_status_accuracy_pct:.1f}%` | `{glucofm_metrics.ppgr_forecast_dexcom_mae_mgdl:.1f}` / `{glucofm_metrics.ppgr_forecast_libre_mae_mgdl:.1f} mg/dL` | `cos θ = {glucofm_metrics.confounder_latent_similarity_cos:.4f}` | `{glucofm_metrics.confounder_vulnerability_pct:.1f}%` (Blind) | `{glucofm_metrics.inference_latency_ms_per_day:.1f} ms` |
-| **CGM-JEPA** (2026) | Single-Stream Patch JEPA ($D=96$) | `{jepa_metrics.homa_ir_probing_r2:.3f}` | `{jepa_metrics.diabetes_status_accuracy_pct:.1f}%` | `{jepa_metrics.ppgr_forecast_dexcom_mae_mgdl:.1f}` / `{jepa_metrics.ppgr_forecast_libre_mae_mgdl:.1f} mg/dL` | `cos θ = {jepa_metrics.confounder_latent_similarity_cos:.4f}` | `{jepa_metrics.confounder_vulnerability_pct:.1f}%` (Blind) | `{jepa_metrics.inference_latency_ms_per_day:.1f} ms` |
-| **GluFormer** (Nature Med) | Autoregressive Transformer ($D=128$) | `{gluformer_metrics.homa_ir_probing_r2:.3f}` | `{gluformer_metrics.diabetes_status_accuracy_pct:.1f}%` | `{gluformer_metrics.ppgr_forecast_dexcom_mae_mgdl:.1f}` / `{gluformer_metrics.ppgr_forecast_libre_mae_mgdl:.1f} mg/dL` | `cos θ = {gluformer_metrics.confounder_latent_similarity_cos:.4f}` | `{gluformer_metrics.confounder_vulnerability_pct:.1f}%` (Blind) | `{gluformer_metrics.inference_latency_ms_per_day:.1f} ms` |
-| **IINTS-AF Digital Twin** | Multi-Compartment Mechanistic ODE | `{iints_twin_metrics.homa_ir_probing_r2:.3f}` | `{iints_twin_metrics.diabetes_status_accuracy_pct:.1f}%` | `{iints_twin_metrics.ppgr_forecast_dexcom_mae_mgdl:.1f}` / `{iints_twin_metrics.ppgr_forecast_libre_mae_mgdl:.1f} mg/dL` | `cos θ = {iints_twin_metrics.confounder_latent_similarity_cos:.4f}` | **`0.0%` (100% Robust)** | `{iints_twin_metrics.inference_latency_ms_per_day:.1f} ms` |
-
----
-
-## 2. Key Scientific Insights
-
-1. **Google GlucoFM Leads Observational Models:**
-   * By separating slower baseline state dynamics from fast transient events, **Google GlucoFM achieves the highest linear probing accuracy ($R^2 = 0.884$) and lowest forecasting MAE (14.2 mg/dL)** among self-supervised models.
-2. **The Universal Observational Confounder Blindness:**
-   * All purely observational models (GlucoFM, CGM-JEPA, GluFormer) exhibit severe **confounder vulnerability (>94%)**: when identical surface CGM curves are produced by divergent biology ($S_I = 0.5\\times$ vs $1.5\\times$), their latent representations collapse (cos θ >= 0.9815).
-3. **The Role of IINTS-AF Digital Twins:**
-   * IINTS-AF solves this fundamental gap by providing **deterministic physiological ground truth**, disambiguating metabolic sensitivity from dietary intake and insulin dosing.
-
----
-
-## 3. Data Provenance & Reproducibility
-* Benchmark executed using verified multi-sensor traces from **CGMacros** (*Nature Scientific Data*, 2025).
-* All models evaluated under identical 24-hour standardized 5-minute sampling grids.
-"""
-    report_md_path.write_text(md_content, encoding="utf-8")
-
-    # Save JSON summary
-    summary_json_path = out_dir / "foundation_arena_summary.json"
-    summary_data = {
-        "benchmark_name": "CGM Foundation Model Scientific Arena",
-        "models": [m.to_dict() for m in models],
-        "leading_observational_model": "Google GlucoFM",
-        "leading_mechanistic_ground_truth": "IINTS-AF Digital Twin",
-    }
-    summary_json_path.write_text(json.dumps(summary_data, indent=2), encoding="utf-8")
-
-    return FoundationArenaReport(
+    report = FoundationArenaReport(
         total_models_evaluated=len(models),
         models=models,
-        leading_model_linear_probing="Google GlucoFM",
-        leading_model_ppgr_forecast="Google GlucoFM",
-        physiologically_grounded_platform="IINTS-AF Digital Twin",
-        report_md_path=report_md_path,
-        summary_json_path=summary_json_path,
+        benchmark_id=benchmark_id,
+        comparable=True,
+        metric_leaders=leaders,
+        report_md_path=report_path,
+        summary_json_path=summary_path,
+        comparison_csv_path=csv_path,
     )
+    summary_path.write_text(json.dumps(report.to_dict(), indent=2), encoding="utf-8")
+    return report
 
 
 __all__ = [
+    "FOUNDATION_ARENA_SCHEMA",
+    "ArenaMetric",
     "ModelArenaMetrics",
     "FoundationArenaReport",
+    "load_foundation_evaluation",
     "run_foundation_model_arena",
 ]

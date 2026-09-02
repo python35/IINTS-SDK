@@ -104,24 +104,81 @@ else:
             )
             return loss.mean()
 
-    class SafetyWeightedMSE(nn.Module):  # type: ignore[misc,no-redef]
-        """MSE with extra weight on low-glucose targets (safety-critical)."""
+    def _weighting_levels(
+        targets: "torch.Tensor",
+        inputs: "Optional[torch.Tensor]",
+        anchor_index: Optional[int],
+        loss_name: str,
+    ) -> "torch.Tensor":
+        """Return the glucose levels, in mg/dL, that a level threshold applies to.
 
-        def __init__(self, low_threshold: float = 80.0, alpha: float = 2.0, max_weight: float = 4.0) -> None:
+        With absolute targets the target *is* the level, so this is the identity.
+
+        With delta targets (``predictor.predict_delta``) the target is a change,
+        and a level threshold applied to a change is meaningless: a drop of
+        5 mg/dL is not hypoglycemia, and a change is almost never above 180 or
+        below 70. Weighting on the raw delta therefore makes every sample fall in
+        the "low" band and none in the "high" band -- a constant weight, which is
+        plain MSE with a rescaled learning rate. Nothing raises; the run simply
+        stops doing what its config says.
+
+        The level is recovered from the anchor: the last observed glucose in the
+        input window, which is exactly what ``build_sequences`` subtracted to
+        form the delta. ``inputs`` must be the *unscaled* window, since the
+        thresholds are in mg/dL.
+        """
+        if anchor_index is None:
+            return targets
+        if inputs is None:
+            raise ValueError(
+                f"{loss_name} is configured for delta targets but received no input "
+                "window, so it cannot recover the glucose level its thresholds refer "
+                "to. Pass the unscaled input batch as the third argument."
+            )
+        anchor = inputs[:, -1, anchor_index].unsqueeze(-1).to(targets.dtype)
+        return anchor + targets
+
+    class SafetyWeightedMSE(nn.Module):  # type: ignore[misc,no-redef]
+        """MSE with extra weight on low-glucose targets (safety-critical).
+
+        ``anchor_index`` is the position of the glucose column in the feature
+        window. Set it when the targets are deltas; leave it ``None`` for
+        absolute targets. See :func:`_weighting_levels`.
+        """
+
+        def __init__(
+            self,
+            low_threshold: float = 80.0,
+            alpha: float = 2.0,
+            max_weight: float = 4.0,
+            anchor_index: Optional[int] = None,
+        ) -> None:
             super().__init__()
             self.low_threshold = float(low_threshold)
             self.alpha = float(alpha)
             self.max_weight = float(max_weight)
+            self.anchor_index = anchor_index
 
-        def forward(self, preds: "torch.Tensor", targets: "torch.Tensor") -> "torch.Tensor":
+        def forward(
+            self,
+            preds: "torch.Tensor",
+            targets: "torch.Tensor",
+            inputs: "Optional[torch.Tensor]" = None,
+        ) -> "torch.Tensor":
+            levels = _weighting_levels(targets, inputs, self.anchor_index, "safety_weighted")
             # Emphasize errors below the low threshold
-            delta = torch.clamp(self.low_threshold - targets, min=0.0)
+            delta = torch.clamp(self.low_threshold - levels, min=0.0)
             weights = 1.0 + self.alpha * (delta / max(self.low_threshold, 1.0))
             weights = torch.clamp(weights, max=self.max_weight)
             return ((preds - targets) ** 2 * weights).mean()
 
     class BandWeightedMSE(nn.Module):  # type: ignore[misc,no-redef]
-        """MSE with extra weight on low/high glucose targets (band-weighted)."""
+        """MSE with extra weight on low/high glucose targets (band-weighted).
+
+        ``anchor_index`` is the position of the glucose column in the feature
+        window. Set it when the targets are deltas; leave it ``None`` for
+        absolute targets. See :func:`_weighting_levels`.
+        """
 
         def __init__(
             self,
@@ -130,6 +187,7 @@ else:
             low_weight: float = 2.0,
             high_weight: float = 1.5,
             max_weight: float = 5.0,
+            anchor_index: Optional[int] = None,
         ) -> None:
             super().__init__()
             self.low_threshold = float(low_threshold)
@@ -137,11 +195,18 @@ else:
             self.low_weight = float(low_weight)
             self.high_weight = float(high_weight)
             self.max_weight = float(max_weight)
+            self.anchor_index = anchor_index
 
-        def forward(self, preds: "torch.Tensor", targets: "torch.Tensor") -> "torch.Tensor":
-            weights = torch.ones_like(targets)
-            weights = weights + self.low_weight * (targets < self.low_threshold).float()
-            weights = weights + self.high_weight * (targets > self.high_threshold).float()
+        def forward(
+            self,
+            preds: "torch.Tensor",
+            targets: "torch.Tensor",
+            inputs: "Optional[torch.Tensor]" = None,
+        ) -> "torch.Tensor":
+            levels = _weighting_levels(targets, inputs, self.anchor_index, "band_weighted")
+            weights = torch.ones_like(levels)
+            weights = weights + self.low_weight * (levels < self.low_threshold).float()
+            weights = weights + self.high_weight * (levels > self.high_threshold).float()
             weights = torch.clamp(weights, max=self.max_weight)
             return ((preds - targets) ** 2 * weights).mean()
 
@@ -152,6 +217,13 @@ else:
         The historical class name is retained for checkpoint/configuration
         compatibility. Inputs supplied to this loss must remain in physical
         units; model-normalized inputs are not scientifically interpretable.
+
+        Set ``predict_delta`` when the model emits changes rather than levels.
+        Every constraint here is a statement about a glucose *level* or about a
+        rate between levels, so the penalty is applied to the reconstructed
+        trajectory. Applied to raw deltas the bounds penalty would fire on every
+        sample (a delta near zero looks like 0 mg/dL of blood glucose) and the
+        first-step rate would be the distance between a change and a level.
         """
 
         def __init__(
@@ -160,11 +232,13 @@ else:
             pinn_lambda: float = 0.5,
             pinn_max_roc: float = 3.0,
             time_step_minutes: int = 5,
+            predict_delta: bool = False,
         ) -> None:
             super().__init__()
             self.pinn_lambda = pinn_lambda
             self.pinn_max_roc = pinn_max_roc
             self.time_step_minutes = time_step_minutes
+            self.predict_delta = bool(predict_delta)
 
             self.idx_glucose = feature_columns.index("glucose_actual_mgdl") if "glucose_actual_mgdl" in feature_columns else -1
 
@@ -181,6 +255,13 @@ else:
             # Extract the last known state from inputs (time step = -1)
             # inputs is (batch, history, features)
             last_glucose = inputs[:, -1, self.idx_glucose]  # shape: (batch,)
+
+            # Constraints are statements about levels; recover them if the model
+            # emits changes. The anchor is the last observed glucose, which is
+            # what build_sequences subtracted to form the delta target.
+            if self.predict_delta:
+                anchor = last_glucose.to(preds.dtype)
+                preds = (anchor.unsqueeze(-1) if preds.dim() > 1 else anchor) + preds
 
             pinn_penalty = torch.tensor(0.0, device=preds.device)
 
@@ -251,12 +332,14 @@ else:
             low_weight: float = 2.0,
             high_weight: float = 1.5,
             max_weight: float = 5.0,
+            anchor_index: Optional[int] = None,
         ) -> None:
             super().__init__(
                 feature_columns=feature_columns,
                 pinn_lambda=pinn_lambda,
                 pinn_max_roc=pinn_max_roc,
                 time_step_minutes=time_step_minutes,
+                predict_delta=anchor_index is not None,
             )
             self.band_loss = BandWeightedMSE(
                 low_threshold=low_threshold,
@@ -264,9 +347,10 @@ else:
                 low_weight=low_weight,
                 high_weight=high_weight,
                 max_weight=max_weight,
+                anchor_index=anchor_index,
             )
 
         def forward(self, preds: "torch.Tensor", targets: "torch.Tensor", inputs: "torch.Tensor") -> "torch.Tensor":
-            band_loss = self.band_loss(preds, targets)
+            band_loss = self.band_loss(preds, targets, inputs)
             pinn_penalty = self.physiology_penalty(preds, inputs)
             return band_loss + self.pinn_lambda * pinn_penalty

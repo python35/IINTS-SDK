@@ -10,6 +10,9 @@ const required = [
   "frontend/iints-logo.png",
   "frontend/styles.css",
   "frontend/main.js",
+  "frontend/digital-twin-data.js",
+  "frontend/digital-twin-scene.js",
+  "frontend/vendor/three/three.module.js",
   "scripts/build-brand-icons.py",
   "src-tauri/tauri.conf.json",
   "src-tauri/capabilities/main.json",
@@ -29,7 +32,17 @@ for (const file of required) {
 }
 
 const html = readFileSync(join(appRoot, "frontend/index.html"), "utf8");
-const script = readFileSync(join(appRoot, "frontend/main.js"), "utf8");
+// Concatenated so the id/command-reference scans below (referencedIds,
+// invokedCommands) also cover the digital-twin modules, not just main.js --
+// they never call Tauri commands or $()/setText() directly today, but this
+// keeps the check meaningful as those modules grow (e.g. M5's raycast/click
+// wiring).
+const script =
+  readFileSync(join(appRoot, "frontend/main.js"), "utf8") +
+  "\n" +
+  readFileSync(join(appRoot, "frontend/digital-twin-data.js"), "utf8") +
+  "\n" +
+  readFileSync(join(appRoot, "frontend/digital-twin-scene.js"), "utf8");
 const styles = readFileSync(join(appRoot, "frontend/styles.css"), "utf8");
 const tauriConfig = JSON.parse(readFileSync(join(appRoot, "src-tauri/tauri.conf.json"), "utf8"));
 const capabilities = JSON.parse(readFileSync(join(appRoot, "src-tauri/capabilities/main.json"), "utf8"));
@@ -192,6 +205,30 @@ const referencedIds = new Set([
 const missingIds = [...referencedIds].filter((id) => !ids.includes(id));
 if (missingIds.length) {
   console.error(`JavaScript references missing HTML IDs: ${missingIds.join(", ")}`);
+  process.exit(1);
+}
+
+// Every command the frontend invokes must be registered in the Rust
+// invoke_handler. Without this check a renamed or newly added command fails
+// only at runtime, in the packaged app, with an opaque error.
+const rustMain = readFileSync(join(appRoot, "src-tauri/src/main.rs"), "utf8");
+const handlerBlock = rustMain.match(/generate_handler!\[([^\]]*)\]/s);
+if (!handlerBlock) {
+  console.error("Could not locate generate_handler! in src-tauri/src/main.rs.");
+  process.exit(1);
+}
+const registeredCommands = new Set(
+  handlerBlock[1]
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+);
+const invokedCommands = new Set(
+  [...script.matchAll(/\bcall\(\s*"([a-z0-9_]+)"/g)].map((match) => match[1])
+);
+const unregistered = [...invokedCommands].filter((name) => !registeredCommands.has(name));
+if (unregistered.length) {
+  console.error(`Frontend invokes unregistered Tauri commands: ${unregistered.join(", ")}`);
   process.exit(1);
 }
 

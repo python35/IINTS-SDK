@@ -316,13 +316,16 @@ iints data import-cgmacros \
 ```
 
 ### `iints research ppgr-benchmark`
-Benchmark 2-hour Postprandial Glycemic Response (PPGR) models (Google GlucoFM style):
-- Compares Carb-Only baseline, Multi-Macronutrient biphasic regression, and Dual-Stream GlucoFM architectures.
+Benchmark 2-hour Postprandial Glycemic Response (PPGR) estimators:
+- Uses a subject-grouped split; row-level random splitting is rejected.
+- Compares carb-only, macronutrient, and measured-context ridge baselines.
+- Adds the IINTS GlucoFM reproduction only when a trained checkpoint and measured 24-hour pre-meal histories are supplied.
 - Computes trajectory MAE, RMSE, Pearson $r$, Peak Glucose MAE, and Time-to-Peak error.
 
 ```bash
 iints research ppgr-benchmark \
   --meals-file data/cgmacros_standardized/cgmacros_meals.csv \
+  --glucofm-checkpoint models/glucofm-reproduction/glucofm_encoder.pt \
   --sensor dexcom \
   --output-dir results/ppgr_benchmark
 ```
@@ -534,6 +537,11 @@ iints research glucose-model jetson-train-hf \
 ```
 
 Use `--upload-mode pr` after review to upload a promoted champion as a Hugging Face pull request. The command uploads model artifacts and redacted metadata only, not raw private dataset rows.
+
+This command accepts the native IINTS glucose-forecast bundle format containing
+`predictor.pt`; it is not a generic adapter for GlucoFM, CGM-JEPA, or arbitrary
+Hugging Face backbones. Use `iints research glucofm-pretrain` for the independent
+GlucoFM reproduction.
 
 ### `iints research build-control-dataset`
 Combine one or more run bundles into a supervised controller teacher dataset.
@@ -817,22 +825,70 @@ iints mdmp validate contracts/cgm_contract.yaml data/patient_cgm.csv --min-mdmp-
 
 ## Foundation Models & Multi-Sensor Research Commands
 
+### `iints research glucofm-pretrain`
+Pretrain the independent, paper-aligned IINTS GlucoFM v2 reproduction on mask-preserving daily windows:
+
+```bash
+iints research glucofm-pretrain \
+  --source data/processed/cgm.csv \
+  --glucose-column glucose_mgdl \
+  --timestamp-column timestamp \
+  --subject-column subject_id \
+  --output-dir models/glucofm-reproduction
+```
+
 ### `iints research glucofm-embed`
-Extract Google GlucoFM Dual-Stream 256-dimensional patient representation embeddings:
+Extract a checkpoint-backed 128-dimensional representation. Official Google weights are not bundled:
 
 ```bash
 iints research glucofm-embed \
   --input-file data/patient_run.csv \
+  --checkpoint models/glucofm-reproduction/glucofm_encoder.pt \
+  --glucose-column glucose_mgdl \
+  --timestamp-column timestamp \
   --output-file results/glucofm/embedding.csv
 ```
 
 ### `iints research foundation-arena`
-Run head-to-head Foundation Model Arena benchmark (Google GlucoFM vs CGM-JEPA vs GluFormer vs IINTS-AF Digital Twin):
+Compare measured model-evaluation artifacts from one shared group-disjoint benchmark. The command contains no built-in scores:
 
 ```bash
 iints research foundation-arena \
-  --output-dir results/foundation_arena \
-  --n-trials 50
+  --result results/evaluations/glucofm.json \
+  --result results/evaluations/jepa.json \
+  --output-dir results/foundation_arena
+```
+
+### `iints research visualize`
+Generate the GlucoFM method schematic and add result figures only when their
+evidence artifacts are supplied:
+
+```bash
+iints research visualize \
+  --arena-result results/evaluations/glucofm.json \
+  --arena-result results/evaluations/baseline.json \
+  --confounder-evidence results/confounder_pairs.csv \
+  --dual-sensor-evidence results/paired_sensors.csv \
+  --safety-trace results/safety_trace.csv \
+  --output-dir results/scientific_visualizations
+```
+
+Without these inputs, missing result panels are marked `not generated`; the
+command never inserts synthetic performance scores.
+
+### `iints research eucys-playbook`
+Build the jury dossier from the same evidence contracts. Clarke EGA input must
+contain `reference_mgdl` and `predicted_mgdl`:
+
+```bash
+iints research eucys-playbook \
+  --prediction-evidence results/held_out_predictions.csv \
+  --arena-result results/evaluations/glucofm.json \
+  --arena-result results/evaluations/baseline.json \
+  --confounder-evidence results/confounder_pairs.csv \
+  --dual-sensor-evidence results/paired_sensors.csv \
+  --safety-trace results/safety_trace.csv \
+  --output-dir results/eucys_jury_dossier
 ```
 
 ### `iints data download-cgmacros`

@@ -11,6 +11,11 @@ from typing import Any, Callable
 import pandas as pd
 import numpy as np
 
+from iints.analysis.clustered_inference import (
+    DEFAULT_CLUSTER_KEY,
+    MIN_CLUSTERS_FOR_INTERVAL,
+    cluster_t_ci,
+)
 from iints.analysis.study_engine import slugify_study_token
 from iints.research.evaluation import forecast_error_report
 from iints.validation.run_validation import compute_run_metrics
@@ -114,17 +119,97 @@ def _percentile(values: Sequence[float | int | None], quantile: float) -> float 
     return float(pd.Series(cleaned).quantile(quantile))
 
 
-def _ci95_half_width(values: Sequence[float | int | None]) -> float | None:
-    cleaned = _clean_numeric(values)
-    if not cleaned:
-        return None
-    if len(cleaned) == 1:
-        return 0.0
-    return float(1.96 * stdev(cleaned) / sqrt(len(cleaned)))
+def _aligned_numeric(
+    values: Sequence[float | int | None],
+    clusters: Sequence[Any] | None,
+) -> tuple[list[float], list[Any]]:
+    """Drop non-numeric entries, keeping each value beside its cluster label.
+
+    Filtering the two lists separately would silently shift labels onto the
+    wrong runs as soon as one metric is missing, so they are filtered together.
+    """
+    if clusters is None:
+        return _clean_numeric(values), []
+    kept_values: list[float] = []
+    kept_clusters: list[Any] = []
+    for value, cluster in zip(values, clusters, strict=True):
+        numeric = _clean_numeric([value])
+        if not numeric:
+            continue
+        kept_values.append(numeric[0])
+        kept_clusters.append("unknown" if cluster is None else cluster)
+    return kept_values, kept_clusters
 
 
-def _stats(values: Sequence[float | int | None]) -> dict[str, float | int | None]:
-    cleaned = _clean_numeric(values)
+def _interval_fields(
+    values: Sequence[float],
+    clusters: Sequence[Any] | None,
+    *,
+    cluster_level: str,
+) -> dict[str, Any]:
+    """A 95% interval that respects the study design, or an explicit refusal.
+
+    Runs in the study matrix are repeated measurements of a handful of virtual
+    patients: every profile contributes many runs, and runs sharing a profile
+    share its physiology. The pooled ``1.96 * SD / sqrt(n_runs)`` interval that
+    this function replaces treated 600 runs of 6 profiles as 600 independent
+    patients, which understates the uncertainty by roughly the square root of
+    the number of runs per cluster. See :mod:`iints.analysis.clustered_inference`.
+
+    When the design cannot support a cluster-level interval the interval is
+    left as ``None`` and ``ci95_omitted_because`` says why. A missing interval
+    is a finding about the design, not a defect in the computation.
+    """
+    fields: dict[str, Any] = {
+        "ci95_low": None,
+        "ci95_high": None,
+        "ci_method": None,
+        "cluster_level": cluster_level if clusters else None,
+        "n_clusters": None,
+    }
+    if not values:
+        fields["ci95_omitted_because"] = "no finite observations"
+        return fields
+    if len(values) > 1:
+        # Audit field only: the ratio between this and the reported half width
+        # is how far the historical pooled interval overstated the evidence.
+        # Never report it as an interval; see clustered_inference.naive_ci.
+        fields["pseudoreplicated_ci95_half_width"] = float(
+            1.96 * stdev(values) / sqrt(len(values))
+        )
+    if not clusters:
+        fields["ci95_omitted_because"] = (
+            "no cluster labels were supplied, and a pooled interval over runs "
+            "would be pseudo-replicated"
+        )
+        return fields
+    distinct = len(set(clusters))
+    fields["n_clusters"] = distinct
+    if distinct < MIN_CLUSTERS_FOR_INTERVAL:
+        fields["ci95_omitted_because"] = (
+            f"{distinct} {cluster_level} cluster(s) is below the minimum of "
+            f"{MIN_CLUSTERS_FOR_INTERVAL}; the width of such an interval is set "
+            "by the t multiplier rather than by the data"
+        )
+        return fields
+    estimate = cluster_t_ci(values, clusters)
+    fields["ci95_low"] = float(estimate.ci_low)
+    fields["ci95_high"] = float(estimate.ci_high)
+    fields["ci_method"] = estimate.method
+    fields["n_clusters"] = estimate.n_clusters
+    # The interval is centred on the mean of cluster means, which differs from
+    # the pooled mean when clusters carry unequal run counts.
+    fields["cluster_mean"] = float(estimate.estimate)
+    return fields
+
+
+def _stats(
+    values: Sequence[float | int | None],
+    clusters: Sequence[Any] | None = None,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
+) -> dict[str, Any]:
+    cleaned, cleaned_clusters = _aligned_numeric(values, clusters)
     if not cleaned:
         return {
             "count": 0,
@@ -133,12 +218,10 @@ def _stats(values: Sequence[float | int | None]) -> dict[str, float | int | None
             "std": None,
             "min": None,
             "max": None,
-            "ci95_low": None,
-            "ci95_high": None,
+            **_interval_fields([], None, cluster_level=cluster_level),
         }
     mean_value = float(mean(cleaned))
     std_value = 0.0 if len(cleaned) == 1 else float(stdev(cleaned))
-    half_width = 0.0 if len(cleaned) == 1 else float(1.96 * std_value / sqrt(len(cleaned)))
     return {
         "count": len(cleaned),
         "mean": mean_value,
@@ -146,8 +229,11 @@ def _stats(values: Sequence[float | int | None]) -> dict[str, float | int | None
         "std": std_value,
         "min": float(min(cleaned)),
         "max": float(max(cleaned)),
-        "ci95_low": mean_value - half_width,
-        "ci95_high": mean_value + half_width,
+        **_interval_fields(
+            cleaned,
+            cleaned_clusters or None,
+            cluster_level=cluster_level,
+        ),
     }
 
 
@@ -176,23 +262,76 @@ def _cohens_d(left: Sequence[float | int | None], right: Sequence[float | int | 
     return (left_mean - right_mean) / sqrt(pooled_variance)
 
 
+def _cluster_means(values: Sequence[float], clusters: Sequence[Any]) -> dict[Any, float]:
+    buckets: dict[Any, list[float]] = {}
+    for value, cluster in zip(values, clusters, strict=True):
+        buckets.setdefault(cluster, []).append(value)
+    return {cluster: float(mean(items)) for cluster, items in buckets.items()}
+
+
 def _difference_ci95(
     left: Sequence[float | int | None],
     right: Sequence[float | int | None],
-) -> tuple[float | None, float | None, float | None]:
-    left_values = _clean_numeric(left)
-    right_values = _clean_numeric(right)
-    if not left_values or not right_values:
-        return None, None, None
+    left_clusters: Sequence[Any] | None = None,
+    right_clusters: Sequence[Any] | None = None,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
+) -> dict[str, Any]:
+    """Difference in means, with an interval taken over clusters.
 
-    left_mean = float(mean(left_values))
-    right_mean = float(mean(right_values))
-    difference = left_mean - right_mean
-    left_std = 0.0 if len(left_values) < 2 else float(stdev(left_values))
-    right_std = 0.0 if len(right_values) < 2 else float(stdev(right_values))
-    standard_error = sqrt((left_std**2 / max(len(left_values), 1)) + (right_std**2 / max(len(right_values), 1)))
-    half_width = 1.96 * standard_error
-    return difference, difference - half_width, difference + half_width
+    Both sides are repeated measurements of the same small set of virtual
+    patients, so the interval is a one-sample t interval over the per-cluster
+    differences: pairing removes between-patient variance, which is what makes
+    the contrast sensitive with only a handful of profiles. An unpaired
+    interval over runs would be pseudo-replicated twice over.
+    """
+    left_values, left_labels = _aligned_numeric(left, left_clusters)
+    right_values, right_labels = _aligned_numeric(right, right_clusters)
+    out: dict[str, Any] = {
+        "difference_in_means": None,
+        "ci95_low": None,
+        "ci95_high": None,
+        "ci_method": None,
+        "cluster_level": None,
+        "n_clusters": None,
+    }
+    if not left_values or not right_values:
+        out["ci95_omitted_because"] = "one side has no finite observations"
+        return out
+
+    out["difference_in_means"] = float(mean(left_values)) - float(mean(right_values))
+    if not left_labels or not right_labels:
+        out["ci95_omitted_because"] = (
+            "no cluster labels were supplied, and an interval over runs would "
+            "be pseudo-replicated"
+        )
+        return out
+
+    out["cluster_level"] = cluster_level
+    left_means = _cluster_means(left_values, left_labels)
+    right_means = _cluster_means(right_values, right_labels)
+    shared = sorted(set(left_means) & set(right_means), key=str)
+    out["n_clusters"] = len(shared)
+    if len(shared) < MIN_CLUSTERS_FOR_INTERVAL:
+        out["ci95_omitted_because"] = (
+            f"the two sides share {len(shared)} {cluster_level} cluster(s), "
+            f"below the minimum of {MIN_CLUSTERS_FOR_INTERVAL}; without shared "
+            "clusters the contrast cannot be paired, and an unpaired interval "
+            "over these runs would be pseudo-replicated"
+        )
+        return out
+
+    differences = [left_means[cluster] - right_means[cluster] for cluster in shared]
+    estimate = cluster_t_ci(differences, shared)
+    out["paired_difference_over_clusters"] = float(estimate.estimate)
+    out["ci95_low"] = float(estimate.ci_low)
+    out["ci95_high"] = float(estimate.ci_high)
+    out["ci_method"] = "paired_cluster_t"
+    out["per_cluster_differences"] = {
+        str(cluster): float(difference)
+        for cluster, difference in zip(shared, differences, strict=True)
+    }
+    return out
 
 
 def _first_numeric(payload: dict[str, Any], keys: list[str]) -> float | None:
@@ -601,13 +740,32 @@ def _top_runs(
     ]
 
 
-def _aggregate_core_metrics(runs: list[StudyRunSummary]) -> tuple[dict[str, float | int | None], dict[str, dict[str, float | int | None]]]:
+def _profile_cluster(run: StudyRunSummary) -> str:
+    """Unit of independence for a study run: the virtual patient."""
+    return run.profile_id or "unknown"
+
+
+def _scenario_cluster(run: StudyRunSummary) -> str:
+    return run.scenario_slug or run.scenario_name or "unknown"
+
+
+def _aggregate_core_metrics(
+    runs: list[StudyRunSummary],
+    cluster_fn: Callable[[StudyRunSummary], str] = _profile_cluster,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
+) -> tuple[dict[str, float | int | None], dict[str, dict[str, Any]]]:
     aggregate: dict[str, float | int | None] = {"run_count": len(runs)}
-    aggregate_stats: dict[str, dict[str, float | int | None]] = {}
+    aggregate_stats: dict[str, dict[str, Any]] = {}
+    clusters = [cluster_fn(run) for run in runs]
+
+    def stats_for(values: Sequence[float | int | None]) -> dict[str, Any]:
+        return _stats(values, clusters, cluster_level=cluster_level)
+
     for metric_key, aggregate_key in CORE_METRIC_KEYS.items():
         values = [run.metrics.get(metric_key) for run in runs]
         aggregate[aggregate_key] = _mean(values)
-        aggregate_stats[metric_key] = _stats(values)
+        aggregate_stats[metric_key] = stats_for(values)
 
     uncertainty_mean_values = [run.predictor_uncertainty_mean for run in runs]
     uncertainty_p95_values = [run.predictor_uncertainty_p95 for run in runs]
@@ -615,9 +773,9 @@ def _aggregate_core_metrics(runs: list[StudyRunSummary]) -> tuple[dict[str, floa
     aggregate["mean_predictor_uncertainty_mean"] = _mean(uncertainty_mean_values)
     aggregate["mean_predictor_uncertainty_p95"] = _mean(uncertainty_p95_values)
     aggregate["mean_predictor_uncertainty_max"] = _mean(uncertainty_max_values)
-    aggregate_stats["predictor_uncertainty_mean"] = _stats(uncertainty_mean_values)
-    aggregate_stats["predictor_uncertainty_p95"] = _stats(uncertainty_p95_values)
-    aggregate_stats["predictor_uncertainty_max"] = _stats(uncertainty_max_values)
+    aggregate_stats["predictor_uncertainty_mean"] = stats_for(uncertainty_mean_values)
+    aggregate_stats["predictor_uncertainty_p95"] = stats_for(uncertainty_p95_values)
+    aggregate_stats["predictor_uncertainty_max"] = stats_for(uncertainty_max_values)
     return aggregate, aggregate_stats
 
 
@@ -663,8 +821,15 @@ def _aggregate_uncertainty_alignment(reports: list[dict[str, Any]]) -> dict[str,
     return summary
 
 
-def _summarize_group(runs: list[StudyRunSummary]) -> dict[str, Any]:
-    aggregate, aggregate_stats = _aggregate_core_metrics(runs)
+def _summarize_group(
+    runs: list[StudyRunSummary],
+    cluster_fn: Callable[[StudyRunSummary], str] = _profile_cluster,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
+) -> dict[str, Any]:
+    aggregate, aggregate_stats = _aggregate_core_metrics(
+        runs, cluster_fn, cluster_level=cluster_level
+    )
     return {
         "run_count": len(runs),
         "aggregate": aggregate,
@@ -679,12 +844,21 @@ def _summarize_group(runs: list[StudyRunSummary]) -> dict[str, Any]:
     }
 
 
-def _group_summary(runs: list[StudyRunSummary], key_fn: Callable[[StudyRunSummary], str | None]) -> dict[str, Any]:
+def _group_summary(
+    runs: list[StudyRunSummary],
+    key_fn: Callable[[StudyRunSummary], str | None],
+    cluster_fn: Callable[[StudyRunSummary], str] = _profile_cluster,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
+) -> dict[str, Any]:
     groups: dict[str, list[StudyRunSummary]] = {}
     for run in runs:
         key = key_fn(run) or "unknown"
         groups.setdefault(key, []).append(run)
-    return {group: _summarize_group(items) for group, items in sorted(groups.items())}
+    return {
+        group: _summarize_group(items, cluster_fn, cluster_level=cluster_level)
+        for group, items in sorted(groups.items())
+    }
 
 
 def _pairwise_baseline_deltas(runs: list[StudyRunSummary]) -> dict[str, Any]:
@@ -700,8 +874,11 @@ def _pairwise_baseline_deltas(runs: list[StudyRunSummary]) -> dict[str, Any]:
 
     candidate_name = next((run.algorithm for run in runs if run.algorithm_role == "candidate"), None)
     by_baseline: dict[str, dict[str, list[float]]] = {}
+    # Each paired difference is labelled with the profile it came from: the
+    # pairs are not independent, so the interval must be taken over profiles.
+    clusters_by_baseline: dict[str, dict[str, list[str]]] = {}
     pair_count: dict[str, int] = {}
-    for mapping in keyed_runs.values():
+    for (_arm, cluster_profile, _scenario, _seed), mapping in keyed_runs.items():
         candidate = next((item for item in mapping.values() if isinstance(item, StudyRunSummary) and item.algorithm_role == "candidate"), None)
         if candidate is None:
             continue
@@ -717,12 +894,16 @@ def _pairwise_baseline_deltas(runs: list[StudyRunSummary]) -> dict[str, Any]:
             seen.add(baseline.algorithm)
             pair_count[baseline.algorithm] = pair_count.get(baseline.algorithm, 0) + 1
             bucket = by_baseline.setdefault(baseline.algorithm, {metric: [] for metric in PAIRWISE_METRICS})
+            cluster_bucket = clusters_by_baseline.setdefault(
+                baseline.algorithm, {metric: [] for metric in PAIRWISE_METRICS}
+            )
             for metric in PAIRWISE_METRICS:
                 candidate_value = candidate.metrics.get(metric)
                 baseline_value = baseline.metrics.get(metric)
                 if candidate_value is None or baseline_value is None:
                     continue
                 bucket[metric].append(float(candidate_value) - float(baseline_value))
+                cluster_bucket[metric].append(cluster_profile)
 
     return {
         "candidate_algorithm": candidate_name,
@@ -730,7 +911,13 @@ def _pairwise_baseline_deltas(runs: list[StudyRunSummary]) -> dict[str, Any]:
             baseline: {
                 "pair_count": pair_count.get(baseline, 0),
                 "mean_deltas": {metric: _mean(values) for metric, values in metrics.items()},
-                "delta_stats": {metric: _stats(values) for metric, values in metrics.items()},
+                "delta_stats": {
+                    metric: _stats(
+                        values,
+                        clusters_by_baseline.get(baseline, {}).get(metric),
+                    )
+                    for metric, values in metrics.items()
+                },
             }
             for baseline, metrics in sorted(by_baseline.items())
         },
@@ -1004,6 +1191,36 @@ def analyze_run_directory(run_dir: Path) -> StudyRunSummary:
     )
 
 
+def _derive_inference_blocks(runs: list[StudyRunSummary]) -> dict[str, Any]:
+    """Every block that is a pure function of the runs, derived in one place.
+
+    These blocks carry the confidence intervals, so they must never be read
+    back from a stored file: a summary written by an earlier version of this
+    module would keep serving intervals computed under a superseded method,
+    and nothing in the payload marks which method produced them. The runs are
+    the record; the statistics are derived from them on every read.
+    """
+    aggregate, aggregate_stats = _aggregate_core_metrics(runs)
+    return {
+        "aggregate": aggregate,
+        "aggregate_stats": aggregate_stats,
+        "by_algorithm": _group_summary(runs, lambda run: run.algorithm),
+        # Within one profile every run is a repeated measurement of the same
+        # virtual patient, so no patient-level interval exists there. Clustering
+        # on the scenario keeps an interval that is honest about what it covers:
+        # variation across scenarios for this one patient, not across patients.
+        "by_profile": _group_summary(
+            runs,
+            lambda run: run.profile_id,
+            _scenario_cluster,
+            cluster_level="scenario_slug (within a single profile_id)",
+        ),
+        "by_arm": _group_summary(runs, lambda run: run.study_arm or run.condition_group),
+        "by_scenario": _group_summary(runs, lambda run: run.scenario_slug or run.scenario_name),
+        "pairwise_baseline_deltas": _pairwise_baseline_deltas(runs),
+    }
+
+
 def analyze_study_directory(
     study_dir: Path,
     *,
@@ -1017,7 +1234,9 @@ def analyze_study_directory(
     protocol_reference = _load_protocol_reference(study_dir)
     runs = _infer_protocol_metadata(runs, protocol_reference)
 
-    aggregate, aggregate_stats = _aggregate_core_metrics(runs)
+    derived = _derive_inference_blocks(runs)
+    aggregate = derived["aggregate"]
+    aggregate_stats = derived["aggregate_stats"]
     certified_runs = [run for run in runs if run.certified_for_medical_research]
     uncertified_runs = [run for run in runs if run.certified_for_medical_research is False or run.certification_grade is None]
 
@@ -1086,11 +1305,11 @@ def analyze_study_directory(
     }
 
     evidence_rows = [_evidence_row(run) for run in runs]
-    by_algorithm = _group_summary(runs, lambda run: run.algorithm)
-    by_profile = _group_summary(runs, lambda run: run.profile_id)
-    by_arm = _group_summary(runs, lambda run: run.study_arm or run.condition_group)
-    by_scenario = _group_summary(runs, lambda run: run.scenario_slug or run.scenario_name)
-    pairwise_baseline_deltas = _pairwise_baseline_deltas(runs)
+    by_algorithm = derived["by_algorithm"]
+    by_profile = derived["by_profile"]
+    by_arm = derived["by_arm"]
+    by_scenario = derived["by_scenario"]
+    pairwise_baseline_deltas = derived["pairwise_baseline_deltas"]
     safety_summary = _build_safety_summary(runs, certification_comparison)
     calibration_summary = _build_calibration_summary(runs)
     uncertainty_summary = _build_uncertainty_summary(runs)
@@ -1165,11 +1384,16 @@ def load_study_summary(path: str | Path) -> StudySummary:
         )
         for item in payload.get("runs", [])
     ]
+    # Derived statistics are recomputed from the runs rather than read back, so
+    # a summary written by an older version cannot serve its intervals again.
+    # Without runs there is nothing to derive from, and the stored blocks are
+    # all that exist; they are then passed through unchanged.
+    derived = _derive_inference_blocks(runs) if runs else {}
     return StudySummary(
         study_dir=str(payload.get("study_dir", resolved)),
         run_count=int(payload.get("run_count", len(runs))),
-        aggregate=dict(payload.get("aggregate", {})),
-        aggregate_stats=dict(payload.get("aggregate_stats", {})),
+        aggregate=dict(derived.get("aggregate", payload.get("aggregate", {}))),
+        aggregate_stats=dict(derived.get("aggregate_stats", payload.get("aggregate_stats", {}))),
         certification_comparison=dict(payload.get("certification_comparison", {})),
         baseline_summary=dict(payload.get("baseline_summary", {})),
         failure_analysis=dict(payload.get("failure_analysis", {})),
@@ -1177,12 +1401,14 @@ def load_study_summary(path: str | Path) -> StudySummary:
         study_protocol=dict(payload["study_protocol"]) if isinstance(payload.get("study_protocol"), dict) else None,
         evidence_rows=list(payload.get("evidence_rows", [])),
         runs=runs,
-        by_algorithm=dict(payload.get("by_algorithm", {})),
-        by_profile=dict(payload.get("by_profile", {})),
-        by_arm=dict(payload.get("by_arm", {})),
-        by_scenario=dict(payload.get("by_scenario", {})),
+        by_algorithm=dict(derived.get("by_algorithm", payload.get("by_algorithm", {}))),
+        by_profile=dict(derived.get("by_profile", payload.get("by_profile", {}))),
+        by_arm=dict(derived.get("by_arm", payload.get("by_arm", {}))),
+        by_scenario=dict(derived.get("by_scenario", payload.get("by_scenario", {}))),
         safety_summary=dict(payload.get("safety_summary", {})),
-        pairwise_baseline_deltas=dict(payload.get("pairwise_baseline_deltas", {})),
+        pairwise_baseline_deltas=dict(
+            derived.get("pairwise_baseline_deltas", payload.get("pairwise_baseline_deltas", {}))
+        ),
         calibration_summary=dict(payload["calibration_summary"]) if isinstance(payload.get("calibration_summary"), dict) else None,
         uncertainty_summary=dict(payload["uncertainty_summary"]) if isinstance(payload.get("uncertainty_summary"), dict) else None,
     )
@@ -1192,6 +1418,9 @@ def _subgroup_effects(
     left_runs: list[StudyRunSummary],
     right_runs: list[StudyRunSummary],
     key_fn: Callable[[StudyRunSummary], str | None],
+    cluster_fn: Callable[[StudyRunSummary], str] = _profile_cluster,
+    *,
+    cluster_level: str = DEFAULT_CLUSTER_KEY,
 ) -> dict[str, Any]:
     groups = sorted({key_fn(run) or "unknown" for run in left_runs + right_runs})
     metrics = ("tir_70_180", "supervisor_interventions", "mean_glucose", "tir_below_70", "predictor_uncertainty_mean")
@@ -1207,14 +1436,21 @@ def _subgroup_effects(
             else:
                 left_values = [run.metrics.get(metric) for run in left_group]
                 right_values = [run.metrics.get(metric) for run in right_group]
-            difference, ci95_low, ci95_high = _difference_ci95(left_values, right_values)
+            estimate = _difference_ci95(
+                left_values,
+                right_values,
+                [cluster_fn(run) for run in left_group],
+                [cluster_fn(run) for run in right_group],
+                cluster_level=cluster_level,
+            )
             metric_payload[metric] = {
                 "left_n": len(_clean_numeric(left_values)),
                 "right_n": len(_clean_numeric(right_values)),
-                "difference_in_means": difference,
-                "ci95_low": ci95_low,
-                "ci95_high": ci95_high,
-                "cohens_d": _cohens_d(left_values, right_values),
+                # Standardised on runs, so it inherits the run-level spread and
+                # is not a cluster-level effect size. Read it beside the
+                # interval, never instead of it.
+                "cohens_d_over_runs": _cohens_d(left_values, right_values),
+                **estimate,
             }
         result[group] = metric_payload
     return result
@@ -1262,16 +1498,18 @@ def compare_studies(left: str | Path, right: str | Path, *, left_label: str | No
             if left_value is not None and right_value is not None:
                 delta[f"calibration_{metric}"] = float(left_value) - float(right_value)
 
-    effect_estimates: dict[str, dict[str, float | None]] = {}
+    effect_estimates: dict[str, dict[str, Any]] = {}
     for metric in ("tir_70_180", "supervisor_interventions", "mean_glucose", "tir_below_70"):
         left_values = [run.metrics.get(metric) for run in left_summary.runs]
         right_values = [run.metrics.get(metric) for run in right_summary.runs]
-        difference, ci95_low, ci95_high = _difference_ci95(left_values, right_values)
         effect_estimates[metric] = {
-            "difference_in_means": difference,
-            "ci95_low": ci95_low,
-            "ci95_high": ci95_high,
-            "cohens_d": _cohens_d(left_values, right_values),
+            "cohens_d_over_runs": _cohens_d(left_values, right_values),
+            **_difference_ci95(
+                left_values,
+                right_values,
+                [_profile_cluster(run) for run in left_summary.runs],
+                [_profile_cluster(run) for run in right_summary.runs],
+            ),
         }
 
     left_runs = left_summary.runs
@@ -1284,6 +1522,12 @@ def compare_studies(left: str | Path, right: str | Path, *, left_label: str | No
         left_summary=left_payload,
         right_summary=right_payload,
         by_algorithm=_subgroup_effects(left_runs, right_runs, lambda run: run.algorithm),
-        by_profile=_subgroup_effects(left_runs, right_runs, lambda run: run.profile_id),
+        by_profile=_subgroup_effects(
+            left_runs,
+            right_runs,
+            lambda run: run.profile_id,
+            _scenario_cluster,
+            cluster_level="scenario_slug (within a single profile_id)",
+        ),
         by_scenario=_subgroup_effects(left_runs, right_runs, lambda run: run.scenario_slug or run.scenario_name),
     )

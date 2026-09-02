@@ -49,6 +49,31 @@ def test_summarize_results_csv_extracts_research_metrics(tmp_path) -> None:
     assert record["realism_verdict"] == "likely_realistic"
 
 
+def test_index_results_finds_runs_below_a_hidden_directory(tmp_path) -> None:
+    """A results root inside a dot-directory must still index its runs.
+
+    The hidden-path filter used to inspect every part of the absolute path, so any
+    tree below `~/.local/share`, a dotted project directory, or a temporary
+    directory silently indexed zero runs while still reporting success.
+    """
+    root = tmp_path / ".cache" / "iints" / "results"
+    _write_run(root / "study" / "run_a", [110, 122, 134, 145, 132, 120])
+
+    bundle = index_results(root)
+
+    assert bundle.run_count == 1, "runs below a hidden directory were filtered out"
+
+
+def test_index_results_still_skips_hidden_entries_inside_the_root(tmp_path) -> None:
+    root = tmp_path / "results"
+    _write_run(root / "study" / "run_a", [110, 122, 134, 145, 132, 120])
+    _write_run(root / ".scratch" / "run_b", [95, 100, 112, 126, 121, 115])
+
+    bundle = index_results(root)
+
+    assert bundle.run_count == 1
+
+
 def test_index_results_writes_catalogue_and_optional_raw_table(tmp_path) -> None:
     root = tmp_path / "results"
     _write_run(root / "study" / "run_a", [110, 122, 134, 145, 132, 120])

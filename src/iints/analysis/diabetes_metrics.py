@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from iints.core import glycemic_risk
+
 class DiabetesMetrics:
     """Professional diabetes metrics for algorithm evaluation."""
     
@@ -12,20 +14,26 @@ class DiabetesMetrics:
     
     @staticmethod
     def coefficient_of_variation(glucose_values):
-        """Calculate CV - variability metric."""
-        return (np.std(glucose_values) / np.mean(glucose_values)) * 100
-    
+        """Calculate CV - variability metric.
+
+        Uses the sample standard deviation (ddof=1), matching
+        iints.core.clinical_metrics so the two modules report the same CV.
+        """
+        values = np.asarray(glucose_values, dtype=float)
+        return (np.std(values, ddof=1) / np.mean(values)) * 100
+
     @staticmethod
     def blood_glucose_risk_index(glucose_values, risk_type='high'):
-        """Calculate LBGI or HBGI."""
-        def risk_function(bg):
-            if risk_type == 'low':
-                return 10 * (1.509 * (np.log(bg)**1.084 - 5.381))**2 if bg < 112.5 else 0
-            else:  # high
-                return 10 * (1.509 * (np.log(bg)**1.084 - 5.381))**2 if bg > 112.5 else 0
-        
-        risks = [risk_function(bg) for bg in glucose_values]
-        return np.mean(risks)
+        """Calculate LBGI or HBGI.
+
+        Delegates to iints.core.glycemic_risk, the single definition used
+        across the SDK. The previous inline version split the branches at a
+        rounded 112.5 mg/dL; the canonical version splits on the sign of
+        f(BG), which is the exact same boundary without the rounding.
+        """
+        if risk_type == 'low':
+            return glycemic_risk.lbgi(glucose_values)
+        return glycemic_risk.hbgi(glucose_values)
     
     @staticmethod
     def calculate_all_metrics(df, baseline=120):

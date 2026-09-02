@@ -12,6 +12,7 @@ from iints.core.safety import InputValidator, SafetyConfig
 from iints.core.safety.config import (
     SIMULATION_GLUCOSE_CEILING_MGDL,
     SIMULATION_GLUCOSE_FLOOR_MGDL,
+    SENSOR_FAIL_SOFT_MAX_FOLLOW_PER_5_MIN_MGDL,
     SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL,
 )
 from iints.core.devices.models import SensorModel, PumpModel
@@ -477,7 +478,18 @@ class Simulator:
             if fallback is not None and active_validator.last_validation_time is not None:
                 time_delta = max(float(current_time) - float(active_validator.last_validation_time), 0.0)
                 if time_delta > 0.0:
-                    allowed_delta = active_validator.max_glucose_delta_per_5_min * (time_delta / 5.0)
+                    # Follow a rejected reading at the fail-soft rate, which is
+                    # deliberately tighter than the plausibility ceiling that
+                    # rejected it: this path is the damping against corrupted
+                    # sensor input, not a statement about plausible physiology.
+                    follow_rate = float(
+                        getattr(
+                            self.safety_config,
+                            "fail_soft_max_follow_per_5_min",
+                            SENSOR_FAIL_SOFT_MAX_FOLLOW_PER_5_MIN_MGDL,
+                        )
+                    )
+                    allowed_delta = follow_rate * (time_delta / 5.0)
                     requested_delta = incoming_value - float(fallback)
                     fallback = float(fallback) + float(
                         max(-allowed_delta, min(requested_delta, allowed_delta))
@@ -786,6 +798,36 @@ class Simulator:
             safety_report["performance_report"] = self._build_performance_report()
         logger.info("Batch simulation completed. %d records generated.", len(simulation_results_df))
         return simulation_results_df, safety_report
+
+    def _patient_compartment_fields(self) -> Dict[str, float]:
+        """Return the patient model's compartment contents and fluxes for this step.
+
+        Without these columns the exported trace holds only glucose, insulin on
+        board, and carbohydrates on board, so any compartment-level view would
+        have to re-implement the physiology to obtain the rest -- and would then
+        display numbers this SDK never computed. Exporting the integrated state
+        keeps the single source of truth in the ODE.
+
+        The accessors are looked up rather than assumed, because the three
+        patient backends integrate different state vectors. A backend that
+        publishes no schema contributes no columns, which is preferable to
+        columns whose names would suggest the wrong model. Flux values are
+        instantaneous rates at the end of the step, not amounts transferred
+        during it.
+        """
+
+        state_getter = getattr(self.patient_model, "get_compartment_state", None)
+        if not callable(state_getter):
+            return {}
+        fields: Dict[str, float] = {
+            f"patient_state_{key}": value for key, value in state_getter().items()
+        }
+        flux_getter = getattr(self.patient_model, "flux_snapshot", None)
+        if callable(flux_getter):
+            fields.update(
+                {f"patient_flux_{key}": value for key, value in flux_getter().items()}
+            )
+        return fields
 
     def export_audit_trail(self, simulation_results_df: pd.DataFrame, output_dir: str) -> Dict[str, str]:
         """
@@ -1370,6 +1412,7 @@ class Simulator:
                 "human_intervention_note": human_intervention.get("note") if isinstance(human_intervention, dict) else "",
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
                 "explainable_events": "; ".join(step_events) if step_events else "",
+                **self._patient_compartment_fields(),
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
             }
 

@@ -19,6 +19,8 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 
+from iints.core import glycemic_risk
+
 
 @dataclass
 class ClinicalMetricsResult:
@@ -233,16 +235,23 @@ class ClinicalMetricsCalculator:
                                      glucose: pd.Series,
                                      timestamp: Optional[pd.Series] = None) -> float:
         """
-        Calculate Hypoglycemia Index (HI).
+        Calculate the SDK's hypoglycaemia severity score.
 
-        HI measures severity and duration of hypoglycemia events.
+        WARNING - this is not Rodbard's published Hypoglycemia Index. Rodbard
+        defines HI = sum((LLTR - BG)^b) / (n * d) with b = 2 and d = 30 mg/dL;
+        the score below is a mean of linearly normalised excursions under
+        70 mg/dL, expressed as a percentage. It is a defensible internal
+        severity score but must not be reported or cited as the published HI.
+
+        Kept under the original name for API compatibility;
+        ``calculate_hypo_severity_score`` is the preferred alias.
 
         Args:
             glucose: Series of glucose values
             timestamp: Optional series of timestamps (in minutes)
 
         Returns:
-            Hypoglycemia Index value
+            Mean linear hypoglycaemia severity, in percent
         """
         if len(glucose) == 0:
             return 0.0
@@ -263,6 +272,16 @@ class ClinicalMetricsCalculator:
 
         return hi / len(glucose) * 100 if len(glucose) > 0 else 0
 
+    def calculate_hypo_severity_score(self,
+                                      glucose: pd.Series,
+                                      timestamp: Optional[pd.Series] = None) -> float:
+        """Preferred name for :meth:`calculate_hypoglycemia_index`.
+
+        Same value, honest name: this is an internal severity score, not the
+        published Hypoglycemia Index.
+        """
+        return self.calculate_hypoglycemia_index(glucose, timestamp)
+
     def calculate_lbgi(self, glucose: pd.Series) -> float:
         """
         Calculate Low Blood Glucose Index (LBGI).
@@ -279,21 +298,10 @@ class ClinicalMetricsCalculator:
         if len(glucose) == 0:
             return 0.0
 
-        # Transform glucose to risk space
-        # BG Risk function: f(BG) = 1.509 × (ln(BG)^1.084 - 5.381)
-        lbgi = 0.0
-
-        for bg in glucose:
-            if bg > 0:
-                try:
-                    risk = 1.509 * ((np.log(bg) ** 1.084) - 5.381)
-                    if risk < 0:
-                        # Low glucose risk
-                        lbgi += risk ** 2
-                except (ValueError, OverflowError):
-                    pass
-
-        return lbgi / len(glucose)
+        # Delegates to the canonical implementation so this module and
+        # iints.analysis.diabetes_metrics cannot drift apart. See
+        # iints.core.glycemic_risk for the definition and the factor 10.
+        return glycemic_risk.lbgi(glucose)
 
     def calculate_hbgi(self, glucose: pd.Series) -> float:
         """
@@ -311,19 +319,8 @@ class ClinicalMetricsCalculator:
         if len(glucose) == 0:
             return 0.0
 
-        hbgi = 0.0
-
-        for bg in glucose:
-            if bg > 0:
-                try:
-                    risk = 1.509 * ((np.log(bg) ** 1.084) - 5.381)
-                    if risk > 0:
-                        # High glucose risk
-                        hbgi += risk ** 2
-                except (ValueError, OverflowError):
-                    pass
-
-        return hbgi / len(glucose)
+        # See calculate_lbgi: single definition in iints.core.glycemic_risk.
+        return glycemic_risk.hbgi(glucose)
 
     def calculate_readings_per_day(self,
                                    glucose: pd.Series,
@@ -341,31 +338,51 @@ class ClinicalMetricsCalculator:
         if duration_hours == 0:
             return len(glucose)
 
-        # If timestamps are provided and cover ~1 day of 5-min intervals,
-        # normalize to the expected 288 readings/day for stability.
-        if len(glucose) in (287, 288, 289) and 23.5 <= duration_hours <= 24.5:
-            return 288.0
-
+        # No snapping to the nominal 288/day: this metric exists to expose
+        # sensor loss, so rounding a near-complete day up to the expected
+        # count would hide exactly what it is supposed to measure.
         readings_per_hour = len(glucose) / duration_hours
         return readings_per_hour * 24
 
     def calculate_data_coverage(self,
                                 glucose: pd.Series,
                                 expected_interval_minutes: int = 5,
-                                duration_hours: float = 24) -> float:
+                                duration_hours: float = 24,
+                                timestamp: Optional[pd.Series] = None) -> float:
         """
         Calculate data coverage percentage.
+
+        When timestamps are supplied, coverage is measured on the time axis:
+        the sum of observed sampling intervals (each capped at one nominal
+        interval) divided by the total span. This is the only form that can
+        detect gaps, duplicate timestamps and forward-filled samples.
+
+        Without timestamps it falls back to a row count against the expected
+        number of readings, which cannot see gaps in an already gap-filled
+        series and will report 100% for a resampled table.
 
         Args:
             glucose: Series of glucose values
             expected_interval_minutes: Expected time between readings
             duration_hours: Duration of data in hours
+            timestamp: Optional series of timestamps in minutes
 
         Returns:
             Data coverage percentage
         """
         if duration_hours == 0:
             return 0.0
+
+        if timestamp is not None and len(timestamp) >= 2:
+            times = pd.Series(timestamp).dropna().astype(float).sort_values()
+            span = float(times.iloc[-1] - times.iloc[0])
+            if span <= 0:
+                return 0.0
+            deltas = times.diff().dropna()
+            # A gap contributes only one nominal interval of covered time; a
+            # duplicate timestamp (delta 0) contributes nothing.
+            observed = float(deltas.clip(upper=expected_interval_minutes).sum())
+            return min((observed / span) * 100, 100)
 
         expected_readings = (duration_hours * 60) / expected_interval_minutes
         actual_readings = len(glucose)
@@ -426,7 +443,9 @@ class ClinicalMetricsCalculator:
 
             # Additional
             readings_per_day=self.calculate_readings_per_day(clean_glucose, duration_hours),
-            data_coverage=self.calculate_data_coverage(clean_glucose, duration_hours=duration_hours)
+            data_coverage=self.calculate_data_coverage(
+                clean_glucose, duration_hours=duration_hours, timestamp=timestamp
+            )
         )
 
         return result

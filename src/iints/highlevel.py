@@ -8,6 +8,7 @@ import pandas as pd
 import yaml
 
 from iints.api.base_algorithm import InsulinAlgorithm
+from iints.core.patient.compartments import schema_for_model
 from iints.core.patient.patient_factory import PatientFactory
 from iints.core.patient.profile import PatientProfile
 from iints.core.physiology_variation import EmpiricalResidualModel
@@ -212,6 +213,15 @@ def run_simulation(
     results_df.to_csv(results_csv, index=False)
     outputs["results_csv"] = str(results_csv)
 
+    compartment_schema_payload = schema_for_model(patient_model)
+    if compartment_schema_payload is not None:
+        # Written beside the trace so a compartment view reads topology, units,
+        # and canonical/extension provenance from the run that produced the
+        # numbers, instead of hardcoding one backend's layout.
+        compartment_schema_path = output_path / "compartment_schema.json"
+        write_json(compartment_schema_path, compartment_schema_payload)
+        outputs["compartment_schema_path"] = str(compartment_schema_path)
+
     if export_audit:
         audit_paths = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
         outputs["audit"] = audit_paths
@@ -400,6 +410,15 @@ def run_full(
     results_csv = output_path / "results.csv"
     results_df.to_csv(results_csv, index=False)
     outputs["results_csv"] = str(results_csv)
+
+    compartment_schema_payload = schema_for_model(patient_model)
+    if compartment_schema_payload is not None:
+        # Written beside the trace so a compartment view reads topology, units,
+        # and canonical/extension provenance from the run that produced the
+        # numbers, instead of hardcoding one backend's layout.
+        compartment_schema_path = output_path / "compartment_schema.json"
+        write_json(compartment_schema_path, compartment_schema_payload)
+        outputs["compartment_schema_path"] = str(compartment_schema_path)
 
     outputs["audit"] = simulator.export_audit_trail(results_df, output_dir=str(output_path / "audit"))
     outputs["baseline_files"] = write_baseline_comparison(comparison, output_path / "baseline")

@@ -2260,6 +2260,28 @@ def validate_run(
         raise typer.Exit(code=1)
 
 
+def _format_interval(block: Any) -> str:
+    """Render an interval together with what it was taken over.
+
+    A bare ``[low, high]`` labelled "95% CI" hides the question that decides
+    whether it means anything: how many independent units it rests on. When
+    :mod:`iints.analysis.study_analysis` withholds an interval it records the
+    reason, and printing that reason is more informative than printing nothing.
+    """
+    if not isinstance(block, dict):
+        return "`n/a`"
+    low = block.get("ci95_low")
+    high = block.get("ci95_high")
+    if low is None or high is None:
+        reason = block.get("ci95_omitted_because")
+        return f"not reported ({reason})" if reason else "`n/a`"
+    method = block.get("ci_method") or "unspecified method"
+    clusters = block.get("n_clusters")
+    level = block.get("cluster_level") or "unknown unit"
+    basis = f"{method}, {clusters} {level} clusters" if clusters else method
+    return f"`[{low}, {high}]` ({basis})"
+
+
 def _study_summary_markdown(payload: Dict[str, Any]) -> str:
     aggregate = payload.get("aggregate", {})
     aggregate_stats = payload.get("aggregate_stats", {})
@@ -2297,9 +2319,9 @@ def _study_summary_markdown(payload: Dict[str, Any]) -> str:
         "## Descriptive Statistics",
         "",
         f"- TIR 70-180 std: `{aggregate_stats.get('tir_70_180', {}).get('std')}`",
-        f"- TIR 70-180 95% CI: `[{aggregate_stats.get('tir_70_180', {}).get('ci95_low')}, {aggregate_stats.get('tir_70_180', {}).get('ci95_high')}]`",
+        f"- TIR 70-180 95% CI: {_format_interval(aggregate_stats.get('tir_70_180'))}",
         f"- Mean glucose std: `{aggregate_stats.get('mean_glucose', {}).get('std')}`",
-        f"- Mean glucose 95% CI: `[{aggregate_stats.get('mean_glucose', {}).get('ci95_low')}, {aggregate_stats.get('mean_glucose', {}).get('ci95_high')}]`",
+        f"- Mean glucose 95% CI: {_format_interval(aggregate_stats.get('mean_glucose'))}",
         "",
         "## Certification Comparison",
         "",
@@ -2503,8 +2525,8 @@ def _study_comparison_markdown(payload: Dict[str, Any]) -> str:
             [
                 f"### {metric}",
                 f"- Difference in means: `{estimate.get('difference_in_means')}`",
-                f"- 95% CI: `[{estimate.get('ci95_low')}, {estimate.get('ci95_high')}]`",
-                f"- Cohen's d: `{estimate.get('cohens_d')}`",
+                f"- 95% CI: {_format_interval(estimate)}",
+                f"- Cohen's d (over runs, not clusters): `{estimate.get('cohens_d_over_runs')}`",
                 "",
             ]
         )
@@ -2517,7 +2539,8 @@ def _study_comparison_markdown(payload: Dict[str, Any]) -> str:
             lines.append(f"### {label}")
             tir = metrics.get("tir_70_180", {}) if isinstance(metrics, dict) else {}
             lines.append(f"- TIR diff: `{tir.get('difference_in_means')}`")
-            lines.append(f"- TIR Cohen's d: `{tir.get('cohens_d')}`")
+            lines.append(f"- TIR 95% CI: {_format_interval(tir)}")
+            lines.append(f"- TIR Cohen's d (over runs): `{tir.get('cohens_d_over_runs')}`")
             lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -3029,12 +3052,15 @@ def analyze(
     table.add_row("Run count", str(payload["run_count"]))
     table.add_row("Mean TIR 70-180", f"{aggregate['mean_tir_70_180']:.2f}%" if aggregate["mean_tir_70_180"] is not None else "n/a")
     table.add_row("TIR 70-180 std", f"{aggregate_stats['tir_70_180']['std']:.2f}" if aggregate_stats["tir_70_180"]["std"] is not None else "n/a")
+    tir_stats = aggregate_stats.get("tir_70_180", {})
     table.add_row(
         "TIR 70-180 95% CI",
         (
-            f"[{aggregate_stats['tir_70_180']['ci95_low']:.2f}, {aggregate_stats['tir_70_180']['ci95_high']:.2f}]"
-            if aggregate_stats["tir_70_180"]["ci95_low"] is not None and aggregate_stats["tir_70_180"]["ci95_high"] is not None
-            else "n/a"
+            f"[{tir_stats['ci95_low']:.2f}, {tir_stats['ci95_high']:.2f}]"
+            f" ({tir_stats.get('ci_method')}, n={tir_stats.get('n_clusters')}"
+            f" {tir_stats.get('cluster_level')})"
+            if tir_stats.get("ci95_low") is not None and tir_stats.get("ci95_high") is not None
+            else f"not reported ({tir_stats.get('ci95_omitted_because') or 'n/a'})"
         ),
     )
     table.add_row(
@@ -3131,17 +3157,26 @@ def compare_study(
     effects.add_column("Metric", style="green")
     effects.add_column("Difference in means")
     effects.add_column("95% CI")
-    effects.add_column("Cohen's d")
+    effects.add_column("Interval basis")
+    effects.add_column("Cohen's d (runs)")
     for metric, estimate in payload.get("effect_estimates", {}).items():
         ci_low = estimate.get("ci95_low")
         ci_high = estimate.get("ci95_high")
-        ci_text = "n/a" if ci_low is None or ci_high is None else f"[{ci_low:.3f}, {ci_high:.3f}]"
+        ci_text = "not reported" if ci_low is None or ci_high is None else f"[{ci_low:.3f}, {ci_high:.3f}]"
+        clusters = estimate.get("n_clusters")
+        basis = (
+            f"{estimate.get('ci_method')}, n={clusters} {estimate.get('cluster_level')}"
+            if ci_low is not None
+            else str(estimate.get("ci95_omitted_because") or "n/a")
+        )
         diff = estimate.get("difference_in_means")
+        cohens_d = estimate.get("cohens_d_over_runs")
         effects.add_row(
             metric,
             "n/a" if diff is None else f"{diff:.3f}",
             ci_text,
-            "n/a" if estimate.get("cohens_d") is None else f"{estimate['cohens_d']:.3f}",
+            basis,
+            "n/a" if cohens_d is None else f"{cohens_d:.3f}",
         )
     console.print(effects)
 
@@ -11132,10 +11167,11 @@ def research_ppgr_benchmark(
     output_dir: Annotated[Path, typer.Option("--output-dir", help="Output directory for benchmark reports")] = Path("results/ppgr_benchmark"),
     sensor: Annotated[str, typer.Option("--sensor", help="Sensor type to evaluate ('dexcom' or 'libre')")] = "dexcom",
     subjects_file: Annotated[Optional[Path], typer.Option("--subjects-file", help="Optional subjects bio metadata CSV")] = None,
+    glucofm_checkpoint: Annotated[Optional[Path], typer.Option("--glucofm-checkpoint", help="Optional trained IINTS GlucoFM v2 reproduction checkpoint. Requires measured 24-hour pre-meal history JSON per meal.")] = None,
     test_split: Annotated[float, typer.Option("--test-split", help="Fraction of meals for test evaluation")] = 0.25,
     seed: Annotated[int, typer.Option("--seed", help="Random seed for reproducible split")] = 42,
 ):
-    """Benchmark 2-hour Postprandial Glycemic Response (PPGR) models (Google GlucoFM style)."""
+    """Benchmark PPGR estimators with a subject-disjoint train/test split."""
     console = Console()
     from iints.research.ppgr import run_ppgr_benchmark
 
@@ -11146,6 +11182,7 @@ def research_ppgr_benchmark(
             output_dir=output_dir,
             sensor=sensor,
             subjects_path=subjects_file,
+            glucofm_checkpoint=glucofm_checkpoint,
             test_split=test_split,
             seed=seed,
         )
@@ -11228,38 +11265,48 @@ def research_cgm_jepa_experiment(
             param_range=(min_val, max_val),
         )
 
-        table = Table(title="CGM-JEPA Scientific Validation Metrics")
-        table.add_column("Evaluation Dimension", style="bold")
+        # The third column describes what each number measures. It used to assert a
+        # conclusion ("insulin sensitivity is smoothly decodable", "high stability")
+        # in fixed text that printed unchanged whatever the score turned out to be,
+        # so a weak result was reported in the language of a strong one.
+        table = Table(title="CGM-JEPA sweep probe metrics")
+        table.add_column("Metric", style="bold")
         table.add_column("Score", justify="right", style="cyan")
-        table.add_column("Scientific Interpretation")
+        table.add_column("What this measures")
 
         table.add_row(
-            "PC1 Latent Variance Explained",
+            "PC1 latent variance explained",
             f"{res.pc1_variance_explained_pct:.2f}%",
-            "Latent manifold aligns directly with underlying metabolic shifts",
+            "Share of embedding variance on the first principal component",
         )
         table.add_row(
-            "Linear Probing R² (Clean)",
+            "Linear probe R² (clean)",
             f"{res.linear_probe_r2:.4f}",
-            "Insulin sensitivity is smoothly decodable from the 96D embedding",
+            f"Recovery of the swept parameter ({sweep_param}) by ridge regression on the embedding",
         )
         table.add_row(
             "Monotonicity (Spearman ρ)",
             f"{res.spearman_monotonicity_rho:.4f}",
-            "Strict monotonic order preserved across simulated phenotypes",
+            "Rank correlation between the swept parameter and the probe prediction",
         )
         table.add_row(
-            "Noise Robustness (Cosine Similarity)",
+            "Noise robustness (cosine similarity)",
             f"{res.noise_robustness_cosine_sim:.4f}",
-            "High representation stability under Gaussian noise and sensor dropouts",
+            "Embedding similarity before and after added sensor noise and dropouts",
         )
         table.add_row(
-            "Linear Probing R² (Noisy)",
+            "Linear probe R² (noisy)",
             f"{res.noisy_linear_probe_r2:.4f}",
-            "Parameter recovery remains resilient despite severe sensor artifacts",
+            "Same probe, fitted on the noise-corrupted traces",
         )
         console.print(table)
-        console.print(f"[bold green]Experiment Completed Successfully![/bold green]")
+        console.print("[bold green]Experiment Completed Successfully![/bold green]")
+        console.print(
+            "[yellow]Interpretation note:[/yellow] a randomly initialised encoder also scores "
+            "high on these probes, because a random projection of a smooth trace retains a "
+            "slowly varying sweep parameter. Compare against the untrained baseline before "
+            "reading any score as evidence of a learned representation."
+        )
         console.print(f"Report written to: [dim]{res.summary_report_path}[/dim]")
     except Exception as e:
         console.print(f"[bold red]Failed to run CGM-JEPA experiment:[/bold red] {e}")
@@ -11299,66 +11346,150 @@ def research_cgm_jepa_confounder(
         raise typer.Exit(code=1)
 
 
+@research_app.command(name="glucofm-pretrain")
+def research_glucofm_pretrain(
+    source: Annotated[Path, typer.Option("--source", help="CGM CSV/TSV/Parquet used for self-supervised pretraining")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", help="Directory for checkpoint, state, manifest, and training report")] = Path("models/glucofm-reproduction"),
+    glucose_column: Annotated[Optional[str], typer.Option("--glucose-column", help="Glucose column; inferred when omitted")] = None,
+    timestamp_column: Annotated[Optional[str], typer.Option("--timestamp-column", help="Timestamp column; inferred when omitted")] = None,
+    subject_column: Annotated[Optional[str], typer.Option("--subject-column", help="Subject/group column used for leakage-safe validation")] = "subject_id",
+    epochs: Annotated[int, typer.Option("--epochs", min=1, help="Pretraining epochs")] = 120,
+    batch_size: Annotated[int, typer.Option("--batch-size", min=1, help="Windows per optimization step")] = 128,
+    validation_fraction: Annotated[float, typer.Option("--validation-fraction", min=0.01, max=0.5, help="Fraction of subjects reserved for validation")] = 0.2,
+    max_windows: Annotated[Optional[int], typer.Option("--max-windows", min=2, help="Optional deterministic window cap for smoke tests")] = None,
+    device: Annotated[str, typer.Option("--device", help="auto, cpu, cuda, or mps")] = "auto",
+    seed: Annotated[int, typer.Option("--seed", help="Reproducible split/training seed")] = 42,
+    resume_state: Annotated[Optional[Path], typer.Option("--resume-state", help="Resume from glucofm_pretraining_state.pt with matching dataset hash")] = None,
+    allow_single_subject: Annotated[bool, typer.Option("--allow-single-subject", help="Software smoke tests only; disables subject-disjoint validation")] = False,
+):
+    """Pretrain the independent, paper-aligned IINTS GlucoFM v2 reproduction."""
+
+    console = Console()
+    from iints.research.glucofm_training import pretrain_glucofm
+
+    try:
+        result = pretrain_glucofm(
+            source,
+            output_dir,
+            glucose_column=glucose_column,
+            timestamp_column=timestamp_column,
+            subject_column=subject_column,
+            epochs=epochs,
+            batch_size=batch_size,
+            validation_fraction=validation_fraction,
+            max_windows=max_windows,
+            device=device,
+            seed=seed,
+            resume_state=resume_state,
+            allow_single_subject=allow_single_subject,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]GlucoFM pretraining failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+    console.print("[bold green]GlucoFM reproduction checkpoint trained.[/bold green]")
+    console.print("  Independent method reproduction; not official Google weights.")
+    console.print(f"  Train/validation subjects: {result.train_subjects}/{result.validation_subjects}")
+    console.print(f"  Best validation loss: {result.best_validation_loss:.6f}")
+    console.print(f"  Checkpoint: [dim]{result.checkpoint_path}[/dim]")
+    console.print(f"  Training report: [dim]{result.report_path}[/dim]")
+
+
 @research_app.command(name="glucofm-embed")
 def research_glucofm_embed(
-    input_file: Annotated[Path, typer.Option("--input-file", help="Path to simulation or patient CSV containing glucose/CGM readings")],
-    output_file: Annotated[Path, typer.Option("--output-file", help="Path to save 256D GlucoFM embedding CSV")] = Path("results/glucofm/embedding.csv"),
+    input_file: Annotated[Path, typer.Option("--input-file", help="CSV containing one 24-hour CGM window")],
+    checkpoint: Annotated[Path, typer.Option("--checkpoint", help="Trained IINTS GlucoFM reproduction checkpoint")],
+    output_file: Annotated[Path, typer.Option("--output-file", help="Path to save the 128D embedding CSV")] = Path("results/glucofm/embedding.csv"),
+    glucose_column: Annotated[Optional[str], typer.Option("--glucose-column", help="Glucose column; inferred when omitted")] = None,
+    timestamp_column: Annotated[Optional[str], typer.Option("--timestamp-column", help="Timestamp column for irregular/missing observations")] = None,
 ):
-    """Extract Google GlucoFM Dual-Stream 256-dimensional patient representation embeddings."""
-    console = Console()
-    from iints.research.glucofm import embed_cgm_with_glucofm
+    """Extract a reproducible 128D embedding using a trained local checkpoint."""
 
-    console.print(f"[bold blue]Extracting Google GlucoFM Dual-Stream 256D embedding from:[/bold blue] {input_file}")
+    console = Console()
+    from iints.research.glucofm import embed_cgm_with_glucofm_result
+
     try:
         df = pd.read_csv(input_file)
-        cgm_col = next((c for c in ["glucose", "cgm", "glucose_dexcom", "glucose_libre"] if c in df.columns), df.columns[0])
-        cgm_vals = df[cgm_col].dropna().to_numpy(dtype=float)
-
-        z_vec = embed_cgm_with_glucofm(cgm_vals)
+        candidates = ["glucose", "cgm", "glucose_mgdl", "glucose_dexcom", "glucose_libre"]
+        cgm_col = glucose_column or next((c for c in candidates if c in df.columns), None)
+        if cgm_col is None or cgm_col not in df.columns:
+            raise ValueError("Could not infer glucose column; pass --glucose-column")
+        if timestamp_column is not None and timestamp_column not in df.columns:
+            raise ValueError(f"Timestamp column not found: {timestamp_column}")
+        timestamps = df[timestamp_column] if timestamp_column else None
+        result = embed_cgm_with_glucofm_result(
+            df[cgm_col],
+            checkpoint=checkpoint,
+            timestamps=timestamps,
+        )
         output_file.parent.mkdir(parents=True, exist_ok=True)
-        pd.DataFrame([z_vec]).to_csv(output_file, index=False, header=[f"z_{i}" for i in range(len(z_vec))])
-
-        console.print(f"[bold green]Embedding successfully generated![/bold green]")
-        console.print(f"  • Model: Google GlucoFM (Dual-Stream State-Event Latent Transformer)")
-        console.print(f"  • Latent Dimensions: [cyan]256[/cyan] (128 State ⊕ 128 Event)")
-        console.print(f"  • Output Saved: [dim]{output_file}[/dim]")
-    except Exception as e:
-        console.print(f"[bold red]Failed to extract GlucoFM embedding:[/bold red] {e}")
+        pd.DataFrame(
+            [result.embedding],
+            columns=[f"z_{index}" for index in range(len(result.embedding))],
+        ).to_csv(output_file, index=False)
+        provenance_path = output_file.with_name(f"{output_file.stem}.provenance.json")
+        provenance_path.write_text(
+            json.dumps(
+                {
+                    "model_family": "iints-glucofm-v2-reproduction",
+                    "implementation_kind": "independent-paper-reproduction",
+                    "official_google_checkpoint": False,
+                    "checkpoint_path": str(result.checkpoint_path),
+                    "checkpoint_sha256": result.checkpoint_sha256,
+                    "checkpoint_metadata": result.checkpoint_metadata.to_dict(),
+                    "input_file": str(input_file.expanduser().resolve()),
+                    "glucose_column": cgm_col,
+                    "timestamp_column": timestamp_column,
+                    "observed_count": result.input_observed_count,
+                    "coverage": result.input_coverage,
+                    "latent_dimension": len(result.embedding),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        console.print(f"[bold red]Failed to extract GlucoFM embedding:[/bold red] {exc}")
         raise typer.Exit(code=1)
+    console.print("[bold green]128D embedding generated from trained local weights.[/bold green]")
+    console.print("  Independent method reproduction; not an official Google checkpoint.")
+    console.print(f"  Observed grid coverage: {result.input_coverage:.1%}")
+    console.print(f"  Embedding: [dim]{output_file}[/dim]")
+    console.print(f"  Provenance: [dim]{provenance_path}[/dim]")
 
 
 @research_app.command(name="foundation-arena")
 def research_foundation_arena(
     output_dir: Annotated[Path, typer.Option("--output-dir", help="Output directory for Foundation Arena comparative benchmark artifacts")] = Path("results/foundation_arena"),
-    n_trials: Annotated[int, typer.Option("--n-trials", help="Number of benchmark evaluation trials")] = 50,
+    result_files: Annotated[Optional[list[Path]], typer.Option("--result", help="Measured evaluation JSON. Repeat --result for every model in the same benchmark.")] = None,
 ):
-    """Run head-to-head Foundation Model Arena benchmark (Google GlucoFM vs CGM-JEPA vs GluFormer vs IINTS-AF)."""
+    """Compare evidence artifacts from one shared, group-disjoint benchmark."""
     console = Console()
     from iints.research.foundation_arena import run_foundation_model_arena
 
     console.print(f"[bold blue]Running CGM Foundation Model Scientific Arena & Benchmark...[/bold blue]")
     try:
-        report = run_foundation_model_arena(output_dir=output_dir, n_benchmark_trials=n_trials)
+        report = run_foundation_model_arena(
+            output_dir=output_dir,
+            evaluation_artifacts=result_files,
+        )
 
         table = Table(title="CGM Foundation Model Arena Performance Summary")
         table.add_column("Foundation Model", style="bold cyan")
         table.add_column("Architecture", style="dim")
-        table.add_column("HOMA-IR R²", justify="right")
-        table.add_column("PPGR MAE (Dex/Lib)", justify="right")
-        table.add_column("Confounder Vulnerability", justify="right", style="bold red")
+        metric_names = sorted(set.intersection(*(set(m.metrics) for m in report.models)))
+        for metric_name in metric_names:
+            table.add_column(metric_name, justify="right")
 
         for m in report.models:
-            v_style = "[bold green]0.0% (Robust)[/bold green]" if m.confounder_vulnerability_pct == 0.0 else f"[red]{m.confounder_vulnerability_pct:.1f}% (Blind)[/red]"
             table.add_row(
                 m.model_name,
                 m.architecture[:35] + ("..." if len(m.architecture) > 35 else ""),
-                f"{m.homa_ir_probing_r2:.3f}",
-                f"{m.ppgr_forecast_dexcom_mae_mgdl:.1f} / {m.ppgr_forecast_libre_mae_mgdl:.1f}",
-                v_style,
+                *(f"{m.metrics[name].value:.4g} {m.metrics[name].unit}".strip() for name in metric_names),
             )
 
         console.print(table)
-        console.print(f"[bold green]Foundation Model Arena Benchmark Complete![/bold green]")
+        console.print("[bold green]Evidence-backed Foundation Arena complete.[/bold green]")
+        console.print(f"Benchmark contract: [dim]{report.benchmark_id}[/dim]")
         console.print(f"Summary Report: [dim]{report.report_md_path}[/dim]")
     except Exception as e:
         console.print(f"[bold red]Failed to run Foundation Arena:[/bold red] {e}")
@@ -11368,20 +11499,42 @@ def research_foundation_arena(
 @research_app.command(name="visualize")
 def research_visualize_suite(
     output_dir: Annotated[Path, typer.Option("--output-dir", help="Output directory for scientific figures and interactive HTML dashboard")] = Path("results/scientific_visualizations"),
+    arena_results: Annotated[Optional[list[Path]], typer.Option("--arena-result", help="Measured foundation evaluation JSON; repeat for each comparable model.")] = None,
+    confounder_evidence: Annotated[Optional[Path], typer.Option("--confounder-evidence", help="CSV/Parquet with model_name, si_ratio, and embedding_cosine_similarity.")] = None,
+    dual_sensor_evidence: Annotated[Optional[Path], typer.Option("--dual-sensor-evidence", help="Paired sensor table with timestamp, dexcom_mgdl, libre_mgdl, and cohort.")] = None,
+    safety_trace: Annotated[Optional[Path], typer.Option("--safety-trace", help="In-silico trace with comparator and supervised glucose columns.")] = None,
 ):
-    """Generate high-resolution scientific plots, radar charts, and interactive HTML dashboards."""
+    """Render method diagrams and only those result plots backed by evidence."""
     console = Console()
     from iints.research.visualizer import generate_all_scientific_visualizations
 
     console.print(f"[bold blue]Generating Full Scientific Visualization Suite & Dashboards...[/bold blue]")
     try:
-        artifacts = generate_all_scientific_visualizations(output_dir=output_dir)
+        artifacts = generate_all_scientific_visualizations(
+            output_dir=output_dir,
+            arena_evaluation_artifacts=arena_results,
+            confounder_evidence=confounder_evidence,
+            cgmacros_evidence=dual_sensor_evidence,
+            safety_trace=safety_trace,
+        )
         console.print(f"[bold green]Visualization Suite Generated Successfully![/bold green]")
-        console.print(f"  • Foundation Arena Radar Chart: [cyan]{artifacts.arena_radar_png.name}[/cyan]")
-        console.print(f"  • Confounder Cosine Similarity Plot: [cyan]{artifacts.confounder_cosine_png.name}[/cyan]")
-        console.print(f"  • Google GlucoFM Dual-Stream Plot: [cyan]{artifacts.glucofm_decomposition_png.name}[/cyan]")
-        console.print(f"  • CGMacros Dual-Sensor Inter-Site Plot: [cyan]{artifacts.cgmacros_dualsensor_png.name}[/cyan]")
-        console.print(f"  • OpenFDA Safety Mitigation Plot: [cyan]{artifacts.fda_safety_timeline_png.name}[/cyan]")
+        console.print(
+            "  • Foundation Arena: "
+            + (f"[cyan]{artifacts.arena_radar_png.name}[/cyan]" if artifacts.arena_radar_png else "[dim]not generated (no evidence)[/dim]")
+        )
+        console.print(
+            "  • Confounder analysis: "
+            + (f"[cyan]{artifacts.confounder_cosine_png.name}[/cyan]" if artifacts.confounder_cosine_png else "[dim]not generated (no evidence)[/dim]")
+        )
+        console.print(f"  • GlucoFM method schematic: [cyan]{artifacts.glucofm_decomposition_png.name}[/cyan]")
+        console.print(
+            "  • Paired dual-sensor analysis: "
+            + (f"[cyan]{artifacts.cgmacros_dualsensor_png.name}[/cyan]" if artifacts.cgmacros_dualsensor_png else "[dim]not generated (no evidence)[/dim]")
+        )
+        console.print(
+            "  • Safety benchmark trace: "
+            + (f"[cyan]{artifacts.fda_safety_timeline_png.name}[/cyan]" if artifacts.fda_safety_timeline_png else "[dim]not generated (no evidence)[/dim]")
+        )
         console.print(f"  • Interactive HTML Dashboard: [bold yellow]{artifacts.interactive_dashboard_html}[/bold yellow]")
     except Exception as e:
         console.print(f"[bold red]Failed to generate visualizations:[/bold red] {e}")
@@ -11391,17 +11544,40 @@ def research_visualize_suite(
 @research_app.command(name="eucys-playbook")
 def research_eucys_playbook(
     output_dir: Annotated[Path, typer.Option("--output-dir", help="Output directory for the complete EUCYS 2026 jury scientific portfolio & dossier")] = Path("results/eucys_jury_dossier"),
+    prediction_evidence: Annotated[Optional[Path], typer.Option("--prediction-evidence", help="Held-out CSV containing reference_mgdl and predicted_mgdl for Clarke EGA.")] = None,
+    arena_results: Annotated[Optional[list[Path]], typer.Option("--arena-result", help="Measured foundation evaluation JSON; repeat for each comparable model.")] = None,
+    confounder_evidence: Annotated[Optional[Path], typer.Option("--confounder-evidence", help="Pair-level physiological confounder evidence table.")] = None,
+    dual_sensor_evidence: Annotated[Optional[Path], typer.Option("--dual-sensor-evidence", help="Paired Dexcom/Libre evidence table.")] = None,
+    safety_trace: Annotated[Optional[Path], typer.Option("--safety-trace", help="In-silico comparator/supervisor safety trace.")] = None,
 ):
-    """Generate the complete 11-figure EUCYS 2026 European Jury scientific portfolio and interactive dossier."""
+    """Build an EUCYS dossier without substituting missing result evidence."""
     console = Console()
     from iints.research.eucys_playbook_generator import generate_complete_eucys_jury_portfolio
 
     console.print(f"[bold blue]Generating EUCYS 2026 European Jury Scientific Portfolio & Playbook...[/bold blue]")
     try:
-        portfolio = generate_complete_eucys_jury_portfolio(output_dir=output_dir)
-        console.print(f"[bold green]EUCYS Jury Portfolio Generated Successfully ({len(portfolio.figures)} Publication-Grade Figures)![/bold green]")
+        ega_pairs = None
+        if prediction_evidence is not None:
+            paired = pd.read_csv(prediction_evidence)
+            required = {"reference_mgdl", "predicted_mgdl"}
+            if not required.issubset(paired.columns):
+                raise ValueError(
+                    "--prediction-evidence requires reference_mgdl and predicted_mgdl"
+                )
+            ega_pairs = (paired["reference_mgdl"], paired["predicted_mgdl"])
+        portfolio = generate_complete_eucys_jury_portfolio(
+            output_dir=output_dir,
+            ega_pairs=ega_pairs,
+            arena_evaluation_artifacts=arena_results,
+            confounder_evidence=confounder_evidence,
+            dual_sensor_evidence=dual_sensor_evidence,
+            safety_trace=safety_trace,
+        )
+        generated_count = sum(figure.png_path is not None for figure in portfolio.figures)
+        console.print(f"[bold green]EUCYS dossier generated: {generated_count} figures backed by methods/evidence; missing inputs remain marked as not generated.[/bold green]")
         for fig in portfolio.figures:
-            console.print(f"  • [{fig.figure_id}] {fig.title} -> [cyan]{fig.file_name}[/cyan]")
+            destination = f"[cyan]{fig.file_name}[/cyan]" if fig.png_path else "[dim]not generated[/dim]"
+            console.print(f"  • [{fig.figure_id}] {fig.title} -> {destination}")
         console.print(f"  • Interactive Jury Examination Dossier: [bold yellow]{portfolio.index_html_path}[/bold yellow]")
         console.print(f"  • Portfolio Manifest: [cyan]{portfolio.manifest_json_path}[/cyan]")
     except Exception as e:
@@ -11824,7 +12000,7 @@ def research_glucose_model_jetson_train_hf(
     ] = Path("models/iints-glucose-forecast-v0/dataset/glucose_training_dataset.csv"),
     base_hf_repo: Annotated[
         Optional[str],
-        typer.Option("--base-hf-repo", "--repo-id", help="External Hugging Face model to pull from (e.g. username/GlucoFM). If empty, pulls from target_hf_repo. --repo-id is kept as a compatibility alias."),
+        typer.Option("--base-hf-repo", "--repo-id", help="IINTS native glucose-forecast bundle containing predictor.pt. Arbitrary foundation-model repositories are not compatible. If empty, pulls from target_hf_repo. --repo-id is a compatibility alias."),
     ] = None,
     target_hf_repo: Annotated[
         Optional[str],
@@ -16008,4 +16184,3 @@ def safety_fda_benchmark(
 
 if __name__ == "__main__":
     app()
-

@@ -107,6 +107,23 @@ class TestBuildSequences:
         assert X.dtype == np.float32
         assert y.dtype == np.float32
 
+    def test_predict_delta(self):
+        """When predict_delta=True, targets are relative changes G_{t+k} - G_t."""
+        df = pd.DataFrame({
+            "glucose_actual_mgdl": [100.0, 105.0, 110.0, 115.0, 120.0, 125.0],
+            "insulin_units": [0.0] * 6,
+            "carb_grams": [0.0] * 6,
+            "subject_id": ["0"] * 6,
+        })
+        X, y = build_sequences(
+            df, history_steps=3, horizon_steps=2,
+            feature_columns=self.FEATURE_COLS, target_column=self.TARGET_COL,
+            subject_column=None, predict_delta=True,
+        )
+        # Window 0: history = [100, 105, 110], current G = 110. Horizon targets = [115, 120].
+        # Relative delta targets = [115 - 110, 120 - 110] = [5.0, 10.0].
+        np.testing.assert_allclose(y[0], [5.0, 10.0])
+
     def test_raises_on_too_small_df(self):
         df = _make_df(5, n_subjects=1)
         with pytest.raises(ValueError, match="Not enough rows"):

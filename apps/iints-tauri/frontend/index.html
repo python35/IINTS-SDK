@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-11" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-12" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -306,6 +306,61 @@
           <text x="24" y="40">Load a results CSV to display the glucose trajectory.</text>
         </svg>
         <div class="subsection-heading">
+          <h3>Compartment model</h3>
+          <span id="compartment-summary">Loaded from the run's own schema</span>
+        </div>
+        <pre id="compartment-status" class="status-box compact" aria-live="polite">Load a results CSV to display the compartment model.</pre>
+        <div id="compartment-viewer" hidden>
+          <div class="chart-tab-bar" id="compartment-view-mode">
+            <button class="chart-tab-btn is-active" data-compartment-mode="diagram" type="button">Diagram</button>
+            <button class="chart-tab-btn" data-compartment-mode="twin" type="button">3D Digital Twin</button>
+          </div>
+          <div id="compartment-diagram-panel" data-compartment-panel="diagram">
+            <div class="compartment-controls">
+              <label class="field-control" for="compartment-time">
+                <span>Simulation time</span>
+                <input id="compartment-time" type="range" min="0" max="0" step="1" value="0" />
+              </label>
+              <output id="compartment-time-label" for="compartment-time">--</output>
+              <label class="checkbox-field">
+                <input id="compartment-show-signals" type="checkbox" />
+                <span>Show signal and effect states</span>
+              </label>
+            </div>
+            <svg id="compartment-diagram" viewBox="0 0 760 420" role="img"
+                 aria-label="Compartment diagram of the simulated patient model"></svg>
+            <p id="compartment-caption" class="muted"></p>
+            <div class="table-wrap">
+              <table id="compartment-table"></table>
+            </div>
+          </div>
+          <div id="digital-twin-viewer" data-compartment-panel="twin" hidden>
+            <p class="muted">3D view of the Hovorka compartment model. The liver node has no
+              stored contents of its own -- it visualizes the live endogenous glucose
+              production flux, not a tracked compartment.</p>
+            <div class="digital-twin-controls">
+              <label class="field-control" for="digital-twin-time">
+                <span>Simulation time</span>
+                <input id="digital-twin-time" type="range" min="0" max="1440" step="1" value="0" />
+              </label>
+              <output id="digital-twin-time-label" for="digital-twin-time">0 min</output>
+              <button id="digital-twin-play-btn" type="button">Play</button>
+              <label class="field-control" for="digital-twin-speed">
+                <span>Speed</span>
+                <select id="digital-twin-speed">
+                  <option value="1">1x</option>
+                  <option value="4">4x</option>
+                  <option value="15">15x</option>
+                </select>
+              </label>
+            </div>
+            <div class="digital-twin-canvas-wrap">
+              <canvas id="digital-twin-canvas" tabindex="0" aria-label="3D digital twin of the simulated patient"></canvas>
+              <div id="digital-twin-card" class="digital-twin-card" hidden></div>
+            </div>
+          </div>
+        </div>
+        <div class="subsection-heading">
           <h3>Tabular preview</h3>
           <span id="table-preview-summary">First bounded rows only</span>
         </div>
@@ -331,6 +386,28 @@
           privacy approval, or clinical validation.
         </p>
         <div class="academic-fields">
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-train-source">Pretraining dataset</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-train-source" placeholder="Choose a multi-subject CGM CSV, TSV, or Parquet file" spellcheck="false" />
+              <button id="foundation-glucofm-train-source-browse-btn" type="button">Choose dataset...</button>
+            </div>
+          </div>
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-train-output">Pretraining output folder</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-train-output" value="models/glucofm-reproduction" spellcheck="false" />
+              <button id="foundation-glucofm-train-output-browse-btn" type="button">Choose folder...</button>
+            </div>
+          </div>
+          <label>
+            Epochs
+            <input id="foundation-glucofm-epochs" type="number" min="1" value="120" />
+          </label>
+          <label>
+            Batch size
+            <input id="foundation-glucofm-batch-size" type="number" min="1" value="128" />
+          </label>
           <div class="field-control academic-run-field">
             <label for="academic-run-dir">Completed run folder</label>
             <div class="path-picker">
@@ -732,53 +809,83 @@
       <section class="panel foundation-panel" data-view-panel="foundation" hidden>
         <div class="panel-heading">
           <div>
-            <h2>CGM Foundation Models & Multi-Sensor Visualizer</h2>
+            <h2>CGM representation research</h2>
           </div>
-          <p>Scientific benchmarking of Google GlucoFM, CGM-JEPA, CGMacros dual-sensors, and FDA device safety.</p>
+          <p>Train, inspect, and compare representation models without built-in benchmark claims.</p>
         </div>
+
+        <p class="muted">
+          IINTS provides an independent, paper-aligned reproduction of the GlucoFM v2 method.
+          It does not ship official Google weights. Research embeddings require a trained local
+          checkpoint and retain their checkpoint and input provenance.
+        </p>
 
         <div class="foundation-metrics-grid" id="foundation-metrics-grid">
           <div class="metric-card">
-            <span class="metric-title">Google GlucoFM Probing R²</span>
-            <span class="metric-value" id="metric-glucofm-r2">0.884</span>
-            <small class="metric-sub text-success">+5.8% vs GluFormer</small>
+            <span class="metric-title">Implementation</span>
+            <span class="metric-value">Independent</span>
+            <small class="metric-sub">Paper-aligned reproduction</small>
           </div>
           <div class="metric-card">
-            <span class="metric-title">Observational Confounder Similarity</span>
-            <span class="metric-value text-danger" id="metric-confounder-cos">cos θ = 0.9882</span>
-            <small class="metric-sub text-danger">96% Observational Blindness</small>
+            <span class="metric-title">Embedding</span>
+            <span class="metric-value">128D</span>
+            <small class="metric-sub">24 one-hour fused tokens</small>
           </div>
           <div class="metric-card">
-            <span class="metric-title">IINTS-AF Confounder Immunity</span>
-            <span class="metric-value text-success" id="metric-iints-immunity">100.0%</span>
-            <small class="metric-sub text-success">Biological Ground Truth</small>
+            <span class="metric-title">Checkpoint</span>
+            <span class="metric-value" id="metric-glucofm-checkpoint">Not selected</span>
+            <small class="metric-sub">Trained local weights required</small>
           </div>
           <div class="metric-card">
-            <span class="metric-title">CGMacros Standardized Cohort</span>
-            <span class="metric-value" id="metric-cgmacros-count">45 Subjects</span>
-            <small class="metric-sub text-primary">1,350 Meals, 129k Readings</small>
+            <span class="metric-title">Local evaluation</span>
+            <span class="metric-value" id="metric-foundation-evaluation">Not run</span>
+            <small class="metric-sub">Evidence artifacts only</small>
+          </div>
+        </div>
+
+        <div class="academic-fields">
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-csv">24-hour CGM CSV</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-csv" placeholder="Choose a CGM CSV" spellcheck="false" />
+              <button id="foundation-glucofm-csv-browse-btn" type="button">Choose CSV...</button>
+            </div>
+          </div>
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-checkpoint">Trained GlucoFM checkpoint</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-checkpoint" placeholder="Choose glucofm_encoder.pt" spellcheck="false" />
+              <button id="foundation-glucofm-checkpoint-browse-btn" type="button">Choose checkpoint...</button>
+            </div>
+          </div>
+          <label>
+            Glucose column
+            <input id="foundation-glucose-column" placeholder="Infer automatically" spellcheck="false" />
+          </label>
+          <label>
+            Timestamp column
+            <input id="foundation-timestamp-column" placeholder="Optional for an exact 288-position CSV" spellcheck="false" />
+          </label>
+          <div class="field-control academic-run-field">
+            <label for="foundation-arena-results">Comparable evaluation artifacts</label>
+            <div class="path-picker">
+              <input id="foundation-arena-results" placeholder="Choose one or more evaluation JSON files" readonly />
+              <button id="foundation-arena-results-browse-btn" type="button">Choose JSON files...</button>
+            </div>
           </div>
         </div>
 
         <div class="button-row">
-          <button id="foundation-arena-btn" class="primary">Run Arena Benchmark (50 Trials)</button>
-          <button id="eucys-playbook-btn" class="primary" style="background: linear-gradient(135deg, #137333, #0d652d);">★ Generate EUCYS 2026 Jury Playbook</button>
-          <button id="foundation-glucofm-btn">Extract GlucoFM 256D</button>
-          <button id="foundation-cgmacros-btn">Load CGMacros Cohort (45 Subj)</button>
-          <button id="foundation-fda-btn">Run OpenFDA Benchmark</button>
-          <button id="foundation-visualize-btn">Open Interactive Dossier</button>
+          <button id="foundation-glucofm-pretrain-btn">Pretrain local reproduction</button>
+          <button id="foundation-glucofm-btn" class="primary">Extract trained 128D embedding</button>
+          <button id="foundation-arena-btn">Compare selected evidence</button>
+          <button id="eucys-playbook-btn">Generate EUCYS evidence dossier</button>
         </div>
 
         <div class="chart-tab-bar">
-          <button class="chart-tab-btn is-active" data-chart-tab="arena">Arena Polar Radar</button>
-          <button class="chart-tab-btn" data-chart-tab="confounder">Confounder Cosine (cos θ)</button>
-          <button class="chart-tab-btn" data-chart-tab="clarke">Clarke Error Grid (98.6%)</button>
-          <button class="chart-tab-btn" data-chart-tab="tir">Clinical TIR (92.4%)</button>
-          <button class="chart-tab-btn" data-chart-tab="scislet">SC-Islet GSIS & C-Peptide</button>
-          <button class="chart-tab-btn" data-chart-tab="edge">Jetson Latency (4.2ms)</button>
-          <button class="chart-tab-btn" data-chart-tab="glucofm">GlucoFM State-Event</button>
-          <button class="chart-tab-btn" data-chart-tab="dualsensor">CGMacros Dual-Sensor</button>
-          <button class="chart-tab-btn" data-chart-tab="fda">OpenFDA Recall</button>
+          <button class="chart-tab-btn is-active" data-chart-tab="glucofm">Method schematic</button>
+          <button class="chart-tab-btn" data-chart-tab="embedding">Last embedding</button>
+          <button class="chart-tab-btn" data-chart-tab="clarke">Held-out forecast evidence</button>
         </div>
 
         <div class="chart-viewport" id="chart-viewport">
@@ -786,12 +893,12 @@
             <canvas id="foundation-chart-canvas" width="900" height="420"></canvas>
           </div>
           <div class="chart-explanation" id="chart-explanation">
-            <h3>Foundation Model Arena (Polar Radar Benchmark)</h3>
-            <p>Comparing Google GlucoFM (256D Dual-Stream), CGM-JEPA (96D Patch-based), GluFormer (128D Causal), and IINTS-AF Digital Twin across 5 key dimensions: HOMA-IR Linear Probing R², Diabetes Status Classification Accuracy, PPGR Forecasting Accuracy, Confounder Immunity, and Inference Speed.</p>
+            <h3>GlucoFM v2 method reproduction</h3>
+            <p>Mask-preserving 24-hour input, causal state/event decomposition, 24 one-hour patches per stream, and a fused 128-dimensional representation.</p>
           </div>
         </div>
 
-        <pre id="foundation-status" class="status-box compact">Select an action above to execute foundation model benchmarking or render scientific visualizations.</pre>
+        <pre id="foundation-status" class="status-box compact">Select measured input and trained weights to begin. No benchmark result is preloaded.</pre>
       </section>
     </main>
 
@@ -802,6 +909,6 @@
       </div>
     </div>
 
-    <script type="module" src="./main.js?v=workbench-11"></script>
+    <script type="module" src="./main.js?v=workbench-12"></script>
   </body>
 </html>

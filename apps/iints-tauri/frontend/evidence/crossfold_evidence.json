@@ -1,0 +1,917 @@
+{
+  "generated_utc": "2026-09-01T12:55:27+00:00",
+  "estimand": "Out-of-sample accuracy of the training recipe on an unseen subject. Every interval is a cluster-level t interval over subjects; the effective sample size is n_subjects, never n_pairs.",
+  "folds": [
+    {
+      "name": "ohio_t1dm_full_multimodal_seed7",
+      "n_pairs": 24569,
+      "model_path": "models/ohio_t1dm_full_multimodal_seed7/predictor.pt",
+      "model_sha256": "8bca66f450769933ae2eb9b2141c70d7d79e6a5fcc423ece5c81ac0c890851cf",
+      "data_path": "data_packs/ohio_merged.parquet",
+      "data_sha256": "a54fdc3004dac3da1b4453581adf48d29c864d0c52b6dc44e7ea50b6702bc28f",
+      "data_sha256_at_training": "7f392c168d2396f34a6974b22f4bda0fceebfcdc1fdbfc5a9d7073c177453733",
+      "config_path": "results/ohio_t1dm_full_training_sweep/configs/multimodal_seed7.yaml",
+      "config_sha256": "58558cd16677d64f462bf2b3d971564613d8a2b0f357569c8c6bf379cff3cd9b",
+      "config_fingerprint": {
+        "history_minutes": 240,
+        "horizon_minutes": 120,
+        "feature_columns": [
+          "glucose_actual_mgdl",
+          "glucose_trend_mgdl_min",
+          "patient_iob_units",
+          "patient_cob_grams",
+          "effective_isf",
+          "effective_icr",
+          "effective_basal_rate_u_per_hr",
+          "steps",
+          "calories",
+          "heart_rate",
+          "sleep_minutes",
+          "time_of_day_sin",
+          "time_of_day_cos",
+          "meal_announcement_grams"
+        ],
+        "target_column": "glucose_actual_mgdl",
+        "loss": "band_weighted",
+        "hidden_size": 96,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "normalization": "zscore",
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "meal_announcement_minutes": 15,
+        "meal_announcement_grams": null
+      },
+      "seed": 7,
+      "best_epoch": 7,
+      "epoch_cap": 10,
+      "test_subjects": [
+        "563",
+        "570"
+      ],
+      "val_subjects": [
+        "540",
+        "591"
+      ],
+      "train_subjects": [
+        "544",
+        "552",
+        "559",
+        "567",
+        "575",
+        "584",
+        "588",
+        "596"
+      ],
+      "history_minutes": 240,
+      "horizon_minutes": 120,
+      "step_minutes": 5.0,
+      "meal_announcement_minutes": 15
+    },
+    {
+      "name": "ohio_t1dm_full_multimodal_seed99",
+      "n_pairs": 25863,
+      "model_path": "models/ohio_t1dm_full_multimodal_seed99/predictor.pt",
+      "model_sha256": "e790e2a587a393426af80a6d38be53c91332536fceb305640fa47af4ea90c4ec",
+      "data_path": "data_packs/ohio_merged.parquet",
+      "data_sha256": "a54fdc3004dac3da1b4453581adf48d29c864d0c52b6dc44e7ea50b6702bc28f",
+      "data_sha256_at_training": "7f392c168d2396f34a6974b22f4bda0fceebfcdc1fdbfc5a9d7073c177453733",
+      "config_path": "results/ohio_t1dm_full_training_sweep/configs/multimodal_seed99.yaml",
+      "config_sha256": "7842e5060df0f69f5bef02be18149b76b2b3002bfc7c3fb0120cc60db318035a",
+      "config_fingerprint": {
+        "history_minutes": 240,
+        "horizon_minutes": 120,
+        "feature_columns": [
+          "glucose_actual_mgdl",
+          "glucose_trend_mgdl_min",
+          "patient_iob_units",
+          "patient_cob_grams",
+          "effective_isf",
+          "effective_icr",
+          "effective_basal_rate_u_per_hr",
+          "steps",
+          "calories",
+          "heart_rate",
+          "sleep_minutes",
+          "time_of_day_sin",
+          "time_of_day_cos",
+          "meal_announcement_grams"
+        ],
+        "target_column": "glucose_actual_mgdl",
+        "loss": "band_weighted",
+        "hidden_size": 96,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "normalization": "zscore",
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "meal_announcement_minutes": 15,
+        "meal_announcement_grams": null
+      },
+      "seed": 99,
+      "best_epoch": 7,
+      "epoch_cap": 10,
+      "test_subjects": [
+        "584",
+        "591"
+      ],
+      "val_subjects": [
+        "540",
+        "567"
+      ],
+      "train_subjects": [
+        "544",
+        "552",
+        "559",
+        "563",
+        "570",
+        "575",
+        "588",
+        "596"
+      ],
+      "history_minutes": 240,
+      "horizon_minutes": 120,
+      "step_minutes": 5.0,
+      "meal_announcement_minutes": 15
+    },
+    {
+      "name": "ohio_t1dm_full_medium",
+      "n_pairs": 26072,
+      "model_path": "models/ohio_t1dm_full_medium/predictor.pt",
+      "model_sha256": "1c3276056c2ce3f597ac594443bf83b8aae11af3b5c579fda271065005366880",
+      "data_path": "data_packs/ohio_merged.parquet",
+      "data_sha256": "a54fdc3004dac3da1b4453581adf48d29c864d0c52b6dc44e7ea50b6702bc28f",
+      "data_sha256_at_training": "7f392c168d2396f34a6974b22f4bda0fceebfcdc1fdbfc5a9d7073c177453733",
+      "config_path": "results/ohio_t1dm_full_results/predictor_ohio_full_medium.yaml",
+      "config_sha256": "88a152dfd7bd414adff7da6b30a509c2b745ad0aeb31fcbc1a462bc4ecea6c4b",
+      "config_fingerprint": {
+        "history_minutes": 240,
+        "horizon_minutes": 120,
+        "feature_columns": [
+          "glucose_actual_mgdl",
+          "glucose_trend_mgdl_min",
+          "patient_iob_units",
+          "patient_cob_grams",
+          "effective_isf",
+          "effective_icr",
+          "effective_basal_rate_u_per_hr",
+          "steps",
+          "calories",
+          "heart_rate",
+          "sleep_minutes",
+          "time_of_day_sin",
+          "time_of_day_cos",
+          "meal_announcement_grams"
+        ],
+        "target_column": "glucose_actual_mgdl",
+        "loss": "band_weighted",
+        "hidden_size": 96,
+        "num_layers": 2,
+        "dropout": 0.25,
+        "normalization": "zscore",
+        "learning_rate": 0.001,
+        "batch_size": 256,
+        "meal_announcement_minutes": 15,
+        "meal_announcement_grams": null
+      },
+      "seed": 42,
+      "best_epoch": 5,
+      "epoch_cap": 12,
+      "test_subjects": [
+        "540",
+        "575"
+      ],
+      "val_subjects": [
+        "570",
+        "588"
+      ],
+      "train_subjects": [
+        "544",
+        "552",
+        "559",
+        "563",
+        "567",
+        "584",
+        "591",
+        "596"
+      ],
+      "history_minutes": 240,
+      "horizon_minutes": 120,
+      "step_minutes": 5.0,
+      "meal_announcement_minutes": 15
+    }
+  ],
+  "n_subjects": 6,
+  "n_pairs": 76504,
+  "horizon_minutes": 120,
+  "pair_definition": "forecast endpoint, one pair per window",
+  "primary_outcome_hypoglycemia_detection": {
+    "definition": "Share of windows whose reference endpoint is below 70 mg/dL for which the forecast endpoint is also below it. Cluster-level t interval over subjects. At a fixed horizon the detection lead time of a correctly predicted event is the horizon itself, so it is a design property and is not reported as a measurement.",
+    "n_hypo_windows": 3133,
+    "n_subjects_with_hypo": 6,
+    "model": {
+      "estimate": 3.4734632482387653,
+      "ci_low": -1.5253035952671716,
+      "ci_high": 8.472230091744702,
+      "method": "cluster_t",
+      "n_observations": 3133,
+      "n_clusters": 6,
+      "half_width": 4.998766843505937,
+      "excludes_zero": false,
+      "n_subjects": 6,
+      "n_pairs": 3133
+    },
+    "persistence": {
+      "estimate": 17.13414802221541,
+      "ci_low": 6.527539749706804,
+      "ci_high": 27.740756294724015,
+      "method": "cluster_t",
+      "n_observations": 3133,
+      "n_clusters": 6,
+      "half_width": 10.606608272508605,
+      "excludes_zero": true,
+      "n_subjects": 6,
+      "n_pairs": 3133
+    },
+    "paired_model_minus_persistence": {
+      "estimate": -13.660684773976643,
+      "ci_low": -23.813907586247346,
+      "ci_high": -3.507461961705941,
+      "method": "cluster_t",
+      "n_observations": 3133,
+      "n_clusters": 6,
+      "half_width": 10.153222812270702,
+      "excludes_zero": true,
+      "n_subjects": 6,
+      "n_pairs": 3133,
+      "higher_is_better": true,
+      "model_better_at_95pct": false
+    }
+  },
+  "summary": {
+    "model": {
+      "clarke_zone_a": {
+        "estimate": 51.114158130035584,
+        "ci_low": 40.60360109019116,
+        "ci_high": 61.624715169880005,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 10.510557039844421,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "clarke_hazardous": {
+        "estimate": 7.169256708967079,
+        "ci_low": 3.5284234518010265,
+        "ci_high": 10.81008996613313,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 3.6408332571660518,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional_erroneous": {
+        "estimate": 7.169256708967079,
+        "ci_low": 3.5284234518010265,
+        "ci_high": 10.81008996613313,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 3.6408332571660518,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional_accurate": {
+        "estimate": 74.55404435411519,
+        "ci_low": 67.86595325266731,
+        "ci_high": 81.24213545556307,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 6.688091101447881,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "reversed_trend": {
+        "estimate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 0.0,
+        "excludes_zero": false,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "absolute_error_mgdl": {
+        "estimate": 39.17176788688777,
+        "ci_low": 34.66602463910832,
+        "ci_high": 43.67751113466722,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 4.505743247779449,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "signed_error_mgdl": {
+        "estimate": 5.587159884319511,
+        "ci_low": -6.263751128386608,
+        "ci_high": 17.43807089702563,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 11.850911012706119,
+        "excludes_zero": false,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.9418973674069444,
+          "predicted_rate_sd_mgdl_min": 0.18379619087978563,
+          "rate_attenuation": 0.195133989370603,
+          "reference_max_abs_rate_mgdl_min": 12.106666056315104,
+          "predicted_max_abs_rate_mgdl_min": 0.5919932047526042,
+          "reference_pct_moving": 20.58193035658266,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": 64.4735170837038,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 0.0,
+          "n_reference_moving": 15746,
+          "n_sign_concordance_basis": 15746,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 76504,
+          "counts": {
+            "accurate": 56912,
+            "benign": 14058,
+            "erroneous": 5534
+          },
+          "percentages": {
+            "accurate": 74.39088152253477,
+            "benign": 18.375509777266547,
+            "erroneous": 7.233608700198682
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 56.47286416396528,
+          "mean_signed_error_mgdl": 5.795786418763212
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 3133,
+            "counts": {
+              "accurate": 167,
+              "benign": 5,
+              "erroneous": 2961
+            },
+            "percentages": {
+              "accurate": 5.330354293009894,
+              "benign": 0.15959144589849983,
+              "erroneous": 94.51005426109161
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 99.0743696137887,
+            "mean_signed_error_mgdl": 68.09326500379731
+          },
+          "target": {
+            "n_pairs": 47147,
+            "counts": {
+              "accurate": 37507,
+              "benign": 8411,
+              "erroneous": 1229
+            },
+            "percentages": {
+              "accurate": 79.55331198167434,
+              "benign": 17.839947398561943,
+              "erroneous": 2.6067406197637175
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 73.15417736017137,
+            "mean_signed_error_mgdl": 23.44938657167828
+          },
+          "hyper": {
+            "n_pairs": 26224,
+            "counts": {
+              "accurate": 19238,
+              "benign": 5642,
+              "erroneous": 1344
+            },
+            "percentages": {
+              "accurate": 73.36028065893838,
+              "benign": 21.51464307504576,
+              "erroneous": 5.1250762660158635
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 21.39261744966443,
+            "mean_signed_error_mgdl": -33.385585104131785
+          }
+        }
+      },
+      "hypo_detection_pooled": {
+        "threshold_mgdl": 70.0,
+        "counts": {
+          "true_positive": 94,
+          "false_negative": 3039,
+          "false_positive": 122,
+          "true_negative": 73249
+        },
+        "sensitivity": 0.03000319182891797,
+        "sensitivity_pct": 3.000319182891797,
+        "specificity": 0.9983372177018168,
+        "specificity_pct": 99.83372177018168,
+        "precision": 0.4351851851851852,
+        "precision_pct": 43.51851851851852,
+        "negative_predictive_value": 0.9601641149328859,
+        "negative_predictive_value_pct": 96.01641149328859,
+        "false_positive_rate": 0.0016627822981832058,
+        "false_positive_rate_pct": 0.16627822981832058,
+        "missed_hypo_rate": 0.969996808171082,
+        "missed_hypo_rate_pct": 96.9996808171082
+      },
+      "hypo_sensitivity_by_subject": {
+        "540": 0.24242424242424243,
+        "563": 0.0,
+        "570": 10.050251256281408,
+        "575": 1.4571948998178506,
+        "584": 0.0,
+        "591": 9.090909090909092
+      }
+    },
+    "persistence": {
+      "clarke_zone_a": {
+        "estimate": 48.62978258981392,
+        "ci_low": 40.59377291943104,
+        "ci_high": 56.6657922601968,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 8.036009670382882,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "clarke_hazardous": {
+        "estimate": 8.732454834086937,
+        "ci_low": 5.379618205877186,
+        "ci_high": 12.085291462296688,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 3.352836628209751,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional_erroneous": {
+        "estimate": 8.732454834086937,
+        "ci_low": 5.379618205877186,
+        "ci_high": 12.085291462296688,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 3.352836628209751,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional_accurate": {
+        "estimate": 73.98694662148277,
+        "ci_low": 67.45346085096617,
+        "ci_high": 80.52043239199938,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 6.533485770516606,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "reversed_trend": {
+        "estimate": 0.0,
+        "ci_low": 0.0,
+        "ci_high": 0.0,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 0.0,
+        "excludes_zero": false,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "absolute_error_mgdl": {
+        "estimate": 42.72547087275368,
+        "ci_low": 37.38934456989749,
+        "ci_high": 48.061597175609876,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 5.336126302856194,
+        "excludes_zero": true,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "signed_error_mgdl": {
+        "estimate": -0.11827609461048412,
+        "ci_low": -0.3323764470841368,
+        "ci_high": 0.09582425786316855,
+        "method": "cluster_t",
+        "n_observations": 76504,
+        "n_clusters": 6,
+        "half_width": 0.21410035247365267,
+        "excludes_zero": false,
+        "n_subjects": 6,
+        "n_pairs": 76504
+      },
+      "directional": {
+        "definition": "Rate-aware classification. Rate of change is estimated on the predicted trajectory for the prediction and on the reference trajectory for the reference, following the design principle of Sivananthan et al. 2011 (doi:10.1089/dia.2011.0033). Category boundaries are defined locally in iints.analysis.prediction_accuracy and are NOT the published PRED-EGA zone tables.",
+        "parameters": {
+          "step_minutes": 5.0,
+          "rate_window_minutes": 15.0,
+          "rate_bin_edges_mgdl_min": [
+            -2.0,
+            -1.0,
+            1.0,
+            2.0
+          ],
+          "trend_reversal_mgdl_min": 1.0,
+          "acceptable_clarke_zones": [
+            "A",
+            "B"
+          ]
+        },
+        "trend_dynamics": {
+          "reference_rate_sd_mgdl_min": 0.9418973674069444,
+          "predicted_rate_sd_mgdl_min": 0.0,
+          "rate_attenuation": 0.0,
+          "reference_max_abs_rate_mgdl_min": 12.106666056315104,
+          "predicted_max_abs_rate_mgdl_min": 0.0,
+          "reference_pct_moving": 20.58193035658266,
+          "predicted_pct_moving": 0.0,
+          "sign_concordance_pct": null,
+          "sign_concordance_basis": "reference moving and forecast has a direction",
+          "predicted_no_direction_pct": 100.0,
+          "n_reference_moving": 15746,
+          "n_sign_concordance_basis": 0,
+          "flat_forecast": true,
+          "caveat": "The predicted rate never reaches the trend-reversal threshold, so the reversal clause cannot fire and 'erroneous' reduces to the Clarke criterion. Read rate_attenuation and sign_concordance_pct instead: this forecast carries level information but little or no trend information."
+        },
+        "overall": {
+          "n_pairs": 76504,
+          "counts": {
+            "accurate": 56477,
+            "benign": 13292,
+            "erroneous": 6735
+          },
+          "percentages": {
+            "accurate": 73.82228380215413,
+            "benign": 17.37425494091812,
+            "erroneous": 8.803461256927742
+          },
+          "reversed_trend_pct": 0.0,
+          "overestimation_pct": 48.439297291644884,
+          "mean_signed_error_mgdl": -0.12210696109802444
+        },
+        "by_range": {
+          "hypo": {
+            "n_pairs": 3133,
+            "counts": {
+              "accurate": 795,
+              "benign": 38,
+              "erroneous": 2300
+            },
+            "percentages": {
+              "accurate": 25.375039897861473,
+              "benign": 1.2128949888285987,
+              "erroneous": 73.41206511330992
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 87.42419406319821,
+            "mean_signed_error_mgdl": 53.72880946018427
+          },
+          "target": {
+            "n_pairs": 47147,
+            "counts": {
+              "accurate": 37035,
+              "benign": 8122,
+              "erroneous": 1990
+            },
+            "percentages": {
+              "accurate": 78.55218783803848,
+              "benign": 17.226970963157783,
+              "erroneous": 4.2208411988037415
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 56.58896642416272,
+            "mean_signed_error_mgdl": 12.533883349676563
+          },
+          "hyper": {
+            "n_pairs": 26224,
+            "counts": {
+              "accurate": 18647,
+              "benign": 5132,
+              "erroneous": 2445
+            },
+            "percentages": {
+              "accurate": 71.10661989017694,
+              "benign": 19.56985967053081,
+              "erroneous": 9.32352043929225
+            },
+            "reversed_trend_pct": 0.0,
+            "overestimation_pct": 29.129804758999388,
+            "mean_signed_error_mgdl": -29.30937420980024
+          }
+        }
+      },
+      "hypo_detection_pooled": {
+        "threshold_mgdl": 70.0,
+        "counts": {
+          "true_positive": 649,
+          "false_negative": 2484,
+          "false_positive": 2486,
+          "true_negative": 70885
+        },
+        "sensitivity": 0.2071496967762528,
+        "sensitivity_pct": 20.71496967762528,
+        "specificity": 0.9661174033337422,
+        "specificity_pct": 96.61174033337421,
+        "precision": 0.20701754385964913,
+        "precision_pct": 20.701754385964914,
+        "negative_predictive_value": 0.9661437391813982,
+        "negative_predictive_value_pct": 96.61437391813982,
+        "false_positive_rate": 0.033882596666257786,
+        "false_positive_rate_pct": 3.3882596666257787,
+        "missed_hypo_rate": 0.7928503032237472,
+        "missed_hypo_rate_pct": 79.28503032237472
+      },
+      "hypo_sensitivity_by_subject": {
+        "540": 20.96969696969697,
+        "563": 10.81081081081081,
+        "570": 8.542713567839195,
+        "575": 18.48816029143898,
+        "584": 9.090909090909092,
+        "591": 34.9025974025974
+      }
+    }
+  },
+  "paired_model_minus_persistence": {
+    "clarke_zone_a": {
+      "estimate": 2.4843755402216687,
+      "ci_low": -0.14250023856513083,
+      "ci_high": 5.111251319008469,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 2.6268757787867996,
+      "excludes_zero": false,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": true,
+      "model_better_at_95pct": false
+    },
+    "clarke_hazardous": {
+      "estimate": -1.5631981251198572,
+      "ci_low": -2.8553704104920437,
+      "ci_high": -0.271025839747671,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 1.2921722853721862,
+      "excludes_zero": true,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": false,
+      "model_better_at_95pct": true
+    },
+    "directional_erroneous": {
+      "estimate": -1.5631981251198572,
+      "ci_low": -2.8553704104920437,
+      "ci_high": -0.271025839747671,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 1.2921722853721862,
+      "excludes_zero": true,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": false,
+      "model_better_at_95pct": true
+    },
+    "directional_accurate": {
+      "estimate": 0.5670977326324079,
+      "ci_low": -0.49720052260074865,
+      "ci_high": 1.6313959878655644,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 1.0642982552331566,
+      "excludes_zero": false,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": true,
+      "model_better_at_95pct": false
+    },
+    "reversed_trend": {
+      "estimate": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 0.0,
+      "excludes_zero": false,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": false,
+      "model_better_at_95pct": false
+    },
+    "absolute_error_mgdl": {
+      "estimate": -3.5537029858659164,
+      "ci_low": -5.115940388049498,
+      "ci_high": -1.991465583682335,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 1.5622374021835812,
+      "excludes_zero": true,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": false,
+      "model_better_at_95pct": true
+    },
+    "signed_error_mgdl": {
+      "estimate": 5.705435978929997,
+      "ci_low": -6.346913173911646,
+      "ci_high": 17.75778513177164,
+      "method": "cluster_t",
+      "n_observations": 76504,
+      "n_clusters": 6,
+      "half_width": 12.052349152841643,
+      "excludes_zero": false,
+      "n_subjects": 6,
+      "n_pairs": 76504,
+      "higher_is_better": false,
+      "model_better_at_95pct": false
+    }
+  },
+  "per_subject": {
+    "540": {
+      "fold": "ohio_t1dm_full_medium",
+      "n_pairs": 13039,
+      "model": {
+        "clarke_zone_a": 39.80366592530102,
+        "clarke_hazardous": 9.939412531635861,
+        "directional_erroneous": 9.939412531635861,
+        "directional_accurate": 69.87499041337526,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 42.01396557421523,
+        "signed_error_mgdl": 14.687559552459284
+      },
+      "persistence": {
+        "clarke_zone_a": 40.61661170335148,
+        "clarke_hazardous": 10.345885420661094,
+        "directional_erroneous": 10.345885420661094,
+        "directional_accurate": 70.12807730654191,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 43.466857793717146,
+        "signed_error_mgdl": -0.33768854112710694
+      }
+    },
+    "563": {
+      "fold": "ohio_t1dm_full_multimodal_seed7",
+      "n_pairs": 13028,
+      "model": {
+        "clarke_zone_a": 52.49462695732269,
+        "clarke_hazardous": 4.398219220141234,
+        "directional_erroneous": 4.398219220141234,
+        "directional_accurate": 82.02333435677004,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 34.97005405695408,
+        "signed_error_mgdl": 10.659804547971328
+      },
+      "persistence": {
+        "clarke_zone_a": 49.81578139392079,
+        "clarke_hazardous": 5.511206631869819,
+        "directional_erroneous": 5.511206631869819,
+        "directional_accurate": 81.37856923549279,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 37.648391841341464,
+        "signed_error_mgdl": -0.2437442437541752
+      }
+    },
+    "570": {
+      "fold": "ohio_t1dm_full_multimodal_seed7",
+      "n_pairs": 11541,
+      "model": {
+        "clarke_zone_a": 67.82774456286283,
+        "clarke_hazardous": 3.4832336885885105,
+        "directional_erroneous": 3.4832336885885105,
+        "directional_accurate": 83.26834763018803,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 33.00942553817766,
+        "signed_error_mgdl": -7.151770550501676
+      },
+      "persistence": {
+        "clarke_zone_a": 62.00502556104324,
+        "clarke_hazardous": 5.09487912659215,
+        "directional_erroneous": 5.09487912659215,
+        "directional_accurate": 82.45386015076683,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 36.005221848884084,
+        "signed_error_mgdl": 0.1257040098008679
+      }
+    },
+    "575": {
+      "fold": "ohio_t1dm_full_medium",
+      "n_pairs": 13033,
+      "model": {
+        "clarke_zone_a": 42.246604772500575,
+        "clarke_hazardous": 12.238164658942685,
+        "directional_erroneous": 12.238164658942685,
+        "directional_accurate": 68.83296247985882,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 42.8106198506592,
+        "signed_error_mgdl": 16.911980421373176
+      },
+      "persistence": {
+        "clarke_zone_a": 42.29264175554362,
+        "clarke_hazardous": 13.71134811632011,
+        "directional_erroneous": 13.71134811632011,
+        "directional_accurate": 69.00176475101665,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 48.40537809244479,
+        "signed_error_mgdl": -0.18838333554876324
+      }
+    },
+    "584": {
+      "fold": "ohio_t1dm_full_multimodal_seed99",
+      "n_pairs": 13178,
+      "model": {
+        "clarke_zone_a": 54.56063135528912,
+        "clarke_hazardous": 4.962816815905296,
+        "directional_erroneous": 4.962816815905296,
+        "directional_accurate": 71.65730763393535,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 43.073283008639706,
+        "signed_error_mgdl": -9.656386110413182
+      },
+      "persistence": {
+        "clarke_zone_a": 50.58430717863105,
+        "clarke_hazardous": 8.878433753225073,
+        "directional_erroneous": 8.878433753225073,
+        "directional_accurate": 69.2290180604037,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 47.76651482257157,
+        "signed_error_mgdl": 0.1477310671613111
+      }
+    },
+    "591": {
+      "fold": "ohio_t1dm_full_multimodal_seed99",
+      "n_pairs": 12685,
+      "model": {
+        "clarke_zone_a": 49.75167520693733,
+        "clarke_hazardous": 7.993693338588884,
+        "directional_erroneous": 7.993693338588884,
+        "directional_accurate": 71.66732361056366,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 39.15325929268073,
+        "signed_error_mgdl": 8.071771445028135
+      },
+      "persistence": {
+        "clarke_zone_a": 46.464327946393375,
+        "clarke_hazardous": 8.85297595585337,
+        "directional_erroneous": 8.85297595585337,
+        "directional_accurate": 71.7303902246748,
+        "reversed_trend": 0.0,
+        "absolute_error_mgdl": 43.06046083756305,
+        "signed_error_mgdl": -0.21327552419503842
+      }
+    }
+  }
+}

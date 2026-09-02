@@ -45,6 +45,150 @@ INSULIN_COLUMNS = ("delivered_insulin_units", "insulin", "insulin_units", "bolus
 SAFETY_COLUMNS = ("safety_triggered", "supervisor_triggered", "safety_intervention")
 
 
+@dataclass(frozen=True)
+class CompartmentTimeline:
+    """Compartment contents and fluxes over a run, ready for a topology view.
+
+    ``available`` is False for runs that carry no compartment columns -- every
+    run produced before the simulator exported them, and any run whose patient
+    backend publishes no schema. ``reason`` then explains which case it is, so
+    the UI can say the layout is unavailable rather than draw an empty diagram.
+    """
+
+    available: bool
+    reason: str
+    schema: dict[str, Any]
+    times: list[float]
+    compartments: dict[str, list[float]]
+    fluxes: dict[str, list[float]]
+    flux_extremes: dict[str, tuple[float, float]]
+    step_count: int
+    stride: int
+    # Canonical plasma glucose (mg/dL), aligned to `times` the same way every
+    # other series is. Named distinctly from the GLUCOSE_COLUMNS candidate
+    # list below (rather than "glucose_mgdl") to avoid confusion between the
+    # two. Empty when the run has no recognizable glucose column -- the 3D
+    # viewer's hypo-coloring degrades gracefully rather than crashing.
+    plasma_glucose_mgdl: list[float]
+
+
+def load_compartment_timeline(
+    csv_path: str | Path, *, max_points: int = 400
+) -> CompartmentTimeline:
+    """Load the compartment/flux series exported alongside a results CSV.
+
+    The schema is read from the sidecar the run wrote, never inferred from a
+    model name, so the view describes the backend that actually produced the
+    numbers.
+
+    Downsampling takes every n-th step rather than averaging. Averaging fluxes
+    over steps would report rates the ODE never computed, and these values are
+    instantaneous rates at the end of a step, not amounts transferred during
+    it. ``flux_extremes`` is computed over the full trace, so a scale derived
+    from it does not depend on the stride.
+    """
+
+    path = Path(csv_path).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Results CSV not found: {path}")
+
+    empty: dict[str, list[float]] = {}
+    schema_path = path.parent / "compartment_schema.json"
+    if not schema_path.is_file():
+        return CompartmentTimeline(
+            available=False,
+            reason=(
+                "This run has no compartment_schema.json, so the compartment "
+                "layout it used is unknown."
+            ),
+            schema={},
+            times=[],
+            compartments=empty,
+            fluxes=empty,
+            flux_extremes={},
+            step_count=0,
+            stride=1,
+            plasma_glucose_mgdl=[],
+        )
+
+    import json
+
+    import pandas as pd
+
+    schema = json.loads(schema_path.read_text())
+    df = pd.read_csv(path)
+
+    state_columns = {
+        column[len("patient_state_") :]: column
+        for column in df.columns
+        if str(column).startswith("patient_state_")
+    }
+    if not state_columns:
+        return CompartmentTimeline(
+            available=False,
+            reason=(
+                "This run exported no patient_state_* columns; it predates "
+                "compartment export."
+            ),
+            schema=schema,
+            times=[],
+            compartments=empty,
+            fluxes=empty,
+            flux_extremes={},
+            step_count=0,
+            stride=1,
+            plasma_glucose_mgdl=[],
+        )
+
+    flux_columns = {
+        column[len("patient_flux_") :]: column
+        for column in df.columns
+        if str(column).startswith("patient_flux_")
+    }
+
+    time_column = next((name for name in TIME_COLUMNS if name in df.columns), None)
+    times = (
+        [float(value) for value in df[time_column].to_numpy()]
+        if time_column is not None
+        else [float(index) for index in range(len(df))]
+    )
+
+    step_count = len(df)
+    stride = max(1, -(-step_count // max(1, max_points)))
+    keep = slice(None, None, stride)
+
+    extremes = {
+        key: (float(df[column].min()), float(df[column].max()))
+        for key, column in flux_columns.items()
+    }
+
+    glucose_column = _first_present(df.columns, GLUCOSE_COLUMNS)
+    plasma_glucose_mgdl = (
+        [float(value) for value in df[glucose_column].to_numpy()[keep]]
+        if glucose_column is not None
+        else []
+    )
+
+    return CompartmentTimeline(
+        available=True,
+        reason="",
+        schema=schema,
+        times=times[keep],
+        compartments={
+            key: [float(value) for value in df[column].to_numpy()[keep]]
+            for key, column in state_columns.items()
+        },
+        fluxes={
+            key: [float(value) for value in df[column].to_numpy()[keep]]
+            for key, column in flux_columns.items()
+        },
+        flux_extremes=extremes,
+        step_count=step_count,
+        stride=stride,
+        plasma_glucose_mgdl=plasma_glucose_mgdl,
+    )
+
+
 def load_results_preview(csv_path: str | Path, *, max_rows: int = 200) -> ResultPreview:
     """Load a CSV into bounded table rows plus a simple glucose graph."""
 

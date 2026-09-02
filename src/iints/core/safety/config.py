@@ -8,8 +8,42 @@ from typing import Any
 
 SENSOR_GLUCOSE_MIN_MGDL = 40.0
 SENSOR_GLUCOSE_MAX_MGDL = 500.0
-SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL = 20.0
-SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL = 4.0
+# Sensor rate-of-change ceilings.
+#
+# These two constants state the same physical claim in two units and are used to
+# reject an implausible CGM step (core/safety/input_validator.py) and to flag
+# implausible rows in real data (data/quality_checker.py, analysis/validator.py).
+#
+# They were 20.0 mg/dL per 5 min (4.0 mg/dL/min), which is below the real step
+# distribution and therefore rejected genuine physiology. Measured on the prepared
+# cohorts over exact 5-minute steps (absolute step, per subject):
+#
+#   cohort      n         p99    p99.9   max     share > 20 mg/dL
+#   AZT1D       283,921   21.0   34.1    163.0   1.03%
+#   HUPA-UCM    309,342   17.0   54.0    259.0   0.64%
+#   OhioT1DM    188,959   17.6   34.8     85.0   0.61%
+#
+# A 20 mg/dL ceiling discards 0.61-1.03% of real steps, and it discards them where
+# it matters most: a fall steeper than 20 mg/dL per 5 min is exactly the situation
+# the supervisor exists for, and the validator raises instead of acting on it.
+# The ceiling is therefore set above the highest measured p99.9 (54.0), which leaves
+# 0.009-0.094% of steps rejected as sensor artifact rather than 1 in 100.
+#
+# This is a plausibility ceiling on a measured signal, not a physiologic limit on
+# blood glucose: the simulator's own envelope is SIMULATION_GLUCOSE_* below.
+SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL = 55.0
+SENSOR_MAX_GLUCOSE_RATE_PER_MIN_MGDL = 11.0
+
+# How fast the simulator's reported value may follow a reading the validator has
+# already rejected (core/simulator.py:_validate_glucose_fail_soft).
+#
+# This used to be the same constant as the plausibility ceiling above, which
+# conflated two opposite requirements: the ceiling should be permissive enough not
+# to reject real physiology, while the damping applied to an implausible reading
+# should stay tight, because that path exists to keep injected sensor corruption
+# from reaching the algorithm in one step. Raising the ceiling would otherwise have
+# made the simulator follow a corrupted sensor faster. They are separate now.
+SENSOR_FAIL_SOFT_MAX_FOLLOW_PER_5_MIN_MGDL = 20.0
 SIMULATION_GLUCOSE_FLOOR_MGDL = 20.0
 SIMULATION_GLUCOSE_CEILING_MGDL = 600.0
 CONTROLLER_HYPO_GUARD_MGDL = 90.0
@@ -30,6 +64,9 @@ class SafetyConfig:
     min_glucose: float = SENSOR_GLUCOSE_MIN_MGDL
     max_glucose: float = SENSOR_GLUCOSE_MAX_MGDL
     max_glucose_delta_per_5_min: float = SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN_MGDL
+    # Damping applied after a reading has been rejected; deliberately tighter than
+    # the plausibility ceiling above. See the comment on the constant.
+    fail_soft_max_follow_per_5_min: float = SENSOR_FAIL_SOFT_MAX_FOLLOW_PER_5_MIN_MGDL
 
     # Supervisor thresholds
     hypoglycemia_threshold: float = 70.0

@@ -1,22 +1,17 @@
 from __future__ import annotations
 
 import base64
-from dataclasses import asdict, dataclass
-import io
+from dataclasses import dataclass
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Sequence
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle
+from matplotlib.patches import FancyBboxPatch, Polygon
 import numpy as np
-import pandas as pd
 
-from iints.research.foundation_arena import run_foundation_model_arena
-from iints.research.glucofm import build_glucofm_foundation_model
-from iints.data.cgmacros_downloader import BENCHMARK_PARTICIPANTS_META
 from iints.research.visualizer import apply_scientific_plot_style
 
 
@@ -29,7 +24,7 @@ class EUCYSFigureMetadata:
     title: str
     subtitle: str
     file_name: str
-    png_path: Path
+    png_path: Path | None
     description: str
     key_metrics: dict[str, str]
     scientific_citations: list[str]
@@ -41,7 +36,7 @@ class EUCYSFigureMetadata:
             "title": self.title,
             "subtitle": self.subtitle,
             "file_name": self.file_name,
-            "png_path": str(self.png_path),
+            "png_path": str(self.png_path) if self.png_path is not None else None,
             "description": self.description,
             "key_metrics": self.key_metrics,
             "scientific_citations": self.scientific_citations,
@@ -71,8 +66,35 @@ class EUCYSJuryPortfolio:
 # INDIVIDUAL SCIENTIFIC PLOT GENERATORS (NATURE / LANCET GRADE, 300 DPI)
 # ==============================================================================
 
-def plot_clarke_error_grid(output_path: Path | str) -> Path:
-    """Generate Clarke Error Grid Analysis (EGA) with multi-zone pastel shading and density overlay."""
+def plot_clarke_error_grid(output_path: Path | str,
+                           reference=None,
+                           predicted=None) -> Path:
+    """Plot a Clarke Error Grid Analysis from paired measurements.
+
+    Args:
+        output_path: Destination PNG.
+        reference: Reference glucose values (mg/dL). Required.
+        predicted: Model predictions paired with ``reference``. Required.
+
+    Raises:
+        ValueError: If no paired data is supplied. Zone percentages are
+            counted from the data; this function will not draw a grid from
+            simulated scatter, because the resulting percentages would not be
+            a clinical accuracy result.
+    """
+    from iints.analysis.error_grid import clarke_error_grid
+
+    if reference is None or predicted is None:
+        raise ValueError(
+            "plot_clarke_error_grid requires paired (reference, predicted) "
+            "glucose values. Supply model outputs against held-out reference "
+            "data; the zone percentages are computed from them."
+        )
+
+    ega = clarke_error_grid(reference, predicted)
+    ref_vals = np.asarray(reference, dtype=float).ravel()
+    pred_vals = np.asarray(predicted, dtype=float).ravel()
+
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -88,18 +110,18 @@ def plot_clarke_error_grid(output_path: Path | str) -> Path:
 
     # Zone A (+- 20% or +- 20 mg/dL)
     zone_a_poly = Polygon(
-        [[0, 0], [70, 56], [400, 320], [400, 400], [58.33, 70], [0, 70]],
+        np.array([[0, 0], [70, 56], [400, 320], [400, 400], [58.33, 70], [0, 70]], dtype=float),
         closed=True, facecolor="#DCFCE7", edgecolor="#86EFAC", alpha=0.7, linewidth=1.0, zorder=1
     )
     ax.add_patch(zone_a_poly)
 
     # Zone B Polygon (upper and lower)
     zone_b_upper = Polygon(
-        [[0, 70], [58.33, 70], [400, 400], [400, 400], [0, 400]],
+        np.array([[0, 70], [58.33, 70], [400, 400], [400, 400], [0, 400]], dtype=float),
         closed=True, facecolor="#FEF9C3", edgecolor="#FDE047", alpha=0.4, linewidth=0.8, zorder=0
     )
     zone_b_lower = Polygon(
-        [[70, 0], [70, 56], [400, 320], [400, 0]],
+        np.array([[70, 0], [70, 56], [400, 320], [400, 0]], dtype=float),
         closed=True, facecolor="#FEF9C3", edgecolor="#FDE047", alpha=0.4, linewidth=0.8, zorder=0
     )
     ax.add_patch(zone_b_upper)
@@ -114,33 +136,32 @@ def plot_clarke_error_grid(output_path: Path | str) -> Path:
     ax.plot([180, 400], [70, 70], color="#1E293B", linewidth=1.0, zorder=2)
     ax.plot([240, 240], [70, 180], color="#1E293B", linewidth=1.0, zorder=2)
 
-    # Generate realistic scatter points clustered along diagonal
-    np.random.seed(42)
-    ref_vals = np.random.uniform(50, 360, 800)
-    noise = np.random.normal(0, 0.045, 800) * ref_vals + np.random.normal(0, 2.5, 800)
-    pred_vals = np.clip(ref_vals + noise, 35, 385)
-
-    ax.scatter(ref_vals, pred_vals, color="#2563EB", alpha=0.55, s=22, edgecolors="#1D4ED8", linewidth=0.4, label="Digital Twin Forecasts (N=800 in silico pairs)", zorder=4)
+    ax.scatter(ref_vals, pred_vals, color="#2563EB", alpha=0.55, s=22,
+               edgecolors="#1D4ED8", linewidth=0.4,
+               label=f"Paired forecasts (N={ega.n_pairs:,})", zorder=4)
 
     # Zone Labels with clear styling
-    ax.text(250, 250, "Zone A\n(Clinically Accurate: 98.6%)", fontsize=11, color="#047857", weight="bold", ha="center", va="center", bbox=dict(boxstyle="round,pad=0.4", facecolor="#FFFFFF", edgecolor="#059669", alpha=0.95), zorder=5)
-    ax.text(330, 170, "Zone B\n(Benign: 1.4%)", fontsize=10, color="#B45309", weight="bold", ha="center", bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFF", edgecolor="#D97706", alpha=0.9), zorder=5)
-    ax.text(45, 340, "Zone E\n(Erroneous: 0.0%)", fontsize=9.5, color="#DC2626", weight="bold", ha="center", zorder=5)
-    ax.text(340, 40, "Zone E\n(Erroneous: 0.0%)", fontsize=9.5, color="#DC2626", weight="bold", ha="center", zorder=5)
+    pct = ega.percentages
+    ax.text(250, 250, f"Zone A\n(Clinically Accurate: {pct['A']:.1f}%)", fontsize=11, color="#047857", weight="bold", ha="center", va="center", bbox=dict(boxstyle="round,pad=0.4", facecolor="#FFFFFF", edgecolor="#059669", alpha=0.95), zorder=5)
+    ax.text(330, 170, f"Zone B\n(Benign: {pct['B']:.1f}%)", fontsize=10, color="#B45309", weight="bold", ha="center", bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFFFFF", edgecolor="#D97706", alpha=0.9), zorder=5)
+    ax.text(45, 340, f"Zone E\n(Erroneous: {pct['E']:.1f}%)", fontsize=9.5, color="#DC2626", weight="bold", ha="center", zorder=5)
+    ax.text(340, 40, f"Zone D\n(Missed: {pct['D']:.1f}%)", fontsize=9.5, color="#DC2626", weight="bold", ha="center", zorder=5)
 
-    # Statistical Summary Card Box (Top Left)
+    # Statistical Summary Card Box (Top Left) - all values counted from data.
     stats_text = (
-        "Clarke EGA Clinical Verification:\n"
-        "• Zone A (No Action Required): 98.6%\n"
-        "• Zone B (Benign Deviation):    1.4%\n"
-        "• Zone C/D/E (Clinical Hazard): 0.0%\n"
-        "• ISO 15197:2013 Compliance:  PASS"
+        "Clarke EGA (computed from paired data):\n"
+        f"• Zone A (No Action Required): {pct['A']:.1f}%\n"
+        f"• Zone B (Benign Deviation):   {pct['B']:.1f}%\n"
+        f"• Zone C/D/E (Clinical Hazard): {ega.hazardous_pct:.1f}%\n"
+        f"• Pairs analysed: n = {ega.n_pairs:,}"
     )
     ax.text(18, 280, stats_text, fontsize=9, color="#0F172A", family="monospace", va="top", bbox=dict(boxstyle="round,pad=0.5", facecolor="#F8FAFC", edgecolor="#94A3B8", alpha=0.95), zorder=5)
 
     ax.grid(True, linestyle="--", color="#E2E8F0", alpha=0.7)
     ax.legend(loc="lower right", framealpha=0.95, fontsize=9.5)
-    plt.title("Clarke Error Grid Analysis (EGA) – 10,000 Paired In Silico Forecasts\nISO 15197:2013 & FDA MDDT Clinical Accuracy Standards", fontsize=12.5, weight="bold", pad=15)
+    plt.title(f"Clarke Error Grid Analysis – {ega.n_pairs:,} paired in silico forecasts\n"
+              "Zone percentages counted from the plotted pairs",
+              fontsize=12.5, weight="bold", pad=15)
 
     plt.tight_layout()
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
@@ -149,7 +170,11 @@ def plot_clarke_error_grid(output_path: Path | str) -> Path:
 
 
 def plot_glycemic_tir_distribution(output_path: Path | str) -> Path:
-    """Generate Time In Range (TIR) clinical consensus breakdown with custom scorecard layout."""
+    """Generate a labelled synthetic TIR layout fixture.
+
+    This legacy helper is retained for visual regression work only. Its values
+    are not study results; the EUCYS dossier no longer calls it by default.
+    """
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -223,14 +248,15 @@ def plot_glycemic_tir_distribution(output_path: Path | str) -> Path:
 
     ax2.text(-0.05, 1.05, "b", transform=ax2.transAxes, fontsize=16, fontweight="bold", color="#0F172A")
 
-    plt.tight_layout()
+    fig.suptitle("SYNTHETIC LAYOUT FIXTURE - NOT A STUDY RESULT", color="#991B1B", fontsize=10)
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
     plt.close()
     return out_file
 
 
 def plot_sc_islet_gsis_dynamics(output_path: Path | str) -> Path:
-    """Generate Stem-Cell Derived Islet Glucose-Stimulated Insulin Secretion (GSIS) profile."""
+    """Generate a synthetic GSIS layout fixture, not wet-lab evidence."""
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -309,14 +335,15 @@ def plot_sc_islet_gsis_dynamics(output_path: Path | str) -> Path:
     ax2.legend(loc="upper left", fontsize=8.5, framealpha=0.95)
     ax2.text(-0.10, 1.05, "b", transform=ax2.transAxes, fontsize=16, fontweight="bold", color="#0F172A")
 
-    plt.tight_layout()
+    fig.suptitle("SYNTHETIC LAYOUT FIXTURE - NO WET-LAB DATA", color="#991B1B", fontsize=10)
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
     plt.close()
     return out_file
 
 
 def plot_regenerative_graft_survival(output_path: Path | str) -> Path:
-    """Generate 90-day post-transplant graft survival and endogenous insulin independence."""
+    """Generate an uncalibrated synthetic graft layout fixture."""
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -359,10 +386,10 @@ def plot_regenerative_graft_survival(output_path: Path | str) -> Path:
     ax1.text(46, 28, "Day 45 Milestone:\n100% Exogenous Insulin\nIndependence (0 U/day)\nC-Peptide: 1.85 ng/mL", fontsize=9.5, color="#047857", fontweight="bold", bbox=dict(boxstyle="round,pad=0.4", facecolor="#ECFDF5", edgecolor="#059669", alpha=0.95))
 
     lines = line1 + line2
-    labels = [l.get_label() for l in lines]
+    labels = [str(l.get_label()) for l in lines]
     ax1.legend(lines, labels, loc="center right", framealpha=0.95, fontsize=9.5)
 
-    plt.title("90-Day Longitudinal SC-Islet Graft Engraftment & Insulin Independence\n(In Silico Multi-Compartment Subcutaneous Implant Kinetics)", fontsize=13, fontweight="bold", pad=15)
+    plt.title("Synthetic 90-Day Graft Scenario\n(Uncalibrated layout fixture - not a treatment result)", fontsize=13, fontweight="bold", pad=15)
     ax1.grid(True, linestyle="--", alpha=0.7)
 
     plt.tight_layout()
@@ -372,7 +399,7 @@ def plot_regenerative_graft_survival(output_path: Path | str) -> Path:
 
 
 def plot_edge_hardware_latency_budget(output_path: Path | str) -> Path:
-    """Generate Edge computing latency budget breakdown with horizontal bar and pipeline waterfall."""
+    """Generate a synthetic hardware-layout fixture, not benchmark evidence."""
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -448,14 +475,15 @@ def plot_edge_hardware_latency_budget(output_path: Path | str) -> Path:
     ax2.legend(loc="upper center", bbox_to_anchor=(0.5, 1.22), ncol=3, fontsize=8, framealpha=0.95)
     ax2.text(-0.05, 1.05, "b", transform=ax2.transAxes, fontsize=16, fontweight="bold", color="#0F172A")
 
-    plt.tight_layout()
+    fig.suptitle("SYNTHETIC LAYOUT FIXTURE - NO HARDWARE BENCHMARK INPUT", color="#991B1B", fontsize=10)
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
     plt.savefig(out_file, dpi=300, bbox_inches="tight")
     plt.close()
     return out_file
 
 
 def plot_quantum_safe_mdmp_security(output_path: Path | str) -> Path:
-    """Generate Quantum-Safe ML-DSA-65 & EU AI Act Governance card architecture diagram."""
+    """Generate an implementation-status diagram without conformity claims."""
     apply_scientific_plot_style()
     out_file = Path(output_path).expanduser().resolve()
     out_file.parent.mkdir(parents=True, exist_ok=True)
@@ -468,14 +496,14 @@ def plot_quantum_safe_mdmp_security(output_path: Path | str) -> Path:
     ax.axis("off")
 
     ax.text(0.5, 0.965, "IINTS-AF Regulatory & Cryptographic Governance Architecture", ha="center", va="top", fontsize=14, fontweight="bold", color="#0F172A")
-    ax.text(0.5, 0.925, "NIST PQC ML-DSA-65 • EU AI Act High-Risk Annex III • FDA MDDT / ASME V&V 40 Alignment", ha="center", va="top", fontsize=10, color="#64748B")
+    ax.text(0.5, 0.925, "Implemented controls, self-assessment topics, and explicit roadmap gaps", ha="center", va="top", fontsize=10, color="#64748B")
 
     cards_data = [
-        ("Post-Quantum Cryptography", "NIST FIPS 204 (ML-DSA-65)", "Every CGM & infusion control packet is cryptographically signed with Dilithium-3 lattice keys, guaranteeing quantum-resilient data integrity.", "VERIFIED (100% PASS)", "#2563EB", "#EFF6FF"),
+        ("Packet Integrity & Signing", "Ed25519 + SHA-256 + ChaCha20-Poly1305", "Every CGM & infusion control packet is signed and authenticated with classical primitives. Post-quantum (ML-DSA / FIPS 204) signing is a roadmap item, not implemented.", "IMPLEMENTED (classical)", "#2563EB", "#EFF6FF"),
         ("Data Provenance & Lineage", "W3C PROV-O & RO-Crate", "Immutable SHA-256 hash-chained study bundles and run parameters provide a mathematically verifiable, tamper-evident audit trail.", "TRACEABLE AUDIT", "#7C3AED", "#FAF5FF"),
-        ("EU AI Act Conformity", "Regulation (EU) 2024/1689 (Annex III)", "Classified as High-Risk AI System. Full conformity ready with continuous human-in-the-loop oversight, risk management, and bias logging.", "FULL CONFORMITY", "#059669", "#ECFDF5"),
-        ("In Silico Trial Credibility", "FDA MDDT & ASME V&V 40", "Virtual patient cohorts validated against real Nature CGMacros dual-sensor data and historical OpenFDA recall failure benchmarks.", "RIGOROUS V&V", "#D97706", "#FFFBEB"),
-        ("Deterministic Fail-Safe Guard", "IEC 62304 Class C Medical", "Dual-Guard supervisor operates in an isolated deterministic Rust runtime, overriding AI anomalies in <5 min without external dependencies.", "ZERO FAILURES", "#DC2626", "#FEF2F2"),
+        ("EU AI Act Review", "Regulation (EU) 2024/1689", "Research-software self-assessment topics are documented. This is not a legal classification, conformity assessment, or CE mark.", "SELF-ASSESSMENT", "#059669", "#ECFDF5"),
+        ("In Silico Credibility", "ASME V&V 40 concepts", "Evidence contracts support traceable comparison, but context-of-use validation and regulatory qualification remain future work.", "PARTIAL / RESEARCH", "#D97706", "#FFFBEB"),
+        ("Deterministic Safety Layer", "Research implementation", "Fixed safety logic can override candidate outputs in simulation. It is not certified IEC 62304 Class C medical software.", "IMPLEMENTED IN SIMULATION", "#DC2626", "#FEF2F2"),
         ("Patient Data Sovereignty", "GDPR / HIPAA De-identification", "Local-first edge execution ensures zero biometric telemetry egress to the cloud without explicit, cryptographically signed patient consent.", "AIR-GAPPED READY", "#0D9488", "#F0FDFA"),
     ]
 
@@ -530,9 +558,21 @@ def plot_quantum_safe_mdmp_security(output_path: Path | str) -> Path:
 
 def generate_complete_eucys_jury_portfolio(
     output_dir: Path | str = "results/eucys_jury_dossier",
+    ega_pairs: tuple | None = None,
+    arena_evaluation_artifacts: Sequence[Path | str] | None = None,
+    confounder_evidence: Path | str | None = None,
+    dual_sensor_evidence: Path | str | None = None,
+    safety_trace: Path | str | None = None,
 ) -> EUCYSJuryPortfolio:
     """
-    Generate all 11 publication-grade PNG figures, metadata manifest, and interactive HTML dossier.
+    Generate the publication-grade PNG figures, metadata manifest, and interactive HTML dossier.
+
+    Args:
+        output_dir: Destination directory.
+        ega_pairs: Optional ``(reference, predicted)`` values from a held-out
+            evaluation. Evidence-dependent figures are skipped when their
+            corresponding artifact is absent; the generator never fabricates
+            a replacement score.
     """
     from iints.research.visualizer import (
         plot_foundation_arena_radar,
@@ -548,143 +588,218 @@ def generate_complete_eucys_jury_portfolio(
 
     figures: list[EUCYSFigureMetadata] = []
 
-    # 1. Arena Radar Plot
-    p1 = plot_foundation_arena_radar(fig_dir / "01_foundation_arena_radar.png")
+    # 1. Arena Radar Plot - comparable evidence only.
+    p1 = (
+        plot_foundation_arena_radar(
+            fig_dir / "01_foundation_arena_radar.png",
+            arena_evaluation_artifacts,
+        )
+        if arena_evaluation_artifacts
+        else None
+    )
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-01",
         category="AI & Foundation Models",
-        title="Foundation Model Arena Polar Benchmark",
-        subtitle="Head-to-head comparison across Google GlucoFM, CGM-JEPA, GluFormer, and Digital Twin",
+        title="Foundation-model benchmark",
+        subtitle=(
+            "Within-benchmark normalized comparison from supplied artifacts"
+            if p1 else "Not generated - no comparable evaluation artifacts supplied"
+        ),
         file_name="01_foundation_arena_radar.png",
         png_path=p1,
-        description="5-axis radar chart evaluating representations on HOMA-IR linear probing R², diabetes classification accuracy, postprandial forecasting (100 - MAE), biological confounder immunity, and inference latency.",
-        key_metrics={"Google GlucoFM R²": "0.884", "Digital Twin Immunity": "100.0%", "Arena Trials": "50"},
-        scientific_citations=["Metwally et al. (Google Research, 2026)", "CRUISE Lab (arXiv:2605.00933, 2026)"],
+        description=(
+            "Every value is loaded from a model evaluation using the same "
+            "benchmark ID and a group-disjoint split. Radial scores are "
+            "relative min-max values, not clinical percentages."
+            if p1 else
+            "Skipped. Supply at least two iints.foundation-arena.evaluation.v1 "
+            "artifacts with three shared measured metrics."
+        ),
+        key_metrics={"Status": "evidence-backed" if p1 else "not generated"},
+        scientific_citations=["Metwally et al. (arXiv:2605.30865v2, 2026)"],
     ))
 
-    # 2. Confounder Cosine Analysis
-    p2 = plot_confounder_cosine_analysis(fig_dir / "02_confounder_cosine_collapse.png")
+    # 2. Confounder Cosine Analysis - pair-level evidence only.
+    p2 = (
+        plot_confounder_cosine_analysis(
+            fig_dir / "02_confounder_cosine_analysis.png",
+            confounder_evidence,
+        )
+        if confounder_evidence is not None
+        else None
+    )
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-02",
         category="AI & Foundation Models",
-        title="Observational Cosine Similarity Collapse vs Ground Truth",
-        subtitle="Latent representation cosine similarity under divergent insulin sensitivity",
-        file_name="02_confounder_cosine_collapse.png",
+        title="Physiological confounder benchmark",
+        subtitle=(
+            "Pair-level embedding similarity under controlled simulated physiology"
+            if p2 else "Not generated - no confounder evidence supplied"
+        ),
+        file_name="02_confounder_cosine_analysis.png",
         png_path=p2,
-        description="Dual-panel analysis showing that observational foundation models collapse (cos θ >= 0.9815) when identical glucose curves are caused by 3-fold different biology, whereas IINTS-AF achieves cos θ = 0.0120.",
-        key_metrics={"GlucoFM cos θ": "0.9882 (Blind)", "Digital Twin cos θ": "0.0120 (Disambiguated)", "Pairs Evaluated": "50"},
-        scientific_citations=["Nature Medicine (2021)", "Metwally et al. (2026)"],
+        description=(
+            "Similarity summaries and points are computed directly from the "
+            "supplied long-format evidence table."
+            if p2 else
+            "Skipped. Supply model_name, si_ratio, and "
+            "embedding_cosine_similarity for every evaluated pair."
+        ),
+        key_metrics={"Status": "evidence-backed" if p2 else "not generated"},
+        scientific_citations=["Metwally et al. (arXiv:2605.30865v2, 2026)"],
     ))
 
-    # 3. GlucoFM Decomposition
+    # 3. GlucoFM implementation schematic. This is a method figure, not data.
     p3 = plot_glucofm_dual_stream_decomposition(fig_dir / "03_glucofm_dual_stream_decomposition.png")
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-03",
         category="AI & Foundation Models",
-        title="Google GlucoFM State-Event Latent Decomposition",
-        subtitle="24-hour continuous glucose separation into circadian state and transient meal spikes",
+        title="IINTS GlucoFM v2 reproduction architecture",
+        subtitle="Independent paper-aligned implementation; method schematic only",
         file_name="03_glucofm_dual_stream_decomposition.png",
         png_path=p3,
-        description="Decomposition of 24h CGM telemetry into low-frequency state stream (1-hour patches, Z_state in R¹²⁸) and high-frequency event stream (30-min patches, Z_event in R¹²⁸) with meal annotations.",
-        key_metrics={"Sequence Length": "288 (5-min)", "Fused Dimension": "256D", "Meals Detected": "3"},
-        scientific_citations=["Metwally et al. (Google Research, 2026)"],
+        description="A 288-position masked CGM grid is causally separated into state and event streams. Both use 24 one-hour patches; 64D stream tokens are fused into a 128D representation and processed by three transformer layers.",
+        key_metrics={"Grid": "288 x 5 min", "Patches": "24 x 12 per stream", "Embedding": "128D"},
+        scientific_citations=["Metwally et al. (arXiv:2605.30865v2, 2026)"],
     ))
 
-    # 4. CGMacros Dual-Sensor Comparison
-    p4 = plot_cgmacros_dualsensor_comparison(fig_dir / "04_cgmacros_dualsensor_cohorts.png")
+    # 4. Dual-sensor comparison - paired evidence only.
+    p4 = (
+        plot_cgmacros_dualsensor_comparison(
+            fig_dir / "04_paired_dual_sensor.png",
+            dual_sensor_evidence,
+        )
+        if dual_sensor_evidence is not None
+        else None
+    )
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-04",
         category="Clinical & Sensor Dynamics",
-        title="CGMacros Dual-Sensor Inter-Site Ingestion (Dexcom vs Libre)",
-        subtitle="Simultaneous abdominal Dexcom G6 Pro and arm FreeStyle Libre Pro telemetry across 3 cohorts",
-        file_name="04_cgmacros_dualsensor_cohorts.png",
+        title="Paired dual-sensor comparison",
+        subtitle=("Descriptive medians from supplied paired data" if p4 else "Not generated - no paired sensor evidence supplied"),
+        file_name="04_paired_dual_sensor.png",
         png_path=p4,
-        description="Empirical time-series comparison across Healthy (N=15), Prediabetes (N=16), and T2D (N=14) cohorts highlighting interstitial perfusion deltas and sensor lag dynamics.",
-        key_metrics={"Total Participants": "45", "Total Measurements": "129,600", "Meals Logged": "1,350"},
-        scientific_citations=["Nature Scientific Data (2025)", "NIH / PhysioNet CGMacros"],
+        description=(
+            "Computed from timestamped Dexcom/Libre pairs grouped by the "
+            "cohort labels in the supplied artifact."
+            if p4 else
+            "Skipped. The dossier does not substitute generated sensor curves."
+        ),
+        key_metrics={"Status": "evidence-backed" if p4 else "not generated"},
+        scientific_citations=["CGMacros source publication and dataset documentation"],
     ))
 
     # 5. Clarke Error Grid Analysis
-    p5 = plot_clarke_error_grid(fig_dir / "05_clarke_error_grid_analysis.png")
+    # Requires paired (reference, predicted) glucose values from an actual
+    # held-out evaluation. The figure is skipped rather than drawn from
+    # simulated scatter: a grid without real pairs is not an accuracy result.
+    if ega_pairs is None:
+        p5 = None
+        ega_result = None
+    else:
+        from iints.analysis.error_grid import clarke_error_grid
+
+        ega_result = clarke_error_grid(ega_pairs[0], ega_pairs[1])
+        p5 = plot_clarke_error_grid(fig_dir / "05_clarke_error_grid_analysis.png",
+                                    reference=ega_pairs[0], predicted=ega_pairs[1])
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-05",
         category="Clinical & Sensor Dynamics",
         title="Clarke Error Grid Analysis (EGA)",
-        subtitle="Clinical accuracy evaluation across 10,000 paired in silico measurements",
+        subtitle=(f"Clinical accuracy across {ega_result.n_pairs:,} paired in silico measurements"
+                  if ega_result else "Not generated - no paired evaluation data supplied"),
         file_name="05_clarke_error_grid_analysis.png",
         png_path=p5,
-        description="Evaluation of predicted glucose vs reference values across ISO 15197 / FDA clinical accuracy zones, confirming 98.6% in Zone A (clinically accurate) and 0.0% in dangerous zones C/D/E.",
-        key_metrics={"Zone A (Accurate)": "98.6%", "Zone B (Benign)": "1.4%", "Zone C/D/E (Dangerous)": "0.0%"},
-        scientific_citations=["Clarke et al. (Diabetes Care, 1987)", "ISO 15197:2013"],
+        description=(
+            "Predicted glucose versus reference values across Clarke clinical "
+            f"accuracy zones: {ega_result.percentages['A']:.1f}% in Zone A, "
+            f"{ega_result.hazardous_pct:.1f}% in the hazardous zones C/D/E."
+            if ega_result else
+            "Skipped: requires paired (reference, predicted) values from a "
+            "held-out evaluation. Pass ega_pairs to generate this figure."
+        ),
+        key_metrics=({
+            "Zone A (Accurate)": f"{ega_result.percentages['A']:.1f}%",
+            "Zone B (Benign)": f"{ega_result.percentages['B']:.1f}%",
+            "Zone C/D/E (Dangerous)": f"{ega_result.hazardous_pct:.1f}%",
+            "Pairs": f"{ega_result.n_pairs:,}",
+        } if ega_result else {"Status": "not generated - no paired data"}),
+        scientific_citations=["Clarke et al. (Diabetes Care, 1987)"],
     ))
 
-    # 6. Glycemic Targets & TIR Distribution
-    p6 = plot_glycemic_tir_distribution(fig_dir / "06_glycemic_tir_clinical_distribution.png")
+    # 6. No default trace is substituted for a measured run.
+    p6 = None
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-06",
         category="Clinical & Sensor Dynamics",
         title="International Consensus Glycemic Targets (TIR / TBR / TAR)",
-        subtitle="Evaluation against ATTD / ADA clinical guidelines across virtual cohorts",
+        subtitle="Not generated - no run-level glucose evidence supplied",
         file_name="06_glycemic_tir_clinical_distribution.png",
         png_path=p6,
-        description="Comprehensive breakdown of Time in Range (70-180 mg/dL: 92.4%), Time Below Range (<70 mg/dL: 0.8%), Severe Hypoglycemia (<54 mg/dL: 0.0%), and Glycemic Variability (CV = 28.4%).",
-        key_metrics={"Time In Range (TIR)": "92.4%", "Severe Hypo (<54)": "0.0%", "CV": "28.4%"},
+        description="Skipped. TIR, TBR, TAR, mean glucose, and CV must be calculated from an identified results file rather than hardcoded demonstration values.",
+        key_metrics={"Status": "not generated - run evidence required"},
         scientific_citations=["Battelino et al. (Diabetes Care, 2019)", "ADA Standards of Care (2026)"],
     ))
 
-    # 7. OpenFDA Device Safety Mitigation
-    p7 = plot_fda_safety_mitigation_timeline(fig_dir / "07_openfda_device_safety_timeline.png")
+    # 7. Safety benchmark - explicit in-silico trace only.
+    p7 = (
+        plot_fda_safety_mitigation_timeline(
+            fig_dir / "07_safety_benchmark_trace.png", safety_trace
+        )
+        if safety_trace is not None
+        else None
+    )
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-07",
         category="FDA & Device Safety",
-        title="OpenFDA Real-World Incident Safety Containment",
-        subtitle="Autonomous dual-guard intervention during critical insulin pump firmware recall events",
-        file_name="07_openfda_device_safety_timeline.png",
+        title="Deterministic safety benchmark",
+        subtitle=("In-silico comparator and supervisor traces" if p7 else "Not generated - no safety trace supplied"),
+        file_name="07_safety_benchmark_trace.png",
         png_path=p7,
-        description="Comparative simulation of Tandem Control-IQ software lockup defect: unprotected infusion results in severe hypoglycemia (<54 mg/dL), whereas IINTS-AF halts infusion at t=25 min.",
-        key_metrics={"Hazard Detection Rate": "100.0%", "Adverse Events Supervised": "0.0%", "Intervention Time": "25 min"},
-        scientific_citations=["FDA Recall Class I/II (2020-2026)", "MAUDE Database"],
+        description=("The plot is explicitly labelled as simulation evidence and does not claim FDA validation or reproduction of a patient event." if p7 else "Skipped. Supply an in-silico benchmark trace; no recall outcome is fabricated."),
+        key_metrics={"Status": "simulation evidence" if p7 else "not generated"},
+        scientific_citations=["FDA MAUDE and recall records may inform scenario design; they do not validate simulator outcomes"],
     ))
 
-    # 8. SC-Islet GSIS Dynamics
-    p8 = plot_sc_islet_gsis_dynamics(fig_dir / "08_sc_islet_gsis_cpeptide_dynamics.png")
+    # 8. Wet-lab claims require wet-lab evidence; none is generated by default.
+    p8 = None
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-08",
         category="Regenerative & Molecular",
         title="Stem-Cell Derived Beta-Islet GSIS & Biomarkers",
-        subtitle="Dynamic perifusion glucose challenge and stage 6 maturation proteomics profile",
+        subtitle="Not generated - no GSIS assay and proteomics evidence supplied",
         file_name="08_sc_islet_gsis_cpeptide_dynamics.png",
         png_path=p8,
-        description="In vitro validated dynamic perifusion profile under basal (2.8 mM) and high glucose (16.7 mM) challenge, demonstrating a stimulation index of 3.68 ± 0.24 and authentic beta-cell identity.",
-        key_metrics={"Stimulation Index": "3.68 ± 0.24", "Basal C-Peptide": "0.40 ng/10⁶/min", "Peak C-Peptide": "3.60 ng/10⁶/min"},
+        description="Skipped. The SDK can ingest proteomics evidence, but it cannot label generated curves as in-vitro validation.",
+        key_metrics={"Status": "not generated - experimental evidence required"},
         scientific_citations=["Pagliuca et al. (Cell, 2014)", "Rezania et al. (Nature Biotech, 2014)"],
     ))
 
-    # 9. Regenerative Graft Survival
-    p9 = plot_regenerative_graft_survival(fig_dir / "09_regenerative_graft_longterm_survival.png")
+    # 9. A transplantation trajectory is not generated without a trace.
+    p9 = None
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-09",
         category="Regenerative & Molecular",
         title="90-Day SC-Islet Graft Engraftment & Insulin Independence",
-        subtitle="Longitudinal in silico transplantation model showing exogenous insulin elimination",
+        subtitle="Not generated - no calibrated longitudinal graft trace supplied",
         file_name="09_regenerative_graft_longterm_survival.png",
         png_path=p9,
-        description="Continuous 90-day simulation of vascularized islet pouch graft, showing progressive rise of endogenous C-peptide to 1.85 ng/mL and complete withdrawal of exogenous daily insulin by day 45.",
-        key_metrics={"Insulin Independence Day": "Day 45", "Day 90 Fasting C-Pep": "1.85 ng/mL", "Graft Viability": "98.2%"},
+        description="Skipped. The dossier will not infer insulin independence, C-peptide, or graft viability from an uncalibrated demonstration curve.",
+        key_metrics={"Status": "not generated - calibrated evidence required"},
         scientific_citations=["Shapiro et al. (NEJM, 2000)", "Vertex VX-880 Phase 1/2 Data"],
     ))
 
-    # 10. Edge Hardware Latency Budget
-    p10 = plot_edge_hardware_latency_budget(fig_dir / "10_edge_hardware_latency_budget.png")
+    # 10. Hardware latency must come from benchmark output.
+    p10 = None
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-10",
         category="Hardware & Edge Computing",
         title="Deterministic Edge Latency Budget Breakdown",
-        subtitle="Benchmarked on NVIDIA Jetson Orin Nano, Xilinx FPGA, and Rust Core",
+        subtitle="Not generated - no hardware benchmark artifact supplied",
         file_name="10_edge_hardware_latency_budget.png",
         png_path=p10,
-        description="Hardware execution profile demonstrating a 4.20 ms total cycle on Jetson Orin Nano, representing a 0.0014% duty cycle relative to the 5-minute (300,000 ms) clinical control tick.",
-        key_metrics={"Jetson Latency": "4.20 ms", "FPGA Latency": "0.85 ms", "Duty Cycle": "0.0014%"},
+        description="Skipped. Platform latency, stage timing, power, and duty cycle must come from a traceable benchmark run.",
+        key_metrics={"Status": "not generated - benchmark evidence required"},
         scientific_citations=["IEEE Trans Biomedical Circuits (2025)", "ASME V&V 40"],
     ))
 
@@ -693,12 +808,12 @@ def generate_complete_eucys_jury_portfolio(
     figures.append(EUCYSFigureMetadata(
         figure_id="FIG-11",
         category="Security & Regulatory",
-        title="NIST PQC ML-DSA-65 & EU AI Act Governance",
-        subtitle="Cryptographic verification and High-Risk Annex III conformity checklist",
+        title="MDMP Packet Integrity & EU AI Act Governance",
+        subtitle="Signing and provenance status against the High-Risk Annex III checklist",
         file_name="11_quantum_safe_mdmp_security.png",
         png_path=p11,
-        description="Comprehensive verification table detailing NIST FIPS 204 post-quantum signing, immutable RO-Crate provenance, and EU AI Act Annex III high-risk medical AI compliance.",
-        key_metrics={"PQC Standard": "NIST FIPS 204 (ML-DSA-65)", "EU AI Act Status": "Conformity Ready", "Audit Verification": "100% PASS"},
+        description="Status table for packet signing (Ed25519, classical), authenticated encryption (ChaCha20-Poly1305), immutable RO-Crate provenance, and self-assessed EU AI Act Annex III readiness. Post-quantum signing is a roadmap item and is not implemented; the EU AI Act status is a self-assessment, not a conformity assessment by a notified body.",
+        key_metrics={"Signing": "Ed25519 (classical)", "Post-quantum": "roadmap, not implemented", "EU AI Act Status": "self-assessed readiness"},
         scientific_citations=["NIST FIPS 204 (2024)", "EU AI Act Regulation (EU) 2024/1689"],
     ))
 
@@ -731,11 +846,23 @@ def _build_eucys_dossier_html(figures: list[EUCYSFigureMetadata], manifest: dict
     categories = sorted(list(set(f.category for f in figures)))
 
     for f in figures:
-        png_bytes = f.png_path.read_bytes()
-        b64 = base64.b64encode(png_bytes).decode("utf-8")
-
         metrics_items = "".join(f'<div class="metric-pill"><span class="m-k">{k}:</span> <span class="m-v">{v}</span></div>' for k, v in f.key_metrics.items())
         citations_items = "".join(f'<li>{c}</li>' for c in f.scientific_citations)
+
+        if f.png_path is None:
+            # Skipped figure (e.g. Clarke EGA with no paired evaluation data
+            # supplied) - render the metadata card without an image rather
+            # than crashing or fabricating a placeholder plot.
+            image_block = '<div class="img-container img-container--skipped">Not generated</div>'
+        else:
+            png_bytes = f.png_path.read_bytes()
+            b64 = base64.b64encode(png_bytes).decode("utf-8")
+            image_block = f"""
+            <div class="img-container" onclick="openModal('{f.figure_id}', '{b64}', '{f.title}', '{f.subtitle}')">
+                <img src="data:image/png;base64,{b64}" alt="{f.title}" loading="lazy" />
+                <div class="zoom-overlay">🔍 Click to Enlarge (300 DPI)</div>
+            </div>
+            """
 
         cards_html.append(f"""
         <div class="figure-card" data-category="{f.category}">
@@ -743,10 +870,7 @@ def _build_eucys_dossier_html(figures: list[EUCYSFigureMetadata], manifest: dict
                 <span class="card-id">{f.figure_id}</span>
                 <span class="card-cat">{f.category}</span>
             </div>
-            <div class="img-container" onclick="openModal('{f.figure_id}', '{b64}', '{f.title}', '{f.subtitle}')">
-                <img src="data:image/png;base64,{b64}" alt="{f.title}" loading="lazy" />
-                <div class="zoom-overlay">🔍 Click to Enlarge (300 DPI)</div>
-            </div>
+            {image_block}
             <div class="card-body">
                 <h3>{f.title}</h3>
                 <p class="subtitle">{f.subtitle}</p>
@@ -999,14 +1123,13 @@ def _build_eucys_dossier_html(figures: list[EUCYSFigureMetadata], manifest: dict
 <body>
     <div class="header">
         <h1>IINTS-AF • EUCYS 2026 European Jury Scientific Portfolio & Playbook</h1>
-        <p>Comprehensive interactive examination dossier for European Union Contest for Young Scientists (EUCYS 2026) Jury Members. Browse all publication-grade empirical results, mechanistic multi-compartment proofs, Google GlucoFM representations, OpenFDA safety containment timelines, and regenerative stem-cell islet kinetics.</p>
+        <p>Interactive research dossier for EUCYS 2026. Method diagrams are shown separately from measured evidence; missing evidence remains visibly ungenerated rather than being replaced by demonstration values.</p>
         <div class="badge-row">
             <div class="header-badge">★ EUCYS 2026 Finalist Project</div>
-            <div class="header-badge">NIST PQC ML-DSA-65</div>
-            <div class="header-badge">Google GlucoFM Dual-Stream</div>
-            <div class="header-badge">45-Subject Dual-Sensor Cohort (129.6k pts)</div>
-            <div class="header-badge">OpenFDA 5-Recall Benchmark</div>
-            <div class="header-badge">ISO 15197 / ATTD TIR 92.4%</div>
+            <div class="header-badge">Independent GlucoFM v2 reproduction</div>
+            <div class="header-badge">Evidence-only result figures</div>
+            <div class="header-badge">Group-disjoint evaluation contract</div>
+            <div class="header-badge">Research and education only</div>
         </div>
     </div>
 

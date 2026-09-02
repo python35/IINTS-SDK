@@ -1,3 +1,12 @@
+import {
+  clarkeErrorGrid,
+  coefficientOfVariation,
+  drawSyntheticBanner,
+  glycemicBands,
+  seededRandom,
+} from "./science.js";
+import { LIVER_CARD_CAPTION, interpolateSeries, lookupEquation } from "./digital-twin-data.js";
+
 const tauriCore = window.__TAURI__?.core;
 const invoke = tauriCore?.invoke;
 const nativeOpenDialog = window.__TAURI__?.dialog?.open;
@@ -117,9 +126,9 @@ const VIEW_METADATA = {
     description: "Inspect biological, mechanistic, and physical evidence without silently changing patient parameters."
   },
   foundation: {
-    eyebrow: "Foundation AI & Visualizer",
-    title: "CGM Foundation Models & Multi-Sensor Visualizer",
-    description: "Evaluate Google GlucoFM, CGM-JEPA, GluFormer, and CGMacros dual-sensor data with interactive charts and cosine similarity analysis."
+    eyebrow: "Representation research",
+    title: "CGM representation laboratory",
+    description: "Train and inspect the independent GlucoFM reproduction, then compare traceable evaluation artifacts produced under one shared benchmark contract."
   },
   eucys: {
     eyebrow: "★ EUCYS 2026 Jury Playbook",
@@ -161,6 +170,11 @@ function setActiveView(view, focusHeading = true) {
   document.querySelectorAll("[data-view-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.viewPanel !== effectiveView;
   });
+  // The digital twin's render loop keeps running via requestAnimationFrame
+  // even while its panel is set `hidden` (not unmounted); stop it when the
+  // user navigates away, the same way closeMoleculeViewer() cancels its own
+  // animation frame rather than leaving it spinning in the background.
+  if (effectiveView !== "results") digitalTwin?.pause();
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -1283,6 +1297,7 @@ async function previewCsv() {
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
+    await loadCompartmentTimeline(preview.csv_path || csv);
     setText("results-status", `Loaded ${preview.row_count} rows.\n${csv}`);
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
     setText("ai-context", `Attached result CSV: ${csv}`);
@@ -2646,6 +2661,532 @@ function svgRect(x, y, width, height, fill, opacity) {
   return node;
 }
 
+// --- Compartment model viewer -------------------------------------------
+// The diagram is built from the schema the run itself exported. Nothing about
+// the physiology is re-implemented here: every number drawn is a value the
+// simulator computed and wrote to results.csv.
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+// Anatomical left-to-right ordering. Sites absent from a model's schema are
+// simply skipped, so the same layout serves any backend that declares sites.
+const COMPARTMENT_SITE_ORDER = ["gut", "subcutaneous", "plasma", "periphery", "signal"];
+const COMPARTMENT_SITE_LABELS = {
+  gut: "Gut",
+  subcutaneous: "Subcutaneous",
+  plasma: "Plasma",
+  periphery: "Periphery",
+  signal: "Signals",
+};
+
+let compartmentTimeline = null;
+
+function compartmentRange(series) {
+  let low = Infinity;
+  let high = -Infinity;
+  for (const value of series) {
+    if (!Number.isFinite(value)) continue;
+    if (value < low) low = value;
+    if (value > high) high = value;
+  }
+  if (!Number.isFinite(low)) return null;
+  return { low, high };
+}
+
+function formatCompartmentValue(value) {
+  const magnitude = Math.abs(value);
+  if (magnitude === 0) return "0";
+  if (magnitude >= 1000 || magnitude < 0.001) return value.toExponential(2);
+  if (magnitude >= 10) return value.toFixed(1);
+  if (magnitude >= 1) return value.toFixed(2);
+  return value.toFixed(4);
+}
+
+function svgNode(name, attributes) {
+  const node = document.createElementNS(SVG_NS, name);
+  for (const [key, value] of Object.entries(attributes)) {
+    node.setAttribute(key, String(value));
+  }
+  return node;
+}
+
+function compartmentIsVisible(compartment, showSignals) {
+  if (showSignals) return true;
+  // Effect and legacy states are not amounts of a substance; hiding them by
+  // default keeps the initial view to actual contents.
+  return compartment.kind === "pool" || compartment.kind === "concentration";
+}
+
+// Moves `centre` out to the border of its 104x40 node box, along the line
+// towards `towards`, plus a small gap so the arrowhead is drawn in open space
+// instead of underneath the box. Returns the centre unchanged for a degenerate
+// direction, which keeps the caller's zero-length guard meaningful.
+function trimToBox(centre, towards, halfWidth = 52, halfHeight = 20, gap = 7) {
+  const dx = towards.x - centre.x;
+  const dy = towards.y - centre.y;
+  const length = Math.hypot(dx, dy);
+  if (!Number.isFinite(length) || length < 1) return centre;
+  const scale = Math.min(
+    Math.abs(dx) > 0.001 ? (halfWidth + gap) / Math.abs(dx) : Infinity,
+    Math.abs(dy) > 0.001 ? (halfHeight + gap) / Math.abs(dy) : Infinity
+  );
+  // Never overshoot the far endpoint: for boxes closer than their own border
+  // the arrow would otherwise flip direction.
+  const t = Math.min(scale, 0.45);
+  return { x: centre.x + dx * t, y: centre.y + dy * t };
+}
+
+function layoutCompartments(compartments) {
+  const bySite = new Map();
+  for (const compartment of compartments) {
+    const site = COMPARTMENT_SITE_ORDER.includes(compartment.site) ? compartment.site : "signal";
+    if (!bySite.has(site)) bySite.set(site, []);
+    bySite.get(site).push(compartment);
+  }
+  const sites = COMPARTMENT_SITE_ORDER.filter((site) => bySite.has(site));
+  const positions = new Map();
+  const columnWidth = 760 / Math.max(sites.length, 1);
+  sites.forEach((site, columnIndex) => {
+    const column = bySite.get(site);
+    const centreX = columnWidth * (columnIndex + 0.5);
+    const spacing = 320 / Math.max(column.length, 1);
+    column.forEach((compartment, rowIndex) => {
+      positions.set(compartment.key, {
+        x: centreX,
+        y: 70 + spacing * (rowIndex + 0.5),
+        site,
+        compartment,
+      });
+    });
+  });
+  return { positions, sites, columnWidth };
+}
+
+function renderCompartmentDiagram() {
+  const diagram = $("compartment-diagram");
+  const timeline = compartmentTimeline;
+  if (!diagram || !timeline || !timeline.available) return;
+
+  const showSignals = $("compartment-show-signals").checked;
+  const index = Number($("compartment-time").value) || 0;
+  const compartments = (timeline.schema.compartments || []).filter((compartment) =>
+    compartmentIsVisible(compartment, showSignals)
+  );
+  const visibleKeys = new Set(compartments.map((compartment) => compartment.key));
+  const { positions, sites, columnWidth } = layoutCompartments(compartments);
+
+  diagram.replaceChildren();
+  const defs = svgNode("defs", {});
+  for (const [id, colour] of [
+    ["compartment-arrow", "#3f6f9f"],
+    ["compartment-arrow-weak", "#b8c4cf"],
+  ]) {
+    const marker = svgNode("marker", {
+      id,
+      viewBox: "0 0 10 10",
+      refX: 9,
+      refY: 5,
+      // Fixed size in user units. The SVG default scales the head with stroke
+      // width, which lets the thickest flux draw a head wide enough to cover
+      // the box it points at; thickness alone carries the magnitude.
+      markerUnits: "userSpaceOnUse",
+      markerWidth: 9,
+      markerHeight: 9,
+      orient: "auto-start-reverse",
+    });
+    marker.appendChild(svgNode("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: colour }));
+    defs.appendChild(marker);
+  }
+  diagram.appendChild(defs);
+
+  sites.forEach((site, columnIndex) => {
+    diagram.appendChild(
+      svgText(columnWidth * columnIndex + 12, 28, COMPARTMENT_SITE_LABELS[site] || site)
+    );
+  });
+
+  // Several boundary fluxes can share one compartment -- plasma glucose has
+  // production, uptake, renal clearance, exercise and dawn terms. Give each a
+  // slot along the box edge, otherwise they are drawn on top of one another
+  // and read as a single flux.
+  const boundarySlots = new Map();
+  const boundaryCounts = new Map();
+  for (const flux of timeline.schema.fluxes || []) {
+    if (!timeline.fluxes[flux.key]) continue;
+    if (flux.source && flux.target) continue;
+    const key = flux.source || flux.target;
+    if (!positions.has(key)) continue;
+    boundarySlots.set(flux.key, boundaryCounts.get(key) || 0);
+    boundaryCounts.set(key, (boundaryCounts.get(key) || 0) + 1);
+  }
+
+  // Fluxes first, so node boxes are drawn over the arrow ends.
+  let hiddenEndpointFluxes = 0;
+  for (const flux of timeline.schema.fluxes || []) {
+    const series = timeline.fluxes[flux.key];
+    if (!series) continue; // declared but not numerically recorded
+    const rate = series[index];
+    if (!Number.isFinite(rate)) continue;
+    const extreme = timeline.flux_extremes[flux.key] || [0, 0];
+    const scale = Math.max(Math.abs(extreme[0]), Math.abs(extreme[1]));
+    const strength = scale > 0 ? Math.abs(rate) / scale : 0;
+    const source = positions.get(flux.source);
+    const target = positions.get(flux.target);
+    // One or both endpoints belong to a state the user has hidden.
+    if (flux.source && flux.target && (!source || !target)) {
+      hiddenEndpointFluxes += 1;
+      continue;
+    }
+    if (!source && !target) {
+      hiddenEndpointFluxes += 1;
+      continue;
+    }
+
+    // A flux with only one endpoint inside the patient crosses the boundary:
+    // an infusion, an elimination, or a production term. It gets a stub that
+    // starts or ends outside the box, never a line between the same point.
+    const boundary = !flux.source || !flux.target;
+    const anchor = source || target;
+    const slotCount = boundary ? boundaryCounts.get(flux.source || flux.target) || 1 : 1;
+    const slot = boundary ? boundarySlots.get(flux.key) || 0 : 0;
+    // Slots spread across the box width, so each boundary flux leaves the box
+    // at its own point on the edge.
+    const slotX = anchor.x + (slotCount > 1 ? (slot - (slotCount - 1) / 2) * (88 / (slotCount - 1)) : 0);
+    // Both stub endpoints are placed directly: just clear of the box edge on
+    // the inside, and 33px further out. The 27 keeps the arrowhead of an
+    // inbound flux clear of the box that is drawn over it.
+    const direction = flux.source ? 1 : -1;
+    const inside = { x: slotX, y: anchor.y + direction * 27 };
+    const outside = { x: slotX, y: anchor.y + direction * 60 };
+    let start = boundary ? (flux.source ? inside : outside) : { x: source.x, y: source.y };
+    let end = boundary ? (flux.source ? outside : inside) : { x: target.x, y: target.y };
+    // Only a box centre needs trimming; stub endpoints are already positioned.
+    let startOnBox = !boundary;
+    let endOnBox = !boundary;
+    // A negative rate means the term runs the other way; the arrow is
+    // reversed rather than clamped, so the direction stays truthful.
+    if (rate < 0) {
+      [start, end] = [end, start];
+      [startOnBox, endOnBox] = [endOnBox, startOnBox];
+    }
+    // Node boxes are drawn over the arrows, so a line between two box centres
+    // has both ends -- including its head -- hidden under a box, and the
+    // direction becomes invisible. Pull each end back to the box border.
+    if (startOnBox) start = trimToBox(start, end);
+    if (endOnBox) end = trimToBox(end, start);
+
+    const line = svgNode("line", {
+      x1: start.x,
+      y1: start.y,
+      x2: end.x,
+      y2: end.y,
+      stroke: strength > 0.01 ? "#3f6f9f" : "#b8c4cf",
+      "stroke-width": (0.8 + strength * 4.2).toFixed(2),
+      "stroke-dasharray": boundary ? "4 3" : "",
+      "marker-end": strength > 0.01 ? "url(#compartment-arrow)" : "url(#compartment-arrow-weak)",
+      opacity: strength > 0.01 ? 0.9 : 0.35,
+    });
+    const title = svgNode("title", {});
+    title.textContent =
+      `${flux.label}: ${formatCompartmentValue(rate)} ${flux.unit}\n` +
+      `${flux.rate_expression}\n${flux.provenance}` +
+      (flux.description ? `\n${flux.description}` : "");
+    line.appendChild(title);
+    diagram.appendChild(line);
+  }
+
+  for (const [key, position] of positions) {
+    const series = timeline.compartments[key] || [];
+    const value = series[index];
+    const range = compartmentRange(series);
+    // Fill is normalised per compartment over the whole run: the states have
+    // incompatible units, so a shared scale would be meaningless.
+    const fraction =
+      range && range.high > range.low && Number.isFinite(value)
+        ? (value - range.low) / (range.high - range.low)
+        : 0;
+    const group = svgNode("g", {});
+    group.appendChild(
+      svgNode("rect", {
+        x: position.x - 52,
+        y: position.y - 20,
+        width: 104,
+        height: 40,
+        rx: 8,
+        fill: position.compartment.provenance === "extension" ? "#f2e9dc" : "#e7eef5",
+        stroke: position.compartment.kind === "pool" ? "#3f6f9f" : "#7f8f9f",
+        "stroke-width": 1.2,
+        "stroke-dasharray": position.compartment.provenance === "extension" ? "3 2" : "",
+      })
+    );
+    group.appendChild(
+      svgNode("rect", {
+        x: position.x - 52,
+        y: position.y + 12,
+        width: 104 * Math.max(0, Math.min(1, fraction)),
+        height: 8,
+        rx: 3,
+        fill: "#3f6f9f",
+        opacity: 0.75,
+      })
+    );
+    const symbol = svgText(position.x - 44, position.y - 4, position.compartment.symbol);
+    symbol.setAttribute("fill", "#22303c");
+    symbol.setAttribute("font-size", "13");
+    group.appendChild(symbol);
+    const reading = svgText(
+      position.x - 44,
+      position.y + 9,
+      Number.isFinite(value) ? formatCompartmentValue(value) : "n/a"
+    );
+    reading.setAttribute("font-size", "11");
+    group.appendChild(reading);
+    const title = svgNode("title", {});
+    title.textContent =
+      `${position.compartment.label}\n` +
+      `${Number.isFinite(value) ? formatCompartmentValue(value) : "n/a"} ${position.compartment.unit}\n` +
+      `${position.compartment.kind}, ${position.compartment.provenance}` +
+      (range ? `\nrun range ${formatCompartmentValue(range.low)} to ${formatCompartmentValue(range.high)}` : "") +
+      (position.compartment.description ? `\n${position.compartment.description}` : "");
+    group.appendChild(title);
+    diagram.appendChild(group);
+  }
+
+  const hidden = (timeline.schema.compartments || []).length - visibleKeys.size;
+  const unrecorded = (timeline.schema.fluxes || []).filter(
+    (flux) => !timeline.fluxes[flux.key]
+  );
+  const minutes = timeline.times[index];
+  $("compartment-time-label").textContent =
+    Number.isFinite(minutes) ? `${Math.round(minutes)} min` : `step ${index}`;
+  $("compartment-caption").textContent =
+    "Bar fill inside each box and arrow thickness are normalised per variable " +
+    "over this run; the states carry incompatible units, so thicknesses are not " +
+    "comparable between arrows. Arrow values are instantaneous rates at the end " +
+    "of a step, not amounts transferred during it. Dashed boxes are project " +
+    "extensions to the published model; dashed arrows cross the patient boundary." +
+    (hidden > 0
+      ? ` ${hidden} signal or effect states hidden` +
+        (hiddenEndpointFluxes > 0
+          ? `, along with ${hiddenEndpointFluxes} fluxes that touch them.`
+          : ".")
+      : "") +
+    (unrecorded.length > 0
+      ? ` Not drawn as a rate: ${unrecorded.map((flux) => flux.label).join(", ")}.`
+      : "");
+  renderCompartmentTable(index, compartments);
+}
+
+function renderCompartmentTable(index, compartments) {
+  const table = $("compartment-table");
+  if (!table) return;
+  const rows = compartments
+    .map((compartment) => {
+      const value = (compartmentTimeline.compartments[compartment.key] || [])[index];
+      return `<tr><td>${escapeHtml(compartment.symbol)}</td><td>${escapeHtml(
+        compartment.label
+      )}</td><td>${escapeHtml(
+        Number.isFinite(value) ? formatCompartmentValue(value) : "n/a"
+      )}</td><td>${escapeHtml(compartment.unit)}</td><td>${escapeHtml(
+        compartment.provenance
+      )}</td></tr>`;
+    })
+    .join("");
+  table.innerHTML =
+    "<thead><tr><th>State</th><th>Compartment</th><th>Value</th><th>Unit</th><th>Source</th></tr></thead>" +
+    `<tbody>${rows}</tbody>`;
+}
+
+async function loadCompartmentTimeline(csv) {
+  const viewer = $("compartment-viewer");
+  try {
+    const timeline = await call("compartment_timeline", { csv, maxPoints: 400 });
+    compartmentTimeline = timeline;
+    if (!timeline.available) {
+      viewer.hidden = true;
+      setText("compartment-status", timeline.reason);
+      setText("compartment-summary", "Not available for this run");
+      return;
+    }
+    const slider = $("compartment-time");
+    slider.max = String(Math.max(0, timeline.times.length - 1));
+    slider.value = "0";
+    viewer.hidden = false;
+    setText(
+      "compartment-status",
+      `${timeline.schema.model_label}\n` +
+        `${(timeline.schema.compartments || []).length} states, ` +
+        `${Object.keys(timeline.fluxes).length} recorded fluxes, ` +
+        `${timeline.times.length} of ${timeline.step_count} steps shown` +
+        (timeline.stride > 1 ? ` (every ${timeline.stride}nd step)` : "")
+    );
+    setText("compartment-summary", timeline.schema.model_label);
+    renderCompartmentDiagram();
+    digitalTwin?.setTimeline(timeline);
+  } catch (error) {
+    compartmentTimeline = null;
+    viewer.hidden = true;
+    setText("compartment-status", errorMessage(error));
+  }
+}
+
+$("compartment-time").addEventListener("input", renderCompartmentDiagram);
+$("compartment-show-signals").addEventListener("change", renderCompartmentDiagram);
+
+// --- 3D Digital Twin viewer ----------------------------------------------
+// Alternative, WebGL-based view of the same compartmentTimeline data the SVG
+// diagram above already draws -- no separate fetch, no re-implemented
+// physiology (see digital-twin-data.js's header comment for the same house
+// rule the SVG diagram follows). three.js is loaded lazily (dynamic import)
+// so opening the app and using only the 2D diagram never fetches or parses
+// the vendored ~1MB library.
+let digitalTwin = null;
+let digitalTwinLoading = null;
+
+function currentDigitalTwinMinutes() {
+  return Number($("digital-twin-time").value) || 0;
+}
+
+function showDigitalTwinCard(html) {
+  const card = $("digital-twin-card");
+  card.innerHTML = html;
+  card.hidden = false; // instant, per the app's global no-transition rule
+}
+
+function renderCompartmentCard(compartmentKey) {
+  const schemaEntry = (compartmentTimeline?.schema?.compartments || []).find((c) => c.key === compartmentKey);
+  const series = compartmentTimeline?.compartments?.[compartmentKey];
+  const value = interpolateSeries(compartmentTimeline?.times || [], series || [], currentDigitalTwinMinutes());
+  showDigitalTwinCard(`
+    <h4>${escapeHtml(schemaEntry?.label || compartmentKey)}</h4>
+    <div>${Number.isFinite(value) ? value.toFixed(2) : "--"} ${escapeHtml(schemaEntry?.unit || "")}</div>
+    ${schemaEntry?.description ? `<p>${escapeHtml(schemaEntry.description)}</p>` : ""}
+  `);
+}
+
+function renderFluxCard(fluxKey, { isLiver = false } = {}) {
+  const schemaEntry = (compartmentTimeline?.schema?.fluxes || []).find((f) => f.key === fluxKey);
+  const series = compartmentTimeline?.fluxes?.[fluxKey];
+  const value = interpolateSeries(compartmentTimeline?.times || [], series || [], currentDigitalTwinMinutes());
+  const equation = lookupEquation(compartmentTimeline?.schema || {}, fluxKey);
+  showDigitalTwinCard(`
+    <h4>${escapeHtml(schemaEntry?.label || fluxKey)}</h4>
+    <div>${Number.isFinite(value) ? value.toFixed(3) : "--"} ${escapeHtml(schemaEntry?.unit || "")}</div>
+    ${equation ? `<code>${escapeHtml(equation)}</code>` : ""}
+    ${isLiver ? `<p>${escapeHtml(LIVER_CARD_CAPTION)}</p>` : ""}
+  `);
+}
+
+async function ensureDigitalTwin() {
+  if (digitalTwin) return digitalTwin;
+  if (!digitalTwinLoading) {
+    digitalTwinLoading = import("./digital-twin-scene.js").then(({ createDigitalTwinScene }) => {
+      digitalTwin = createDigitalTwinScene($("digital-twin-canvas"));
+      // Register every callback before the first setTimeline() call below:
+      // setTimeline() triggers an immediate render (buildOrgans() +
+      // requestRender()), and that first frame is the one that computes and
+      // reports flux-chip positions -- registering onFluxChipsUpdate after
+      // it would silently miss that frame and show no chips until the next
+      // interaction or play().
+      digitalTwin.onTimeUpdate((minutes) => {
+        const rounded = Math.round(minutes);
+        $("digital-twin-time").value = String(rounded);
+        setText("digital-twin-time-label", `${rounded} min`);
+      });
+      digitalTwin.onPlaybackEnded(() => {
+        const button = $("digital-twin-play-btn");
+        button.dataset.playing = "false";
+        button.textContent = "Play";
+      });
+      digitalTwin.onPick((userData) => {
+        if (userData.kind === "compartment") {
+          renderCompartmentCard(userData.compartmentKey);
+        } else if (userData.kind === "flux-proxy") {
+          renderFluxCard(userData.fluxKey, { isLiver: userData.organId === "liver" });
+        }
+      });
+      digitalTwin.onFluxChipsUpdate(updateFluxChips);
+      if (compartmentTimeline) digitalTwin.setTimeline(compartmentTimeline);
+      return digitalTwin;
+    });
+  }
+  return digitalTwinLoading;
+}
+
+// Flux "chips" are small always-present buttons projected onto screen space
+// at each stream's curve midpoint (fluxes aren't raycast -- see
+// digital-twin-scene.js's pickOrganAt comment). Reused/repositioned every
+// frame rather than recreated, to avoid needless DOM churn during playback.
+const fluxChipElements = new Map();
+
+function updateFluxChips(chips) {
+  const container = $("digital-twin-canvas").parentElement;
+  const seen = new Set();
+  for (const chip of chips) {
+    seen.add(chip.fluxKey);
+    let el = fluxChipElements.get(chip.fluxKey);
+    if (!el) {
+      el = document.createElement("button");
+      el.type = "button";
+      el.className = "digital-twin-chip";
+      el.addEventListener("click", () => renderFluxCard(chip.fluxKey, { isLiver: chip.fluxKey === "endogenous_production" }));
+      container.appendChild(el);
+      fluxChipElements.set(chip.fluxKey, el);
+    }
+    el.hidden = !chip.visible;
+    el.textContent = chip.label;
+    el.style.left = `${chip.x}px`;
+    el.style.top = `${chip.y}px`;
+  }
+  for (const [fluxKey, el] of fluxChipElements) {
+    if (!seen.has(fluxKey)) {
+      el.remove();
+      fluxChipElements.delete(fluxKey);
+    }
+  }
+}
+
+document.querySelectorAll("[data-compartment-mode]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    document.querySelectorAll("[data-compartment-mode]").forEach((b) => b.classList.remove("is-active"));
+    btn.classList.add("is-active");
+    const mode = btn.dataset.compartmentMode;
+    document.querySelectorAll("[data-compartment-panel]").forEach((panel) => {
+      panel.hidden = panel.dataset.compartmentPanel !== mode;
+    });
+    if (mode === "twin") {
+      await ensureDigitalTwin();
+    } else {
+      digitalTwin?.pause();
+    }
+  });
+});
+
+$("digital-twin-time").addEventListener("input", (event) => {
+  const minutes = Number(event.target.value) || 0;
+  setText("digital-twin-time-label", `${minutes} min`);
+  digitalTwin?.setSimMinutes(minutes);
+});
+
+$("digital-twin-play-btn").addEventListener("click", async () => {
+  const twin = await ensureDigitalTwin();
+  const button = $("digital-twin-play-btn");
+  const nowPlaying = button.dataset.playing === "true";
+  if (nowPlaying) {
+    twin.pause();
+    button.dataset.playing = "false";
+    button.textContent = "Play";
+  } else {
+    twin.play();
+    button.dataset.playing = "true";
+    button.textContent = "Pause";
+  }
+});
+
+$("digital-twin-speed").addEventListener("change", (event) => {
+  digitalTwin?.setSpeed(Number(event.target.value) || 1);
+});
+
 $("run-btn").addEventListener("click", runSelectedWorkflow);
 $("run-cancel-btn").addEventListener("click", cancelSelectedWorkflow);
 $("guide-btn").addEventListener("click", openUserGuide);
@@ -2755,46 +3296,134 @@ $("evidence-search").addEventListener("input", () => renderEvidenceConnectors(ev
 $("evidence-level").addEventListener("change", () => renderEvidenceConnectors(evidenceConnectors));
 
 // Foundation AI & Visualizer Logic
-let activeChartTab = "arena";
+let activeChartTab = "glucofm";
 
 const CHART_DESCRIPTIONS = {
-  arena: {
-    title: "Foundation Model Arena (Polar Radar Benchmark)",
-    desc: "Comparing Google GlucoFM (256D Dual-Stream), CGM-JEPA (96D Patch-based), GluFormer (128D Causal), and IINTS-AF Digital Twin across 5 key dimensions: HOMA-IR Linear Probing R², Diabetes Status Classification Accuracy, PPGR Forecasting Accuracy, Confounder Immunity, and Inference Speed."
+  glucofm: {
+    title: "IINTS GlucoFM v2 independent method reproduction",
+    desc: "A mask-preserving 288-position daily grid is decomposed causally into state and event streams. Both streams use 24 one-hour patches; the fused token and pooled embedding dimension is 128. Official Google weights are not bundled."
   },
-  confounder: {
-    title: "Latent Cosine Similarity & Biological Confounder Analysis",
-    desc: "Empirical proof of observational blindness: When identical surface CGM curves are produced by 3-fold divergent biology (S_I = 0.5x vs 1.5x), observational models collapse (cos θ ≥ 0.9815), while IINTS-AF Digital Twin cleanly separates them (cos θ = 0.0120)."
+  embedding: {
+    title: "Last checkpoint-backed embedding",
+    desc: "The chart is populated only after a trained local checkpoint has processed a selected CGM CSV. The checkpoint SHA-256 and observed-grid coverage remain visible in the result log."
   },
   clarke: {
-    title: "Clarke Error Grid Analysis (EGA – 98.6% in Zone A)",
-    desc: "Gold standard ISO 15197 clinical accuracy verification across 10,000 paired in silico measurements. 98.6% of predictions lie in Zone A (clinically accurate), 1.4% in Zone B (benign errors), and 0.0% in dangerous Zones C, D, and E."
-  },
-  tir: {
-    title: "International Consensus Glycemic Targets (TIR = 92.4%)",
-    desc: "Evaluation against international ATTD / ADA clinical standards across 45 participants. Demonstrates 92.4% Time In Range (70-180 mg/dL), 0.8% Time Below Range (<70 mg/dL), 0.0% Severe Hypoglycemia (<54 mg/dL), and CV = 28.4%."
-  },
-  scislet: {
-    title: "Stem-Cell Derived Beta-Islet GSIS & Maturation Fingerprint",
-    desc: "In vitro dynamic perifusion assay under 2.8 mM basal and 16.7 mM glucose challenge, confirming a robust stimulation index of 3.68 ± 0.24 and authentic Stage-6 proteomics markers (INS, PDX1, NKX6-1, MAFA)."
-  },
-  edge: {
-    title: "NVIDIA Jetson Orin Nano & FPGA Deterministic Latency Budget",
-    desc: "4.20 ms total cycle on Jetson Orin Nano (0.85 ms on FPGA), completing all feature extraction, neural encoder, ODE projection, safety supervision, and ML-DSA signing in 0.0014% of the 5-minute clinical tick budget."
-  },
-  glucofm: {
-    title: "Google GlucoFM Dual-Stream State-Event Decomposition",
-    desc: "Decomposing 24-hour continuous glucose telemetry into a slow circadian baseline state stream (Z_state ∈ ℝ¹²⁸, 1-hour patches) and a fast transient event stream (Z_event ∈ ℝ¹²⁸, 30-min patches) with macronutrient meal annotations."
-  },
-  dualsensor: {
-    title: "CGMacros Dual-Sensor Inter-Site Comparison (Dexcom vs Libre)",
-    desc: "Simultaneous interstitial glucose traces across 45 participants in the Nature CGMacros dataset, demonstrating adipose perfusion gradients between abdominal (Dexcom G6) and upper-arm (FreeStyle Libre) sensor sites."
-  },
-  fda: {
-    title: "OpenFDA Device Hazard & Supervisor Mitigation Timeline",
-    desc: "Real-time automated containment of 5 FDA Class I/II recall failure modes using the IINTS-AF Dual-Guard Supervisor, preventing severe hypoglycemia (<54 mg/dL) with zero false-alarm lockouts."
+    title: "Clarke Error Grid Analysis (demonstration)",
+    desc: "Clarke zone classification per Clarke et al. (Diabetes Care, 1987). The zone percentages shown on the chart are counted from the plotted pairs by the shared classifier in science.js. No paired evaluation data is loaded in the workbench yet, so the plotted pairs are a fixed-seed synthetic demonstration and the chart is labelled as such. ISO 15197 is a bench standard for glucose meters and does not apply to model predictions."
   }
 };
+
+// Real held-out evaluation output, produced by
+// `research/export_desktop_evidence.py`. When the file is present the Clarke
+// chart shows measured pairs; when it is absent the chart falls back to a
+// clearly-labelled synthetic demonstration. It must never silently show
+// generated data as if it were a result.
+let forecastEvidence = null;
+let forecastEvidenceState = "loading";
+
+async function loadForecastEvidence() {
+  try {
+    const res = await fetch("./evidence/forecast_evidence.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    if (!payload?.pooled?.model?.zone_percentages || !payload?.scatter?.reference) {
+      throw new Error("evidence file missing required fields");
+    }
+    forecastEvidence = payload;
+    forecastEvidenceState = "ready";
+  } catch (err) {
+    forecastEvidence = null;
+    forecastEvidenceState = "absent";
+    console.info("No forecast evidence loaded; Clarke chart falls back to demo.", err);
+  }
+  if (activeChartTab === "clarke") renderFoundationChart("clarke");
+}
+
+loadForecastEvidence();
+
+/*
+ * Cross-fold evidence. The scatter above is one checkpoint on the two subjects
+ * it held out; that is a demonstration of the method, not a measure of it. The
+ * cross-fold file pools several checkpoints over their own held-out subjects
+ * and puts a subject-level interval on every claim. When it is present the
+ * panel text is qualified by it, so the app can never state a single-fold
+ * advantage that the subject-level interval does not support.
+ */
+let crossfoldEvidence = null;
+let crossfoldEvidenceState = "loading";
+
+async function loadCrossfoldEvidence() {
+  try {
+    const res = await fetch("./evidence/crossfold_evidence.json", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    if (!payload?.paired_model_minus_persistence?.clarke_zone_a ||
+        !payload?.primary_outcome_hypoglycemia_detection?.paired_model_minus_persistence) {
+      throw new Error("cross-fold evidence missing required fields");
+    }
+    crossfoldEvidence = payload;
+    crossfoldEvidenceState = "ready";
+  } catch (err) {
+    crossfoldEvidence = null;
+    crossfoldEvidenceState = "absent";
+    console.info("No cross-fold evidence loaded; panel text stays single-fold.", err);
+  }
+  if (activeChartTab === "clarke") renderFoundationChart("clarke");
+}
+
+loadCrossfoldEvidence();
+
+/** Subject-level qualification of the single-fold numbers. Empty when absent. */
+function crossfoldSentence() {
+  if (crossfoldEvidenceState !== "ready") return "";
+  const c = crossfoldEvidence;
+  const za = c.paired_model_minus_persistence.clarke_zone_a;
+  const hy = c.primary_outcome_hypoglycemia_detection;
+  const hp = hy.paired_model_minus_persistence;
+  const dyn = c.summary.model.directional.trend_dynamics;
+  const zaVerdict = za.model_better_at_95pct
+    ? "which excludes zero"
+    : "which includes zero, so this advantage is not established";
+  const hypoVerdict = hp.estimate < 0
+    ? `the model detects ${Math.abs(hp.estimate).toFixed(1)} percentage points FEWER ` +
+      `hypoglycemic windows than carrying the last reading forward ` +
+      `(95% CI ${hp.ci_low.toFixed(1)} to ${hp.ci_high.toFixed(1)})`
+    : `the model detects ${hp.estimate.toFixed(1)} percentage points more hypoglycemic ` +
+      `windows than the baseline (95% CI ${hp.ci_low.toFixed(1)} to ${hp.ci_high.toFixed(1)})`;
+  const flat = dyn.flat_forecast
+    ? ` The forecast reproduces only ${(dyn.rate_attenuation * 100).toFixed(0)}% of the ` +
+      `observed rate-of-change spread, so it carries level information but little trend.`
+    : "";
+  return (
+    ` Across ${c.folds.length} folds covering ${c.n_subjects} held-out subjects, the ` +
+    `paired Zone A advantage over the baseline is ${za.estimate >= 0 ? "+" : ""}` +
+    `${za.estimate.toFixed(1)} points (95% CI ${za.ci_low.toFixed(1)} to ` +
+    `${za.ci_high.toFixed(1)}), ${zaVerdict}. On the primary safety outcome, ` +
+    `${hypoVerdict}.${flat}`
+  );
+}
+
+/** Description text for the Clarke tab, derived from the evidence provenance. */
+function clarkeDescription() {
+  if (forecastEvidenceState !== "ready") return CHART_DESCRIPTIONS.clarke.desc;
+  const p = forecastEvidence.provenance;
+  const m = forecastEvidence.pooled.model;
+  const b = forecastEvidence.pooled.persistence;
+  const sl = forecastEvidence.subject_level_zone_a;
+  const meal = p.meal_announcement_minutes
+    ? ` Meals are announced ${p.meal_announcement_minutes} min ahead, which is information the model receives about the near future.`
+    : "";
+  return (
+    `Clarke zone classification (Clarke et al., 1987) of ${m.n_pairs.toLocaleString()} forecast ` +
+    `endpoints at a ${p.horizon_minutes}-minute horizon, on subjects ${(p.test_subjects || []).join(" and ")} — ` +
+    `held out of both training and model selection. ` +
+    `Model: ${m.zone_percentages.A.toFixed(1)}% Zone A, MAE ${m.mae.toFixed(1)} mg/dL. ` +
+    `Carrying the last reading forward: ${b.zone_percentages.A.toFixed(1)}% Zone A, MAE ${b.mae.toFixed(1)} mg/dL. ` +
+    `Zone A ranges from ${sl.min.toFixed(1)}% to ${sl.max.toFixed(1)}% across only ${sl.n_subjects} subjects, ` +
+    `so the pooled figure is far more precise than the evidence warrants.${meal}` +
+    crossfoldSentence()
+  );
+}
 
 function renderFoundationChart(tab) {
   activeChartTab = tab;
@@ -2808,465 +3437,107 @@ function renderFoundationChart(tab) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, w, h);
 
-  const info = CHART_DESCRIPTIONS[tab] || CHART_DESCRIPTIONS.arena;
-  $("chart-explanation").innerHTML = `<h3>${info.title}</h3><p>${info.desc}</p>`;
+  const info = CHART_DESCRIPTIONS[tab] || CHART_DESCRIPTIONS.glucofm;
+  let title = info.title;
+  let desc = info.desc;
+  if (tab === "clarke" && forecastEvidenceState === "ready") {
+    title = "Clarke Error Grid Analysis (held-out evaluation)";
+    desc = clarkeDescription();
+  }
+  $("chart-explanation").innerHTML = `<h3>${title}</h3><p>${desc}</p>`;
 
-  if (tab === "arena") {
-    drawArenaRadarChart(ctx, w, h);
-  } else if (tab === "confounder") {
-    drawConfounderCosineChart(ctx, w, h);
-  } else if (tab === "clarke") {
+  if (tab === "clarke") {
     drawClarkeErrorGridChart(ctx, w, h);
-  } else if (tab === "tir") {
-    drawGlycemicTirChart(ctx, w, h);
-  } else if (tab === "scislet") {
-    drawScIsletGsisChart(ctx, w, h);
-  } else if (tab === "edge") {
-    drawEdgeLatencyChart(ctx, w, h);
   } else if (tab === "glucofm") {
     drawGlucoFMDecompositionChart(ctx, w, h);
-  } else if (tab === "dualsensor") {
-    drawDualSensorComparisonChart(ctx, w, h);
-  } else if (tab === "fda") {
-    drawFdaMitigationTimelineChart(ctx, w, h);
+  } else if (tab === "embedding") {
+    drawEmbeddingChart(ctx, w, h);
   }
 }
 
-function drawArenaRadarChart(ctx, w, h) {
-  const cx = w / 2;
-  const cy = h / 2 + 10;
-  const radius = Math.min(w, h) * 0.36;
+let lastGlucoFMEmbedding = null;
 
-  const categories = [
-    "HOMA-IR R² (Probing)",
-    "Diabetes Acc (Classif)",
-    "PPGR Accuracy (1-MAE)",
-    "Confounder Immunity",
-    "Inference Speed"
-  ];
-  const numCats = categories.length;
-
-  // Grid circles
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.lineWidth = 1.5;
-  for (let r = 0.25; r <= 1.0; r += 0.25) {
-    ctx.beginPath();
-    for (let i = 0; i < numCats; i++) {
-      const angle = (i * 2 * Math.PI / numCats) - Math.PI / 2;
-      const x = cx + radius * r * Math.cos(angle);
-      const y = cy + radius * r * Math.sin(angle);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  }
-
-  // Axis spokes & labels
+function drawEmbeddingChart(ctx, w, h) {
+  const values = Array.isArray(lastGlucoFMEmbedding) ? lastGlucoFMEmbedding : [];
   ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 11px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  for (let i = 0; i < numCats; i++) {
-    const angle = (i * 2 * Math.PI / numCats) - Math.PI / 2;
-    const x = cx + radius * Math.cos(angle);
-    const y = cy + radius * Math.sin(angle);
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(x, y);
-    ctx.strokeStyle = "#cbd5e1";
-    ctx.stroke();
-
-    const lx = cx + (radius + 24) * Math.cos(angle);
-    const ly = cy + (radius + 18) * Math.sin(angle);
-    ctx.fillText(categories[i], lx, ly + 4);
-  }
-
-  const models = [
-    { name: "Google GlucoFM (2026)", color: "rgba(26, 115, 232, 0.75)", fill: "rgba(26, 115, 232, 0.15)", scores: [0.884, 0.892, 0.858, 0.040, 0.800] },
-    { name: "CGM-JEPA (2026)", color: "rgba(242, 153, 0, 0.75)", fill: "rgba(242, 153, 0, 0.15)", scores: [0.841, 0.850, 0.832, 0.000, 0.920] },
-    { name: "GluFormer (Nature Med)", color: "rgba(147, 52, 230, 0.75)", fill: "rgba(147, 52, 230, 0.15)", scores: [0.812, 0.824, 0.816, 0.060, 0.450] },
-    { name: "IINTS-AF Digital Twin", color: "rgba(13, 144, 79, 0.95)", fill: "rgba(13, 144, 79, 0.22)", scores: [1.000, 1.000, 0.919, 1.000, 0.980] }
-  ];
-
-  models.forEach(m => {
-    ctx.beginPath();
-    for (let i = 0; i < numCats; i++) {
-      const angle = (i * 2 * Math.PI / numCats) - Math.PI / 2;
-      const score = m.scores[i];
-      const x = cx + radius * score * Math.cos(angle);
-      const y = cy + radius * score * Math.sin(angle);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.closePath();
-    ctx.fillStyle = m.fill;
-    ctx.fill();
-    ctx.strokeStyle = m.color;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-  });
-
-  // Legend
-  let lx = 30;
-  models.forEach(m => {
-    ctx.fillStyle = m.color;
-    ctx.fillRect(lx, 20, 12, 12);
-    ctx.fillStyle = "#1e293b";
-    ctx.font = "bold 10px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(m.name, lx + 16, 30);
-    lx += ctx.measureText(m.name).width + 36;
-  });
-}
-
-function drawConfounderCosineChart(ctx, w, h) {
-  // Dual panel: Left = Bar chart of cos theta, Right = Scatter of S_I gap vs cos theta
-  const midX = w / 2;
-
-  // Left Panel: Bar Chart
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 13px system-ui, sans-serif";
+  ctx.font = "bold 14px system-ui, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Observational Representation Collapse (cos θ)", 40, 30);
-
-  const models = [
-    { name: "Google GlucoFM", cos: 0.9882, color: "#1a73e8" },
-    { name: "CGM-JEPA", cos: 0.9977, color: "#f29900" },
-    { name: "GluFormer", cos: 0.9815, color: "#9334e6" },
-    { name: "IINTS-AF Twin", cos: 0.0120, color: "#0d904f" }
-  ];
-
-  const barW = 65;
-  const startX = 60;
-  const baseY = h - 60;
-  const maxH = 260;
-
-  // Threshold line
-  ctx.strokeStyle = "#ef4444";
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([4, 4]);
-  const threshY = baseY - 0.95 * maxH;
+  ctx.fillText("Last checkpoint-backed 128D embedding", 38, 34);
+  if (!values.length) {
+    ctx.fillStyle = "#64748b";
+    ctx.font = "13px system-ui, sans-serif";
+    ctx.fillText("No embedding has been generated in this session.", 38, 72);
+    return;
+  }
+  const left = 48;
+  const right = w - 32;
+  const top = 64;
+  const bottom = h - 48;
+  const maxAbs = Math.max(...values.map((value) => Math.abs(Number(value) || 0)), 1e-6);
+  ctx.strokeStyle = "#94a3b8";
   ctx.beginPath();
-  ctx.moveTo(startX - 20, threshY);
-  ctx.lineTo(midX - 30, threshY);
+  ctx.moveTo(left, (top + bottom) / 2);
+  ctx.lineTo(right, (top + bottom) / 2);
   ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#ef4444";
-  ctx.font = "9px system-ui, sans-serif";
-  ctx.fillText("Confounder Blindness Threshold (cos θ ≥ 0.95)", startX - 10, threshY - 6);
-
-  models.forEach((m, idx) => {
-    const x = startX + idx * (barW + 24);
-    const barH = m.cos * maxH;
-    const y = baseY - barH;
-
-    ctx.fillStyle = m.color;
-    ctx.fillRect(x, y, barW, barH);
-    ctx.strokeStyle = "#1e293b";
-    ctx.strokeRect(x, y, barW, barH);
-
-    ctx.fillStyle = "#1e293b";
-    ctx.font = "bold 10px system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(`${m.cos.toFixed(4)}`, x + barW / 2, y - 6);
-
-    ctx.font = "9px system-ui, sans-serif";
-    ctx.fillText(m.name, x + barW / 2, baseY + 18);
+  const barWidth = (right - left) / values.length;
+  values.forEach((raw, index) => {
+    const value = Number(raw) || 0;
+    const height = (Math.abs(value) / maxAbs) * ((bottom - top) / 2 - 8);
+    const x = left + index * barWidth;
+    const zero = (top + bottom) / 2;
+    ctx.fillStyle = value >= 0 ? "#1d4ed8" : "#b45309";
+    ctx.fillRect(x, value >= 0 ? zero - height : zero, Math.max(1, barWidth - 1), height);
   });
-
-  // Right Panel: Scatter Plot
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 13px system-ui, sans-serif";
-  ctx.textAlign = "left";
-  ctx.fillText("True Biology Disambiguation vs Cosine Similarity", midX + 30, 30);
-
-  const plotLeft = midX + 40;
-  const plotRight = w - 40;
-  const plotTop = 60;
-  const plotBottom = h - 60;
-
-  ctx.strokeStyle = "#cbd5e1";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(plotLeft, plotTop, plotRight - plotLeft, plotBottom - plotTop);
-
-  // Scatter dots
-  for (let i = 0; i < 40; i++) {
-    const gap = 2.0 + (i / 40) * 1.5; // S_I gap [2.0 to 3.5]
-    const px = plotLeft + ((gap - 2.0) / 1.5) * (plotRight - plotLeft);
-
-    // Observational (GlucoFM & JEPA) @ top
-    const jepaCos = 0.995 + Math.sin(i * 3) * 0.003;
-    const jepaY = plotBottom - jepaCos * (plotBottom - plotTop);
-    ctx.fillStyle = "#f29900";
-    ctx.beginPath();
-    ctx.arc(px, jepaY, 4, 0, 2 * Math.PI);
-    ctx.fill();
-
-    const glucofmCos = 0.985 + Math.cos(i * 2) * 0.005;
-    const glucoY = plotBottom - glucofmCos * (plotBottom - plotTop);
-    ctx.fillStyle = "#1a73e8";
-    ctx.beginPath();
-    ctx.arc(px, glucoY, 4, 0, 2 * Math.PI);
-    ctx.fill();
-
-    // IINTS-AF Digital Twin @ bottom
-    const twinCos = 0.012 + Math.sin(i * 5) * 0.004;
-    const twinY = plotBottom - twinCos * (plotBottom - plotTop);
-    ctx.fillStyle = "#0d904f";
-    ctx.fillRect(px - 3, twinY - 3, 7, 7);
-  }
-
-  // Scatter labels
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 10px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("True Biological Sensitivity Gap (S_I Ratio: 2.0x - 3.5x)", (plotLeft + plotRight) / 2, plotBottom + 25);
+  ctx.fillStyle = "#475569";
+  ctx.font = "11px ui-monospace, monospace";
+  ctx.fillText(`Dimensions: ${values.length}; scale: +/-${maxAbs.toFixed(3)}`, left, h - 18);
 }
 
 function drawGlucoFMDecompositionChart(ctx, w, h) {
-  const marginL = 60;
-  const marginR = 40;
-  const plotW = w - marginL - marginR;
-  const trackH = (h - 100) / 3;
-
-  const titles = [
-    { name: "Track 1: Raw 24h Continuous Glucose Trace (mg/dL)", color: "#1e293b" },
-    { name: "Track 2: Slow Baseline State Stream (Z_state ∈ ℝ¹²⁸, 1-hour patches)", color: "#1a73e8" },
-    { name: "Track 3: Fast Postprandial Event Stream (Z_event ∈ ℝ¹²⁸, 30-min patches)", color: "#ef4444" }
+  const boxes = [
+    { x: 45, y: 135, width: 150, title: "24-hour CGM", detail: "288 x 5-minute grid" },
+    { x: 245, y: 72, width: 160, title: "State stream", detail: "causal Gaussian filter" },
+    { x: 245, y: 205, width: 160, title: "Event stream", detail: "observed - state" },
+    { x: 455, y: 72, width: 165, title: "24 state patches", detail: "12 positions each" },
+    { x: 455, y: 205, width: 165, title: "24 event patches", detail: "12 positions each" },
+    { x: 680, y: 135, width: 175, title: "Fused representation", detail: "24 tokens x 128D" }
   ];
+  ctx.fillStyle = "#0f172a";
+  ctx.font = "bold 15px system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("IINTS GlucoFM v2 independent method reproduction", 38, 34);
+  ctx.fillStyle = "#475569";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText("Missingness is preserved with a physical observation mask; no official Google weights are bundled.", 38, 56);
 
-  for (let track = 0; track < 3; track++) {
-    const topY = 30 + track * (trackH + 20);
-    const botY = topY + trackH;
-
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.strokeRect(marginL, topY, plotW, trackH);
-
-    ctx.fillStyle = titles[track].color;
-    ctx.font = "bold 11px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(titles[track].name, marginL + 8, topY + 16);
-
-    ctx.beginPath();
-    ctx.strokeStyle = titles[track].color;
-    ctx.lineWidth = 2;
-
-    for (let t = 0; t <= 288; t++) {
-      const hours = (t / 288) * 24;
-      const x = marginL + (t / 288) * plotW;
-
-      // Base state: 105 + 12 * sin
-      const stateVal = 105 + 12 * Math.sin(2 * Math.PI * (hours - 6) / 24);
-      // Event spikes:
-      let eventVal = 0;
-      eventVal += 45 * Math.exp(-Math.pow((hours - 8.5) / 1.0, 2));
-      eventVal += 65 * Math.exp(-Math.pow((hours - 13.75) / 1.2, 2));
-      eventVal += 55 * Math.exp(-Math.pow((hours - 19.5) / 1.1, 2));
-
-      let val = 0;
-      if (track === 0) val = stateVal + eventVal;
-      else if (track === 1) val = stateVal;
-      else val = eventVal;
-
-      const normY = track === 2
-        ? botY - (val / 80) * trackH
-        : botY - ((val - 60) / 160) * trackH;
-
-      if (t === 0) ctx.moveTo(x, normY);
-      else ctx.lineTo(x, normY);
-    }
-    ctx.stroke();
-
-    if (track === 2) {
-      // Draw meal markers
-      const meals = [{ h: 8.0, name: "Breakfast (45g)" }, { h: 13.0, name: "Lunch (65g)" }, { h: 19.0, name: "Dinner (55g)" }];
-      meals.forEach(m => {
-        const mx = marginL + (m.h / 24) * plotW;
-        ctx.strokeStyle = "#f59e0b";
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath();
-        ctx.moveTo(mx, topY);
-        ctx.lineTo(mx, botY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = "#f59e0b";
-        ctx.font = "bold 9px system-ui, sans-serif";
-        ctx.fillText(m.name, mx + 4, topY + 30);
-      });
-    }
-  }
-}
-
-function drawDualSensorComparisonChart(ctx, w, h) {
-  const panels = ["Healthy Adult (N=15)", "Prediabetes (N=16)", "Type 2 Diabetes (N=14)"];
-  const panelW = (w - 100) / 3;
-  const plotH = h - 100;
-  const startY = 50;
-
-  panels.forEach((title, pIdx) => {
-    const startX = 50 + pIdx * (panelW + 20);
-
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.strokeRect(startX, startY, panelW, plotH);
-
-    ctx.fillStyle = "#1e293b";
+  const arrows = [
+    [195, 170, 245, 110], [195, 170, 245, 242],
+    [405, 110, 455, 110], [405, 242, 455, 242],
+    [620, 110, 680, 170], [620, 242, 680, 170]
+  ];
+  ctx.strokeStyle = "#64748b";
+  ctx.lineWidth = 2;
+  arrows.forEach(([x1, y1, x2, y2]) => {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  });
+  boxes.forEach((box, index) => {
+    ctx.fillStyle = index === boxes.length - 1 ? "#e0f2fe" : "#f8fafc";
+    ctx.strokeStyle = index === boxes.length - 1 ? "#0369a1" : "#94a3b8";
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(box.x, box.y, box.width, 70);
+    ctx.strokeRect(box.x, box.y, box.width, 70);
+    ctx.fillStyle = "#0f172a";
     ctx.font = "bold 12px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(title, startX + panelW / 2, startY - 10);
-
-    const base = [85, 106, 142][pIdx];
-    const bias = [28, 18, 10][pIdx];
-
-    // Shaded area
-    ctx.fillStyle = "rgba(26, 115, 232, 0.12)";
-    ctx.beginPath();
-    for (let t = 0; t <= 100; t++) {
-      const hours = (t / 100) * 24;
-      const x = startX + (t / 100) * panelW;
-      const libre = base + 15 * Math.sin(2 * Math.PI * hours / 24) + 35 * Math.exp(-Math.pow((hours - 8.5) / 1.2, 2)) + 45 * Math.exp(-Math.pow((hours - 13.5) / 1.5, 2));
-      const dex = libre + bias;
-      const yDex = startY + plotH - ((dex - 50) / 200) * plotH;
-      if (t === 0) ctx.moveTo(x, yDex);
-      else ctx.lineTo(x, yDex);
-    }
-    for (let t = 100; t >= 0; t--) {
-      const hours = (t / 100) * 24;
-      const x = startX + (t / 100) * panelW;
-      const libre = base + 15 * Math.sin(2 * Math.PI * hours / 24) + 35 * Math.exp(-Math.pow((hours - 8.5) / 1.2, 2)) + 45 * Math.exp(-Math.pow((hours - 13.5) / 1.5, 2));
-      const yLib = startY + plotH - ((libre - 50) / 200) * plotH;
-      ctx.lineTo(x, yLib);
-    }
-    ctx.closePath();
-    ctx.fill();
-
-    // Dexcom curve (Blue)
-    ctx.strokeStyle = "#1a73e8";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    for (let t = 0; t <= 100; t++) {
-      const hours = (t / 100) * 24;
-      const x = startX + (t / 100) * panelW;
-      const dex = base + bias + 15 * Math.sin(2 * Math.PI * hours / 24) + 35 * Math.exp(-Math.pow((hours - 8.5) / 1.2, 2)) + 45 * Math.exp(-Math.pow((hours - 13.5) / 1.5, 2));
-      const y = startY + plotH - ((dex - 50) / 200) * plotH;
-      if (t === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-
-    // Libre curve (Red dashed)
-    ctx.strokeStyle = "#ef4444";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath();
-    for (let t = 0; t <= 100; t++) {
-      const hours = (t / 100) * 24;
-      const x = startX + (t / 100) * panelW;
-      const libre = base + 15 * Math.sin(2 * Math.PI * hours / 24) + 35 * Math.exp(-Math.pow((hours - 8.5) / 1.2, 2)) + 45 * Math.exp(-Math.pow((hours - 13.5) / 1.5, 2));
-      const y = startY + plotH - ((libre - 50) / 200) * plotH;
-      if (t === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.fillText(box.title, box.x + box.width / 2, box.y + 28);
+    ctx.fillStyle = "#475569";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillText(box.detail, box.x + box.width / 2, box.y + 49);
   });
-
-  // Legend
-  ctx.fillStyle = "#1a73e8";
-  ctx.fillRect(w / 2 - 140, h - 25, 12, 12);
-  ctx.fillStyle = "#1e293b";
-  ctx.font = "bold 10px system-ui, sans-serif";
+  ctx.fillStyle = "#475569";
+  ctx.font = "11px system-ui, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText("Dexcom G6 Pro (Abdomen)", w / 2 - 122, h - 15);
-
-  ctx.fillStyle = "#ef4444";
-  ctx.fillRect(w / 2 + 50, h - 25, 12, 12);
-  ctx.fillStyle = "#1e293b";
-  ctx.fillText("FreeStyle Libre Pro (Upper Arm)", w / 2 + 68, h - 15);
-}
-
-function drawFdaMitigationTimelineChart(ctx, w, h) {
-  const panelW = (w - 100) / 2;
-  const plotH = h - 100;
-  const startY = 50;
-
-  // Left Panel: Unmitigated Tandem Recall
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.strokeRect(50, startY, panelW, plotH);
-  ctx.fillStyle = "#ef4444";
-  ctx.font = "bold 12px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("Unmitigated Device Recall (Tandem Auto-Bolus Spike)", 50 + panelW / 2, startY - 10);
-
-  // Severe hypo threshold (54 mg/dL)
-  const hypoY = startY + plotH - ((54 - 30) / 110) * plotH;
-  ctx.strokeStyle = "#ef4444";
-  ctx.setLineDash([3, 3]);
-  ctx.beginPath();
-  ctx.moveTo(50, hypoY);
-  ctx.lineTo(50 + panelW, hypoY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#ef4444";
-  ctx.font = "9px system-ui, sans-serif";
-  ctx.fillText("Severe Hypoglycemia Threshold (<54 mg/dL)", 50 + panelW / 2, hypoY + 14);
-
-  // Unmitigated curve falling to 42
-  ctx.strokeStyle = "#ef4444";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  for (let t = 0; t <= 100; t++) {
-    const x = 50 + (t / 100) * panelW;
-    let val = 110 - (t / 100) * 68;
-    if (val < 42) val = 42;
-    const y = startY + plotH - ((val - 30) / 110) * plotH;
-    if (t === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // Right Panel: IINTS-AF Supervised
-  const rightX = 50 + panelW + 20;
-  ctx.strokeStyle = "#e2e8f0";
-  ctx.strokeRect(rightX, startY, panelW, plotH);
-  ctx.fillStyle = "#0d904f";
-  ctx.font = "bold 12px system-ui, sans-serif";
-  ctx.textAlign = "center";
-  ctx.fillText("IINTS-AF Dual-Guard Supervised (100% Hazard Containment)", rightX + panelW / 2, startY - 10);
-
-  // Safe target zone (70-180)
-  const safeTop = startY + plotH - ((140 - 30) / 110) * plotH;
-  const safeBot = startY + plotH - ((70 - 30) / 110) * plotH;
-  ctx.fillStyle = "rgba(13, 144, 79, 0.1)";
-  ctx.fillRect(rightX, safeTop, panelW, safeBot - safeTop);
-
-  // Supervised curve
-  ctx.strokeStyle = "#0d904f";
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  for (let t = 0; t <= 100; t++) {
-    const x = rightX + (t / 100) * panelW;
-    let val = 110;
-    if (t < 25) val = 110 - (t / 25) * 22; // drops to 88
-    else val = 88 + 8 * Math.exp(-(t - 25) / 20); // stabilizes safely
-    const y = startY + plotH - ((val - 30) / 110) * plotH;
-    if (t === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-
-  // Intervention line at t=25
-  const intX = rightX + (25 / 100) * panelW;
-  ctx.strokeStyle = "#1a73e8";
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(intX, startY);
-  ctx.lineTo(intX, startY + plotH);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = "#1a73e8";
-  ctx.font = "bold 9px system-ui, sans-serif";
-  ctx.fillText("Supervisor Intercept (Pump Suspended)", intX + 8, startY + 40);
+  ctx.fillText("Pretraining: masked contextual reconstruction + temporal-dynamics objective with an EMA target encoder.", 38, h - 32);
 }
 
 function drawClarkeErrorGridChart(ctx, w, h) {
@@ -3305,158 +3576,85 @@ function drawClarkeErrorGridChart(ctx, w, h) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Scatter points
-  ctx.fillStyle = "rgba(26, 115, 232, 0.6)";
-  for (let i = 0; i < 200; i++) {
-    const ref = 60 + Math.random() * 300;
-    const noise = (Math.random() - 0.5) * (ref * 0.08 + 4);
-    const pred = Math.max(40, Math.min(380, ref + noise));
-    const px = startX + (ref / 400) * size;
-    const py = startY + size - (pred / 400) * size;
+  // Scatter points.
+  //
+  // No paired evaluation data is loaded in the workbench yet, so these points
+  // are generated. They are drawn with a fixed seed (reproducible across
+  // repaints), the zone percentages below are counted from these exact points
+  // by the shared classifier, and the chart is labelled as synthetic. Wire
+  // real (reference, predicted) arrays into this function and both the
+  // scatter and the percentages follow automatically.
+  const AXIS_MAX = 400;
+  const plot = (ref, pred, radius) => {
+    const px = startX + (Math.min(ref, AXIS_MAX) / AXIS_MAX) * size;
+    const py = startY + size - (Math.min(pred, AXIS_MAX) / AXIS_MAX) * size;
     ctx.beginPath();
-    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
     ctx.fill();
+  };
+
+  let zoneA, zoneB, hazardous, nPairs, isReal = false;
+
+  if (forecastEvidenceState === "ready") {
+    // Measured pairs from a held-out evaluation. The percentages come from the
+    // exporter, which computed them over ALL pairs; the scatter may be a
+    // subsample for legibility, so the two are deliberately not recomputed here.
+    const ev = forecastEvidence;
+    const refs = ev.scatter.reference;
+    const preds = ev.scatter.predicted;
+    ctx.fillStyle = "rgba(26, 115, 232, 0.35)";
+    for (let i = 0; i < refs.length; i++) plot(refs[i], preds[i], 1.6);
+    const m = ev.pooled.model;
+    zoneA = m.zone_percentages.A;
+    zoneB = m.zone_percentages.B;
+    hazardous = m.hazardous_pct;
+    nPairs = m.n_pairs;
+    isReal = true;
+  } else {
+    // No evaluation output present. Generate a demonstration with a fixed seed
+    // (reproducible across repaints), count the zones from exactly these
+    // points, and say plainly that they are synthetic.
+    const rand = seededRandom(42);
+    const refVals = [];
+    const predVals = [];
+    ctx.fillStyle = "rgba(26, 115, 232, 0.6)";
+    for (let i = 0; i < 200; i++) {
+      const ref = 60 + rand() * 300;
+      const noise = (rand() - 0.5) * (ref * 0.08 + 4);
+      const pred = Math.max(40, Math.min(380, ref + noise));
+      refVals.push(ref);
+      predVals.push(pred);
+      plot(ref, pred, 2.5);
+    }
+    const ega = clarkeErrorGrid(refVals, predVals);
+    zoneA = ega.percentages.A;
+    zoneB = ega.percentages.B;
+    hazardous = ega.hazardousPct;
+    nPairs = ega.nPairs;
   }
 
-  // Zone A Label
   ctx.fillStyle = "#137333";
   ctx.font = "bold 13px system-ui, sans-serif";
-  ctx.fillText("Zone A: 98.6% Clinically Accurate", startX + 20, startY + 30);
+  ctx.fillText(`Zone A: ${zoneA.toFixed(1)}% clinically accurate (n = ${nPairs.toLocaleString()})`,
+               startX + 20, startY + 30);
   ctx.fillStyle = "#5f6368";
   ctx.font = "11px system-ui, sans-serif";
+  ctx.fillText(`Zone B: ${zoneB.toFixed(1)}% | Zone C/D/E: ${hazardous.toFixed(1)}%`,
+               startX + 20, startY + 48);
   ctx.fillText("Reference Glucose (mg/dL) →", startX + size/2 - 60, startY + size + 25);
-  ctx.fillText("Zone B: 1.4% | Zone C/D/E: 0.0%", startX + 20, startY + 48);
-}
 
-function drawGlycemicTirChart(ctx, w, h) {
-  const pad = 60;
-  const startX = pad + 120;
-  const barW = w - startX - pad - 40;
-  const cohorts = ["Healthy (N=15)", "Prediabetes (N=16)", "T2D (N=14)", "IINTS-AF Twin"];
-  const tirs = [
-    { vlow: 0.0, low: 0.4, tir: 96.2, high: 3.2, vhigh: 0.2 },
-    { vlow: 0.1, low: 0.7, tir: 88.5, high: 9.8, vhigh: 0.9 },
-    { vlow: 0.4, low: 1.8, tir: 68.2, high: 24.5, vhigh: 5.1 },
-    { vlow: 0.0, low: 0.8, tir: 92.4, high: 6.4, vhigh: 0.4 }
-  ];
-
-  cohorts.forEach((c, idx) => {
-    const y = 80 + idx * 60;
-    const d = tirs[idx];
-
-    ctx.fillStyle = "#202124";
-    ctx.font = "bold 12px system-ui, sans-serif";
-    ctx.fillText(c, pad, y + 18);
-
-    let curX = startX;
-    const drawSeg = (val, color) => {
-      const segW = (val / 100) * barW;
-      ctx.fillStyle = color;
-      ctx.fillRect(curX, y, segW, 26);
-      curX += segW;
-    };
-
-    drawSeg(d.vlow, "#a50e0e");
-    drawSeg(d.low, "#d93025");
-    drawSeg(d.tir, "#1e8e3e");
-    drawSeg(d.high, "#f9ab00");
-    drawSeg(d.vhigh, "#e37400");
-
-    // TIR Text
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 11px system-ui, sans-serif";
-    ctx.fillText(`${d.tir}%`, startX + (d.tir/200)*barW, y + 18);
-  });
-
-  // Legend
-  ctx.fillStyle = "#1e8e3e";
-  ctx.fillRect(startX, 330, 14, 14);
-  ctx.fillStyle = "#202124";
-  ctx.font = "11px system-ui, sans-serif";
-  ctx.fillText("Time In Range (70-180 mg/dL) [Target > 70%]", startX + 22, 342);
-
-  ctx.fillStyle = "#d93025";
-  ctx.fillRect(startX + 280, 330, 14, 14);
-  ctx.fillStyle = "#202124";
-  ctx.fillText("TBR (<70 mg/dL) [< 4%]", startX + 302, 342);
-}
-
-function drawScIsletGsisChart(ctx, w, h) {
-  const pad = 60;
-  const plotW = w - 2 * pad;
-  const plotH = h - 2 * pad;
-  const startX = pad;
-  const startY = pad;
-
-  // Background glucose phases
-  ctx.fillStyle = "#f1f3f4";
-  ctx.fillRect(startX, startY, (20/90)*plotW, plotH);
-  ctx.fillStyle = "#fef7e0";
-  ctx.fillRect(startX + (20/90)*plotW, startY, (40/90)*plotW, plotH);
-  ctx.fillStyle = "#f1f3f4";
-  ctx.fillRect(startX + (60/90)*plotW, startY, (30/90)*plotW, plotH);
-
-  ctx.fillStyle = "#5f6368";
-  ctx.font = "bold 10px system-ui, sans-serif";
-  ctx.fillText("Basal (2.8mM)", startX + 10, startY + 20);
-  ctx.fillText("High Glucose Challenge (16.7mM)", startX + (30/90)*plotW, startY + 20);
-  ctx.fillText("Basal (2.8mM)", startX + (68/90)*plotW, startY + 20);
-
-  // Dynamic C-Peptide curve
-  ctx.strokeStyle = "#1a73e8";
-  ctx.lineWidth = 3.0;
-  ctx.beginPath();
-  for (let t = 0; t <= 90; t++) {
-    const x = startX + (t / 90) * plotW;
-    let c = 0.4;
-    if (t >= 20 && t < 35) c += 3.2 * Math.exp(-Math.pow(t - 25, 2) / 12);
-    else if (t >= 30 && t < 60) c += 1.8 * (1 - Math.exp(-(t - 30) / 8));
-    else if (t >= 60) c = 0.4 + 1.8 * Math.exp(-(t - 60) / 10);
-
-    const y = startY + plotH - (c / 4.0) * plotH;
-    if (t === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+  if (isReal) {
+    const p = forecastEvidence.provenance;
+    const b = forecastEvidence.pooled.persistence;
+    ctx.fillStyle = "#5f6368";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText(
+      `${p.horizon_minutes} min horizon | held-out subjects ${(p.test_subjects || []).join(", ")} | ` +
+      `persistence baseline: ${b.zone_percentages.A.toFixed(1)}% Zone A`,
+      startX + 20, startY + size - 12);
+  } else {
+    drawSyntheticBanner(ctx, startX + 20, startY + size - 26);
   }
-  ctx.stroke();
-
-  // Peak note
-  ctx.fillStyle = "#1a73e8";
-  ctx.font = "bold 11px system-ui, sans-serif";
-  ctx.fillText("Peak C-Peptide: 3.60 ng/10⁶ cells/min (SI = 3.68 ± 0.24)", startX + (28/90)*plotW, startY + 70);
-}
-
-function drawEdgeLatencyChart(ctx, w, h) {
-  const pad = 60;
-  const items = [
-    { name: "Cloud API (REST)", lat: 485.0, col: "#ea4335" },
-    { name: "Desktop CPU", lat: 18.2, col: "#fbbc04" },
-    { name: "NVIDIA Jetson Orin (15W)", lat: 4.20, col: "#34a853" },
-    { name: "Xilinx FPGA", lat: 0.85, col: "#4285f4" },
-    { name: "IINTS-AF Rust Core", lat: 0.40, col: "#9334e6" }
-  ];
-
-  const barH = 34;
-  const startX = pad + 180;
-  const maxW = w - startX - pad - 60;
-
-  items.forEach((it, idx) => {
-    const y = 80 + idx * 54;
-    ctx.fillStyle = "#202124";
-    ctx.font = "bold 12px system-ui, sans-serif";
-    ctx.fillText(it.name, pad, y + 22);
-
-    const logW = (Math.log10(it.lat + 0.1) / Math.log10(600)) * maxW;
-    ctx.fillStyle = it.col;
-    ctx.fillRect(startX, y, Math.max(8, logW), barH);
-
-    ctx.fillStyle = "#202124";
-    ctx.font = "bold 11px system-ui, sans-serif";
-    ctx.fillText(`${it.lat.toFixed(2)} ms`, startX + Math.max(8, logW) + 10, y + 22);
-  });
-
-  ctx.fillStyle = "#137333";
-  ctx.font = "bold 12px system-ui, sans-serif";
-  ctx.fillText("5-Minute Clinical Tick Budget: 300,000 ms | Jetson Duty Cycle: 0.0014%", startX, 360);
 }
 
 // Chart tab switching
@@ -3470,7 +3668,7 @@ document.querySelectorAll("[data-chart-tab]").forEach(btn => {
 
 // EUCYS Playbook Button
 $("eucys-playbook-btn")?.addEventListener("click", async () => {
-  setText("foundation-status", "Generating complete EUCYS 2026 European Jury Scientific Portfolio & Playbook (11 Publication Figures)...");
+  setText("foundation-status", "Generating the EUCYS evidence dossier. Figures without required measured inputs are skipped rather than fabricated...");
   try {
     const result = await invoke("generate_eucys_playbook", { outputDir: "results/eucys_jury_dossier" });
     setText("foundation-status", `★ EUCYS 2026 Jury Portfolio Generated Successfully!\nTotal Figures: ${result.data?.total_figures}\nInteractive Dossier: ${result.data?.index_html_path}\nManifest: ${result.data?.manifest_json_path}`);
@@ -3480,59 +3678,159 @@ $("eucys-playbook-btn")?.addEventListener("click", async () => {
   }
 });
 
-// Foundation action buttons
-$("foundation-arena-btn").addEventListener("click", async () => {
-  setText("foundation-status", "Running Foundation Arena Benchmark (50 trials across GlucoFM, JEPA, GluFormer, IINTS-AF)...");
+// Foundation model inputs and evidence-only actions
+let foundationArenaResultFiles = [];
+
+$("foundation-glucofm-train-source-browse-btn")?.addEventListener("click", () => chooseLocalPath({
+  inputId: "foundation-glucofm-train-source",
+  buttonId: "foundation-glucofm-train-source-browse-btn",
+  statusId: "foundation-status",
+  title: "Choose a multi-subject CGM training dataset",
+  filters: [{ name: "CGM table", extensions: ["csv", "tsv", "txt", "parquet", "pq"] }],
+  selectedLabel: "Pretraining dataset selected"
+}));
+
+$("foundation-glucofm-train-output-browse-btn")?.addEventListener("click", () => chooseLocalPath({
+  inputId: "foundation-glucofm-train-output",
+  buttonId: "foundation-glucofm-train-output-browse-btn",
+  statusId: "foundation-status",
+  title: "Choose the GlucoFM training output folder",
+  directory: true,
+  selectedLabel: "Training output folder selected"
+}));
+
+$("foundation-glucofm-csv-browse-btn")?.addEventListener("click", () => chooseLocalPath({
+  inputId: "foundation-glucofm-csv",
+  buttonId: "foundation-glucofm-csv-browse-btn",
+  statusId: "foundation-status",
+  title: "Choose a 24-hour CGM CSV",
+  filters: [{ name: "CSV data", extensions: ["csv"] }],
+  selectedLabel: "CGM CSV selected"
+}));
+
+$("foundation-glucofm-checkpoint-browse-btn")?.addEventListener("click", () => chooseLocalPath({
+  inputId: "foundation-glucofm-checkpoint",
+  buttonId: "foundation-glucofm-checkpoint-browse-btn",
+  statusId: "foundation-status",
+  title: "Choose a trained GlucoFM checkpoint",
+  filters: [{ name: "PyTorch checkpoint", extensions: ["pt"] }],
+  selectedLabel: "Checkpoint selected"
+}));
+
+$("foundation-glucofm-checkpoint")?.addEventListener("input", () => {
+  const path = $("foundation-glucofm-checkpoint").value.trim();
+  setText("metric-glucofm-checkpoint", path ? "Selected" : "Not selected");
+});
+
+$("foundation-arena-results-browse-btn")?.addEventListener("click", async () => {
+  if (typeof nativeOpenDialog !== "function") {
+    setText("foundation-status", "The native file chooser is available only in the installed app.");
+    return;
+  }
   try {
-    const result = await invoke("run_foundation_arena", { outputDir: "results/foundation_arena", nTrials: 50 });
-    setText("foundation-status", `Arena benchmark complete!\nEvaluated: ${result.data?.models?.length || 4} models.\nReport: ${result.data?.report_md_path || "results/foundation_arena/FOUNDATION_MODEL_ARENA_REPORT.md"}`);
-    renderFoundationChart("arena");
-  } catch (err) {
-    setText("foundation-status", `Arena run failed: ${err}`);
+    const selected = await nativeOpenDialog({
+      title: "Choose comparable foundation evaluation artifacts",
+      directory: false,
+      multiple: true,
+      filters: [{ name: "IINTS evaluation JSON", extensions: ["json"] }]
+    });
+    foundationArenaResultFiles = (Array.isArray(selected) ? selected : [selected])
+      .filter((path) => typeof path === "string" && path.trim());
+    $("foundation-arena-results").value = foundationArenaResultFiles.join("; ");
+    setText(
+      "foundation-status",
+      foundationArenaResultFiles.length
+        ? `${foundationArenaResultFiles.length} evaluation artifact(s) selected. Comparability is validated before ranking.`
+        : "No evaluation artifacts selected."
+    );
+  } catch (error) {
+    setText("foundation-status", `Could not select evaluation artifacts: ${errorMessage(error)}`);
   }
 });
 
-$("foundation-glucofm-btn").addEventListener("click", async () => {
-  setText("foundation-status", "Extracting Google GlucoFM 256D dual-stream embeddings...");
+$("foundation-arena-btn")?.addEventListener("click", async () => {
+  if (!foundationArenaResultFiles.length) {
+    setText("foundation-status", "Choose measured evaluation JSON files first. The app does not generate placeholder scores.");
+    return;
+  }
+  setText("foundation-status", "Validating benchmark contracts and comparing supplied evidence...");
   try {
-    const result = await invoke("extract_glucofm_embedding", { csv: null });
-    setText("foundation-status", `Google GlucoFM Embedding Extracted:\nModel: ${result.data?.model}\nLatent Dim: ${result.data?.latent_dim}\nSample Vector: [${result.data?.embedding?.slice(0, 8).join(", ")}...]`);
-    renderFoundationChart("glucofm");
-  } catch (err) {
-    setText("foundation-status", `GlucoFM embedding failed: ${err}`);
+    const result = await invoke("run_foundation_arena", {
+      outputDir: "results/foundation_arena",
+      resultFiles: foundationArenaResultFiles
+    });
+    const modelCount = result.data?.total_models_evaluated ?? result.data?.models?.length ?? 0;
+    setText("metric-foundation-evaluation", `${modelCount} model${modelCount === 1 ? "" : "s"}`);
+    setText(
+      "foundation-status",
+      `Evidence comparison complete.\nBenchmark: ${result.data?.benchmark_id}\nModels: ${modelCount}\nReport: ${result.data?.report_md_path}`
+    );
+  } catch (error) {
+    setText("foundation-status", `Evidence comparison failed: ${errorMessage(error)}`);
   }
 });
 
-$("foundation-cgmacros-btn").addEventListener("click", async () => {
-  setText("foundation-status", "Loading Nature CGMacros 45-participant cohort (129,600 dual-sensor points, 1,350 meals)...");
+$("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
+  const source = $("foundation-glucofm-train-source").value.trim();
+  const outputDir = $("foundation-glucofm-train-output").value.trim();
+  if (!source || !outputDir) {
+    setText("foundation-status", "Choose a multi-subject CGM dataset and an output folder first.");
+    return;
+  }
+  setText("foundation-status", "Pretraining the independent GlucoFM reproduction. This can take a long time; the UI remains responsive...");
   try {
-    const result = await invoke("load_cgmacros_cohort", { outputDir: "data/cgmacros_cohort", participants: 45 });
-    setText("foundation-status", `CGMacros Ingestion Complete:\nSubjects: ${result.data?.subject_count} (Healthy: ${result.data?.status_distribution?.healthy}, Prediabetes: ${result.data?.status_distribution?.prediabetes}, T2D: ${result.data?.status_distribution?.t2d})\nMeals: ${result.data?.meal_count}\nTelemetry: ${result.data?.time_series_rows} simultaneous readings.`);
-    renderFoundationChart("dualsensor");
-  } catch (err) {
-    setText("foundation-status", `CGMacros load failed: ${err}`);
+    const result = await invoke("pretrain_glucofm", {
+      source,
+      outputDir,
+      glucoseColumn: $("foundation-glucose-column").value.trim() || null,
+      timestampColumn: $("foundation-timestamp-column").value.trim() || null,
+      subjectColumn: "subject_id",
+      epochs: Number($("foundation-glucofm-epochs").value || 120),
+      batchSize: Number($("foundation-glucofm-batch-size").value || 128),
+      device: "auto",
+      seed: 42
+    });
+    const checkpoint = result.data?.checkpoint_path;
+    if (checkpoint) {
+      $("foundation-glucofm-checkpoint").value = checkpoint;
+      setText("metric-glucofm-checkpoint", "Trained");
+    }
+    setText(
+      "foundation-status",
+      `Pretraining complete.\\nTrain/validation subjects: ${result.data?.train_subjects}/${result.data?.validation_subjects}\\nBest validation loss: ${Number(result.data?.best_validation_loss).toFixed(6)}\\nCheckpoint: ${checkpoint}\\nReport: ${result.data?.report_path}`
+    );
+  } catch (error) {
+    setText("foundation-status", `GlucoFM pretraining failed: ${errorMessage(error)}`);
   }
 });
 
-$("foundation-fda-btn").addEventListener("click", async () => {
-  setText("foundation-status", "Executing OpenFDA Medical Device Recall Safety Benchmark (5 scenarios)...");
-  try {
-    const result = await invoke("run_fda_safety_benchmark", { outputDir: "results/fda_safety" });
-    setText("foundation-status", `FDA Safety Benchmark Complete:\nHazard Detection Rate: ${result.data?.hazard_detection_rate_pct}%\nAdverse Event Reduction: -${(result.data?.unmitigated_adverse_event_rate_pct - result.data?.supervised_adverse_event_rate_pct).toFixed(1)}%\nReport: ${result.data?.report_md_path}`);
-    renderFoundationChart("fda");
-  } catch (err) {
-    setText("foundation-status", `FDA benchmark failed: ${err}`);
+$("foundation-glucofm-btn")?.addEventListener("click", async () => {
+  const csv = $("foundation-glucofm-csv").value.trim();
+  const checkpoint = $("foundation-glucofm-checkpoint").value.trim();
+  if (!csv || !checkpoint) {
+    setText("foundation-status", "Choose both a 24-hour CGM CSV and a trained GlucoFM checkpoint.");
+    return;
   }
-});
-
-$("foundation-visualize-btn").addEventListener("click", async () => {
-  setText("foundation-status", "Generating complete high-resolution scientific visualization suite and interactive HTML dashboard...");
+  setText("foundation-status", "Extracting a checkpoint-backed 128D representation...");
   try {
-    const result = await invoke("generate_scientific_visualizations", { outputDir: "results/scientific_visualizations" });
-    setText("foundation-status", `Visualization Suite Generated Successfully!\n• Radar Chart: ${result.data?.arena_radar_png}\n• Confounder Cosine: ${result.data?.confounder_cosine_png}\n• GlucoFM Decomp: ${result.data?.glucofm_decomposition_png}\n• CGMacros Dual-Sensor: ${result.data?.cgmacros_dualsensor_png}\n• Interactive Dashboard: ${result.data?.interactive_dashboard_html}`);
-    renderFoundationChart("confounder");
-  } catch (err) {
-    setText("foundation-status", `Visualization generation failed: ${err}`);
+    const result = await invoke("extract_glucofm_embedding", {
+      csv,
+      checkpoint,
+      glucoseColumn: $("foundation-glucose-column").value.trim() || null,
+      timestampColumn: $("foundation-timestamp-column").value.trim() || null
+    });
+    lastGlucoFMEmbedding = result.data?.embedding || null;
+    setText("metric-glucofm-checkpoint", "Verified");
+    setText(
+      "foundation-status",
+      `Embedding generated.\nModel: ${result.data?.model}\nOfficial Google checkpoint: no\nLatent dimension: ${result.data?.latent_dim}\nObserved-grid coverage: ${((result.data?.input_coverage || 0) * 100).toFixed(1)}%\nCheckpoint SHA-256: ${result.data?.checkpoint_sha256}`
+    );
+    document.querySelectorAll("[data-chart-tab]").forEach((button) => {
+      button.classList.toggle("is-active", button.dataset.chartTab === "embedding");
+    });
+    renderFoundationChart("embedding");
+  } catch (error) {
+    setText("foundation-status", `GlucoFM embedding failed: ${errorMessage(error)}`);
   }
 });
 

@@ -238,7 +238,15 @@ def load_glucofm_windows(
         )
         for subject_id, subject_frame in frame.groupby(subject, sort=True):
             ordered = subject_frame.sort_values(timestamp, kind="stable").copy()
-            gaps = ordered[timestamp].diff().dt.total_seconds().div(60.0)
+            # Work on integer nanoseconds here. Pandas-stubs cannot retain the
+            # datetime dtype after dynamic string-based DataFrame indexing.
+            timestamp_ns = pd.to_datetime(
+                ordered[timestamp], errors="coerce"
+            ).astype("int64").to_numpy(dtype=np.int64)
+            gap_values = np.concatenate(
+                ([np.nan], np.diff(timestamp_ns).astype(float) / 60_000_000_000.0)
+            )
+            gaps = pd.Series(gap_values, index=ordered.index, dtype=float)
             ordered["__segment"] = (gaps > max_gap_minutes).cumsum()
             for _, segment in ordered.groupby("__segment", sort=True):
                 if segment.empty:

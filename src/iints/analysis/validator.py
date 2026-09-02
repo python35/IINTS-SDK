@@ -53,7 +53,10 @@ class DataIntegrityValidator:
                 rate = glucose_diff / time_diff if time_diff > 0 else float('inf')
                 
                 if rate > self.max_glucose_rate:
-                    issues.append(f"Impossible glucose rate: {rate:.1f} mg/dL/min at step {i}")
+                    issues.append(
+                        f"Implausible glucose rate: {rate:.1f} mg/dL/min at step {i} "
+                        f"(ceiling {self.max_glucose_rate:.1f})"
+                    )
                     score -= 15
         
         # Check for missing values (NaN)

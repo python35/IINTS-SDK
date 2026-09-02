@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Sequence
@@ -17,7 +18,7 @@ from iints.research.cgm_jepa import (
 
 @dataclass(frozen=True)
 class PhysiologicalSensitivityResult:
-    """Scientific metrics measuring how systematically CGM-JEPA representations encode physiology."""
+    """Held-out metrics for one checkpoint on a simulated parameter sweep."""
 
     param_name: str
     num_simulations: int
@@ -28,6 +29,11 @@ class PhysiologicalSensitivityResult:
     spearman_monotonicity_rho: float
     noise_robustness_cosine_sim: float
     noisy_linear_probe_r2: float
+    train_simulations: int
+    test_simulations: int
+    checkpoint_path: str | None
+    checkpoint_sha256: str | None
+    trained_checkpoint: bool
     summary_report_path: Path
 
 
@@ -127,16 +133,26 @@ def run_cgm_jepa_parameter_experiment(
     param_range: tuple[float, float] = (0.4, 2.0),
     model: CGMJEPAEncoder | None = None,
     device: str = "cpu",
+    checkpoint_path: Path | str | None = None,
+    allow_untrained: bool = False,
+    seed: int = 42,
 ) -> PhysiologicalSensitivityResult:
     """
-    Execute 100 systematic simulations of a virtual patient under continuous parameter variations,
-    extract CGM-JEPA representations, and test representation monotonicity and noise robustness.
+    Evaluate one explicit checkpoint on a held-out simulated parameter sweep.
     """
+    if num_simulations < 10:
+        raise ValueError("At least 10 simulations are required for a held-out probe")
     out_dir = Path(output_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if model is None:
-        model = load_cgm_jepa_model(device=device)
+        model = load_cgm_jepa_model(
+            checkpoint_path,
+            device=device,
+            allow_untrained=allow_untrained,
+        )
+    elif not model.checkpoint_loaded and not allow_untrained:
+        raise ValueError("CGM-JEPA experiment requires trained checkpoint weights")
 
     # Generate parameter sweep
     param_values = np.linspace(param_range[0], param_range[1], num_simulations)
@@ -170,8 +186,18 @@ def run_cgm_jepa_parameter_experiment(
     noisy_arr = np.array(noisy_traces, dtype=np.float32)
 
     # Extract 96-dimensional CGM-JEPA embeddings
-    embeddings_clean = extract_cgm_jepa_embeddings(clean_arr, model=model, device=device)  # (100, 96)
-    embeddings_noisy = extract_cgm_jepa_embeddings(noisy_arr, model=model, device=device)  # (100, 96)
+    embeddings_clean = extract_cgm_jepa_embeddings(
+        clean_arr,
+        model=model,
+        device=device,
+        allow_untrained=allow_untrained,
+    )
+    embeddings_noisy = extract_cgm_jepa_embeddings(
+        noisy_arr,
+        model=model,
+        device=device,
+        allow_untrained=allow_untrained,
+    )
 
     # 1. PCA on embeddings
     emb_centered = embeddings_clean - np.mean(embeddings_clean, axis=0)
@@ -180,14 +206,40 @@ def run_cgm_jepa_parameter_experiment(
     pc1_var_pct = round(float(var_explained[0] * 100.0), 2)
     pc1_proj = emb_centered @ vt[0]
 
-    # 2. Linear probing R2 on clean embeddings
-    # Fit y = param_values using Ridge / OLS on z
-    z_design = np.hstack([embeddings_clean, np.ones((len(embeddings_clean), 1))])
-    weights, _, _, _ = np.linalg.lstsq(z_design, param_values, rcond=None)
-    pred_params = z_design @ weights
-    ss_res = np.sum((param_values - pred_params) ** 2)
-    ss_tot = np.sum((param_values - np.mean(param_values)) ** 2)
-    linear_r2 = max(0.0, round(float(1.0 - (ss_res / max(1e-6, ss_tot))), 4))
+    # 2. Fit a ridge probe on training simulations and report only held-out
+    # performance. The old 96D in-sample OLS probe could trivially overfit a
+    # small sweep and was not valid evidence.
+    rng = np.random.default_rng(seed)
+    indices = np.arange(num_simulations)
+    rng.shuffle(indices)
+    test_count = max(2, int(round(num_simulations * 0.2)))
+    test_indices = indices[:test_count]
+    train_indices = indices[test_count:]
+    train_mean = embeddings_clean[train_indices].mean(axis=0, keepdims=True)
+    train_std = embeddings_clean[train_indices].std(axis=0, keepdims=True)
+    train_std = np.where(train_std < 1e-6, 1.0, train_std)
+    clean_scaled = (embeddings_clean - train_mean) / train_std
+    noisy_scaled = (embeddings_noisy - train_mean) / train_std
+    x_train = np.hstack(
+        [clean_scaled[train_indices], np.ones((len(train_indices), 1))]
+    )
+    ridge = np.eye(x_train.shape[1])
+    ridge[-1, -1] = 0.0
+    weights = np.linalg.solve(
+        x_train.T @ x_train + ridge,
+        x_train.T @ param_values[train_indices],
+    )
+
+    def held_out_r2(features: np.ndarray) -> float:
+        design = np.hstack([features[test_indices], np.ones((test_count, 1))])
+        predictions = design @ weights
+        truth = param_values[test_indices]
+        denominator = float(np.sum((truth - np.mean(truth)) ** 2))
+        if denominator <= 1e-12:
+            return float("nan")
+        return float(1.0 - np.sum((truth - predictions) ** 2) / denominator)
+
+    linear_r2 = round(held_out_r2(clean_scaled), 4)
 
     # 3. Monotonicity (Spearman Rank Correlation)
     rank_true = np.argsort(np.argsort(param_values))
@@ -202,12 +254,9 @@ def run_cgm_jepa_parameter_experiment(
     cos_sims = np.sum((embeddings_clean / norm_clean) * (embeddings_noisy / norm_noisy), axis=1)
     mean_cos_sim = round(float(np.mean(cos_sims)), 4)
 
-    # Linear probe on noisy embeddings
-    z_noisy_design = np.hstack([embeddings_noisy, np.ones((len(embeddings_noisy), 1))])
-    weights_n, _, _, _ = np.linalg.lstsq(z_noisy_design, param_values, rcond=None)
-    pred_noisy_params = z_noisy_design @ weights_n
-    ss_res_n = np.sum((param_values - pred_noisy_params) ** 2)
-    noisy_r2 = max(0.0, round(float(1.0 - (ss_res_n / max(1e-6, ss_tot))), 4))
+    # The clean-trained probe is applied to noisy held-out embeddings. It is
+    # not refitted on the test set.
+    noisy_r2 = round(held_out_r2(noisy_scaled), 4)
 
     # Export embeddings and run data
     emb_df = pd.DataFrame(run_records)
@@ -228,31 +277,58 @@ def run_cgm_jepa_parameter_experiment(
         spearman_monotonicity_rho=spearman_rho,
         noise_robustness_cosine_sim=mean_cos_sim,
         noisy_linear_probe_r2=noisy_r2,
+        train_simulations=len(train_indices),
+        test_simulations=len(test_indices),
+        checkpoint_path=str(model.checkpoint_path) if model.checkpoint_path else None,
+        checkpoint_sha256=(
+            hashlib.sha256(model.checkpoint_path.read_bytes()).hexdigest()
+            if model.checkpoint_path
+            else None
+        ),
+        trained_checkpoint=model.checkpoint_loaded,
         summary_report_path=report_md_path,
     )
 
     report_json_path.write_text(json.dumps(asdict(res), indent=2, default=str), encoding="utf-8")
 
     # Generate Markdown Report
-    md_content = f"""# CGM-JEPA Representation & Physiological Sensitivity Report
+    md_content = f"""# CGM-JEPA Reproduction: Simulated Sensitivity Probe
 
 ## Study Overview
-- **Foundation Model:** `CGM-JEPA` (Context Encoder: $L=3$, $D=96$, $H=6$, $P=12$, $T=288$)
-- **Simulation Protocol:** 100 Virtual Patient Runs over continuous `{sweep_param}` sweep ({param_range[0]} - {param_range[1]}x)
+- **Model:** IINTS CGM-JEPA architecture reproduction ($L=3$, $D=96$, $H=6$, $P=12$, $T=288$)
+- **Checkpoint SHA-256:** `{res.checkpoint_sha256 or 'untrained architecture smoke test'}`
+- **Simulation Protocol:** `{num_simulations}` virtual runs over a continuous `{sweep_param}` sweep ({param_range[0]} - {param_range[1]}x)
 - **Resolution:** 24 hours at 5-minute sampling (288 tokens/run)
+- **Probe Split:** `{res.train_simulations}` train / `{res.test_simulations}` held-out simulations
 
-## Scientific Validation Findings
+## Descriptive Findings for This Context
 
-| Metric | Result | Meaning |
+| Metric | Result | What it measures |
 | :--- | :--- | :--- |
-| **PC1 Variance Explained** | `{pc1_var_pct}%` | The dominant axis of variation in the 96D latent space directly aligns with the varied physiology. |
-| **Linear Probing $R^2$ (Clean)** | `{linear_r2}` | Ground truth insulin sensitivity is smoothly and linearly decodable from the self-supervised embedding. |
-| **Monotonicity (Spearman $\\rho$)** | `{spearman_rho}` | Perfect monotonic ordering of metabolic phenotype across the latent trajectory. |
-| **Noise Robustness (Cosine Sim)** | `{mean_cos_sim}` | Representation remains stable (cos > 0.90) despite sensor noise and missingness dropouts. |
-| **Linear Probing $R^2$ (Noisy)** | `{noisy_r2}` | Physiological parameter recovery remains highly accurate under severe sensor degradation. |
+| **PC1 Variance Explained** | `{pc1_var_pct}%` | Share of embedding variance carried by the first principal component. |
+| **Linear Probing $R^2$ (Clean)** | `{linear_r2}` | Held-out recovery of the swept `{sweep_param}` value by ridge regression on the embedding. |
+| **Monotonicity (Spearman $\\rho$)** | `{spearman_rho}` | Rank correlation between the swept value and the probe prediction. |
+| **Noise Robustness (Cosine Sim)** | `{mean_cos_sim}` | Embedding similarity before and after added sensor noise and dropouts. |
+| **Linear Probing $R^2$ (Noisy)** | `{noisy_r2}` | The same probe, fitted on the noise-corrupted traces. |
 
-## Conclusion
-The **IINTS-AF → CGM-JEPA Bridge** successfully transforms 24-hour continuous physiological simulation traces into rich, noise-resilient 96-dimensional latent representations. The learned embedding manifold systematically encodes underlying insulin sensitivity with high fidelity.
+## How to read these numbers
+A randomly initialised encoder also scores high on these probes: a random projection
+of a 288-point trace preserves a slowly varying sweep parameter, so a linear probe can
+recover it without any representation having been learned. These values are therefore
+descriptive of this sweep, and become evidence about the checkpoint only when compared
+against the untrained baseline on the identical protocol.
+
+{'This run used a trained checkpoint (SHA-256 above).' if res.trained_checkpoint else '**This run used UNTRAINED weights.** The numbers below are the random-feature baseline, not a result about a trained model.'}
+
+## Summary
+The bridge mapped `{num_simulations}` simulated 24-hour traces into 96-dimensional
+embeddings and fitted a held-out probe on the `{sweep_param}` sweep, giving
+a held-out $R^2$ of `{linear_r2}` on clean traces and `{noisy_r2}` after noise and dropouts.
+A negative $R^2$ means the probe predicts the held-out sweep value worse than its own
+training mean does, i.e. no usable recovery under that corruption level.
+No comparison against an untrained baseline or an alternative representation is included
+in this artifact, so it does not establish that the embedding encodes physiology better
+than a random projection of the same trace.
 """
     report_md_path.write_text(md_content, encoding="utf-8")
 

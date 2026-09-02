@@ -31,11 +31,12 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from .compartments import HOVORKA_COMPARTMENTS, compartment_schema
 from .models import PatientModelDomainError
 from .physiology import (
     antecedent_hypoglycemia_memory_derivative,
@@ -415,6 +416,8 @@ class HovorkaPatientModel:
 
     def reset(self) -> None:
         self._state = self._default_ode_state()
+        self._last_input_rates: Tuple[float, float] = (0.0, 0.0)
+        self._last_ode_time = 0.0
         self.current_glucose = self.initial_glucose
         self.insulin_on_board = 0.0
         self.carbs_on_board = 0.0
@@ -512,6 +515,11 @@ class HovorkaPatientModel:
 
         # Solve ODE
         ct = current_time if current_time is not None else 0.0
+        # Kept so flux_snapshot reports the rates and clock this step actually
+        # integrated with, instead of repeating the unit conversions above at
+        # every call site.
+        self._last_input_rates = (float(insulin_rate), float(glucagon_rate))
+        self._last_ode_time = float(ct) + float(time_step)
         try:
             sol = solve_ivp(
                 fun=lambda t, y: self._ode(
@@ -635,6 +643,60 @@ class HovorkaPatientModel:
             if not np.isfinite(dia_minutes) or float(dia_minutes) <= 0.0:
                 raise ValueError("dia_minutes must be finite and positive")
             self.insulin_action_duration = float(dia_minutes)
+
+    def describe_compartments(self) -> Dict[str, Any]:
+        """Return the compartment and flux schema this model integrates.
+
+        The schema names each state's unit, whether it is a physical content or a
+        dimensionless action variable, and whether it comes from the published
+        equations or is one of this project's extensions. Consumers that draw a
+        compartment diagram must read the schema from the model rather than
+        assume it, because the three patient backends have different state
+        vectors.
+        """
+
+        return compartment_schema("hovorka")
+
+    def get_compartment_state(self) -> Dict[str, float]:
+        """Return the current ODE state keyed by compartment name."""
+
+        return {
+            item.key: float(self._state[item.state_index])
+            for item in HOVORKA_COMPARTMENTS
+        }
+
+    def flux_snapshot(
+        self,
+        insulin_rate_mu_per_min: Optional[float] = None,
+        glucagon_rate_pg_per_min: Optional[float] = None,
+        current_time: Optional[float] = None,
+    ) -> Dict[str, float]:
+        """Return the instantaneous transfer rates at the current state.
+
+        This evaluates the ODE once more at the state the integrator finished
+        on, so the values come from the same expressions that produced the
+        trajectory instead of a second implementation that could drift from it.
+        The result is an instantaneous rate at one instant, not a mass
+        transferred over the preceding step.
+
+        The delivery rates and clock default to the ones the last ``update``
+        actually integrated with. Callers therefore never repeat the unit
+        conversion from delivered units to mU/min, which would be a second place
+        for it to be wrong.
+        """
+
+        insulin_rate, glucagon_rate = self._last_input_rates
+        clock = self._last_ode_time if current_time is None else float(current_time)
+        record: Dict[str, float] = {}
+        self._ode(
+            0.0,
+            self._state,
+            insulin_rate if insulin_rate_mu_per_min is None else float(insulin_rate_mu_per_min),
+            glucagon_rate if glucagon_rate_pg_per_min is None else float(glucagon_rate_pg_per_min),
+            clock,
+            record=record,
+        )
+        return record
 
     def get_state(self) -> Dict[str, Any]:
         return {
@@ -765,7 +827,19 @@ class HovorkaPatientModel:
         u_insulin: float,
         u_glucagon: float,
         current_time: float,
+        record: Optional[Dict[str, float]] = None,
     ) -> np.ndarray:
+        """Right-hand side of the patient ODE.
+
+        When ``record`` is supplied, the individual transfer terms are written
+        into it under the flux keys of ``patient.compartments``. Recording only
+        copies subexpressions that are computed anyway, so an integration with
+        recording enabled is numerically identical to one without it. The
+        integrator evaluates this function several times per step, so a snapshot
+        taken this way is an instantaneous rate at one state, never a
+        step-averaged flow.
+        """
+
         Q1, Q2, S1, S2, I, x1, x2, x3, D1, D2, D3, H_stress, H_exercise, Y1, Y2, Gamma, x_gluc, HAAF, GLUT4_active = y
         p = self.params
 
@@ -894,6 +968,30 @@ class HovorkaPatientModel:
             + dawn_flux
         )
         dQ2_dt = x1 * Q1 - (p.k_12 + x2) * Q2
+
+        if record is not None:
+            record.update({
+                "insulin_infusion": float(u_insulin),
+                "insulin_depot_transfer": float(S1 / t_max_I),
+                "insulin_appearance": float(U_I),
+                "insulin_elimination": float(p.k_e * I),
+                "insulin_action_x1": float(dx1_dt),
+                "insulin_action_x2": float(dx2_dt),
+                "insulin_action_x3": float(dx3_dt),
+                "meal_transfer": float(meal_rate * D1),
+                "glucose_appearance": float(U_G),
+                "glucose_to_periphery": float(x1 * Q1),
+                "glucose_from_periphery": float(p.k_12 * Q2),
+                "peripheral_disposal": float(x2 * Q2),
+                "nimgu": float(NIMGU),
+                "renal_clearance": float(F_R),
+                "endogenous_production": float(EGP_0 * max(0.0, 1 - x3 + x_gluc)),
+                "dawn_flux": float(dawn_flux),
+                "glucagon_infusion": float(u_glucagon),
+                "glucagon_depot_transfer": float(glucagon_k1 * Y1),
+                "glucagon_appearance": float(glucagon_concentration),
+                "glucagon_action": float(dx_gluc_dt),
+            })
 
         return np.array(
             [dQ1_dt, dQ2_dt, dS1_dt, dS2_dt, dI_dt, dx1_dt, dx2_dt, dx3_dt, dD1_dt, dD2_dt, dD3_dt, dH_stress_dt, dH_exercise_dt, dY1_dt, dY2_dt, dGamma_dt, dx_gluc_dt, dHAAF_dt, dGLUT4_active_dt]

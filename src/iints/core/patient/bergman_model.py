@@ -36,6 +36,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from .compartments import BERGMAN_COMPARTMENTS, compartment_schema
 from .models import PatientModelDomainError
 from .physiology import (
     antecedent_hypoglycemia_memory_derivative,
@@ -365,6 +366,8 @@ class BergmanPatientModel:
 
     def reset(self) -> None:
         """Reset to initial conditions."""
+        self._last_input_rates = (0.0, 0.0)
+        self._last_ode_time = 0.0
         self._refresh_basal_steady_state()
         self._state = np.array([
             self.initial_glucose,
@@ -476,6 +479,11 @@ class BergmanPatientModel:
 
         # --- Solve ODE ---
         ct = current_time if current_time is not None else 0.0
+        # Kept so flux_snapshot reports the rates and clock this step actually
+        # integrated with, rather than repeating the unit conversions above at
+        # every call site.
+        self._last_input_rates = (float(insulin_rate), float(glucagon_rate))
+        self._last_ode_time = float(ct) + float(time_step)
         try:
             sol = solve_ivp(
                 fun=lambda t, y: self._ode(
@@ -601,6 +609,59 @@ class BergmanPatientModel:
             if not np.isfinite(dia_minutes) or float(dia_minutes) <= 0.0:
                 raise ValueError("dia_minutes must be finite and positive")
             self.insulin_action_duration = float(dia_minutes)
+
+    def describe_compartments(self) -> Dict[str, Any]:
+        """Return the compartment schema this model integrates.
+
+        The Bergman state vector differs from the Hovorka one -- it integrates
+        glucose as a concentration and has no separate accessible/peripheral
+        glucose mass pair -- so consumers must read the schema from the model
+        instead of assuming a single layout across patient backends. No flux
+        table is published for this backend yet, so a diagram drawn from it
+        shows contents without transfer arrows.
+        """
+
+        return compartment_schema("bergman")
+
+    def get_compartment_state(self) -> Dict[str, float]:
+        """Return the current ODE state keyed by compartment name."""
+
+        return {
+            item.key: float(self._state[item.state_index])
+            for item in BERGMAN_COMPARTMENTS
+        }
+
+    def flux_snapshot(
+        self,
+        insulin_rate_mu_per_min: Optional[float] = None,
+        glucagon_rate_pg_per_min: Optional[float] = None,
+        current_time: Optional[float] = None,
+    ) -> Dict[str, float]:
+        """Return the instantaneous transfer rates at the current state.
+
+        This evaluates the ODE once more at the state the integrator finished
+        on, so the values come from the same expressions that produced the
+        trajectory. The result is an instantaneous rate at one instant, not a
+        mass transferred over the preceding step. Glucose terms are per volume
+        because this backend integrates glucose as a concentration.
+
+        The delivery rates and clock default to the ones the last ``update``
+        actually integrated with, so callers never repeat the unit conversion
+        from delivered units to mU/min.
+        """
+
+        insulin_rate, glucagon_rate = self._last_input_rates
+        clock = self._last_ode_time if current_time is None else float(current_time)
+        record: Dict[str, float] = {}
+        self._ode(
+            0.0,
+            self._state,
+            insulin_rate if insulin_rate_mu_per_min is None else float(insulin_rate_mu_per_min),
+            glucagon_rate if glucagon_rate_pg_per_min is None else float(glucagon_rate_pg_per_min),
+            clock,
+            record=record,
+        )
+        return record
 
     def get_state(self) -> Dict[str, Any]:
         return {
@@ -755,7 +816,17 @@ class BergmanPatientModel:
         u_insulin_mu_per_min: float,
         u_glucagon_pg_per_min: float,
         current_time: float,
+        record: Optional[Dict[str, float]] = None,
     ) -> np.ndarray:
+        """Right-hand side of the extended minimal model.
+
+        When ``record`` is given, the transfer terms already computed here are
+        copied into it under the keys declared in ``BERGMAN_FLUXES``. Reporting
+        reuses these values instead of recomputing them elsewhere, which would
+        create a second implementation free to drift from the equations that
+        actually produced the trajectory. The integration itself is unaffected.
+        """
+
         G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, M_graft = y
         p = self.params
 
@@ -862,5 +933,31 @@ class BergmanPatientModel:
         dQ_sto1_dt = -solid_to_liquid_rate * Q_sto1
         dQ_sto2_dt = solid_to_liquid_rate * Q_sto1 - gastric_emptying_rate * Q_sto2
         dQ_gut_dt = gastric_emptying_rate * Q_sto2 - p.k_abs * Q_gut
+
+        if record is not None:
+            record.update(
+                {
+                    "gastric_liquefaction": float(solid_to_liquid_rate * Q_sto1),
+                    "gastric_emptying": float(gastric_emptying_rate * Q_sto2),
+                    "glucose_appearance": float(Ra),
+                    "insulin_infusion": float(u_insulin_mu_per_min),
+                    "insulin_depot_transfer": float(p.k_a * S1),
+                    "insulin_appearance": float(Ra_I),
+                    "insulin_elimination": float(p.n * I),
+                    "insulin_action": float(dXdt),
+                    "glucose_uptake": float((p1_eff + X) * G),
+                    "basal_production": float(p1_eff * Gb_eff),
+                    "renal_clearance": float(F_R),
+                    "exercise_uptake": float(exercise_glucose_uptake),
+                    "dawn_flux": float(dawn),
+                    "glucagon_infusion": float(u_glucagon_pg_per_min),
+                    "glucagon_depot_transfer": float(glucagon_k1 * Y1),
+                    "glucagon_appearance": float(glucagon_k2 * Y2 / max(glucagon_clearance_ml_min, 1e-9)),
+                    "glucagon_action": float(dx_gluc_dt),
+                    "islet_secretion_subq": float(secretion_subq),
+                    "islet_secretion_plasma": float(secretion_plasma / Vi_abs),
+                    "graft_rejection": float(p.immune_rejection_rate * M_graft),
+                }
+            )
 
         return np.array([dGdt, dXdt, dIdt, dQ_sto1_dt, dQ_sto2_dt, dQ_gut_dt, dS1dt, dS2dt, dY1_dt, dY2_dt, dGamma_dt, dx_gluc_dt, dHAAF_dt, dM_graft_dt])

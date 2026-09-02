@@ -90,7 +90,7 @@ _SUPPORTED_SCALES = {"linear", "log2"}
 
 def _load_payload(path: Path | None = None) -> dict[str, Any]:
     if path is None:
-        resource = resources.files("iints").joinpath("data", _RESOURCE_NAME)
+        resource = resources.files("iints").joinpath("data").joinpath(_RESOURCE_NAME)
         text = resource.read_text(encoding="utf-8")
     else:
         text = Path(path).read_text(encoding="utf-8")

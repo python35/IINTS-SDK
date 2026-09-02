@@ -74,7 +74,7 @@ These values are deliberately conservative software controls. They protect simul
 | Maximum insulin on board | `20.0 U` | Configurable engineering envelope for active insulin burden |
 | Falling-trend stop | `-2.0 mg/dL/min` | Helps block dosing when glucose is falling quickly |
 | Plausible sensor range | `40-500 mg/dL` | Broad fail-soft bound for incoming CGM-like readings |
-| Maximum plausible CGM change | `20 mg/dL per 5 min` | Flags implausibly abrupt sensor movement |
+| Maximum plausible CGM change | `55 mg/dL per 5 min` | Flags implausibly abrupt sensor movement. Set above the highest 99.9th percentile of real 5-minute steps measured on AZT1D, HUPA-UCM and OhioT1DM (34-54 mg/dL); the previous `20 mg/dL` rejected 0.6-1.0% of genuine steps. See `src/iints/core/safety/config.py`. |
 
 The dose envelopes are deliberately broad defaults, not prescriptions. They
 allow meal coverage for the bundled ICR profiles while low-glucose,

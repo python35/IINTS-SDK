@@ -19,6 +19,7 @@ class PredictorConfig:
         "glucose_trend_mgdl_min",
     ])
     target_column: str = "glucose_actual_mgdl"
+    predict_delta: bool = False
 
     @property
     def history_steps(self) -> int:

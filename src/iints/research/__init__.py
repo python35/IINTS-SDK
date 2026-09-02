@@ -312,6 +312,7 @@ __all__ = [
     "BasePPGRModel",
     "CarbOnlyLinearPPGR",
     "MultiMacroLinearPPGR",
+    "ContextFeatureRidgePPGR",
     "DualStreamGlucoFMPPGR",
     "compute_trajectory_metrics",
     "build_ppgr_dataset",
@@ -331,6 +332,27 @@ __all__ = [
     "PhysiologicalConfounderStudyResult",
     "generate_confounded_physiological_pair",
     "run_physiological_confounder_experiment",
+    "GlucoFMConfig",
+    "GlucoFMCheckpointMetadata",
+    "GlucoFMEmbeddingResult",
+    "GlucoFMStreamEncoder",
+    "GlucoFMDualStreamEncoder",
+    "GlucoFMDownstreamProbes",
+    "GlucoFMPretrainer",
+    "align_cgm_window",
+    "load_glucofm_checkpoint",
+    "embed_cgm_with_glucofm",
+    "embed_cgm_with_glucofm_result",
+    "build_glucofm_foundation_model",
+    "GlucoFMWindowCollection",
+    "GlucoFMTrainingResult",
+    "load_glucofm_windows",
+    "pretrain_glucofm",
+    "ArenaMetric",
+    "ModelArenaMetrics",
+    "FoundationArenaReport",
+    "load_foundation_evaluation",
+    "run_foundation_model_arena",
 ]
 
 from .dual_stream import (
@@ -344,6 +366,7 @@ from .ppgr import (
     BasePPGRModel,
     CarbOnlyLinearPPGR,
     MultiMacroLinearPPGR,
+    ContextFeatureRidgePPGR,
     DualStreamGlucoFMPPGR,
     compute_trajectory_metrics,
     build_ppgr_dataset,
@@ -381,15 +404,29 @@ try:
     )
     from .glucofm import (
         GlucoFMConfig,
+        GlucoFMCheckpointMetadata,
+        GlucoFMEmbeddingResult,
         GlucoFMStreamEncoder,
         GlucoFMDualStreamEncoder,
         GlucoFMDownstreamProbes,
-        build_glucofm_foundation_model,
+        GlucoFMPretrainer,
+        align_cgm_window,
+        load_glucofm_checkpoint,
         embed_cgm_with_glucofm,
+        embed_cgm_with_glucofm_result,
+        build_glucofm_foundation_model,
+    )
+    from .glucofm_training import (
+        GlucoFMWindowCollection,
+        GlucoFMTrainingResult,
+        load_glucofm_windows,
+        pretrain_glucofm,
     )
     from .foundation_arena import (
+        ArenaMetric,
         ModelArenaMetrics,
         FoundationArenaReport,
+        load_foundation_evaluation,
         run_foundation_model_arena,
     )
     from .visualizer import (
@@ -430,13 +467,25 @@ except ImportError:
     generate_confounded_physiological_pair = None  # type: ignore[assignment]
     run_physiological_confounder_experiment = None  # type: ignore[assignment]
     GlucoFMConfig = None  # type: ignore[assignment,misc]
+    GlucoFMCheckpointMetadata = None  # type: ignore[assignment,misc]
+    GlucoFMEmbeddingResult = None  # type: ignore[assignment,misc]
     GlucoFMStreamEncoder = None  # type: ignore[assignment,misc]
     GlucoFMDualStreamEncoder = None  # type: ignore[assignment,misc]
     GlucoFMDownstreamProbes = None  # type: ignore[assignment,misc]
-    build_glucofm_foundation_model = None  # type: ignore[assignment]
+    GlucoFMPretrainer = None  # type: ignore[assignment,misc]
+    align_cgm_window = None  # type: ignore[assignment]
+    load_glucofm_checkpoint = None  # type: ignore[assignment]
     embed_cgm_with_glucofm = None  # type: ignore[assignment]
+    embed_cgm_with_glucofm_result = None  # type: ignore[assignment]
+    build_glucofm_foundation_model = None  # type: ignore[assignment]
+    GlucoFMWindowCollection = None  # type: ignore[assignment,misc]
+    GlucoFMTrainingResult = None  # type: ignore[assignment,misc]
+    load_glucofm_windows = None  # type: ignore[assignment]
+    pretrain_glucofm = None  # type: ignore[assignment]
+    ArenaMetric = None  # type: ignore[assignment,misc]
     ModelArenaMetrics = None  # type: ignore[assignment,misc]
     FoundationArenaReport = None  # type: ignore[assignment,misc]
+    load_foundation_evaluation = None  # type: ignore[assignment]
     run_foundation_model_arena = None  # type: ignore[assignment]
     ScientificVisualizationArtifacts = None  # type: ignore[assignment,misc]
     plot_foundation_arena_radar = None  # type: ignore[assignment]

@@ -21,6 +21,7 @@ def build_sequences(
     target_column: str,
     subject_column: Optional[str] = "subject_id",
     segment_column: Optional[str] = None,
+    predict_delta: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Convert a time-series dataframe into (X, y) sequences.
@@ -46,6 +47,9 @@ def build_sequences(
     segment_column : str or None
         If provided, sequences will additionally not cross segment boundaries
         (e.g. gaps in CGM data).  Defaults to None.
+    predict_delta : bool
+        If True, target y will be relative glucose changes delta_G = G_{t+k} - G_t,
+        where G_t is the last glucose reading in the history window.
 
     Returns
     -------
@@ -89,7 +93,11 @@ def build_sequences(
             continue
 
         X_list.append(values[idx:window_end])
-        y_list.append(target[window_end:horizon_end])
+        y_seq = target[window_end:horizon_end]
+        if predict_delta:
+            current_val = target[window_end - 1]
+            y_seq = y_seq - current_val
+        y_list.append(y_seq)
 
     if not X_list:
         raise ValueError("Not enough rows to build sequences with current window sizes.")

@@ -9,10 +9,12 @@
     "dev": "tauri dev",
     "build": "tauri build --no-bundle",
     "bundle": "tauri build",
-    "check": "node --check ./frontend/main.js && node ./scripts/check-static.mjs"
+    "check": "node --check ./frontend/main.js && node ./scripts/check-static.mjs && node ./scripts/check-compartment-view.mjs && node ./scripts/check-digital-twin.mjs",
+    "vendor-three": "node ./scripts/vendor-three.mjs"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0"
+    "@tauri-apps/api": "^2.0.0",
+    "three": "0.160.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

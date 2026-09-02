@@ -65,12 +65,26 @@ ALLOWED_LEGACY_EDGES: set[ImportEdge] = set()
 
 def _iter_python_files() -> Iterable[Path]:
     for path in SRC_ROOT.rglob("*.py"):
-        if "__pycache__" not in path.parts:
-            yield path
+        if "__pycache__" in path.parts:
+            continue
+        # macOS AppleDouble sidecars ("._module.py") appear whenever the tree is
+        # copied to or from a non-HFS filesystem. They are binary resource forks,
+        # not source, and ast.parse used to raise UnicodeDecodeError on them --
+        # which aborted the whole scan, so no boundary violation was ever
+        # reported. Skip them instead of failing the check.
+        if path.name.startswith("._"):
+            continue
+        yield path
 
 
 def _imports_from(path: Path) -> set[str]:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
+    try:
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+    except (UnicodeDecodeError, SyntaxError) as exc:
+        # Name the file: an anonymous decode error here previously looked like a
+        # tooling bug rather than an unreadable source file.
+        raise RuntimeError(f"cannot parse {path} for boundary analysis: {exc}") from exc
     imports: set[str] = set()
 
     for node in ast.walk(tree):

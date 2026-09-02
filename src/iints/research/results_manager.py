@@ -196,8 +196,26 @@ def _decode_catalog_record(raw: Any) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _is_hidden_or_index_path(path: Path, output_dir: Path | None = None) -> bool:
-    if any(part.startswith(".") for part in path.parts):
+def _is_hidden_or_index_path(
+    path: Path,
+    output_dir: Path | None = None,
+    root: Path | None = None,
+) -> bool:
+    """Skip dot-files/dot-directories inside the results tree, and the index itself.
+
+    The hidden check is scoped to the path RELATIVE to `root`. It used to test every
+    part of the absolute path, so a results tree anywhere below a hidden directory
+    -- `~/.local/share/...`, a dotted project directory, or a temporary directory
+    such as `./.tmp/...` -- had every run silently filtered out, and indexing then
+    reported success with a run count of zero.
+    """
+    relative_parts = path.parts
+    if root is not None:
+        try:
+            relative_parts = path.relative_to(root).parts
+        except ValueError:
+            relative_parts = path.parts
+    if any(part.startswith(".") for part in relative_parts):
         return True
     if output_dir is not None:
         try:
@@ -378,7 +396,7 @@ def discover_result_csvs(root: Path, output_dir: Path | None = None) -> list[Pat
         return []
     candidates: list[Path] = []
     for path in root.rglob("results.csv"):
-        if _is_hidden_or_index_path(path, output_dir):
+        if _is_hidden_or_index_path(path, output_dir, root):
             continue
         candidates.append(path)
     return sorted(candidates)
@@ -392,7 +410,7 @@ def build_artifact_inventory(root: Path, output_dir: Path | None = None) -> list
     if not root.exists():
         return rows
     for path in sorted(p for p in root.rglob("*") if p.is_file()):
-        if _is_hidden_or_index_path(path, output_dir):
+        if _is_hidden_or_index_path(path, output_dir, root):
             continue
         suffix = path.suffix.lower()
         stat = path.stat()
@@ -484,7 +502,7 @@ def _incremental_artifact_records(
     else:
         paths = []
     for path in paths:
-        if _is_hidden_or_index_path(path, output_dir):
+        if _is_hidden_or_index_path(path, output_dir, root):
             continue
         relative = _normalise_relative(path, root)
         discovered.add(relative)

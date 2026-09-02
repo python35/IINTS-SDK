@@ -67,7 +67,7 @@ The final EUCYS benchmark bundle executed `3600` locked runs across profiles, sc
 |---|---:|
 | Total runs | 3600 |
 | Overall mean Time in Range | 81.42% |
-| 95% CI for overall TIR | 81.09 to 81.75 |
+| 95% CI for overall TIR | 81.07 to 81.78 (cluster-level t over 6 virtual-patient profiles) |
 | Clean-arm candidate TIR | 93.04% |
 | Clean vs corrupted TIR delta | +17.11 points |
 | Python test suite after pack work | 369 passed, 4 skipped |

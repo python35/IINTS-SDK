@@ -268,7 +268,14 @@ def _render_module(module: ModuleInfo) -> list[str]:
 
 
 def build_reference() -> str:
-    modules = tuple(_module_info(path) for path in sorted(SOURCE_ROOT.rglob("*.py")))
+    # macOS creates binary AppleDouble sidecars (``._module.py``) on some
+    # external filesystems. They are metadata, not Python source, and must not
+    # be parsed or documented.
+    source_paths = (
+        path for path in sorted(SOURCE_ROOT.rglob("*.py"))
+        if not path.name.startswith("._")
+    )
+    modules = tuple(_module_info(path) for path in source_paths)
     by_package: dict[str, list[ModuleInfo]] = {}
     for module in modules:
         by_package.setdefault(module.package, []).append(module)
