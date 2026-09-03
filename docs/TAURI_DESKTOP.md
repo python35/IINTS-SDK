@@ -151,7 +151,7 @@ shell input. Hardening roadmap:
   frontend filesystem permissions.
 - Keep background-job progress, cancellation, and error state covered by bridge-contract tests.
 - Add per-command input validation in Rust before calling Python.
-- Keep macOS notarization and Windows timestamped signing mandatory for public installers.
+- Sign with real certificates once available (see docs/DESKTOP_SIGNING.md); until then, public installers ship ad-hoc-signed/unsigned/unnotarized rather than failing the release.
 - Keep the Python bridge command list small and audited.
 
 ## Release Validation

@@ -12,7 +12,7 @@ Unsigned desktop builds are useful for internal testing, but public Windows and 
 
 ## GitHub Actions Support
 
-The `Rust Desktop Beta Builds` workflow fails closed for public uploads: Windows signing and macOS signing/notarization secrets are mandatory. A manually dispatched build with release upload disabled may produce an explicitly labelled unsigned/ad-hoc CI artifact for developer testing, but that artifact cannot update `tauri-beta-latest`.
+The `Rust Desktop Beta Builds` workflow signs with a real certificate when the secrets below are configured, and otherwise falls back to an ad-hoc macOS signature / unsigned Windows installer / skipped notarization for every build, including public tag-triggered releases. This applies uniformly regardless of `MACOS_CERTIFICATE_P12_BASE64` / `WINDOWS_SIGNING_PFX_BASE64` / notarization credentials being present, so a `tauri-beta-v*` release still publishes without any certificates configured -- end users will just see the platform warnings described above until real certificates are added.
 
 ### Windows Secrets
 

@@ -9,6 +9,7 @@ from .physiology import (
     antecedent_hypoglycemia_memory_derivative,
     counterregulatory_rescue_multiplier,
     dawn_glucose_rate_mgdl_min,
+    dawn_insulin_sensitivity_multiplier,
     renal_glucose_clearance_concentration,
     validated_snapshot_bool,
     validated_snapshot_scalar,
@@ -379,6 +380,14 @@ class AdvancedMetabolicModel(BergmanPatientModel):
             start_hour=self.dawn_start_hour,
             end_hour=self.dawn_end_hour,
         )
+        # Dawn resistance: a loss of insulin sensitivity over the same window,
+        # applied to p3 alongside the existing exercise/stress/illness factors.
+        dawn_sens_multiplier = dawn_insulin_sensitivity_multiplier(
+            current_time,
+            peak_resistance_fraction=self.dawn_insulin_resistance_fraction,
+            start_hour=self.dawn_start_hour,
+            end_hour=self.dawn_end_hour,
+        )
 
         # --- Exercise & Stress Physiologic Impact ---
         exercise_p1_multiplier = 1.0
@@ -430,8 +439,8 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         lipotoxicity_factor = 0.4 / max(0.4, F)
 
         p1_eff = p.p1 * exercise_p1_multiplier * stress_p1_multiplier
-        # Total p3 is degraded by lipotoxicity, acute illness, and menstrual hormonal drifts
-        p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier * lipotoxicity_factor * illness_p3_multiplier * cycle_p3_multiplier
+        # Total p3 is degraded by dawn resistance, lipotoxicity, acute illness, and menstrual hormonal drifts
+        p3_eff = p.p3 * exercise_p3_multiplier * stress_p3_multiplier * dawn_sens_multiplier * lipotoxicity_factor * illness_p3_multiplier * cycle_p3_multiplier
         
         insulin_deficit = max(0.0, (p.Ib - I) / max(p.Ib, 1e-6))
         ffa_excess = max(0.0, (F - self.initial_ffa) / max(self.initial_ffa, 1e-6))

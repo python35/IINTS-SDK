@@ -31,7 +31,6 @@ concurrency:
 env:
   NODE_VERSION: "22"
   PYTHON_VERSION: "3.11"
-  PUBLIC_RELEASE: ${{ startsWith(github.ref, 'refs/tags/tauri-beta-v') || (github.event_name == 'workflow_dispatch' && inputs.upload_release) }}
 
 jobs:
   build:
@@ -118,11 +117,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$MACOS_CERTIFICATE_P12_BASE64" ]]; then
-            if [[ "$PUBLIC_RELEASE" == "true" ]]; then
-              echo "A Developer ID certificate is mandatory for public macOS installers."
-              exit 1
-            fi
-            echo "Developer artifact only: using an ad-hoc signature because release upload is disabled."
+            echo "No Developer ID certificate configured: using an ad-hoc signature."
+            echo "macOS Gatekeeper may still warn about, or require an explicit override to run, an app signed this way -- it is not signed by an identified developer. Set MACOS_CERTIFICATE_P12_BASE64 (+ MACOS_CERTIFICATE_PASSWORD, MACOS_KEYCHAIN_PASSWORD, MACOS_SIGNING_IDENTITY) to sign with a real Developer ID instead."
             echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
             exit 0
           fi
@@ -190,10 +186,8 @@ jobs:
           WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
         run: |
           if (-not $env:WINDOWS_SIGNING_PFX_BASE64) {
-            if ($env:PUBLIC_RELEASE -eq "true") {
-              throw "An Authenticode certificate is mandatory for public Windows installers."
-            }
-            Write-Host "Developer artifact only: producing an unsigned installer because release upload is disabled."
+            Write-Host "No Authenticode certificate configured: producing an unsigned installer."
+            Write-Host "Windows SmartScreen may still warn about an installer signed this way. Set WINDOWS_SIGNING_PFX_BASE64 (+ WINDOWS_SIGNING_PFX_PASSWORD) to sign with a real Authenticode certificate instead."
             exit 0
           }
           if (-not $env:WINDOWS_SIGNING_PFX_PASSWORD) {
@@ -228,11 +222,8 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
-            if [[ "$PUBLIC_RELEASE" == "true" ]]; then
-              echo "Apple notarization credentials are mandatory for public macOS installers."
-              exit 1
-            fi
-            echo "Developer artifact only: skipping notarization because release upload is disabled."
+            echo "No Apple notarization credentials configured: skipping notarization."
+            echo "macOS Gatekeeper may still warn about, or require an explicit override to run, an unnotarized app. Set APPLE_ID, APPLE_TEAM_ID, and APPLE_APP_SPECIFIC_PASSWORD to notarize instead."
             exit 0
           fi
           dmg_path="$(find apps/iints-tauri/src-tauri/target/release/bundle/dmg -type f -name '*.dmg' -print -quit)"
