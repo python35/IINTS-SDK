@@ -37,7 +37,7 @@
             <span>Foundation AI & Visualizer</span>
           </button>
           <button class="nav-item" data-view="eucys">
-            <span>★ EUCYS Jury Draaiboek</span>
+            <span>Scientific Portfolio</span>
           </button>
           <button class="nav-item" data-view="research">
             <span>Research tools</span>
@@ -256,6 +256,9 @@
           </div>
         </div>
         <pre id="run-status" class="status-box" aria-live="polite">Workbench loading...</pre>
+        <div id="run-complete-actions" class="button-row" hidden>
+          <button id="view-results-btn" class="primary" type="button">View results &amp; 3D visualizer &rarr;</button>
+        </div>
       </section>
 
       <section class="panel history-panel" data-view-panel="run" hidden>
@@ -879,7 +882,7 @@
           <button id="foundation-glucofm-pretrain-btn">Pretrain local reproduction</button>
           <button id="foundation-glucofm-btn" class="primary">Extract trained 128D embedding</button>
           <button id="foundation-arena-btn">Compare selected evidence</button>
-          <button id="eucys-playbook-btn">Generate EUCYS evidence dossier</button>
+          <button id="eucys-playbook-btn">Generate evidence dossier</button>
         </div>
 
         <div class="chart-tab-bar">

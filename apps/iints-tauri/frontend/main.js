@@ -131,8 +131,8 @@ const VIEW_METADATA = {
     description: "Train and inspect the independent GlucoFM reproduction, then compare traceable evaluation artifacts produced under one shared benchmark contract."
   },
   eucys: {
-    eyebrow: "★ EUCYS 2026 Jury Playbook",
-    title: "EUCYS European Jury Scientific Portfolio & Dossier",
+    eyebrow: "Publication dossier",
+    title: "Scientific Portfolio & Dossier",
     description: "Browse 11 publication-grade scientific figures, Clarke Error Grids, TIR distributions, Stem-Cell Islet kinetics, and Jetson hardware latency."
   },
   evidence: {
@@ -1243,6 +1243,7 @@ async function runSelectedWorkflow() {
   }
   setBusy(true);
   $("run-progress-panel").hidden = false;
+  $("run-complete-actions").hidden = true;
   $("run-progress").value = 0;
   setText("run-progress-value", "0%");
   setText("run-progress-label", "Queueing deterministic workflow...");
@@ -1264,6 +1265,7 @@ async function runSelectedWorkflow() {
     if (result.results_csv) {
       $("csv-path").value = result.results_csv;
       await previewCsv();
+      $("run-complete-actions").hidden = false;
     }
     await loadHistory();
   } catch (error) {
@@ -3146,20 +3148,22 @@ function updateFluxChips(chips) {
   }
 }
 
-document.querySelectorAll("[data-compartment-mode]").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    document.querySelectorAll("[data-compartment-mode]").forEach((b) => b.classList.remove("is-active"));
-    btn.classList.add("is-active");
-    const mode = btn.dataset.compartmentMode;
-    document.querySelectorAll("[data-compartment-panel]").forEach((panel) => {
-      panel.hidden = panel.dataset.compartmentPanel !== mode;
-    });
-    if (mode === "twin") {
-      await ensureDigitalTwin();
-    } else {
-      digitalTwin?.pause();
-    }
+async function activateCompartmentMode(mode) {
+  document.querySelectorAll("[data-compartment-mode]").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.compartmentMode === mode);
   });
+  document.querySelectorAll("[data-compartment-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.compartmentPanel !== mode;
+  });
+  if (mode === "twin") {
+    await ensureDigitalTwin();
+  } else {
+    digitalTwin?.pause();
+  }
+}
+
+document.querySelectorAll("[data-compartment-mode]").forEach((btn) => {
+  btn.addEventListener("click", () => activateCompartmentMode(btn.dataset.compartmentMode));
 });
 
 $("digital-twin-time").addEventListener("input", (event) => {
@@ -3188,6 +3192,10 @@ $("digital-twin-speed").addEventListener("change", (event) => {
 });
 
 $("run-btn").addEventListener("click", runSelectedWorkflow);
+$("view-results-btn").addEventListener("click", async () => {
+  setActiveView("results");
+  await activateCompartmentMode("twin");
+});
 $("run-cancel-btn").addEventListener("click", cancelSelectedWorkflow);
 $("guide-btn").addEventListener("click", openUserGuide);
 $("settings-save-btn").addEventListener("click", saveWorkbenchSettings);
@@ -3666,15 +3674,15 @@ document.querySelectorAll("[data-chart-tab]").forEach(btn => {
   });
 });
 
-// EUCYS Playbook Button
+// Scientific portfolio / evidence dossier button
 $("eucys-playbook-btn")?.addEventListener("click", async () => {
-  setText("foundation-status", "Generating the EUCYS evidence dossier. Figures without required measured inputs are skipped rather than fabricated...");
+  setText("foundation-status", "Generating the evidence dossier. Figures without required measured inputs are skipped rather than fabricated...");
   try {
-    const result = await invoke("generate_eucys_playbook", { outputDir: "results/eucys_jury_dossier" });
-    setText("foundation-status", `★ EUCYS 2026 Jury Portfolio Generated Successfully!\nTotal Figures: ${result.data?.total_figures}\nInteractive Dossier: ${result.data?.index_html_path}\nManifest: ${result.data?.manifest_json_path}`);
+    const result = await invoke("generate_eucys_playbook", { outputDir: "results/scientific_portfolio" });
+    setText("foundation-status", `Evidence portfolio generated successfully!\nTotal Figures: ${result.data?.total_figures}\nInteractive Dossier: ${result.data?.index_html_path}\nManifest: ${result.data?.manifest_json_path}`);
     renderFoundationChart("clarke");
   } catch (err) {
-    setText("foundation-status", `EUCYS portfolio generation failed: ${err}`);
+    setText("foundation-status", `Evidence portfolio generation failed: ${err}`);
   }
 });
 

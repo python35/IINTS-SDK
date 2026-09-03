@@ -763,7 +763,7 @@ class Simulator:
             for record in self.run_live(duration_minutes):
                 all_records.append(record)
                 if step_callback:
-                    step_callback(record["time"], duration_minutes, record["glucose"])
+                    step_callback(record["time_minutes"], duration_minutes, record["glucose_actual_mgdl"])
         except SimulationLimitError as err:
             logger.error("Simulation terminated early: %s", err)
             self._termination_info = {
