@@ -1523,22 +1523,23 @@ textarea[aria-invalid="true"] {
   filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
 }
 
-/* Fill/stroke color and opacity are set per frame in JS (renderDigitalTwinDiagram),
-   keyed to each organ's live normalized value -- these are just the shared
-   shape/interaction properties every organ needs regardless of state. */
+/* Line-art medical icons, not filled shapes: fill stays off permanently, and
+   stroke color/opacity/glow are set per frame in JS (renderDigitalTwinDiagram),
+   keyed to each organ's live normalized value. stroke-width is in the icon's
+   own 24x24 coordinate space -- each <g> in index.html carries its own
+   translate+scale transform, so this renders at a consistent visual
+   thickness across organs regardless of their individual scale. */
 .twin-organ {
-  stroke-width: 2.5;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   cursor: pointer;
 }
 
 .twin-organ:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 2px;
-}
-
-.twin-organ-ring {
-  stroke: #8b5cf6;
-  opacity: 0.5;
 }
 
 /* The card overlays the dark illustration, so it deliberately breaks from the

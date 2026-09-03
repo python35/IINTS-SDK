@@ -3216,9 +3216,10 @@ function renderDigitalTwinDiagram() {
     if (!el) continue;
     const level = organFillLevel(organConfig);
     const color = isHypo && organConfig.id === "plasma" ? HYPO_VASCULAR_COLOR : organConfig.color;
-    el.style.fill = color;
+    // Line icons stay unfilled (see .twin-organ); the live value shows as
+    // stroke thickness, overall opacity, and glow instead of a fill level.
     el.style.stroke = color;
-    el.style.fillOpacity = String(0.25 + level * 0.55);
+    el.style.strokeWidth = String(1.4 + level * 1.2);
     el.style.opacity = String(0.55 + level * 0.45);
     el.style.filter = `drop-shadow(0 0 ${6 + level * 10}px ${color})`;
   }

@@ -286,24 +286,28 @@ timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
 
 for (const organ of ORGAN_LAYOUT) {
   const el = byId(organ.elementId);
-  check(typeof el.style.fill === "string" && el.style.fill.length > 0, `Organ "${organ.id}" should have its fill set after a render.`);
+  check(typeof el.style.stroke === "string" && el.style.stroke.length > 0, `Organ "${organ.id}" should have its stroke set after a render.`);
   check(
-    Number(el.style.fillOpacity) >= 0.25 && Number(el.style.fillOpacity) <= 0.8,
-    `Organ "${organ.id}" fill-opacity should stay within the documented [0.25, 0.8] band, got ${el.style.fillOpacity}.`
+    Number(el.style.opacity) >= 0.55 && Number(el.style.opacity) <= 1,
+    `Organ "${organ.id}" opacity should stay within the documented [0.55, 1] band, got ${el.style.opacity}.`
+  );
+  check(
+    Number(el.style.strokeWidth) >= 1.4 && Number(el.style.strokeWidth) <= 2.6,
+    `Organ "${organ.id}" stroke-width should stay within the documented [1.4, 2.6] band, got ${el.style.strokeWidth}.`
   );
 }
 
-const plasmaAtT5 = byId("twin-organ-plasma").style.fill;
+const plasmaAtT5 = byId("twin-organ-plasma").style.stroke;
 check(plasmaAtT5.toLowerCase() !== HYPO_VASCULAR_COLOR.toLowerCase(), "Plasma should not show the hypo color at t=5 (180 mg/dL, not hypoglycemic).");
 
 timeInput.value = "10";
 timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
-const plasmaAtT10 = byId("twin-organ-plasma").style.fill;
+const plasmaAtT10 = byId("twin-organ-plasma").style.stroke;
 check(
   plasmaAtT10.toLowerCase() === HYPO_VASCULAR_COLOR.toLowerCase(),
   `Plasma should switch to the hypo color at t=10 (60 mg/dL, hypoglycemic), got ${plasmaAtT10}.`
 );
-const liverAtT10 = byId("twin-organ-liver").style.fill;
+const liverAtT10 = byId("twin-organ-liver").style.stroke;
 check(liverAtT10.toLowerCase() !== HYPO_VASCULAR_COLOR.toLowerCase(), "The liver's own steady red must stay visually distinct from the hypo-alarm color.");
 
 // Clicking an organ should populate the inspection card.
