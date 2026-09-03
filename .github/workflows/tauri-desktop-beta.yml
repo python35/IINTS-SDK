@@ -141,6 +141,9 @@ jobs:
       - name: Build native Tauri installer
         shell: bash
         working-directory: apps/iints-tauri
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri -- build --bundles "${{ matrix.bundle_target }}"
 
       - name: Verify sealed macOS app inside DMG
@@ -309,7 +312,9 @@ jobs:
           - `IINTS-AF-Research-Workbench-macos.dmg`
           - `IINTS-AF-Research-Workbench-linux-x64.AppImage`
 
-          Matching `.sha256` files are included for integrity verification. Public macOS downloads are Developer ID signed, notarized, and stapled. Public Windows downloads are Authenticode signed and timestamped. The workflow fails closed instead of publishing unsigned installers.
+          Matching `.sha256` files are included for integrity verification. Downloads are signed with a Developer ID (macOS, notarized and stapled) or Authenticode certificate (Windows) when one is configured for this build; otherwise the workflow falls back to an ad-hoc macOS signature or an unsigned Windows installer rather than failing the release, and the platform will warn accordingly (see [Desktop Signing](https://python35.github.io/IINTS-SDK/DESKTOP_SIGNING/)).
+
+          Once installed, the app can check for and install its own future updates from Settings, signed with a separate updater key independent of the platform certificates above.
 
           ## Required scientific engine
 
@@ -321,6 +326,22 @@ jobs:
 
           Research and education only. This is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
           EOF
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Build updater manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          app_version="$(python -c "import json; print(json.load(open('apps/iints-tauri/src-tauri/tauri.conf.json'))['version'])")"
+          python tools/desktop/build_update_manifest.py \
+            --assets-dir release-assets \
+            --version "$app_version" \
+            --notes-file tauri-beta-release-notes.md \
+            --output release-assets/latest.json
 
       - name: Create or update requested GitHub prerelease
         uses: softprops/action-gh-release@v3

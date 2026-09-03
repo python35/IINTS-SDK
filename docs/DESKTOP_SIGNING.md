@@ -41,6 +41,34 @@ Add these repository secrets:
 
 The workflow imports the certificate into a temporary keychain, signs the `.app` with hardened runtime, creates the `.dmg`, submits it to Apple's notary service with `xcrun notarytool`, staples the notarization ticket, validates it, and rewrites the `.sha256` checksum.
 
+## Updater Signing
+
+The app can check for and install its own updates from inside Settings, instead of the user
+re-downloading an installer manually. This uses the Tauri updater plugin, which is signed with its
+own lightweight keypair -- unrelated to the platform code-signing certificates above, and required
+either way (there is no unsigned fallback for updates, since an unsigned auto-updater would let
+anyone who could intercept or spoof the update feed run arbitrary code on every installed copy).
+
+| Secret | Meaning |
+| --- | --- |
+| `TAURI_SIGNING_PRIVATE_KEY` | The updater's minisign private key, generated once with `npx tauri signer generate` (already configured for this repository). |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Password protecting that private key. |
+
+The matching public key is committed in `apps/iints-tauri/src-tauri/tauri.conf.json` under
+`plugins.updater.pubkey`. When both secrets are present, `tauri build` additionally produces a
+signed updater artifact (`.app.tar.gz` on macOS, the installer itself on Windows and Linux) next to
+the normal installer, and the release workflow assembles those into `latest.json`, published at the
+stable `tauri-beta-latest` release alongside the installers themselves. The app's updater endpoint
+in `tauri.conf.json` always reads that one file, so `tauri-beta-latest` is the only URL it depends
+on; per-version tagged releases keep their own copies of the same generated manifest for the record,
+but nothing reads them.
+
+**If this key is ever lost**, generate a new one and replace `plugins.updater.pubkey`, but understand
+the consequence first: every already-installed copy of the app only trusts the *old* public key, so
+none of them will accept updates signed with the new key. Existing users would need to reinstall
+from a manually downloaded installer at least once to pick up the new key, after which their
+in-app updater works again.
+
 ## Important Notes
 
 - Signing reduces warnings, but Windows SmartScreen may still warn for a new publisher until enough reputation is built.

@@ -342,13 +342,24 @@ def _check_tauri_security_boundary() -> List[str]:
     except json.JSONDecodeError as exc:
         return [f"Invalid Tauri capability JSON: {exc}"]
 
+    # The app may check for and install its own signed updates, and restart to
+    # apply them -- these three narrowly-scoped permissions are an intentional
+    # exception, not the plugins' full default permission sets. Everything
+    # else (filesystem, shell, general HTTP) stays forbidden.
     forbidden_prefixes = ("shell:", "fs:", "http:", "updater:", "process:")
+    allowed_updater_and_process_permissions = {
+        "updater:allow-check",
+        "updater:allow-download-and-install",
+        "process:allow-restart",
+    }
     permissions = capability.get("permissions", [])
     if not isinstance(permissions, list):
         issues.append("Tauri permissions must be a list.")
         permissions = []
     for permission in permissions:
         permission_text = str(permission)
+        if permission_text in allowed_updater_and_process_permissions:
+            continue
         if permission_text.startswith(forbidden_prefixes):
             issues.append(f"Tauri capability grants broad or sensitive permission: {permission_text}")
 

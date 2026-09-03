@@ -52,6 +52,52 @@ def package_bundle(bundle_root: Path, output_dir: Path, platform_label: str) -> 
     return destination
 
 
+def package_updater_artifact(bundle_root: Path, output_dir: Path, platform_label: str) -> Path | None:
+    """Copy the signed updater artifact (if `createUpdaterArtifacts` produced one).
+
+    `tauri build` writes exactly one `<artifact>.sig` file per platform next to
+    the artifact it signs -- an `.app.tar.gz` on macOS, the installer itself on
+    Windows, or the AppImage itself on Linux. Which of those it is varies by
+    platform and by Tauri version, so this discovers the pairing from the
+    `.sig` file rather than hard-coding an extension. Returns None (skipping
+    quietly) when no signing key was configured for this build, matching the
+    optional-signing fallback used for code-signing certificates elsewhere in
+    this pipeline.
+    """
+
+    if platform_label not in RELEASE_NAMES:
+        choices = ", ".join(sorted(RELEASE_NAMES))
+        raise ValueError(f"Unsupported platform label {platform_label!r}; use one of: {choices}")
+
+    signatures = sorted(bundle_root.rglob("*.sig"))
+    if not signatures:
+        return None
+    if len(signatures) > 1:
+        names = ", ".join(str(path.relative_to(bundle_root)) for path in signatures)
+        raise RuntimeError(f"Expected at most one updater signature, found: {names}")
+
+    signature_path = signatures[0]
+    artifact_path = signature_path.with_suffix("")
+    if not artifact_path.is_file():
+        raise FileNotFoundError(f"Updater signature {signature_path} has no matching artifact {artifact_path}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    # Path.suffixes would also pick up dots from an embedded version number
+    # (e.g. "App_0.2.10_x64-setup.exe"), so this only special-cases the one
+    # real compound extension Tauri produces (macOS's .app.tar.gz) and
+    # otherwise keeps just the final extension.
+    if artifact_path.name.endswith(".tar.gz"):
+        stable_suffix = ".tar.gz"
+    elif artifact_path.suffix:
+        stable_suffix = artifact_path.suffix
+    else:
+        raise RuntimeError(f"Updater artifact {artifact_path} has no recognizable file extension")
+    destination = output_dir / f"IINTS-AF-Research-Workbench-{platform_label}-update{stable_suffix}"
+    shutil.copy2(artifact_path, destination)
+    shutil.copy2(signature_path, destination.with_name(f"{destination.name}.sig"))
+    return destination
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle-root", type=Path, required=True)
@@ -61,6 +107,10 @@ def main() -> None:
 
     packaged = package_bundle(args.bundle_root, args.output_dir, args.platform_label)
     print(packaged)
+
+    updater_artifact = package_updater_artifact(args.bundle_root, args.output_dir, args.platform_label)
+    if updater_artifact is not None:
+        print(updater_artifact)
 
 
 if __name__ == "__main__":

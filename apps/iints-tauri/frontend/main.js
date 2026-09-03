@@ -10,6 +10,8 @@ import { LIVER_CARD_CAPTION, interpolateSeries, lookupEquation } from "./digital
 const tauriCore = window.__TAURI__?.core;
 const invoke = tauriCore?.invoke;
 const nativeOpenDialog = window.__TAURI__?.dialog?.open;
+const nativeUpdater = window.__TAURI__?.updater;
+const nativeProcess = window.__TAURI__?.process;
 const isNativeDesktop = typeof invoke === "function";
 const COPYABLE_CONTEXT_SELECTOR = [
   "input",
@@ -631,6 +633,89 @@ async function loadUpdateInfo(refresh = false) {
       "update-status",
       `${errorMessage(error)}\n\nUse 'Install or update Python SDK' to create or repair the private app engine.`
     );
+  }
+}
+
+let pendingAppUpdate = null;
+
+async function checkForAppUpdate() {
+  if (!nativeUpdater) {
+    setText(
+      "update-status",
+      "In-app updates are only available in the installed desktop app; use Download manually below."
+    );
+    return;
+  }
+  $("app-update-check-btn").disabled = true;
+  $("app-update-install-btn").hidden = true;
+  pendingAppUpdate = null;
+  setText("update-status", "Checking for a signed app update...");
+  try {
+    const update = await nativeUpdater.check();
+    if (!update) {
+      setText(
+        "update-status",
+        `You are running the latest signed build (${appInfo?.app_version || "current version"}).`
+      );
+      return;
+    }
+    pendingAppUpdate = update;
+    $("app-update-install-btn").hidden = false;
+    setText(
+      "update-status",
+      [
+        `Update available: ${update.currentVersion} → ${update.version}`,
+        update.date ? `Published: ${update.date}` : "",
+        update.body || ""
+      ].filter(Boolean).join("\n")
+    );
+  } catch (error) {
+    setText("update-status", `Update check failed: ${errorMessage(error)}\n\nUse Download manually below instead.`);
+  } finally {
+    $("app-update-check-btn").disabled = false;
+  }
+}
+
+async function installAppUpdate() {
+  if (!nativeUpdater || !nativeProcess) return;
+  if (!pendingAppUpdate) {
+    await checkForAppUpdate();
+    if (!pendingAppUpdate) return;
+  }
+  const update = pendingAppUpdate;
+  $("app-update-install-btn").disabled = true;
+  $("app-update-progress-panel").hidden = false;
+  $("app-update-progress").value = 0;
+  setText("app-update-progress-value", "0%");
+  setText("app-update-progress-label", "Starting download...");
+  let contentLength = 0;
+  let downloadedBytes = 0;
+  try {
+    await update.downloadAndInstall((event) => {
+      if (event.event === "Started") {
+        contentLength = event.data.contentLength || 0;
+        setText("app-update-progress-label", "Downloading update...");
+      } else if (event.event === "Progress") {
+        downloadedBytes += event.data.chunkLength || 0;
+        const percent = contentLength > 0
+          ? Math.min(100, Math.round((downloadedBytes / contentLength) * 100))
+          : 0;
+        $("app-update-progress").value = percent;
+        setText("app-update-progress-value", `${percent}%`);
+      } else if (event.event === "Finished") {
+        $("app-update-progress").value = 100;
+        setText("app-update-progress-value", "100%");
+        setText("app-update-progress-label", "Installing...");
+      }
+    });
+    pendingAppUpdate = null;
+    setText("update-status", "Update installed. Restarting the app...");
+    await nativeProcess.relaunch();
+  } catch (error) {
+    setText("update-status", `Update install failed: ${errorMessage(error)}\n\nUse Download manually below instead.`);
+  } finally {
+    $("app-update-progress-panel").hidden = true;
+    $("app-update-install-btn").disabled = false;
   }
 }
 
@@ -3211,6 +3296,8 @@ $("diagnostics-btn").addEventListener("click", runDiagnostics);
 $("open-output-btn").addEventListener("click", openOutputFolder);
 $("install-engine-btn").addEventListener("click", openSdkUpdateTerminal);
 $("update-refresh-btn").addEventListener("click", refreshSoftwareVersions);
+$("app-update-check-btn").addEventListener("click", checkForAppUpdate);
+$("app-update-install-btn").addEventListener("click", installAppUpdate);
 $("update-download-btn").addEventListener("click", openAppDownloads);
 $("update-docs-btn").addEventListener("click", openUpdateDocs);
 $("update-copy-btn").addEventListener("click", copyUpdateCommand);

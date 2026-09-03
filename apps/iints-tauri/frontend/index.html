@@ -161,8 +161,17 @@
           <div class="action-cluster action-cluster-resources">
             <span class="action-label">Desktop application</span>
             <div class="button-row">
-              <button id="update-download-btn" class="quiet">Download latest app update</button>
+              <button id="app-update-check-btn" class="primary">Check for app update</button>
+              <button id="app-update-install-btn" class="primary" hidden>Install update &amp; restart</button>
+              <button id="update-download-btn" class="quiet">Download manually</button>
               <button id="update-docs-btn" class="quiet">Read update instructions</button>
+            </div>
+            <div id="app-update-progress-panel" class="run-progress-panel" hidden aria-live="polite">
+              <div class="run-progress-heading">
+                <span id="app-update-progress-label">Downloading update...</span>
+                <strong id="app-update-progress-value">0%</strong>
+              </div>
+              <progress id="app-update-progress" max="100" value="0">0%</progress>
             </div>
           </div>
         </div>

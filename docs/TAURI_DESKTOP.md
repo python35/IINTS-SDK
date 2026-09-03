@@ -48,7 +48,7 @@ It does not store credentials or silently replace the running executable.
 
 ### macOS integrity and Gatekeeper
 
-Every public macOS beta must be signed as one complete app bundle with a Developer ID certificate, notarized by Apple, stapled, and checked from inside the generated DMG. CI may create an explicitly labelled ad-hoc development artifact only when release upload is disabled. It cannot publish that artifact through the stable beta tag.
+A Developer ID certificate signs and notarizes the macOS DMG when the required secrets are configured (see [Desktop Signing](DESKTOP_SIGNING.md)). Without them, CI falls back to an ad-hoc signature and skips notarization for every build, including public releases through the stable beta tag -- Gatekeeper will warn about, or require an explicit override to run, a build signed this way.
 
 ## Workbench Components
 
@@ -145,7 +145,6 @@ The current Settings panel opens the signed stable release for explicit app inst
 Python-engine bootstrap is a fixed, visible maintenance command rather than arbitrary frontend
 shell input. Hardening roadmap:
 
-- Add signed Tauri updater after release signing is stable.
 - Use a dedicated app data directory for outputs.
 - Keep native file/folder selection limited to user-mediated open dialogs; do not grant broad
   frontend filesystem permissions.
@@ -156,7 +155,7 @@ shell input. Hardening roadmap:
 
 ## Release Validation
 
-The cross-platform beta workflow runs frontend dependency audit/static checks, Rust dependency audit, formatting, unit tests, strict Clippy checks, a native executable smoke test, installer packaging, SHA-256 generation, and platform signature verification. Public uploads fail closed when macOS Developer ID/notary credentials or Windows signing credentials are absent.
+The cross-platform beta workflow runs frontend dependency audit/static checks, Rust dependency audit, formatting, unit tests, strict Clippy checks, a native executable smoke test, installer packaging, SHA-256 generation, and platform signature verification. Public uploads fall back to an ad-hoc macOS signature, an unsigned Windows installer, and skipped notarization when the corresponding certificates are absent, rather than failing the release (see [Desktop Signing](DESKTOP_SIGNING.md)).
 
 The release workflow is `.github/workflows/tauri-desktop-beta.yml`, and its stable release tag is `tauri-beta-latest`.
 

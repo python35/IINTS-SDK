@@ -144,8 +144,23 @@ if (!permissions.includes("dialog:allow-open")) {
   console.error("The native selectors require only the user-mediated dialog:allow-open permission.");
   process.exit(1);
 }
-if (permissions.some((permission) => /^(?:fs|shell|http|updater|process):/.test(permission))) {
-  console.error("Native selectors must not introduce broad filesystem, shell, network, or updater permissions.");
+// The app may check for and install its own signed updates, and restart to
+// apply them -- both explicit, narrowly-scoped permissions rather than the
+// plugins' full default sets. Everything else stays off: no filesystem,
+// shell, or general HTTP access.
+const allowedUpdaterAndProcessPermissions = new Set([
+  "updater:allow-check",
+  "updater:allow-download-and-install",
+  "process:allow-restart"
+]);
+if (
+  permissions.some(
+    (permission) =>
+      /^(?:fs|shell|http):/.test(permission)
+      || (/^(?:updater|process):/.test(permission) && !allowedUpdaterAndProcessPermissions.has(permission))
+  )
+) {
+  console.error("Native selectors must not introduce broad filesystem, shell, network, or updater/process permissions.");
   process.exit(1);
 }
 

@@ -785,8 +785,20 @@ def test_tauri_workbench_is_sober_responsive_and_documented() -> None:
         (app_root / "src-tauri/capabilities/main.json").read_text(encoding="utf-8")
     )
     assert "dialog:allow-open" in capabilities["permissions"]
+    # The app may check for and install its own signed updates, and restart to
+    # apply them -- narrowly-scoped permissions, not the plugins' full default
+    # sets. Everything else (filesystem, shell, general HTTP) stays off.
+    allowed_updater_and_process_permissions = {
+        "updater:allow-check",
+        "updater:allow-download-and-install",
+        "process:allow-restart",
+    }
     assert not any(
-        permission.startswith(("fs:", "shell:", "http:", "updater:", "process:"))
+        permission.startswith(("fs:", "shell:", "http:"))
+        or (
+            permission.startswith(("updater:", "process:"))
+            and permission not in allowed_updater_and_process_permissions
+        )
         for permission in capabilities["permissions"]
     )
     assert "SETTINGS_STORAGE_KEY" in frontend_js

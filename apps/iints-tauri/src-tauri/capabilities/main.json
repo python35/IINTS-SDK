@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Main IINTS-AF research workbench window. Native user-mediated open dialogs are allowed; no shell, filesystem, updater, or HTTP plugin permissions are granted.",
+  "description": "Main IINTS-AF research workbench window. Native user-mediated open dialogs are allowed, and the app may check for and install its own signed updates; no shell, filesystem, or HTTP plugin permissions are granted beyond that.",
   "windows": ["main"],
   "permissions": [
     "core:app:default",
@@ -9,6 +9,9 @@
     "core:path:default",
     "core:resources:default",
     "core:window:default",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "updater:allow-check",
+    "updater:allow-download-and-install",
+    "process:allow-restart"
   ]
 }
