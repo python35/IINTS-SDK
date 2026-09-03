@@ -1510,36 +1510,42 @@ textarea[aria-invalid="true"] {
 
 #digital-twin-illustration {
   width: 100%;
-  height: clamp(340px, 48vw, 560px);
+  height: clamp(380px, 52vw, 580px);
   display: block;
-  background: #0f172a;
+  background: #0b132b;
   border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .twin-torso {
-  fill: rgba(148, 178, 216, 0.1);
-  stroke: rgba(96, 165, 250, 0.6);
-  stroke-width: 3;
-  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+  fill: rgba(15, 23, 42, 0.4);
+  stroke: rgba(56, 189, 248, 0.45);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.25));
 }
 
-/* Line-art medical icons, not filled shapes: fill stays off permanently, and
-   stroke color/opacity/glow are set per frame in JS (renderDigitalTwinDiagram),
-   keyed to each organ's live normalized value. stroke-width is in the icon's
-   own 24x24 coordinate space -- each <g> in index.html carries its own
-   translate+scale transform, so this renders at a consistent visual
-   thickness across organs regardless of their individual scale. */
 .twin-organ {
-  fill: none;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
   cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.twin-organ:hover {
+  filter: drop-shadow(0 0 14px #38bdf8) !important;
 }
 
 .twin-organ:focus-visible {
   outline: 2px solid #7dd3fc;
   outline-offset: 2px;
+}
+
+@keyframes twinConduitFlow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: -20; }
+}
+
+.twin-conduits path {
+  animation: twinConduitFlow 2s linear infinite;
 }
 
 /* The card overlays the dark illustration, so it deliberately breaks from the

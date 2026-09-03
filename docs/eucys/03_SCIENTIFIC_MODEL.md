@@ -7,7 +7,7 @@ registered as immutable documentation in
 `src/iints/core/formula_registry.py` and evaluated by deterministic Python code.
 The local AI receives the registry only as read-only explanation context.
 
-Registry version: `iints-formula-registry-v5`<br>
+Registry version: `iints-formula-registry-v6`<br>
 Registered formulas: `15`
 
 !!! note "What 'implemented' means"

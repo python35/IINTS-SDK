@@ -3209,8 +3209,10 @@ function organFillLevel(organConfig) {
 
 function renderDigitalTwinDiagram() {
   if (!compartmentTimeline || !compartmentTimeline.available) return;
-  const glucose = interpolateSeries(compartmentTimeline.times, compartmentTimeline.plasma_glucose_mgdl, currentDigitalTwinMinutes());
+  const minutes = currentDigitalTwinMinutes();
+  const glucose = interpolateSeries(compartmentTimeline.times, compartmentTimeline.plasma_glucose_mgdl, minutes);
   const isHypo = resolveHypoState(glucose);
+
   for (const organConfig of ORGAN_LAYOUT) {
     const el = $(organConfig.elementId);
     if (!el) continue;
@@ -3220,8 +3222,63 @@ function renderDigitalTwinDiagram() {
     // stroke thickness, overall opacity, and glow instead of a fill level.
     el.style.stroke = color;
     el.style.strokeWidth = String(1.4 + level * 1.2);
-    el.style.opacity = String(0.55 + level * 0.45);
-    el.style.filter = `drop-shadow(0 0 ${6 + level * 10}px ${color})`;
+    el.style.opacity = String(0.65 + level * 0.35);
+    el.style.filter = `drop-shadow(0 0 ${8 + level * 12}px ${color})`;
+  }
+
+  // Update In-SVG HUD Badges with Live Values
+  const valPlasma = $("twin-val-plasma");
+  if (valPlasma && Number.isFinite(glucose)) {
+    valPlasma.textContent = `${glucose.toFixed(1)} mg/dL`;
+    valPlasma.setAttribute("fill", isHypo ? "#f87171" : "#ffffff");
+  }
+
+  const valLiver = $("twin-val-liver");
+  if (valLiver && compartmentTimeline.fluxes?.endogenous_production) {
+    const egp = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.endogenous_production, minutes);
+    if (Number.isFinite(egp)) valLiver.textContent = `${egp.toFixed(2)} mg/dL/min`;
+  }
+
+  const valGut = $("twin-val-gut");
+  if (valGut && compartmentTimeline.fluxes?.appearance) {
+    const ra = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.appearance, minutes);
+    if (Number.isFinite(ra)) valGut.textContent = `${ra.toFixed(2)} mg/dL/min`;
+  }
+
+  const valSubq = $("twin-val-subcutaneous");
+  if (valSubq && (compartmentTimeline.compartments?.S1 || compartmentTimeline.compartments?.Q_gut)) {
+    const key = compartmentTimeline.compartments?.S1 ? "S1" : "Q_gut";
+    const val = interpolateSeries(compartmentTimeline.times, compartmentTimeline.compartments[key], minutes);
+    if (Number.isFinite(val)) valSubq.textContent = `${val.toFixed(1)} mg/U`;
+  }
+
+  const valPeriphery = $("twin-val-periphery");
+  if (valPeriphery && compartmentTimeline.fluxes?.uptake) {
+    const uptake = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.uptake, minutes);
+    if (Number.isFinite(uptake)) valPeriphery.textContent = `${uptake.toFixed(2)} mg/dL/min`;
+  }
+
+  // Update Status Pill
+  const statusBg = $("twin-status-bg");
+  const statusDot = $("twin-status-dot");
+  const statusText = $("twin-status-text");
+  if (statusBg && statusDot && statusText) {
+    if (isHypo) {
+      statusBg.setAttribute("fill", "rgba(220,38,38,0.25)");
+      statusBg.setAttribute("stroke", "#dc2626");
+      statusDot.setAttribute("fill", "#ef4444");
+      statusText.textContent = "ALERT: HYPOGLYCEMIA (<70)";
+    } else if (glucose > 180) {
+      statusBg.setAttribute("fill", "rgba(245,158,11,0.25)");
+      statusBg.setAttribute("stroke", "#f59e0b");
+      statusDot.setAttribute("fill", "#f59e0b");
+      statusText.textContent = "HIGH GLUCOSE (>180)";
+    } else {
+      statusBg.setAttribute("fill", "rgba(16,185,129,0.15)");
+      statusBg.setAttribute("stroke", "#10b981");
+      statusDot.setAttribute("fill", "#10b981");
+      statusText.textContent = "EUGLYCEMIA (STABLE)";
+    }
   }
 }
 

@@ -150,6 +150,31 @@ DESKTOP_PRESETS: tuple[DesktopPreset, ...] = (
             "Compare later scenarios against this baseline.",
         ),
     ),
+    DesktopPreset(
+        key="jury-walkthrough",
+        title="Jury walkthrough (full day)",
+        preset_name="realistic_reference_day",
+        audience="Science jury",
+        description=(
+            "The run used as the spoken example during a jury demonstration: a full "
+            "24-hour day at a five-minute step, which is the 288 controller decisions "
+            "a closed loop makes per day. The preset is evaluated against the bundled "
+            "free-living reference envelope, so the trace can be discussed next to "
+            "recorded data instead of on its own. It remains a simulation and is not "
+            "a clinical validation run."
+        ),
+        expected_output=(
+            "Full-day CSV, compartment timeline, audit artifacts, and a PDF report; "
+            "the seeded demo folder additionally holds the portfolio and safety "
+            "artifacts used by the other panels."
+        ),
+        talk_track=(
+            "Open with the number: 288 insulin decisions per day, each one a chance to harm.",
+            "Show the full-day trace first, then say which parts are model and which are reference data.",
+            "Move to reproducibility: fixed preset, fixed seed, signed manifest, same numbers on their machine.",
+            "Name the limits yourself before the jury does: simulated patient, no clinical validation, research use only.",
+        ),
+    ),
 )
 
 

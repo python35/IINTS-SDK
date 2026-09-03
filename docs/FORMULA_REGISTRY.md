@@ -1,6 +1,6 @@
 # IINTS-AF Formula Registry
 
-Registry version: `iints-formula-registry-v5`
+Registry version: `iints-formula-registry-v6`
 
 These formulas document deterministic SDK code. The local AI may explain them, but it must not derive, solve, or alter them.
 
@@ -472,3 +472,34 @@ Implementation: `src/iints/core/devices/models.py:SensorModel.read`
 Literature basis: [source 1](https://doi.org/10.1177/193229681000400507), [source 2](https://doi.org/10.1073/pnas.95.1.294)
 
 Validation note: Models known CGM lag/noise qualitatively; seeded stochastic terms are reproducible when state is saved.
+
+## F16_CIRCADIAN_DAWN_INSULIN_RESISTANCE: Phenomenological dawn insulin-resistance multiplier
+
+Category: `physiology`
+
+Evidence class: `heuristic`
+
+Canonical expression:
+
+$$
+\begin{aligned}M_{\mathrm{dawn}}(t)&=1-f_{\mathrm{dawn}}\,w(t),\quad 0\le f_{\mathrm{dawn}}<1\end{aligned}
+$$
+
+<details>
+<summary>Plain-text runtime notation</summary>
+
+```text
+w(t) as in F10; M_dawn(t) = 1 - f_dawn*w(t), with 0 <= f_dawn < 1 so M_dawn stays strictly positive
+```
+
+</details>
+
+Runtime/solved form: Dimensionless multiplier evaluated per step and applied to the existing insulin-sensitivity factors: p3 in the Bergman and advanced backends, k_b1/k_b2/k_b3 (S_IT, S_ID, S_IE) in Hovorka, and the effective ISF in the simplified backend. It shares the window w(t) of F10, so both dawn components peak together.
+
+Units: dawn_insulin_resistance_fraction: dimensionless fraction in [0, 1)
+
+Implementation: `src/iints/core/patient/physiology.py:dawn_insulin_sensitivity_multiplier`, `src/iints/core/patient/models.py:update`, `src/iints/core/patient/bergman_model.py:_ode`, `src/iints/core/patient/hovorka_model.py:_ode`, `src/iints/core/patient/advanced_metabolic_model.py:_ode`
+
+Literature basis: [source 1](https://doi.org/10.1089/dia.2014.0192), [source 2](https://doi.org/10.2337/db11-1478)
+
+Validation note: The sources support a circadian fall in insulin sensitivity toward the early morning, and the first was written as physiological input for in silico artificial-pancreas work. The raised-cosine shape and the peak fraction are an IINTS scenario heuristic, not coefficients estimated from either study. This term exists because F10 alone is dose-cancellable: a controller can out-dose an additive inflow, but not a loss of sensitivity, so an inflow-only dawn flatters an algorithm overnight. The default is zero, which reproduces the pre-existing behaviour exactly.
