@@ -1,6 +1,6 @@
 {
   "name": "iints-af-tauri-desktop",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "private": true,
   "description": "Native Rust/Tauri research workbench for the IINTS-AF Python SDK.",
   "type": "module",
