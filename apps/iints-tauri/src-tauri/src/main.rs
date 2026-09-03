@@ -1159,7 +1159,10 @@ async fn ask_local_ai(
 }
 
 #[tauri::command]
-async fn run_foundation_arena(output_dir: String, result_files: Vec<String>) -> Result<Value, String> {
+async fn run_foundation_arena(
+    output_dir: String,
+    result_files: Vec<String>,
+) -> Result<Value, String> {
     if output_dir.trim().is_empty() {
         return Err("output_dir is required".to_string());
     }
@@ -1209,6 +1212,11 @@ async fn extract_glucofm_embedding(
     run_python_bridge_async(args).await
 }
 
+// Each parameter is a distinct named argument the frontend passes via
+// invoke(), matching every other Tauri command in this file; bundling them
+// into a struct here would be inconsistent with the rest of the file for no
+// benefit, so the arg count lint is silenced rather than restructured.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 async fn pretrain_glucofm(
     source: String,
@@ -1253,7 +1261,10 @@ async fn pretrain_glucofm(
 }
 
 #[tauri::command]
-async fn load_cgmacros_cohort(output_dir: String, participants: Option<i64>) -> Result<Value, String> {
+async fn load_cgmacros_cohort(
+    output_dir: String,
+    participants: Option<i64>,
+) -> Result<Value, String> {
     if output_dir.trim().is_empty() {
         return Err("output_dir is required".to_string());
     }
