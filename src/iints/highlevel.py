@@ -528,6 +528,9 @@ def run_population(
         initial_glucose=patient_params.get("initial_glucose", 120.0),
         insulin_action_duration=patient_params.get("insulin_action_duration", 300.0),
         dawn_phenomenon_strength=patient_params.get("dawn_phenomenon_strength", 0.0),
+        dawn_insulin_resistance_fraction=patient_params.get(
+            "dawn_insulin_resistance_fraction", 0.0
+        ),
         dawn_start_hour=patient_params.get("dawn_start_hour", 4.0),
         dawn_end_hour=patient_params.get("dawn_end_hour", 8.0),
         glucose_decay_rate=patient_params.get("glucose_decay_rate", 0.05),

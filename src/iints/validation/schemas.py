@@ -97,6 +97,9 @@ class PatientConfigModel(BaseModel):
     insulin_peak_time: float = Field(default=75.0, ge=15.0, le=240.0)
     meal_mismatch_epsilon: float = Field(default=1.0, ge=0.5, le=1.5)
     dawn_phenomenon_strength: float = Field(default=0.0, ge=0.0, le=50.0)
+    # Strictly below 1.0: a value of 1.0 would abolish insulin action at the
+    # dawn peak, making glucose independent of every dose the algorithm gives.
+    dawn_insulin_resistance_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
     dawn_start_hour: float = Field(default=4.0, ge=0.0, le=23.0)
     dawn_end_hour: float = Field(default=8.0, ge=0.0, le=24.0)
     carb_absorption_duration_minutes: float = Field(default=240.0, ge=30.0, le=480.0)

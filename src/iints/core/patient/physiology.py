@@ -79,6 +79,41 @@ def glucagon_mg_to_pg(dose_mg: float) -> float:
     return dose * PICOGRAMS_PER_MILLIGRAM
 
 
+def dawn_window_fraction(
+    current_time_minutes: float,
+    *,
+    start_hour: float,
+    end_hour: float,
+) -> float:
+    """Return the raised-cosine dawn window, 0 outside and 1 at its midpoint.
+
+    Both dawn terms -- the glucose-rate perturbation and the insulin-sensitivity
+    reduction -- share this one window, so that changing the window shape
+    cannot silently move one of them relative to the other.
+    """
+
+    values = {
+        "current_time_minutes": float(current_time_minutes),
+        "start_hour": float(start_hour),
+        "end_hour": float(end_hour),
+    }
+    if not all(math.isfinite(value) for value in values.values()):
+        raise ValueError("dawn-profile inputs must all be finite")
+    if not 0.0 <= values["start_hour"] < values["end_hour"] <= 24.0:
+        raise ValueError("dawn hours must satisfy 0 <= start < end <= 24")
+
+    minute_of_day = values["current_time_minutes"] % 1_440.0
+    start_minute = values["start_hour"] * 60.0
+    end_minute = values["end_hour"] * 60.0
+    if minute_of_day < start_minute or minute_of_day > end_minute:
+        return 0.0
+
+    midpoint = 0.5 * (start_minute + end_minute)
+    half_width = 0.5 * (end_minute - start_minute)
+    phase = math.pi * (minute_of_day - midpoint) / half_width
+    return 0.5 * (1.0 + math.cos(phase))
+
+
 def dawn_glucose_rate_mgdl_min(
     current_time_minutes: float,
     *,
@@ -92,32 +127,65 @@ def dawn_glucose_rate_mgdl_min(
     patient backend.  A raised-cosine window avoids discontinuous rates at the
     configured start and end.  This is a scenario input, not an inferred
     cortisol, growth-hormone, or endogenous-glucose-production measurement.
+
+    This term is an *additive* glucose inflow. A closed-loop controller can
+    dose it away with extra insulin, which is not how the dawn phenomenon
+    behaves clinically; see :func:`dawn_insulin_sensitivity_multiplier` for
+    the resistance component.
     """
 
-    values = {
-        "current_time_minutes": float(current_time_minutes),
-        "peak_strength_mgdl_per_hour": float(peak_strength_mgdl_per_hour),
-        "start_hour": float(start_hour),
-        "end_hour": float(end_hour),
-    }
-    if not all(math.isfinite(value) for value in values.values()):
+    strength = float(peak_strength_mgdl_per_hour)
+    if not math.isfinite(strength):
         raise ValueError("dawn-profile inputs must all be finite")
-    if values["peak_strength_mgdl_per_hour"] < 0.0:
+    if strength < 0.0:
         raise ValueError("peak_strength_mgdl_per_hour must be non-negative")
-    if not 0.0 <= values["start_hour"] < values["end_hour"] <= 24.0:
-        raise ValueError("dawn hours must satisfy 0 <= start < end <= 24")
 
-    minute_of_day = values["current_time_minutes"] % 1_440.0
-    start_minute = values["start_hour"] * 60.0
-    end_minute = values["end_hour"] * 60.0
-    if minute_of_day < start_minute or minute_of_day > end_minute:
-        return 0.0
+    window = dawn_window_fraction(
+        current_time_minutes, start_hour=start_hour, end_hour=end_hour
+    )
+    return strength * window / 60.0
 
-    midpoint = 0.5 * (start_minute + end_minute)
-    half_width = 0.5 * (end_minute - start_minute)
-    phase = math.pi * (minute_of_day - midpoint) / half_width
-    window = 0.5 * (1.0 + math.cos(phase))
-    return values["peak_strength_mgdl_per_hour"] * window / 60.0
+
+def dawn_insulin_sensitivity_multiplier(
+    current_time_minutes: float,
+    *,
+    peak_resistance_fraction: float,
+    start_hour: float,
+    end_hour: float,
+) -> float:
+    """Return a multiplier <= 1 on insulin sensitivity during the dawn window.
+
+    The dawn phenomenon is in part a resistance phenomenon: counter-regulatory
+    hormones blunt the effect of insulin, so the same dose achieves less. That
+    is qualitatively different from an added glucose inflow, because a
+    controller can out-dose an inflow but cannot out-dose a loss of
+    sensitivity -- as resistance rises, additional insulin buys progressively
+    less. Modelling dawn only as an inflow therefore lets a closed-loop
+    algorithm look better overnight than it would be in a patient.
+
+    ``peak_resistance_fraction`` is the fractional loss of insulin sensitivity
+    at the midpoint of the window: 0.0 leaves sensitivity untouched, 0.3 means
+    insulin achieves 70% of its usual effect at the peak. It is capped below
+    1.0 so that insulin action can never be abolished entirely, which would
+    make the glucose trajectory independent of every dose the algorithm gives.
+
+    Like the rate term this is a scenario input, not an inferred cortisol or
+    growth-hormone measurement.
+    """
+
+    fraction = float(peak_resistance_fraction)
+    if not math.isfinite(fraction):
+        raise ValueError("dawn-profile inputs must all be finite")
+    if not 0.0 <= fraction < 1.0:
+        raise ValueError(
+            "peak_resistance_fraction must satisfy 0 <= fraction < 1; "
+            f"got {fraction}"
+        )
+
+    window = dawn_window_fraction(
+        current_time_minutes, start_hour=start_hour, end_hour=end_hour
+    )
+    return 1.0 - fraction * window
 
 
 def antecedent_hypoglycemia_memory_derivative(

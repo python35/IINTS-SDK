@@ -92,6 +92,13 @@ def _default_distributions(bp: PatientProfile) -> Dict[str, ParameterDistributio
             mean=bp.dawn_phenomenon_strength, cv=0.0, distribution="truncated_normal",
             lower_bound=0.0, upper_bound=50.0,
         ),
+        # Upper bound stays strictly below 1.0 so no sampled subject ever loses
+        # insulin action entirely at the dawn peak.
+        "dawn_insulin_resistance_fraction": ParameterDistribution(
+            mean=bp.dawn_insulin_resistance_fraction, cv=0.0,
+            distribution="truncated_normal",
+            lower_bound=0.0, upper_bound=0.95,
+        ),
     }
 
 
@@ -156,6 +163,7 @@ class PopulationGenerator:
                 initial_glucose=float(sampled["initial_glucose"][i]) if "initial_glucose" in sampled else base.initial_glucose,
                 insulin_action_duration=float(sampled["insulin_action_duration"][i]) if "insulin_action_duration" in sampled else base.insulin_action_duration,
                 dawn_phenomenon_strength=float(sampled["dawn_phenomenon_strength"][i]) if "dawn_phenomenon_strength" in sampled else base.dawn_phenomenon_strength,
+                dawn_insulin_resistance_fraction=float(sampled["dawn_insulin_resistance_fraction"][i]) if "dawn_insulin_resistance_fraction" in sampled else base.dawn_insulin_resistance_fraction,
                 # Non-varied parameters carry forward from the base profile
                 dawn_start_hour=base.dawn_start_hour,
                 dawn_end_hour=base.dawn_end_hour,

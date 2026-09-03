@@ -87,7 +87,7 @@ def test_run_metadata_exposes_data_format_versions(tmp_path) -> None:
     assert metadata["schema_version"] == "1.0"
     assert metadata["format_versions"]["results_csv"] == RESULTS_CSV_FORMAT_VERSION
     assert metadata["output_dir"] == "."
-    assert metadata["formula_registry"]["formula_count"] == 15
+    assert metadata["formula_registry"]["formula_count"] == 16
     assert metadata["formula_registry"]["ai_numeric_authority"] is False
     assert "dirty" in metadata["source_control"]
     assert manifest["schema_version"] == "1.0"

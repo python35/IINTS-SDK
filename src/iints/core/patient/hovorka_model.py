@@ -42,6 +42,7 @@ from .physiology import (
     antecedent_hypoglycemia_memory_derivative,
     counterregulatory_rescue_multiplier,
     dawn_glucose_rate_mgdl_min,
+    dawn_insulin_sensitivity_multiplier,
     glucagon_mg_to_pg,
     smooth_threshold_excess,
     validated_activity_events,
@@ -143,6 +144,7 @@ class HovorkaPatientModel:
         insulin_peak_time: float = 75.0,
         meal_mismatch_epsilon: float = 1.0,
         dawn_phenomenon_strength: float = 0.0,
+        dawn_insulin_resistance_fraction: float = 0.0,
         dawn_start_hour: float = 4.0,
         dawn_end_hour: float = 8.0,
         molecular_affinity_scalar: float = 1.0,
@@ -163,6 +165,7 @@ class HovorkaPatientModel:
             "insulin_peak_time": float(insulin_peak_time),
             "meal_mismatch_epsilon": float(meal_mismatch_epsilon),
             "dawn_phenomenon_strength": float(dawn_phenomenon_strength),
+            "dawn_insulin_resistance_fraction": float(dawn_insulin_resistance_fraction),
             "dawn_start_hour": float(dawn_start_hour),
             "dawn_end_hour": float(dawn_end_hour),
             "molecular_affinity_scalar": float(molecular_affinity_scalar),
@@ -198,6 +201,10 @@ class HovorkaPatientModel:
             raise ValueError("molecular_affinity_scalar must not exceed 2.0")
         if values["dawn_phenomenon_strength"] < 0.0:
             raise ValueError("dawn_phenomenon_strength must be non-negative")
+        if not 0.0 <= values["dawn_insulin_resistance_fraction"] < 1.0:
+            raise ValueError(
+                "dawn_insulin_resistance_fraction must satisfy 0 <= fraction < 1"
+            )
         if values["max_glucose_rate_mgdl_per_min"] < 0.0:
             raise ValueError("max_glucose_rate_mgdl_per_min must be non-negative")
         if not 0.0 <= values["dawn_start_hour"] < values["dawn_end_hour"] <= 24.0:
@@ -227,6 +234,9 @@ class HovorkaPatientModel:
         self.insulin_peak_time = values["insulin_peak_time"]
         self.meal_mismatch_epsilon = values["meal_mismatch_epsilon"]
         self.dawn_phenomenon_strength = values["dawn_phenomenon_strength"]
+        self.dawn_insulin_resistance_fraction = values[
+            "dawn_insulin_resistance_fraction"
+        ]
         self.dawn_start_hour = values["dawn_start_hour"]
         self.dawn_end_hour = values["dawn_end_hour"]
         self.carb_absorption_duration_minutes = values["carb_absorption_duration_minutes"]
@@ -903,7 +913,19 @@ class HovorkaPatientModel:
         stress_EGP_multiplier = 1.0 + 0.5 * H_stress
         ex_sens_multiplier = 1.0 + 2.0 * H_exercise
 
-        overall_sens = stress_sens_multiplier * ex_sens_multiplier
+        # Dawn resistance scales all three insulin actions, because it enters
+        # through k_b1/k_b2/k_b3 -- that is, through S_IT, S_ID and S_IE, the
+        # transport, disposal and EGP-suppression sensitivities alike.
+        dawn_sens_multiplier = dawn_insulin_sensitivity_multiplier(
+            current_time,
+            peak_resistance_fraction=self.dawn_insulin_resistance_fraction,
+            start_hour=self.dawn_start_hour,
+            end_hour=self.dawn_end_hour,
+        )
+
+        overall_sens = (
+            stress_sens_multiplier * ex_sens_multiplier * dawn_sens_multiplier
+        )
 
         affinity = self.molecular_affinity_scalar
         patient_sensitivity = self._basal_parameter_scale * self._clinical_sensitivity_scale

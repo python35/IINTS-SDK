@@ -5230,6 +5230,7 @@ def profiles_create(
     basal_rate: Annotated[float, typer.Option(help="Basal insulin rate (U/hr)")] = 0.8,
     initial_glucose: Annotated[float, typer.Option(help="Initial glucose (mg/dL)")] = 120.0,
     dawn_strength: Annotated[float, typer.Option(help="Dawn phenomenon strength (mg/dL per hour)")] = 0.0,
+    dawn_resistance: Annotated[float, typer.Option(help="Dawn insulin resistance: peak fraction of insulin sensitivity lost, 0 to <1")] = 0.0,
     dawn_start: Annotated[float, typer.Option(help="Dawn phenomenon start hour (0-23)")] = 4.0,
     dawn_end: Annotated[float, typer.Option(help="Dawn phenomenon end hour (0-24)")] = 8.0,
 ):
@@ -5279,6 +5280,7 @@ def profiles_create(
         basal_rate=basal_rate,
         initial_glucose=initial_glucose,
         dawn_phenomenon_strength=dawn_strength,
+        dawn_insulin_resistance_fraction=dawn_resistance,
         dawn_start_hour=dawn_start,
         dawn_end_hour=dawn_end,
         glucose_decay_rate=(

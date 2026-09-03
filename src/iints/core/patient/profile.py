@@ -14,6 +14,7 @@ class PatientProfile:
     basal_rate: float = 0.8  # U/hr
     initial_glucose: float = 120.0
     dawn_phenomenon_strength: float = 0.0  # mg/dL per hour
+    dawn_insulin_resistance_fraction: float = 0.0  # peak fractional loss of insulin sensitivity
     dawn_start_hour: float = 4.0
     dawn_end_hour: float = 8.0
 
@@ -31,6 +32,7 @@ class PatientProfile:
             "carb_factor": self.icr,
             "initial_glucose": self.initial_glucose,
             "dawn_phenomenon_strength": self.dawn_phenomenon_strength,
+            "dawn_insulin_resistance_fraction": self.dawn_insulin_resistance_fraction,
             "dawn_start_hour": self.dawn_start_hour,
             "dawn_end_hour": self.dawn_end_hour,
             "glucose_decay_rate": self.glucose_decay_rate,

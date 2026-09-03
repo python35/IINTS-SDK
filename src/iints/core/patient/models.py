@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 
 from .physiology import (
     dawn_glucose_rate_mgdl_min,
+    dawn_insulin_sensitivity_multiplier,
     validated_activity_events,
     validated_snapshot_bool,
     validated_snapshot_scalar,
@@ -45,6 +46,7 @@ class CustomPatientModel:
                  insulin_peak_time: float = 75.0, # minutes
                  meal_mismatch_epsilon: float = 1.0, # Legacy effective meal-appearance multiplier
                  dawn_phenomenon_strength: float = 0.0, # mg/dL per hour
+                 dawn_insulin_resistance_fraction: float = 0.0, # peak fraction of insulin sensitivity lost
                  dawn_start_hour: float = 4.0,
                  dawn_end_hour: float = 8.0,
                  carb_absorption_duration_minutes: float = 240.0,
@@ -79,6 +81,7 @@ class CustomPatientModel:
             "insulin_peak_time": insulin_peak_time,
             "meal_mismatch_epsilon": meal_mismatch_epsilon,
             "dawn_phenomenon_strength": dawn_phenomenon_strength,
+            "dawn_insulin_resistance_fraction": dawn_insulin_resistance_fraction,
             "dawn_start_hour": dawn_start_hour,
             "dawn_end_hour": dawn_end_hour,
             "carb_absorption_duration_minutes": carb_absorption_duration_minutes,
@@ -107,6 +110,10 @@ class CustomPatientModel:
             raise ValueError("molecular_affinity_scalar must be between 0 and 2")
         if dawn_phenomenon_strength < 0.0:
             raise ValueError("dawn_phenomenon_strength must be non-negative")
+        if not 0.0 <= dawn_insulin_resistance_fraction < 1.0:
+            raise ValueError(
+                "dawn_insulin_resistance_fraction must satisfy 0 <= fraction < 1"
+            )
         if not 0.0 <= dawn_start_hour < dawn_end_hour <= 24.0:
             raise ValueError("dawn hours must satisfy 0 <= start < end <= 24")
         if basal_glucose_target is not None and (
@@ -131,6 +138,7 @@ class CustomPatientModel:
         self.insulin_peak_time = insulin_peak_time
         self.meal_mismatch_epsilon = meal_mismatch_epsilon
         self.dawn_phenomenon_strength = dawn_phenomenon_strength
+        self.dawn_insulin_resistance_fraction = dawn_insulin_resistance_fraction
         self.dawn_start_hour = dawn_start_hour
         self.dawn_end_hour = dawn_end_hour
         self.carb_absorption_duration_minutes = carb_absorption_duration_minutes
@@ -308,10 +316,22 @@ class CustomPatientModel:
 
         # Stress decreases insulin sensitivity up to 70%
         stress_isf_multiplier = 1.0 - 0.7 * self.stress_intensity if self.is_stressed else 1.0
+        # Dawn resistance. This backend is stepped without a clock in some
+        # callers; with no time of day there is no dawn window to place, so
+        # the multiplier stays 1.0 rather than assuming a phase.
+        dawn_isf_multiplier = 1.0
+        if current_time is not None:
+            dawn_isf_multiplier = dawn_insulin_sensitivity_multiplier(
+                current_time,
+                peak_resistance_fraction=self.dawn_insulin_resistance_fraction,
+                start_hour=self.dawn_start_hour,
+                end_hour=self.dawn_end_hour,
+            )
         effective_isf = (
             self.insulin_sensitivity
             * self.molecular_affinity_scalar
             * stress_isf_multiplier
+            * dawn_isf_multiplier
         )
         insulin_effect = total_insulin_action * effective_isf
 

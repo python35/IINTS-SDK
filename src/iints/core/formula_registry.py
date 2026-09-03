@@ -7,7 +7,7 @@ from typing import Literal
 FormulaCategory = Literal["physiology", "sensor", "safety", "research_loss"]
 EvidenceClass = Literal["canonical", "adapted", "heuristic"]
 
-FORMULA_REGISTRY_VERSION = "iints-formula-registry-v5"
+FORMULA_REGISTRY_VERSION = "iints-formula-registry-v6"
 
 
 @dataclass(frozen=True)
@@ -336,7 +336,11 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "the rate; Hovorka converts it to glucose mass flow using V_G."
         ),
         state_variables=("time_of_day_min",),
-        parameters=("dawn_start_hour", "dawn_end_hour", "dawn_phenomenon_strength"),
+        parameters=(
+            "dawn_start_hour",
+            "dawn_end_hour",
+            "dawn_phenomenon_strength",
+        ),
         units="dawn_phenomenon_strength: mg/dL/hour; runtime rate: mg/dL/min",
         implementation_paths=(
             "src/iints/core/patient/physiology.py:dawn_glucose_rate_mgdl_min",
@@ -520,6 +524,59 @@ FORMULAS: tuple[FormulaSpec, ...] = (
             "https://doi.org/10.1073/pnas.95.1.294",
         ),
         validation_note="Models known CGM lag/noise qualitatively; seeded stochastic terms are reproducible when state is saved.",
+    ),
+    FormulaSpec(
+        formula_id="F16_CIRCADIAN_DAWN_INSULIN_RESISTANCE",
+        title="Phenomenological dawn insulin-resistance multiplier",
+        category="physiology",
+        canonical_expression=(
+            "w(t) as in F10; M_dawn(t) = 1 - f_dawn*w(t), with 0 <= f_dawn < 1 "
+            "so M_dawn stays strictly positive"
+        ),
+        latex_expression=(
+            r"\begin{aligned}"
+            r"M_{\mathrm{dawn}}(t)&=1-f_{\mathrm{dawn}}\,w(t),"
+            r"\quad 0\le f_{\mathrm{dawn}}<1"
+            r"\end{aligned}"
+        ),
+        solved_or_runtime_form=(
+            "Dimensionless multiplier evaluated per step and applied to the "
+            "existing insulin-sensitivity factors: p3 in the Bergman and "
+            "advanced backends, k_b1/k_b2/k_b3 (S_IT, S_ID, S_IE) in Hovorka, "
+            "and the effective ISF in the simplified backend. It shares the "
+            "window w(t) of F10, so both dawn components peak together."
+        ),
+        state_variables=("time_of_day_min",),
+        parameters=(
+            "dawn_start_hour",
+            "dawn_end_hour",
+            "dawn_insulin_resistance_fraction",
+        ),
+        units="dawn_insulin_resistance_fraction: dimensionless fraction in [0, 1)",
+        implementation_paths=(
+            "src/iints/core/patient/physiology.py:dawn_insulin_sensitivity_multiplier",
+            "src/iints/core/patient/models.py:update",
+            "src/iints/core/patient/bergman_model.py:_ode",
+            "src/iints/core/patient/hovorka_model.py:_ode",
+            "src/iints/core/patient/advanced_metabolic_model.py:_ode",
+        ),
+        literature_basis=(
+            "https://doi.org/10.1089/dia.2014.0192",
+            "https://doi.org/10.2337/db11-1478",
+        ),
+        validation_note=(
+            "The sources support a circadian fall in insulin sensitivity "
+            "toward the early morning, and the first was written as "
+            "physiological input for in silico artificial-pancreas work. The "
+            "raised-cosine shape and the peak fraction are an IINTS scenario "
+            "heuristic, not coefficients estimated from either study. This "
+            "term exists because F10 alone is dose-cancellable: a controller "
+            "can out-dose an additive inflow, but not a loss of sensitivity, "
+            "so an inflow-only dawn flatters an algorithm overnight. The "
+            "default is zero, which reproduces the pre-existing behaviour "
+            "exactly."
+        ),
+        evidence_class="heuristic",
     ),
 )
 
