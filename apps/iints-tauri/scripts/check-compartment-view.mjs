@@ -143,7 +143,16 @@ globalThis.window = {
   location: { href: "" },
 };
 globalThis.localStorage = window.localStorage;
-globalThis.navigator = { clipboard: { writeText: async () => {} }, userAgent: "node" };
+// Node 21+ ships its own read-only `navigator` global (an accessor with only
+// a getter, for Web-API compatibility), so a plain assignment throws
+// "Cannot set property navigator ... which has only a getter". Redefine the
+// property instead of assigning to it, so this stub works across Node
+// versions rather than only on whichever version this was last run on.
+Object.defineProperty(globalThis, "navigator", {
+  value: { clipboard: { writeText: async () => {} }, userAgent: "node" },
+  configurable: true,
+  writable: true,
+});
 globalThis.document = {
   getElementById: byId,
   createElement: (tag) => makeElement(tag),

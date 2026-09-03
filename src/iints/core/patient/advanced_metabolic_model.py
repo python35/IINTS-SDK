@@ -320,7 +320,14 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         u_insulin_mu_per_min: float,
         u_glucagon_pg_per_min: float,
         current_time: float,
+        record: Optional[Dict[str, float]] = None,
     ) -> np.ndarray:
+        # `record` matches the superclass signature (BergmanPatientModel._ode)
+        # so callers that pass it (e.g. flux_snapshot()) don't crash with a
+        # TypeError on this subclass. This 18-state model has no published
+        # compartment/flux schema of its own (unlike Bergman/Hovorka), so
+        # there is nothing to fill in yet -- `record` is accepted and left
+        # empty rather than silently dropped.
         # Unpack 18 states
         G, X, I, Q_sto1, Q_sto2, Q_gut, S1, S2, Y1, Y2, Gamma, x_gluc, HAAF, F, K, Beta, Q_fat, Q_prot = y
         p = self.params

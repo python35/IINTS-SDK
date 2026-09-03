@@ -22,6 +22,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+pytest.importorskip("torch", reason="export_arm_comparison.py loads checkpoints via _evidence_common, which needs torch")
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "research"))
