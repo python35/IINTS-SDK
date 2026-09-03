@@ -125,8 +125,8 @@ def test_missing_csv_raises(tmp_path):
 
 def test_plasma_glucose_is_empty_when_no_glucose_column_present(tmp_path):
     # A run whose CSV carries no recognizable glucose column (see
-    # GLUCOSE_COLUMNS) must degrade gracefully -- the 3D digital twin's hypo
-    # coloring has nothing to key off, not a crash.
+    # GLUCOSE_COLUMNS) must degrade gracefully -- the illustrated diagram's
+    # hypo coloring has nothing to key off, not a crash.
     header = ["time_minutes", "patient_state_A", "patient_state_B", "patient_flux_transfer"]
     lines = [",".join(header)]
     for index in range(5):

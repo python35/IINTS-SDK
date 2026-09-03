@@ -325,7 +325,7 @@
         <div id="compartment-viewer" hidden>
           <div class="chart-tab-bar" id="compartment-view-mode">
             <button class="chart-tab-btn is-active" data-compartment-mode="diagram" type="button">Diagram</button>
-            <button class="chart-tab-btn" data-compartment-mode="twin" type="button">3D Digital Twin</button>
+            <button class="chart-tab-btn" data-compartment-mode="twin" type="button">Illustrated view</button>
           </div>
           <div id="compartment-diagram-panel" data-compartment-panel="diagram">
             <div class="compartment-controls">
@@ -347,7 +347,7 @@
             </div>
           </div>
           <div id="digital-twin-viewer" data-compartment-panel="twin" hidden>
-            <p class="muted">3D view of the Hovorka compartment model. The liver node has no
+            <p class="muted">Illustrated view of the Hovorka compartment model. The liver shape has no
               stored contents of its own -- it visualizes the live endogenous glucose
               production flux, not a tracked compartment.</p>
             <div class="digital-twin-controls">
@@ -367,7 +367,37 @@
               </label>
             </div>
             <div class="digital-twin-canvas-wrap">
-              <canvas id="digital-twin-canvas" tabindex="0" aria-label="3D digital twin of the simulated patient"></canvas>
+              <svg id="digital-twin-illustration" viewBox="0 0 400 500" role="img"
+                   aria-label="Illustrated torso diagram of the simulated patient">
+                <path id="twin-torso" class="twin-torso" d="M 90,40
+                  C 60,45 50,70 55,110
+                  C 58,150 45,180 40,230
+                  C 35,280 45,330 60,380
+                  C 70,410 75,440 80,460
+                  L 320,460
+                  C 325,440 330,410 340,380
+                  C 355,330 365,280 360,230
+                  C 355,180 342,150 345,110
+                  C 350,70 340,45 310,40
+                  C 280,20 250,10 200,10
+                  C 150,10 120,20 90,40 Z" />
+                <path id="twin-organ-plasma" class="twin-organ" data-organ-id="plasma" tabindex="0" role="button"
+                      d="M 205,88 C 185,68 155,73 150,98 C 145,123 170,143 205,168
+                         C 240,143 265,123 260,98 C 255,73 225,68 205,88 Z" />
+                <path id="twin-organ-liver" class="twin-organ" data-organ-id="liver" tabindex="0" role="button"
+                      d="M 128,148 C 98,143 78,158 73,183 C 70,203 78,218 103,223
+                         C 138,230 183,223 203,208 C 213,198 208,178 188,163
+                         C 168,148 148,146 128,148 Z" />
+                <path id="twin-organ-gut" class="twin-organ" data-organ-id="gut" tabindex="0" role="button"
+                      d="M 195,262 C 175,257 160,272 160,292 C 160,317 180,332 205,334
+                         C 230,336 250,322 253,302 C 255,287 245,272 225,264
+                         C 215,260 205,260 195,262 Z" />
+                <circle id="twin-organ-subcutaneous" class="twin-organ" data-organ-id="subcutaneous" tabindex="0" role="button"
+                        cx="145" cy="358" r="22" />
+                <circle class="twin-organ-ring" cx="145" cy="358" r="30" fill="none" stroke-width="1.5" />
+                <rect id="twin-organ-periphery" class="twin-organ" data-organ-id="periphery" tabindex="0" role="button"
+                      x="275" y="368" width="55" height="75" rx="22" />
+              </svg>
               <div id="digital-twin-card" class="digital-twin-card" hidden></div>
             </div>
           </div>

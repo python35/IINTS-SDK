@@ -15,9 +15,3 @@ The preserved MIT notice for legacy IINTS-origin portions is included in:
 Research-use notice:
 This software is intended for academic and pre-clinical research purposes only.
 It is not a medical device and does not provide clinical dosing advice.
-
-Third-party code bundled with the Tauri desktop app:
-`apps/iints-tauri/frontend/vendor/three/three.module.js` is the unmodified
-three.js core ESM build (https://github.com/mrdoob/three.js), version pinned in
-`apps/iints-tauri/package.json`, distributed under the MIT License. See
-`apps/iints-tauri/frontend/vendor/three/VERSION.md` for provenance details.

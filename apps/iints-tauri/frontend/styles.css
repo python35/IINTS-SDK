@@ -1508,23 +1508,43 @@ textarea[aria-invalid="true"] {
   width: 100%;
 }
 
-#digital-twin-canvas {
+#digital-twin-illustration {
   width: 100%;
   height: clamp(340px, 48vw, 560px);
   display: block;
   background: #0f172a;
   border: 1px solid var(--line);
-  cursor: grab;
-  touch-action: none;
 }
 
-#digital-twin-canvas.is-dragging {
-  cursor: grabbing;
+.twin-torso {
+  fill: rgba(148, 178, 216, 0.1);
+  stroke: rgba(96, 165, 250, 0.6);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
 }
 
-/* The card overlays the dark canvas, so it deliberately breaks from the rest
-   of the app's white-surface panel look -- this is the one place in the app
-   that needs a translucent, blurred surface to stay legible over a 3D scene. */
+/* Fill/stroke color and opacity are set per frame in JS (renderDigitalTwinDiagram),
+   keyed to each organ's live normalized value -- these are just the shared
+   shape/interaction properties every organ needs regardless of state. */
+.twin-organ {
+  stroke-width: 2.5;
+  cursor: pointer;
+}
+
+.twin-organ:focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 2px;
+}
+
+.twin-organ-ring {
+  stroke: #8b5cf6;
+  opacity: 0.5;
+}
+
+/* The card overlays the dark illustration, so it deliberately breaks from the
+   rest of the app's white-surface panel look -- this is the one place in the
+   app that needs a translucent, blurred surface to stay legible over a dark
+   scene. */
 .digital-twin-card {
   position: absolute;
   top: 14px;
@@ -1557,27 +1577,6 @@ textarea[aria-invalid="true"] {
   color: #7dd3fc;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-/* Always-present click targets for flux streams (fluxes aren't raycast --
-   see digital-twin-scene.js). Positioned in JS via style.left/top, which is
-   why this isn't in the global animation-ban's path: it's a per-frame
-   position write, not a CSS transition. */
-.digital-twin-chip {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #e2e8f0;
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 10.5px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.digital-twin-chip:hover {
-  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .table-wrap {

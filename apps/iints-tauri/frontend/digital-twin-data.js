@@ -1,10 +1,11 @@
-// Pure data helpers for the 3D Virtual Patient Digital Twin viewer.
+// Pure data helpers for the illustrated torso diagram (main.js's
+// renderDigitalTwinDiagram), an alternative to the "Diagram" SVG compartment
+// view for the same compartmentTimeline data.
 //
-// Deliberately zero imports, no THREE, no DOM access: this file is safe to
-// import from a headless Node script (scripts/check-digital-twin.mjs) the
-// same way scripts/check-compartment-view.mjs already imports parts of
-// main.js in a stubbed DOM. digital-twin-scene.js (the WebGL half) imports
-// this module; this module never imports it back.
+// Deliberately zero imports, no DOM access: this file is safe to import from
+// a headless Node script (scripts/check-digital-twin.mjs), the same way
+// scripts/check-compartment-view.mjs already imports parts of main.js in a
+// stubbed DOM.
 //
 // House rule, same as the existing SVG compartment diagram
 // (main.js's renderCompartmentDiagram): nothing about the physiology is
@@ -17,66 +18,63 @@
 // second, model-aware layout is a later iteration, not this one.
 export const HYPO_THRESHOLD_MGDL = 70;
 
-// Per-organ 3D placement/color/role. This is the 3D analogue of main.js's
-// COMPARTMENT_SITE_ORDER/COMPARTMENT_SITE_LABELS -- a hardcoded, client-side
-// layout table, not something the backend describes. `kind` distinguishes
-// the four organs backed by a real ODE site ("compartment-group") from the
-// liver, which has no compartment of its own and is fed purely by the live
-// value of a boundary flux ("flux-proxy") -- see the plan's decision on how
-// to represent hepatic glucose production (EGP) without a liver state.
-// Positions sit just in front of the mannequin's own torso/limb surfaces
-// (see digital-twin-scene.js's BODY_PARTS) at each organ's real anatomical
-// location, rather than floating apart from the body -- gut and liver in the
-// abdomen, plasma central over the chest, the pump site on the abdomen, and
-// peripheral uptake at a limb. z stays positive (toward the default camera)
-// so a translucent organ never reads as fully swallowed by the body fill.
+// Per-organ shape/color/role in the illustration (index.html's
+// #digital-twin-illustration SVG). This is the illustrated analogue of
+// main.js's COMPARTMENT_SITE_ORDER/COMPARTMENT_SITE_LABELS -- a hardcoded,
+// client-side layout table, not something the backend describes. `kind`
+// distinguishes the four organs backed by a real ODE site
+// ("compartment-group") from the liver, which has no compartment of its own
+// and is fed purely by the live value of a boundary flux ("flux-proxy") --
+// see the plan's decision on how to represent hepatic glucose production
+// (EGP) without a liver state. `elementId` names the SVG shape this organ
+// drives; each one exists as a static path/circle/rect in index.html.
 export const ORGAN_LAYOUT = [
   {
     id: "gut",
     label: "Gut",
     kind: "compartment-group",
     site: "gut",
-    position: [0, 0.25, 0.4],
-    color: 0xff9f43, // orange
+    elementId: "twin-organ-gut",
+    color: "#ff9f43", // orange
   },
   {
     id: "subcutaneous",
     label: "Subcutaneous pump site",
     kind: "compartment-group",
     site: "subcutaneous",
-    position: [-0.4, -0.05, 0.42],
-    color: 0x8b5cf6, // purple/blue
+    elementId: "twin-organ-subcutaneous",
+    color: "#8b5cf6", // purple/blue
   },
   {
     id: "plasma",
     label: "Vascular / plasma",
     kind: "compartment-group",
     site: "plasma",
-    position: [0, 0.95, 0.35],
-    color: 0x38bdf8, // cyan
+    elementId: "twin-organ-plasma",
+    color: "#38bdf8", // cyan
   },
   {
     id: "periphery",
     label: "Peripheral muscle/fat",
     kind: "compartment-group",
     site: "periphery",
-    position: [0.32, -1.25, 0.3],
-    color: 0x22c55e, // green
+    elementId: "twin-organ-periphery",
+    color: "#22c55e", // green
   },
   {
     id: "liver",
     label: "Liver (EGP source)",
     kind: "flux-proxy",
     boundFluxKey: "endogenous_production",
-    position: [-0.35, 0.45, 0.35],
-    color: 0xef4444, // red
+    elementId: "twin-organ-liver",
+    color: "#ef4444", // red
   },
 ];
 
 // The fixed, alarm-state red for the vascular organ during hypoglycemia,
-// kept visually distinct from the liver's steady red (0xef4444 above) so the
+// kept visually distinct from the liver's steady red (#ef4444 above) so the
 // two don't read as the same signal when both are on screen at once.
-export const HYPO_VASCULAR_COLOR = 0xdc2626;
+export const HYPO_VASCULAR_COLOR = "#dc2626";
 
 /**
  * Min/max of a compartment's own series over the whole run, used to
@@ -102,7 +100,7 @@ export function compartmentRange(series) {
 
 /**
  * Normalize a value into [0, 1] against a compartment's own run range, for
- * driving a mesh's fill scale. Falls back to a fixed mid-level when the
+ * driving an organ's glow intensity. Falls back to a fixed mid-level when the
  * range is degenerate (constant series, or no data yet) rather than
  * dividing by zero.
  *
@@ -115,6 +113,23 @@ export function normalizeFillLevel(value, range) {
   const span = range.high - range.low;
   if (span <= 0) return 0.5;
   return Math.max(0, Math.min(1, (value - range.low) / span));
+}
+
+/**
+ * Average several compartments' independently-normalized fill levels into
+ * one representative level for an organ that groups more than one compartment
+ * (e.g. Hovorka's gut has D1 and D2). Each compartment is normalized against
+ * its own range first (via normalizeFillLevel) -- never pooled into one
+ * shared range, since the compartments can be different quantities entirely
+ * (Hovorka's plasma site groups a glucose mass and an insulin concentration).
+ *
+ * @param {number[]} levels - already-normalized [0, 1] levels
+ * @returns {number}
+ */
+export function averageFillLevel(levels) {
+  const finite = (levels || []).filter(Number.isFinite);
+  if (finite.length === 0) return 0.5;
+  return finite.reduce((sum, level) => sum + level, 0) / finite.length;
 }
 
 /**
@@ -156,51 +171,6 @@ export function interpolateSeries(times, values, minutes) {
 }
 
 /**
- * A flux's sign determines which way particles should travel: a negative
- * rate means the ODE term is running in reverse (e.g. Q2->Q1 dominating
- * over Q1->Q2), which the 2D diagram already handles by flipping the arrow
- * rather than clamping the value to zero (see main.js's renderCompartmentDiagram,
- * "A negative rate means the term runs the other way"). Same invariant here.
- *
- * @param {number} rate
- * @returns {1 | -1} +1 for the schema's declared source->target direction, -1 reversed
- */
-export function resolveFluxDirection(rate) {
-  return rate < 0 ? -1 : 1;
-}
-
-/**
- * Map a flux's instantaneous rate to particle stream density/speed, using
- * the exact same normalization the 2D SVG diagram uses for arrow
- * stroke-width (main.js's renderCompartmentDiagram: strength = |rate| / scale,
- * scale = max(|extreme_lo|, |extreme_hi|)) -- so the two views never disagree
- * about how "strong" a flux looks at a given moment.
- *
- * @param {number} rate - instantaneous flux value at the sampled/interpolated time
- * @param {[number, number]} extreme - [min, max] of this flux over the whole run
- * @param {{minCount?: number, maxCount?: number, minSpeed?: number, maxSpeed?: number}} [options]
- */
-export function computeParticleParams(rate, extreme, options = {}) {
-  const { minCount = 8, maxCount = 120, minSpeed = 0.15, maxSpeed = 1.0 } = options;
-  const [lo, hi] = Array.isArray(extreme) ? extreme : [0, 0];
-  const scale = Math.max(Math.abs(lo), Math.abs(hi));
-  // Exact parity with the 2D diagram's formula, unclamped: flux_extremes is
-  // computed over the whole run and interpolateSeries never produces a value
-  // outside the two samples it interpolates between, so `strength` exceeding
-  // 1 should not happen for real data. Clamp only where it actually matters
-  // -- turning strength into a visual count/speed -- so a fixture or a
-  // future edge case can't silently break the parity this is checked
-  // against in scripts/check-digital-twin.mjs.
-  const strength = scale > 0 && Number.isFinite(rate) ? Math.abs(rate) / scale : 0;
-  const clamped = Math.min(1, strength);
-  return {
-    strength,
-    count: Math.round(minCount + clamped * (maxCount - minCount)),
-    speed: minSpeed + clamped * (maxSpeed - minSpeed),
-  };
-}
-
-/**
  * @param {number} glucoseMgdl
  * @returns {boolean} true when the plasma glucose value is in the hypoglycemic range
  */
@@ -225,7 +195,7 @@ export function lookupEquation(schema, fluxKey) {
 
 /** Fixed caption for the liver's inspection card (user decision: UI-only
  * organ, not a storage compartment) -- kept as a named export, not inlined
- * in the scene module, so the headless check can assert its wording. */
+ * in main.js, so the headless check can assert its wording. */
 export const LIVER_CARD_CAPTION =
   "Endogenous glucose production is an external source flux in this model, " +
   "not a stored compartment -- this backend does not track hepatic glycogen mass.";

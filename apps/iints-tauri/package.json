@@ -1,6 +1,6 @@
 {
   "name": "iints-af-tauri-desktop",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "private": true,
   "description": "Native Rust/Tauri research workbench for the IINTS-AF Python SDK.",
   "type": "module",
@@ -9,12 +9,10 @@
     "dev": "tauri dev",
     "build": "tauri build --no-bundle",
     "bundle": "tauri build",
-    "check": "node --check ./frontend/main.js && node ./scripts/check-static.mjs && node ./scripts/check-compartment-view.mjs && node ./scripts/check-digital-twin.mjs",
-    "vendor-three": "node ./scripts/vendor-three.mjs"
+    "check": "node --check ./frontend/main.js && node ./scripts/check-static.mjs && node ./scripts/check-compartment-view.mjs && node ./scripts/check-digital-twin.mjs"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.0.0",
-    "three": "0.160.1"
+    "@tauri-apps/api": "^2.0.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0"

@@ -5,7 +5,16 @@ import {
   glycemicBands,
   seededRandom,
 } from "./science.js";
-import { LIVER_CARD_CAPTION, interpolateSeries, lookupEquation } from "./digital-twin-data.js";
+import {
+  HYPO_VASCULAR_COLOR,
+  LIVER_CARD_CAPTION,
+  ORGAN_LAYOUT,
+  averageFillLevel,
+  interpolateSeries,
+  lookupEquation,
+  normalizeFillLevel,
+  resolveHypoState,
+} from "./digital-twin-data.js";
 
 const tauriCore = window.__TAURI__?.core;
 const invoke = tauriCore?.invoke;
@@ -172,11 +181,11 @@ function setActiveView(view, focusHeading = true) {
   document.querySelectorAll("[data-view-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.viewPanel !== effectiveView;
   });
-  // The digital twin's render loop keeps running via requestAnimationFrame
-  // even while its panel is set `hidden` (not unmounted); stop it when the
-  // user navigates away, the same way closeMoleculeViewer() cancels its own
-  // animation frame rather than leaving it spinning in the background.
-  if (effectiveView !== "results") digitalTwin?.pause();
+  // The illustrated diagram's playback interval keeps running even while its
+  // panel is set `hidden` (not unmounted); stop it when the user navigates
+  // away, the same way closeMoleculeViewer() cancels its own animation frame
+  // rather than leaving it spinning in the background.
+  if (effectiveView !== "results") stopDigitalTwinPlayback();
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -3109,7 +3118,11 @@ async function loadCompartmentTimeline(csv) {
     );
     setText("compartment-summary", timeline.schema.model_label);
     renderCompartmentDiagram();
-    digitalTwin?.setTimeline(timeline);
+    stopDigitalTwinPlayback();
+    digitalTwinMinutes = 0;
+    $("digital-twin-time").value = "0";
+    setText("digital-twin-time-label", "0 min");
+    renderDigitalTwinDiagram();
   } catch (error) {
     compartmentTimeline = null;
     viewer.hidden = true;
@@ -3120,15 +3133,20 @@ async function loadCompartmentTimeline(csv) {
 $("compartment-time").addEventListener("input", renderCompartmentDiagram);
 $("compartment-show-signals").addEventListener("change", renderCompartmentDiagram);
 
-// --- 3D Digital Twin viewer ----------------------------------------------
-// Alternative, WebGL-based view of the same compartmentTimeline data the SVG
-// diagram above already draws -- no separate fetch, no re-implemented
+// --- Illustrated torso diagram --------------------------------------------
+// Alternative, illustrated view of the same compartmentTimeline data the SVG
+// "Diagram" tab above already draws -- no separate fetch, no re-implemented
 // physiology (see digital-twin-data.js's header comment for the same house
-// rule the SVG diagram follows). three.js is loaded lazily (dynamic import)
-// so opening the app and using only the 2D diagram never fetches or parses
-// the vendored ~1MB library.
-let digitalTwin = null;
-let digitalTwinLoading = null;
+// rule the SVG diagram follows). Organs are static shapes declared in
+// index.html (#digital-twin-illustration); this only ever changes their
+// color/opacity/glow and reads clicks, so there is no heavy library to lazy
+// load and no canvas render loop -- a plain interval drives playback.
+const DIGITAL_TWIN_BASE_MINUTES_PER_SECOND = 24; // full 1440-minute run in ~60s at 1x
+const DIGITAL_TWIN_TICK_MS = 100;
+let digitalTwinPlaying = false;
+let digitalTwinSpeed = 1;
+let digitalTwinMinutes = 0;
+let digitalTwinIntervalId = null;
 
 function currentDigitalTwinMinutes() {
   return Number($("digital-twin-time").value) || 0;
@@ -3140,15 +3158,21 @@ function showDigitalTwinCard(html) {
   card.hidden = false; // instant, per the app's global no-transition rule
 }
 
-function renderCompartmentCard(compartmentKey) {
-  const schemaEntry = (compartmentTimeline?.schema?.compartments || []).find((c) => c.key === compartmentKey);
-  const series = compartmentTimeline?.compartments?.[compartmentKey];
-  const value = interpolateSeries(compartmentTimeline?.times || [], series || [], currentDigitalTwinMinutes());
-  showDigitalTwinCard(`
-    <h4>${escapeHtml(schemaEntry?.label || compartmentKey)}</h4>
-    <div>${Number.isFinite(value) ? value.toFixed(2) : "--"} ${escapeHtml(schemaEntry?.unit || "")}</div>
-    ${schemaEntry?.description ? `<p>${escapeHtml(schemaEntry.description)}</p>` : ""}
-  `);
+function organCompartmentKeys(organConfig) {
+  return (compartmentTimeline?.schema?.compartments || [])
+    .filter((compartment) => compartment.site === organConfig.site && compartmentIsVisible(compartment, false))
+    .map((compartment) => compartment.key);
+}
+
+function renderCompartmentCard(organLabel, compartmentKeys) {
+  const minutes = currentDigitalTwinMinutes();
+  const rows = compartmentKeys.map((key) => {
+    const schemaEntry = (compartmentTimeline?.schema?.compartments || []).find((c) => c.key === key);
+    const series = compartmentTimeline?.compartments?.[key];
+    const value = interpolateSeries(compartmentTimeline?.times || [], series || [], minutes);
+    return `<div>${escapeHtml(schemaEntry?.label || key)}: <strong>${Number.isFinite(value) ? value.toFixed(2) : "--"}</strong> ${escapeHtml(schemaEntry?.unit || "")}</div>`;
+  });
+  showDigitalTwinCard(`<h4>${escapeHtml(organLabel)}</h4>${rows.join("") || "<div>No recorded contents.</div>"}`);
 }
 
 function renderFluxCard(fluxKey, { isLiver = false } = {}) {
@@ -3164,76 +3188,82 @@ function renderFluxCard(fluxKey, { isLiver = false } = {}) {
   `);
 }
 
-async function ensureDigitalTwin() {
-  if (digitalTwin) return digitalTwin;
-  if (!digitalTwinLoading) {
-    digitalTwinLoading = import("./digital-twin-scene.js").then(({ createDigitalTwinScene }) => {
-      digitalTwin = createDigitalTwinScene($("digital-twin-canvas"));
-      // Register every callback before the first setTimeline() call below:
-      // setTimeline() triggers an immediate render (buildOrgans() +
-      // requestRender()), and that first frame is the one that computes and
-      // reports flux-chip positions -- registering onFluxChipsUpdate after
-      // it would silently miss that frame and show no chips until the next
-      // interaction or play().
-      digitalTwin.onTimeUpdate((minutes) => {
-        const rounded = Math.round(minutes);
-        $("digital-twin-time").value = String(rounded);
-        setText("digital-twin-time-label", `${rounded} min`);
-      });
-      digitalTwin.onPlaybackEnded(() => {
-        const button = $("digital-twin-play-btn");
-        button.dataset.playing = "false";
-        button.textContent = "Play";
-      });
-      digitalTwin.onPick((userData) => {
-        if (userData.kind === "compartment") {
-          renderCompartmentCard(userData.compartmentKey);
-        } else if (userData.kind === "flux-proxy") {
-          renderFluxCard(userData.fluxKey, { isLiver: userData.organId === "liver" });
-        }
-      });
-      digitalTwin.onFluxChipsUpdate(updateFluxChips);
-      if (compartmentTimeline) digitalTwin.setTimeline(compartmentTimeline);
-      return digitalTwin;
-    });
+// Recomputed on every scrub/tick rather than cached: there are only 5 organs
+// and at most a couple of compartments each, so re-deriving each range here
+// costs nothing next to a 100ms playback tick.
+function organFillLevel(organConfig) {
+  if (organConfig.kind === "flux-proxy") {
+    const series = compartmentTimeline.fluxes[organConfig.boundFluxKey];
+    const range = compartmentRange((series || []).map((value) => Math.abs(value)));
+    const value = Math.abs(interpolateSeries(compartmentTimeline.times, series, currentDigitalTwinMinutes()));
+    return normalizeFillLevel(value, range);
   }
-  return digitalTwinLoading;
+  const levels = organCompartmentKeys(organConfig).map((key) => {
+    const series = compartmentTimeline.compartments[key];
+    const range = compartmentRange(series);
+    const value = interpolateSeries(compartmentTimeline.times, series, currentDigitalTwinMinutes());
+    return normalizeFillLevel(value, range);
+  });
+  return averageFillLevel(levels);
 }
 
-// Flux "chips" are small always-present buttons projected onto screen space
-// at each stream's curve midpoint (fluxes aren't raycast -- see
-// digital-twin-scene.js's pickOrganAt comment). Reused/repositioned every
-// frame rather than recreated, to avoid needless DOM churn during playback.
-const fluxChipElements = new Map();
-
-function updateFluxChips(chips) {
-  const container = $("digital-twin-canvas").parentElement;
-  const seen = new Set();
-  for (const chip of chips) {
-    seen.add(chip.fluxKey);
-    let el = fluxChipElements.get(chip.fluxKey);
-    if (!el) {
-      el = document.createElement("button");
-      el.type = "button";
-      el.className = "digital-twin-chip";
-      el.addEventListener("click", () => renderFluxCard(chip.fluxKey, { isLiver: chip.fluxKey === "endogenous_production" }));
-      container.appendChild(el);
-      fluxChipElements.set(chip.fluxKey, el);
-    }
-    el.hidden = !chip.visible;
-    el.textContent = chip.label;
-    el.style.left = `${chip.x}px`;
-    el.style.top = `${chip.y}px`;
-  }
-  for (const [fluxKey, el] of fluxChipElements) {
-    if (!seen.has(fluxKey)) {
-      el.remove();
-      fluxChipElements.delete(fluxKey);
-    }
+function renderDigitalTwinDiagram() {
+  if (!compartmentTimeline || !compartmentTimeline.available) return;
+  const glucose = interpolateSeries(compartmentTimeline.times, compartmentTimeline.plasma_glucose_mgdl, currentDigitalTwinMinutes());
+  const isHypo = resolveHypoState(glucose);
+  for (const organConfig of ORGAN_LAYOUT) {
+    const el = $(organConfig.elementId);
+    if (!el) continue;
+    const level = organFillLevel(organConfig);
+    const color = isHypo && organConfig.id === "plasma" ? HYPO_VASCULAR_COLOR : organConfig.color;
+    el.style.fill = color;
+    el.style.stroke = color;
+    el.style.fillOpacity = String(0.25 + level * 0.55);
+    el.style.opacity = String(0.55 + level * 0.45);
+    el.style.filter = `drop-shadow(0 0 ${6 + level * 10}px ${color})`;
   }
 }
 
-async function activateCompartmentMode(mode) {
+for (const organConfig of ORGAN_LAYOUT) {
+  const el = $(organConfig.elementId);
+  if (!el) continue;
+  const activate = () => {
+    if (!compartmentTimeline || !compartmentTimeline.available) return;
+    if (organConfig.kind === "flux-proxy") {
+      renderFluxCard(organConfig.boundFluxKey, { isLiver: organConfig.id === "liver" });
+    } else {
+      renderCompartmentCard(organConfig.label, organCompartmentKeys(organConfig));
+    }
+  };
+  el.addEventListener("click", activate);
+  el.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    activate();
+  });
+}
+
+function stopDigitalTwinPlayback() {
+  digitalTwinPlaying = false;
+  if (digitalTwinIntervalId !== null) {
+    clearInterval(digitalTwinIntervalId);
+    digitalTwinIntervalId = null;
+  }
+  const button = $("digital-twin-play-btn");
+  button.dataset.playing = "false";
+  button.textContent = "Play";
+}
+
+function tickDigitalTwinPlayback() {
+  const nextMinutes = digitalTwinMinutes + (DIGITAL_TWIN_TICK_MS / 1000) * DIGITAL_TWIN_BASE_MINUTES_PER_SECOND * digitalTwinSpeed;
+  digitalTwinMinutes = Math.min(1440, nextMinutes);
+  $("digital-twin-time").value = String(Math.round(digitalTwinMinutes));
+  setText("digital-twin-time-label", `${Math.round(digitalTwinMinutes)} min`);
+  renderDigitalTwinDiagram();
+  if (nextMinutes >= 1440) stopDigitalTwinPlayback(); // no auto-loop, per the plan
+}
+
+function activateCompartmentMode(mode) {
   document.querySelectorAll("[data-compartment-mode]").forEach((b) => {
     b.classList.toggle("is-active", b.dataset.compartmentMode === mode);
   });
@@ -3241,9 +3271,9 @@ async function activateCompartmentMode(mode) {
     panel.hidden = panel.dataset.compartmentPanel !== mode;
   });
   if (mode === "twin") {
-    await ensureDigitalTwin();
+    renderDigitalTwinDiagram();
   } else {
-    digitalTwin?.pause();
+    stopDigitalTwinPlayback();
   }
 }
 
@@ -3252,28 +3282,26 @@ document.querySelectorAll("[data-compartment-mode]").forEach((btn) => {
 });
 
 $("digital-twin-time").addEventListener("input", (event) => {
-  const minutes = Number(event.target.value) || 0;
-  setText("digital-twin-time-label", `${minutes} min`);
-  digitalTwin?.setSimMinutes(minutes);
+  digitalTwinMinutes = Number(event.target.value) || 0;
+  setText("digital-twin-time-label", `${Math.round(digitalTwinMinutes)} min`);
+  renderDigitalTwinDiagram();
 });
 
-$("digital-twin-play-btn").addEventListener("click", async () => {
-  const twin = await ensureDigitalTwin();
-  const button = $("digital-twin-play-btn");
-  const nowPlaying = button.dataset.playing === "true";
-  if (nowPlaying) {
-    twin.pause();
-    button.dataset.playing = "false";
-    button.textContent = "Play";
-  } else {
-    twin.play();
-    button.dataset.playing = "true";
-    button.textContent = "Pause";
+$("digital-twin-play-btn").addEventListener("click", () => {
+  if (digitalTwinPlaying) {
+    stopDigitalTwinPlayback();
+    return;
   }
+  if (digitalTwinMinutes >= 1440) digitalTwinMinutes = 0; // restart, not a Play no-op at the end
+  digitalTwinPlaying = true;
+  const button = $("digital-twin-play-btn");
+  button.dataset.playing = "true";
+  button.textContent = "Pause";
+  digitalTwinIntervalId = setInterval(tickDigitalTwinPlayback, DIGITAL_TWIN_TICK_MS);
 });
 
 $("digital-twin-speed").addEventListener("change", (event) => {
-  digitalTwin?.setSpeed(Number(event.target.value) || 1);
+  digitalTwinSpeed = Number(event.target.value) || 1;
 });
 
 $("run-btn").addEventListener("click", runSelectedWorkflow);

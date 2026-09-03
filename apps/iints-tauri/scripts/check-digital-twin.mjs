@@ -1,32 +1,27 @@
-// Headless check of the 3D Virtual Patient Digital Twin's pure data layer.
+// Headless check of the illustrated torso diagram in frontend/main.js.
 //
-// Only frontend/digital-twin-data.js is imported here -- never
-// digital-twin-scene.js or the vendored three.js file. That module needs a
-// real WebGL context (a `<canvas>.getContext("webgl2")`), which a stubbed
-// Node DOM (as check-compartment-view.mjs uses for main.js) cannot provide;
-// mesh rendering, glow/transparency, particle motion, raycast picking, and
-// camera feel are therefore explicitly NOT covered here and must be verified
-// manually via `npm run dev`, the same way the existing hand-rolled
-// "molecule viewer" canvas has no headless visual test either.
-//
-// What *is* checked here is exactly the part that can regress silently
-// without ever touching a GPU: interpolation math, the flux-direction and
-// particle-density formulas (which must stay in parity with the 2D SVG
-// diagram's own formulas in main.js, see the parity check below), the hypo
-// threshold, and the organ layout's shape.
+// Two layers, same split as check-compartment-view.mjs uses for the SVG
+// "Diagram" tab: pure data-layer tests against digital-twin-data.js
+// (interpolation, normalization, hypo threshold, organ layout shape), then a
+// DOM-driven integration check against the real main.js loaded in a stubbed
+// Node DOM -- there is no WebGL/canvas involved any more, so unlike the
+// three.js scene this replaced, the actual rendering logic is fully
+// headless-testable here, not just its pure math.
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
   HYPO_THRESHOLD_MGDL,
+  HYPO_VASCULAR_COLOR,
   LIVER_CARD_CAPTION,
   ORGAN_LAYOUT,
-  computeParticleParams,
+  averageFillLevel,
+  compartmentRange,
   interpolateSeries,
   lookupEquation,
-  resolveFluxDirection,
+  normalizeFillLevel,
   resolveHypoState,
 } from "../frontend/digital-twin-data.js";
 
@@ -59,44 +54,20 @@ check(
 );
 check(Number.isNaN(interpolateSeries([], [], 5)), "interpolateSeries should return NaN for an empty series rather than throw.");
 
-// --- resolveFluxDirection --------------------------------------------------
+// --- compartmentRange / normalizeFillLevel / averageFillLevel --------------
 
-check(resolveFluxDirection(1.5) === 1, "A positive flux should resolve to the schema's declared direction (+1).");
-check(resolveFluxDirection(0) === 1, "A zero flux should resolve to the declared direction, not reversed.");
-check(resolveFluxDirection(-0.01) === -1, "A negative flux should resolve to the reversed direction (-1), matching the 2D diagram's arrow-flip rule.");
-
-// --- computeParticleParams: parity with the 2D diagram's arrow-strength formula ---
-// main.js's renderCompartmentDiagram computes, per flux:
-//   scale = max(|extreme[0]|, |extreme[1]|); strength = scale > 0 ? |rate| / scale : 0
-// This is deliberately re-derived here (not imported from main.js, which is
-// not a module main.js's non-DOM parts can be cleanly imported from) and
-// checked for exact numeric parity, so the two views can never silently
-// disagree about how "strong" a flux looks at a given moment.
-function svgArrowStrength(rate, extreme) {
-  const scale = Math.max(Math.abs(extreme[0]), Math.abs(extreme[1]));
-  return scale > 0 ? Math.abs(rate) / scale : 0;
-}
-
-for (const [rate, extreme] of [
-  [1.2, [-0.3, 1.1]],
-  [-0.3, [-0.3, 1.1]],
-  [0, [-0.3, 1.1]],
-  [0.55, [0, 2.0]],
-  [3, [0, 0]], // degenerate: no recorded range yet
-]) {
-  const expected = svgArrowStrength(rate, extreme);
-  const { strength } = computeParticleParams(rate, extreme);
-  check(
-    Math.abs(strength - expected) < 1e-9,
-    `computeParticleParams(${rate}, [${extreme}]).strength should match the 2D diagram's formula (expected ${expected}, got ${strength}).`
-  );
-}
-
-const weak = computeParticleParams(0.1, [0, 1]);
-const strong = computeParticleParams(0.9, [0, 1]);
-check(strong.count > weak.count, "A stronger flux should produce a denser particle stream than a weaker one.");
-check(strong.speed > weak.speed, "A stronger flux should produce a faster particle stream than a weaker one.");
-check(weak.count >= 8 && strong.count <= 120, "Particle count should stay within the documented [minCount, maxCount] bounds.");
+check(
+  JSON.stringify(compartmentRange([3, 1, NaN, 5])) === JSON.stringify({ low: 1, high: 5 }),
+  "compartmentRange should ignore non-finite values and return the min/max of the rest."
+);
+check(compartmentRange([]) === null, "compartmentRange should return null for an empty series rather than throw.");
+check(normalizeFillLevel(5, { low: 0, high: 10 }) === 0.5, "normalizeFillLevel should map the midpoint of a range to 0.5.");
+check(normalizeFillLevel(-5, { low: 0, high: 10 }) === 0, "normalizeFillLevel should clamp below the range to 0.");
+check(normalizeFillLevel(15, { low: 0, high: 10 }) === 1, "normalizeFillLevel should clamp above the range to 1.");
+check(normalizeFillLevel(5, { low: 10, high: 10 }) === 0.5, "normalizeFillLevel should fall back to 0.5 for a degenerate (zero-span) range.");
+check(Math.abs(averageFillLevel([0.2, 0.4, 0.6]) - 0.4) < 1e-9, "averageFillLevel should average its inputs.");
+check(averageFillLevel([]) === 0.5, "averageFillLevel should fall back to 0.5 for an empty input.");
+check(averageFillLevel([NaN, 0.8]) === 0.8, "averageFillLevel should ignore non-finite inputs rather than propagate NaN.");
 
 // --- resolveHypoState -------------------------------------------------------
 
@@ -129,12 +100,10 @@ for (const organ of ORGAN_LAYOUT) {
 }
 
 for (const organ of ORGAN_LAYOUT) {
-  check(
-    Array.isArray(organ.position) && organ.position.length === 3 && organ.position.every(Number.isFinite),
-    `Organ "${organ.id}" must declare a finite 3D position.`
-  );
-  check(Number.isInteger(organ.color), `Organ "${organ.id}" must declare a numeric hex color.`);
+  check(typeof organ.elementId === "string" && organ.elementId.length > 0, `Organ "${organ.id}" must declare the SVG element id it drives.`);
+  check(/^#[0-9a-f]{6}$/i.test(organ.color), `Organ "${organ.id}" must declare a CSS hex color string, got ${organ.color}.`);
 }
+check(/^#[0-9a-f]{6}$/i.test(HYPO_VASCULAR_COLOR), "HYPO_VASCULAR_COLOR must be a CSS hex color string.");
 
 // --- lookupEquation + liver card copy ---------------------------------------
 
@@ -160,16 +129,199 @@ check(
   "The liver's inspection-card caption must explicitly state it is a source flux, not a storage compartment."
 );
 
-// --- three.js vendoring sanity (cheap, no WebGL needed) ---------------------
+// --- DOM integration: drive the real main.js against a fixture timeline ----
 
-const vendoredThree = readFileSync(join(appRoot, "frontend/vendor/three/three.module.js"), "utf8");
+const html = readFileSync(join(appRoot, "frontend/index.html"), "utf8");
+const declaredIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]));
+for (const organ of ORGAN_LAYOUT) {
+  check(declaredIds.has(organ.elementId), `index.html must declare an element with id="${organ.elementId}" for organ "${organ.id}".`);
+}
+
+// A payload shaped like the bridge output, with two sub-compartments at the
+// gut site (mirroring Hovorka's D1/D2) so averageFillLevel actually has more
+// than one input to average, and a hypoglycemic sample at t=10 so the plasma
+// organ's hypo-color path gets exercised.
+const timeline = {
+  available: true,
+  reason: "",
+  schema: {
+    model_key: "fixture",
+    model_label: "Fixture model",
+    compartments: [
+      { key: "D1", symbol: "D1", label: "Gut carbs 1", unit: "mg", site: "gut", kind: "pool" },
+      { key: "D2", symbol: "D2", label: "Gut carbs 2", unit: "mg", site: "gut", kind: "pool" },
+      { key: "S1", symbol: "S1", label: "SC insulin", unit: "mU", site: "subcutaneous", kind: "pool" },
+      { key: "Q1", symbol: "Q1", label: "Plasma glucose", unit: "mg", site: "plasma", kind: "pool" },
+      { key: "Q2", symbol: "Q2", label: "Peripheral glucose", unit: "mg", site: "periphery", kind: "pool" },
+    ],
+    fluxes: [
+      { key: "endogenous_production", source: null, target: "Q1", label: "EGP", unit: "mg/min", rate_expression: "EGP_0 * max(0, 1 - x3)" },
+    ],
+  },
+  times: [0, 5, 10],
+  compartments: {
+    D1: [1000, 600, 200],
+    D2: [500, 800, 950],
+    S1: [10, 8, 6],
+    Q1: [180, 150, 60],
+    Q2: [90, 95, 100],
+  },
+  fluxes: { endogenous_production: [0.1, 0.2, 0.3] },
+  flux_extremes: { endogenous_production: [0.1, 0.3] },
+  plasma_glucose_mgdl: [180, 150, 60],
+  stride: 1,
+  step_count: 3,
+};
+
+function makeElement(tag = "div", id = "") {
+  return {
+    tagName: tag,
+    id,
+    children: [],
+    attributes: {},
+    style: {},
+    dataset: {},
+    listeners: {},
+    value: "",
+    max: "",
+    min: "",
+    checked: false,
+    hidden: false,
+    textContent: "",
+    innerHTML: "",
+    className: "",
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    setAttribute(key, value) {
+      this.attributes[key] = String(value);
+    },
+    getAttribute(key) {
+      return this.attributes[key];
+    },
+    removeAttribute(key) {
+      delete this.attributes[key];
+    },
+    appendChild(child) {
+      this.children.push(child);
+      return child;
+    },
+    append(...kids) {
+      this.children.push(...kids);
+    },
+    replaceChildren(...kids) {
+      this.children = kids;
+    },
+    remove() {},
+    addEventListener(type, fn) {
+      (this.listeners[type] ||= []).push(fn);
+    },
+    removeEventListener() {},
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    closest: () => null,
+    focus() {},
+    click() {},
+    scrollIntoView() {},
+    getBoundingClientRect: () => ({ width: 760, height: 420, top: 0, left: 0 }),
+    insertAdjacentHTML() {},
+  };
+}
+
+const registry = new Map();
+function byId(id) {
+  if (!registry.has(id)) registry.set(id, makeElement("div", id));
+  return registry.get(id);
+}
+
+globalThis.window = {
+  __TAURI__: {
+    core: {
+      invoke: async (command) => {
+        if (command === "preview_results") {
+          return { csv_path: "/fixture/results.csv", row_count: 3, columns: ["time_minutes"], rows: [["0"]], metrics: {}, graph_path: null };
+        }
+        if (command === "compartment_timeline") return timeline;
+        return {};
+      },
+    },
+  },
+  addEventListener() {},
+  matchMedia: () => ({ matches: false, addEventListener() {} }),
+  localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+  location: { href: "" },
+};
+globalThis.localStorage = window.localStorage;
+Object.defineProperty(globalThis, "navigator", {
+  value: { clipboard: { writeText: async () => {} }, userAgent: "node" },
+  configurable: true,
+  writable: true,
+});
+globalThis.document = {
+  getElementById: byId,
+  createElement: (tag) => makeElement(tag),
+  createElementNS: (_ns, tag) => makeElement(tag),
+  createTextNode: (text) => ({ textContent: text }),
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  addEventListener() {},
+  body: makeElement("body"),
+  documentElement: makeElement("html"),
+};
+globalThis.requestAnimationFrame = (fn) => fn();
+globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => "" });
+
+await import(pathToFileURL(join(appRoot, "frontend/main.js")));
+
+byId("csv-path").value = "/fixture/results.csv";
+const previewClicks = registry.get("preview-btn")?.listeners.click || [];
+check(previewClicks.length > 0, "No click handler is bound to preview-btn.");
+await Promise.all(previewClicks.map((fn) => fn()));
+
+// renderDigitalTwinDiagram() doesn't gate on which compartment-view tab is
+// active, so driving the time input alone is enough to exercise it here --
+// same as scrubbing while the "Illustrated view" tab happens to be open.
+const timeInput = byId("digital-twin-time");
+check(!!(timeInput.listeners.input && timeInput.listeners.input.length), "No input handler is bound to digital-twin-time.");
+timeInput.value = "5";
+timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
+
+for (const organ of ORGAN_LAYOUT) {
+  const el = byId(organ.elementId);
+  check(typeof el.style.fill === "string" && el.style.fill.length > 0, `Organ "${organ.id}" should have its fill set after a render.`);
+  check(
+    Number(el.style.fillOpacity) >= 0.25 && Number(el.style.fillOpacity) <= 0.8,
+    `Organ "${organ.id}" fill-opacity should stay within the documented [0.25, 0.8] band, got ${el.style.fillOpacity}.`
+  );
+}
+
+const plasmaAtT5 = byId("twin-organ-plasma").style.fill;
+check(plasmaAtT5.toLowerCase() !== HYPO_VASCULAR_COLOR.toLowerCase(), "Plasma should not show the hypo color at t=5 (180 mg/dL, not hypoglycemic).");
+
+timeInput.value = "10";
+timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
+const plasmaAtT10 = byId("twin-organ-plasma").style.fill;
 check(
-  !/^\s*import\s+.*from\s+["'](?!\.)/m.test(vendoredThree),
-  "The vendored three.js build must not contain a bare-specifier import (this app's CSP has no import map)."
+  plasmaAtT10.toLowerCase() === HYPO_VASCULAR_COLOR.toLowerCase(),
+  `Plasma should switch to the hypo color at t=10 (60 mg/dL, hypoglycemic), got ${plasmaAtT10}.`
 );
+const liverAtT10 = byId("twin-organ-liver").style.fill;
+check(liverAtT10.toLowerCase() !== HYPO_VASCULAR_COLOR.toLowerCase(), "The liver's own steady red must stay visually distinct from the hypo-alarm color.");
+
+// Clicking an organ should populate the inspection card.
+const gutClicks = byId("twin-organ-gut").listeners.click || [];
+check(gutClicks.length > 0, "No click handler is bound to the gut organ shape.");
+gutClicks.forEach((fn) => fn());
+const card = byId("digital-twin-card");
+check(card.hidden === false, "Clicking an organ should reveal the inspection card.");
+check(/Gut carbs 1/.test(card.innerHTML) && /Gut carbs 2/.test(card.innerHTML), "Clicking the gut organ should list both of its sub-compartments in the card.");
+
+const liverClicks = byId("twin-organ-liver").listeners.click || [];
+liverClicks.forEach((fn) => fn());
+check(/EGP/.test(card.innerHTML), "Clicking the liver should show the endogenous_production flux's label.");
+check(/EGP_0/.test(card.innerHTML), "Clicking the liver should show the flux's literal rate_expression.");
+check(new RegExp(LIVER_CARD_CAPTION.slice(0, 30).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(card.innerHTML), "Clicking the liver should show its fixed caption.");
 
 if (failures.length) {
   for (const failure of failures) console.error(failure);
   process.exit(1);
 }
-console.log("IINTS digital twin data layer OK");
+console.log("IINTS illustrated digital twin OK");
