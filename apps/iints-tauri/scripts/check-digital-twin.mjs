@@ -156,6 +156,8 @@ const timeline = {
     ],
     fluxes: [
       { key: "endogenous_production", source: null, target: "Q1", label: "EGP", unit: "mg/min", rate_expression: "EGP_0 * max(0, 1 - x3)" },
+      { key: "glucose_appearance", source: "D2", target: "Q1", label: "Glucose appearance", unit: "mg/min", rate_expression: "D2 / tmax" },
+      { key: "glucose_to_periphery", source: "Q1", target: "Q2", label: "Peripheral uptake", unit: "mg/min", rate_expression: "x1 * Q1" },
     ],
   },
   times: [0, 5, 10],
@@ -166,8 +168,16 @@ const timeline = {
     Q1: [180, 150, 60],
     Q2: [90, 95, 100],
   },
-  fluxes: { endogenous_production: [0.1, 0.2, 0.3] },
-  flux_extremes: { endogenous_production: [0.1, 0.3] },
+  fluxes: {
+    endogenous_production: [0.1, 0.2, 0.3],
+    glucose_appearance: [2.0, 2.4, 2.8],
+    glucose_to_periphery: [0.5, 0.6, 0.7],
+  },
+  flux_extremes: {
+    endogenous_production: [0.1, 0.3],
+    glucose_appearance: [2.0, 2.8],
+    glucose_to_periphery: [0.5, 0.7],
+  },
   plasma_glucose_mgdl: [180, 150, 60],
   stride: 1,
   step_count: 3,
@@ -309,6 +319,42 @@ check(
 );
 const liverAtT10 = byId("twin-organ-liver").style.stroke;
 check(liverAtT10.toLowerCase() !== HYPO_VASCULAR_COLOR.toLowerCase(), "The liver's own steady red must stay visually distinct from the hypo-alarm color.");
+
+// --- HUD badges: real flux/compartment keys, schema-driven units ----------
+// t=10 uses glucose_appearance=2.8, glucose_to_periphery=0.7, endogenous_production=0.3,
+// S1=6 -- values chosen to be distinguishable from each other and from zero,
+// so a badge stuck on a stale/placeholder value would show up as a mismatch.
+check(byId("twin-val-liver").textContent === "0.30 mg/min", `Liver HUD badge should read the endogenous_production flux, got "${byId("twin-val-liver").textContent}".`);
+check(
+  byId("twin-val-gut").textContent === "2.80 mg/min",
+  `Gut HUD badge should read the glucose_appearance flux (not a nonexistent "appearance" key), got "${byId("twin-val-gut").textContent}".`
+);
+check(
+  byId("twin-val-periphery").textContent === "0.70 mg/min",
+  `Periphery HUD badge should read the glucose_to_periphery flux (not a nonexistent "uptake" key), got "${byId("twin-val-periphery").textContent}".`
+);
+check(
+  byId("twin-val-subcutaneous").textContent === "6.0 mU",
+  `Subcutaneous HUD badge should read S1 with its real schema unit (mU), got "${byId("twin-val-subcutaneous").textContent}".`
+);
+check(
+  byId("twin-val-plasma").textContent === "60.0 mg/dL",
+  `Plasma HUD badge should track the interpolated glucose value, got "${byId("twin-val-plasma").textContent}".`
+);
+
+// --- Status pill tracks the same hypo/hyper thresholds as the organ color -
+check(
+  byId("twin-status-text").textContent === "ALERT: HYPOGLYCEMIA (<70)",
+  `Status pill should read the hypoglycemia alert at 60 mg/dL, got "${byId("twin-status-text").textContent}".`
+);
+timeInput.value = "0"; // 180 mg/dL: above the 70-180 band's ceiling is not exercised by this fixture, but 180 itself is not > 180
+timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
+check(
+  byId("twin-status-text").textContent === "EUGLYCEMIA (STABLE)",
+  `Status pill should read stable at 180 mg/dL (not strictly above the high threshold), got "${byId("twin-status-text").textContent}".`
+);
+timeInput.value = "10";
+timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
 
 // Clicking an organ should populate the inspection card.
 const gutClicks = byId("twin-organ-gut").listeners.click || [];

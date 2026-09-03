@@ -1527,7 +1527,6 @@ textarea[aria-invalid="true"] {
 
 .twin-organ {
   cursor: pointer;
-  transition: transform 0.2s ease;
 }
 
 .twin-organ:hover {
@@ -1539,14 +1538,11 @@ textarea[aria-invalid="true"] {
   outline-offset: 2px;
 }
 
-@keyframes twinConduitFlow {
-  0% { stroke-dashoffset: 0; }
-  100% { stroke-dashoffset: -20; }
-}
-
-.twin-conduits path {
-  animation: twinConduitFlow 2s linear infinite;
-}
+/* Flux conduits flow via a JS-driven stroke-dashoffset loop
+   (startTwinConduitFlow in main.js), not a CSS animation -- this app
+   disables `animation`/`transition` globally with `!important` (see the
+   top of this file), which would otherwise silently no-op a @keyframes
+   rule here exactly as it did before this comment existed. */
 
 /* The card overlays the dark illustration, so it deliberately breaks from the
    rest of the app's white-surface panel look -- this is the one place in the

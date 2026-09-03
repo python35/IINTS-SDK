@@ -181,11 +181,15 @@ function setActiveView(view, focusHeading = true) {
   document.querySelectorAll("[data-view-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.viewPanel !== effectiveView;
   });
-  // The illustrated diagram's playback interval keeps running even while its
-  // panel is set `hidden` (not unmounted); stop it when the user navigates
-  // away, the same way closeMoleculeViewer() cancels its own animation frame
-  // rather than leaving it spinning in the background.
-  if (effectiveView !== "results") stopDigitalTwinPlayback();
+  // The illustrated diagram's playback interval and conduit-flow animation
+  // frame both keep running even while their panel is set `hidden` (not
+  // unmounted); stop them when the user navigates away, the same way
+  // closeMoleculeViewer() cancels its own animation frame rather than
+  // leaving it spinning in the background.
+  if (effectiveView !== "results") {
+    stopDigitalTwinPlayback();
+    stopTwinConduitFlow();
+  }
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
@@ -3226,36 +3230,42 @@ function renderDigitalTwinDiagram() {
     el.style.filter = `drop-shadow(0 0 ${8 + level * 12}px ${color})`;
   }
 
-  // Update In-SVG HUD Badges with Live Values
+  // Update In-SVG HUD Badges with Live Values. Units/labels always come from
+  // the run's own schema (never hardcoded) -- Hovorka's flux keys are
+  // glucose_appearance/glucose_to_periphery, not "appearance"/"uptake", and
+  // S1's unit is mU, not a made-up "U/hr"/"mg/U"; a model-specific guess here
+  // would also silently stop updating for any backend that doesn't share
+  // Hovorka's exact key names.
   const valPlasma = $("twin-val-plasma");
   if (valPlasma && Number.isFinite(glucose)) {
     valPlasma.textContent = `${glucose.toFixed(1)} mg/dL`;
     valPlasma.setAttribute("fill", isHypo ? "#f87171" : "#ffffff");
   }
 
-  const valLiver = $("twin-val-liver");
-  if (valLiver && compartmentTimeline.fluxes?.endogenous_production) {
-    const egp = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.endogenous_production, minutes);
-    if (Number.isFinite(egp)) valLiver.textContent = `${egp.toFixed(2)} mg/dL/min`;
+  function updateTwinFluxBadge(elementId, fluxKey) {
+    const el = $(elementId);
+    const schemaEntry = (compartmentTimeline.schema?.fluxes || []).find((f) => f.key === fluxKey);
+    const series = compartmentTimeline.fluxes?.[fluxKey];
+    if (!el || !schemaEntry || !series) return;
+    const value = interpolateSeries(compartmentTimeline.times, series, minutes);
+    if (Number.isFinite(value)) el.textContent = `${value.toFixed(2)} ${schemaEntry.unit || ""}`;
   }
-
-  const valGut = $("twin-val-gut");
-  if (valGut && compartmentTimeline.fluxes?.appearance) {
-    const ra = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.appearance, minutes);
-    if (Number.isFinite(ra)) valGut.textContent = `${ra.toFixed(2)} mg/dL/min`;
-  }
+  updateTwinFluxBadge("twin-val-liver", "endogenous_production");
+  updateTwinFluxBadge("twin-val-gut", "glucose_appearance");
+  updateTwinFluxBadge("twin-val-periphery", "glucose_to_periphery");
 
   const valSubq = $("twin-val-subcutaneous");
-  if (valSubq && (compartmentTimeline.compartments?.S1 || compartmentTimeline.compartments?.Q_gut)) {
-    const key = compartmentTimeline.compartments?.S1 ? "S1" : "Q_gut";
-    const val = interpolateSeries(compartmentTimeline.times, compartmentTimeline.compartments[key], minutes);
-    if (Number.isFinite(val)) valSubq.textContent = `${val.toFixed(1)} mg/U`;
-  }
-
-  const valPeriphery = $("twin-val-periphery");
-  if (valPeriphery && compartmentTimeline.fluxes?.uptake) {
-    const uptake = interpolateSeries(compartmentTimeline.times, compartmentTimeline.fluxes.uptake, minutes);
-    if (Number.isFinite(uptake)) valPeriphery.textContent = `${uptake.toFixed(2)} mg/dL/min`;
+  if (valSubq) {
+    // The depot furthest along absorption (closest to plasma) is the most
+    // representative single number for a multi-compartment site.
+    const subqKeys = organCompartmentKeys(ORGAN_LAYOUT.find((organ) => organ.id === "subcutaneous"));
+    const key = subqKeys[subqKeys.length - 1];
+    const schemaEntry = (compartmentTimeline.schema?.compartments || []).find((c) => c.key === key);
+    const series = key ? compartmentTimeline.compartments?.[key] : null;
+    if (schemaEntry && series) {
+      const value = interpolateSeries(compartmentTimeline.times, series, minutes);
+      if (Number.isFinite(value)) valSubq.textContent = `${value.toFixed(1)} ${schemaEntry.unit || ""}`;
+    }
   }
 
   // Update Status Pill
@@ -3301,6 +3311,34 @@ for (const organConfig of ORGAN_LAYOUT) {
   });
 }
 
+// Ambient flow along the flux conduits (index.html's .twin-conduits paths),
+// independent of simulation playback -- it runs whenever the illustrated
+// view is open, not just while scrubbing/playing. This app disables CSS
+// `animation`/`transition` globally with `!important`, so a @keyframes rule
+// here would silently no-op; a plain per-frame style write is not a CSS
+// animation and is unaffected by that rule.
+let twinConduitAnimationFrame = null;
+let twinConduitDashOffset = 0;
+
+function tickTwinConduitFlow() {
+  twinConduitDashOffset -= 0.4;
+  document.querySelectorAll(".twin-conduits path").forEach((path) => {
+    path.style.strokeDashoffset = String(twinConduitDashOffset);
+  });
+  twinConduitAnimationFrame = requestAnimationFrame(tickTwinConduitFlow);
+}
+
+function startTwinConduitFlow() {
+  if (twinConduitAnimationFrame === null) twinConduitAnimationFrame = requestAnimationFrame(tickTwinConduitFlow);
+}
+
+function stopTwinConduitFlow() {
+  if (twinConduitAnimationFrame !== null) {
+    cancelAnimationFrame(twinConduitAnimationFrame);
+    twinConduitAnimationFrame = null;
+  }
+}
+
 function stopDigitalTwinPlayback() {
   digitalTwinPlaying = false;
   if (digitalTwinIntervalId !== null) {
@@ -3330,8 +3368,10 @@ function activateCompartmentMode(mode) {
   });
   if (mode === "twin") {
     renderDigitalTwinDiagram();
+    startTwinConduitFlow();
   } else {
     stopDigitalTwinPlayback();
+    stopTwinConduitFlow();
   }
 }
 
