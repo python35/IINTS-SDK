@@ -17,7 +17,7 @@
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(join(appRoot, "frontend/index.html"), "utf8");
@@ -170,7 +170,13 @@ globalThis.requestAnimationFrame = (fn) => fn();
 // letting an unresolvable URL print a stack trace over the check output.
 globalThis.fetch = async () => ({ ok: false, status: 404, json: async () => ({}), text: async () => "" });
 
-await import(`${join(appRoot, "frontend/main.js")}`);
+// A raw filesystem path is not a valid ESM specifier on Windows: an absolute
+// path there starts with a drive letter (e.g. "D:\\..."), and the ESM loader
+// reads that "D:" as an unrecognized URL scheme rather than a drive. POSIX
+// absolute paths happen to work as specifiers by accident (they start with
+// "/"), which is why this only ever surfaced on the Windows CI runner.
+// pathToFileURL() converts either platform's path correctly.
+await import(pathToFileURL(join(appRoot, "frontend/main.js")));
 
 byId("csv-path").value = "/fixture/results.csv";
 const previewClicks = registry.get("preview-btn")?.listeners.click || [];
