@@ -3222,24 +3222,16 @@ function renderDigitalTwinDiagram() {
     if (!el) continue;
     const level = organFillLevel(organConfig);
     const color = isHypo && organConfig.id === "plasma" ? HYPO_VASCULAR_COLOR : organConfig.color;
-    // Line icons stay unfilled (see .twin-organ); the live value shows as
-    // stroke thickness, overall opacity, and glow instead of a fill level.
     el.style.stroke = color;
-    el.style.strokeWidth = String(1.4 + level * 1.2);
-    el.style.opacity = String(0.65 + level * 0.35);
-    el.style.filter = `drop-shadow(0 0 ${8 + level * 12}px ${color})`;
+    el.style.strokeWidth = String(1.6 + level * 1.2);
+    el.style.opacity = String(0.75 + level * 0.25);
   }
 
-  // Update In-SVG HUD Badges with Live Values. Units/labels always come from
-  // the run's own schema (never hardcoded) -- Hovorka's flux keys are
-  // glucose_appearance/glucose_to_periphery, not "appearance"/"uptake", and
-  // S1's unit is mU, not a made-up "U/hr"/"mg/U"; a model-specific guess here
-  // would also silently stop updating for any backend that doesn't share
-  // Hovorka's exact key names.
+  // Update In-SVG HUD Badges with Live Values.
   const valPlasma = $("twin-val-plasma");
   if (valPlasma && Number.isFinite(glucose)) {
     valPlasma.textContent = `${glucose.toFixed(1)} mg/dL`;
-    valPlasma.setAttribute("fill", isHypo ? "#f87171" : "#ffffff");
+    valPlasma.setAttribute("fill", isHypo ? "#C53030" : "#2B6CB0");
   }
 
   function updateTwinFluxBadge(elementId, fluxKey) {
@@ -3256,8 +3248,6 @@ function renderDigitalTwinDiagram() {
 
   const valSubq = $("twin-val-subcutaneous");
   if (valSubq) {
-    // The depot furthest along absorption (closest to plasma) is the most
-    // representative single number for a multi-compartment site.
     const subqKeys = organCompartmentKeys(ORGAN_LAYOUT.find((organ) => organ.id === "subcutaneous"));
     const key = subqKeys[subqKeys.length - 1];
     const schemaEntry = (compartmentTimeline.schema?.compartments || []).find((c) => c.key === key);
@@ -3268,25 +3258,28 @@ function renderDigitalTwinDiagram() {
     }
   }
 
-  // Update Status Pill
+  // Update Clinical Status Pill
   const statusBg = $("twin-status-bg");
   const statusDot = $("twin-status-dot");
   const statusText = $("twin-status-text");
   if (statusBg && statusDot && statusText) {
     if (isHypo) {
-      statusBg.setAttribute("fill", "rgba(220,38,38,0.25)");
-      statusBg.setAttribute("stroke", "#dc2626");
-      statusDot.setAttribute("fill", "#ef4444");
+      statusBg.setAttribute("fill", "#FFF5F5");
+      statusBg.setAttribute("stroke", "#E53E3E");
+      statusDot.setAttribute("fill", "#E53E3E");
+      statusText.setAttribute("fill", "#9B2C2C");
       statusText.textContent = "ALERT: HYPOGLYCEMIA (<70)";
     } else if (glucose > 180) {
-      statusBg.setAttribute("fill", "rgba(245,158,11,0.25)");
-      statusBg.setAttribute("stroke", "#f59e0b");
-      statusDot.setAttribute("fill", "#f59e0b");
+      statusBg.setAttribute("fill", "#FFFAF0");
+      statusBg.setAttribute("stroke", "#DD6B20");
+      statusDot.setAttribute("fill", "#DD6B20");
+      statusText.setAttribute("fill", "#7B341E");
       statusText.textContent = "HIGH GLUCOSE (>180)";
     } else {
-      statusBg.setAttribute("fill", "rgba(16,185,129,0.15)");
-      statusBg.setAttribute("stroke", "#10b981");
-      statusDot.setAttribute("fill", "#10b981");
+      statusBg.setAttribute("fill", "#F0FFF4");
+      statusBg.setAttribute("stroke", "#38A169");
+      statusDot.setAttribute("fill", "#38A169");
+      statusText.setAttribute("fill", "#22543D");
       statusText.textContent = "EUGLYCEMIA (STABLE)";
     }
   }

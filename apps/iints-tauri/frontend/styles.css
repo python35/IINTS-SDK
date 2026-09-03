@@ -1510,19 +1510,18 @@ textarea[aria-invalid="true"] {
 
 #digital-twin-illustration {
   width: 100%;
-  height: clamp(380px, 52vw, 580px);
+  height: clamp(400px, 55vw, 620px);
   display: block;
-  background: #0b132b;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   overflow: hidden;
 }
 
 .twin-torso {
-  fill: rgba(15, 23, 42, 0.4);
-  stroke: rgba(56, 189, 248, 0.45);
+  fill: #ffffff;
+  stroke: #4a5568;
   stroke-width: 2;
-  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.25));
 }
 
 .twin-organ {
@@ -1530,34 +1529,23 @@ textarea[aria-invalid="true"] {
 }
 
 .twin-organ:hover {
-  filter: drop-shadow(0 0 14px #38bdf8) !important;
+  opacity: 0.95 !important;
 }
 
 .twin-organ:focus-visible {
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid #3182ce;
   outline-offset: 2px;
 }
 
-/* Flux conduits flow via a JS-driven stroke-dashoffset loop
-   (startTwinConduitFlow in main.js), not a CSS animation -- this app
-   disables `animation`/`transition` globally with `!important` (see the
-   top of this file), which would otherwise silently no-op a @keyframes
-   rule here exactly as it did before this comment existed. */
-
-/* The card overlays the dark illustration, so it deliberately breaks from the
-   rest of the app's white-surface panel look -- this is the one place in the
-   app that needs a translucent, blurred surface to stay legible over a dark
-   scene. */
 .digital-twin-card {
   position: absolute;
   top: 14px;
   right: 14px;
-  max-width: min(300px, 80%);
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e2e8f0;
+  max-width: min(320px, 85%);
+  background: #ffffff;
+  border: 1px solid #cbd5e0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12);
+  color: #2d3748;
   border-radius: 10px;
   padding: 14px 16px;
   font-size: 12.5px;
@@ -1566,8 +1554,9 @@ textarea[aria-invalid="true"] {
 
 .digital-twin-card h4 {
   margin: 0 0 6px 0;
-  font-size: 13px;
-  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1a202c;
 }
 
 .digital-twin-card code {
