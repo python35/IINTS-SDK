@@ -93,37 +93,77 @@ function createOrganGeometry(organId) {
   }
 }
 
-// A faint, procedural humanoid proxy the organs sit inside -- there is no 3D
-// asset pipeline or licensed body mesh in this repo (see the plan's judgment
-// call), so this is deliberately abstract rather than anatomically precise.
+// A procedural humanoid proxy the organs sit inside -- there is no 3D asset
+// pipeline or licensed body mesh in this repo (see the plan's judgment
+// call), so this is built from primitives rather than an anatomical mesh.
+// Head/neck/chest/abdomen/pelvis/limbs/hands/feet, each given roughly
+// human-like proportions and tapers, so the whole reads as a standing figure
+// rather than the single straight capsule-plus-cylinders proxy this replaced
+// (which put organs outside the body's own silhouette entirely, and was
+// nearly invisible at 0.06 opacity). Every part is drawn twice: a matte
+// front-facing fill, plus a slightly larger back-facing rim copy in an
+// additive accent color, so the outline reads clearly from any orbit angle
+// -- the same cheap "holographic scan" trick used for the organ glows below,
+// applied to the body itself.
+const BODY_PARTS = [
+  { geometry: () => new THREE.SphereGeometry(0.32, 20, 16), position: [0, 2.15, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.14, 0.17, 0.22, 12), position: [0, 1.78, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.6, 0.46, 0.85, 16), position: [0, 1.15, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.46, 0.5, 0.65, 16), position: [0, 0.35, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.5, 0.42, 0.55, 16), position: [0, -0.35, 0] },
+  { geometry: () => new THREE.CapsuleGeometry(0.15, 0.62, 6, 12), position: [-0.78, 0.95, 0], rotation: [0, 0, 0.12] },
+  { geometry: () => new THREE.CapsuleGeometry(0.15, 0.62, 6, 12), position: [0.78, 0.95, 0], rotation: [0, 0, -0.12] },
+  { geometry: () => new THREE.CapsuleGeometry(0.13, 0.58, 6, 12), position: [-0.92, 0.15, 0.05], rotation: [0, 0, 0.05] },
+  { geometry: () => new THREE.CapsuleGeometry(0.13, 0.58, 6, 12), position: [0.92, 0.15, 0.05], rotation: [0, 0, -0.05] },
+  { geometry: () => new THREE.SphereGeometry(0.13, 12, 10), position: [-0.98, -0.35, 0.08] },
+  { geometry: () => new THREE.SphereGeometry(0.13, 12, 10), position: [0.98, -0.35, 0.08] },
+  { geometry: () => new THREE.CylinderGeometry(0.24, 0.18, 1.15, 14), position: [-0.28, -1.25, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.24, 0.18, 1.15, 14), position: [0.28, -1.25, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.16, 0.12, 1.05, 12), position: [-0.28, -2.35, 0] },
+  { geometry: () => new THREE.CylinderGeometry(0.16, 0.12, 1.05, 12), position: [0.28, -2.35, 0] },
+  { geometry: () => new THREE.BoxGeometry(0.22, 0.12, 0.42), position: [-0.28, -2.95, 0.12] },
+  { geometry: () => new THREE.BoxGeometry(0.22, 0.12, 0.42), position: [0.28, -2.95, 0.12] },
+];
+
 function createSilhouette() {
   const group = new THREE.Group();
-  const material = new THREE.MeshPhysicalMaterial({
-    color: 0x94a3b8,
+  const fillMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x9fb4d1,
     transparent: true,
-    opacity: 0.06,
-    side: THREE.BackSide,
-    roughness: 1,
+    opacity: 0.18,
+    side: THREE.FrontSide,
+    roughness: 0.9,
     metalness: 0,
   });
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(1.1, 2.4, 8, 16), material);
-  torso.position.set(0, 0, 0);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), material);
-  head.position.set(0, 2.1, 0);
-  group.add(torso, head);
-  const limbGeometry = new THREE.CylinderGeometry(0.22, 0.28, 2.2, 10);
-  const limbOffsets = [
-    [-1.3, 0.6, 0, 0.35],
-    [1.3, 0.6, 0, -0.35],
-    [-0.55, -2.1, 0, 0],
-    [0.55, -2.1, 0, 0],
-  ];
-  for (const [x, y, z, tilt] of limbOffsets) {
-    const limb = new THREE.Mesh(limbGeometry, material);
-    limb.position.set(x, y, z);
-    limb.rotation.z = tilt;
-    group.add(limb);
+  const rimMaterial = new THREE.MeshBasicMaterial({
+    color: 0x38bdf8,
+    transparent: true,
+    opacity: 0.35,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const geometries = [];
+  for (const part of BODY_PARTS) {
+    const geometry = part.geometry();
+    geometries.push(geometry);
+
+    const fill = new THREE.Mesh(geometry, fillMaterial);
+    fill.position.set(...part.position);
+    if (part.rotation) fill.rotation.set(...part.rotation);
+    group.add(fill);
+
+    const rim = new THREE.Mesh(geometry, rimMaterial);
+    rim.position.copy(fill.position);
+    rim.rotation.copy(fill.rotation);
+    rim.scale.setScalar(1.06);
+    group.add(rim);
   }
+  group.userData.dispose = () => {
+    for (const geometry of geometries) geometry.dispose();
+    fillMaterial.dispose();
+    rimMaterial.dispose();
+  };
   return group;
 }
 
@@ -135,14 +175,19 @@ export function createDigitalTwinScene(canvas) {
   scene.background = new THREE.Color(BACKGROUND_COLOR);
 
   const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  const cameraTarget = new THREE.Vector3(0, 0, 0);
+  // The mannequin's legs pull its visual center of mass well below the
+  // scene origin, so the orbit target sits at the torso instead of (0,0,0).
+  const cameraTarget = new THREE.Vector3(0, 0.2, 0);
 
   // Orbit state in spherical coordinates around cameraTarget, driven by
   // pointer-drag and wheel, following the same interaction feel as the
   // existing hand-rolled "molecule viewer" (main.js's moleculeViewer state
   // machine) -- drag to rotate, wheel to zoom, no external controls library.
   const orbit = {
-    theta: Math.PI / 4, // azimuth
+    // Close to straight-on (a slight angle, not a flat 0, so the scene still
+    // reads as 3D) -- the body is only recognizable as anatomy from close to
+    // the classic anterior-view angle a medical chart uses.
+    theta: Math.PI / 10, // azimuth
     phi: Math.PI / 2.6, // polar, clamped away from the poles below
     radius: DEFAULT_RADIUS,
     dragging: false,
@@ -165,7 +210,8 @@ export function createDigitalTwinScene(canvas) {
 
   const organRoot = new THREE.Group();
   scene.add(organRoot);
-  scene.add(createSilhouette());
+  const silhouette = createSilhouette();
+  scene.add(silhouette);
   const streamRoot = new THREE.Group();
   scene.add(streamRoot);
 
@@ -270,7 +316,10 @@ export function createDigitalTwinScene(canvas) {
       const from = forward ? stream.sourceGroup.position : stream.targetGroup.position;
       const to = forward ? stream.targetGroup.position : stream.sourceGroup.position;
       const control = from.clone().add(to).multiplyScalar(0.5);
-      control.y += 0.7;
+      // Organs now sit close together within the body rather than spread
+      // far apart in open space, so the arc only needs a modest bulge to
+      // read as a curve rather than a straight line between them.
+      control.y += 0.3;
       const curve = new THREE.QuadraticBezierCurve3(from, control, to);
 
       const positionAttr = stream.points.geometry.attributes.position;
@@ -607,6 +656,7 @@ export function createDigitalTwinScene(canvas) {
       this.pause();
       disposeOrgans();
       disposeFluxStreams();
+      silhouette.userData.dispose();
       canvas.removeEventListener("pointerdown", onPointerDown);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerup", stopDragging);

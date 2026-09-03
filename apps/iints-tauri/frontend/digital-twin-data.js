@@ -24,13 +24,19 @@ export const HYPO_THRESHOLD_MGDL = 70;
 // liver, which has no compartment of its own and is fed purely by the live
 // value of a boundary flux ("flux-proxy") -- see the plan's decision on how
 // to represent hepatic glucose production (EGP) without a liver state.
+// Positions sit just in front of the mannequin's own torso/limb surfaces
+// (see digital-twin-scene.js's BODY_PARTS) at each organ's real anatomical
+// location, rather than floating apart from the body -- gut and liver in the
+// abdomen, plasma central over the chest, the pump site on the abdomen, and
+// peripheral uptake at a limb. z stays positive (toward the default camera)
+// so a translucent organ never reads as fully swallowed by the body fill.
 export const ORGAN_LAYOUT = [
   {
     id: "gut",
     label: "Gut",
     kind: "compartment-group",
     site: "gut",
-    position: [-3, 0.5, 0],
+    position: [0, 0.25, 0.4],
     color: 0xff9f43, // orange
   },
   {
@@ -38,7 +44,7 @@ export const ORGAN_LAYOUT = [
     label: "Subcutaneous pump site",
     kind: "compartment-group",
     site: "subcutaneous",
-    position: [-1.4, 1.6, 0.5],
+    position: [-0.4, -0.05, 0.42],
     color: 0x8b5cf6, // purple/blue
   },
   {
@@ -46,7 +52,7 @@ export const ORGAN_LAYOUT = [
     label: "Vascular / plasma",
     kind: "compartment-group",
     site: "plasma",
-    position: [0, 0.4, 0],
+    position: [0, 0.95, 0.35],
     color: 0x38bdf8, // cyan
   },
   {
@@ -54,7 +60,7 @@ export const ORGAN_LAYOUT = [
     label: "Peripheral muscle/fat",
     kind: "compartment-group",
     site: "periphery",
-    position: [1.4, -1.2, 0.3],
+    position: [0.32, -1.25, 0.3],
     color: 0x22c55e, // green
   },
   {
@@ -62,7 +68,7 @@ export const ORGAN_LAYOUT = [
     label: "Liver (EGP source)",
     kind: "flux-proxy",
     boundFluxKey: "endogenous_production",
-    position: [0.6, 0.9, -0.4],
+    position: [-0.35, 0.45, 0.35],
     color: 0xef4444, // red
   },
 ];
