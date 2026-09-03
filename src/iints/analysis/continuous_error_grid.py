@@ -57,7 +57,7 @@ from dataclasses import dataclass
 from typing import Dict, Mapping, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 from .error_grid import clarke_zones
 
@@ -455,9 +455,13 @@ def cgega(reference: ArrayLike,
     NotImplementedError
         If ``r_zones`` is omitted.
     """
-    ref = np.asarray(reference, dtype=float).ravel()
-    pred = np.asarray(predicted, dtype=float).ravel()
-    mins = np.asarray(minutes, dtype=float).ravel()
+    # Annotated as the shape-erased NDArray, not whatever precise shape mypy
+    # would infer from .ravel() alone: the reassignments below (boolean-mask
+    # and slice indexing) return that same broader type, and mypy otherwise
+    # flags them as incompatible with a narrower inferred type.
+    ref: NDArray[np.float64] = np.asarray(reference, dtype=float).ravel()
+    pred: NDArray[np.float64] = np.asarray(predicted, dtype=float).ravel()
+    mins: NDArray[np.float64] = np.asarray(minutes, dtype=float).ravel()
     if not (ref.shape == pred.shape == mins.shape):
         raise ValueError(
             f"shape mismatch: reference {ref.shape}, predicted "
@@ -468,7 +472,7 @@ def cgega(reference: ArrayLike,
 
     if r_zones is None:
         rega_zones(rate, rate)  # raises with the explanation
-    r = np.asarray(r_zones, dtype=str).ravel()
+    r: NDArray[np.str_] = np.asarray(r_zones, dtype=str).ravel()
     if r.size == ref.size:
         r = r[1:]
     elif r.size != ref.size - 1:
