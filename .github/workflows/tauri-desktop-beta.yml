@@ -45,7 +45,11 @@ jobs:
             bundle_target: nsis
           - runner: macos-latest
             platform_label: macos
-            bundle_target: dmg
+            # "dmg" alone builds the manual-download installer but silently
+            # skips the updater artifact -- createUpdaterArtifacts only
+            # triggers for the app/appimage/msi/nsis targets, not dmg. "app"
+            # produces the signed .app.tar.gz + .sig alongside it.
+            bundle_target: dmg,app
           - runner: ubuntu-22.04
             platform_label: linux-x64
             bundle_target: appimage
