@@ -1,6 +1,6 @@
 [package]
 name = "iints-af-tauri"
-version = "0.2.12"
+version = "0.2.13"
 description = "Secure Tauri shell for the IINTS-AF Python SDK"
 authors = ["Rune Bobbaers"]
 license = "Apache-2.0"

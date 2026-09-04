@@ -449,7 +449,11 @@
                 <!-- 1. Vascular System & Heart (Central Thorax) -->
                 <g id="twin-organ-plasma" class="twin-organ" data-organ-id="plasma" tabindex="0" role="button"
                    transform="translate(430, 140)">
-                  <circle r="34" fill="#FFF5F5" stroke="#C53030" stroke-width="2" />
+                  <!-- Outer badge ring: no fixed stroke -- it inherits stroke/stroke-width
+                       from the parent <g>, which renderDigitalTwinDiagram() (main.js) sets
+                       per frame from the live value/hypo state. The icon below keeps its
+                       own fixed anatomical colors; only this ring responds to data. -->
+                  <circle r="34" fill="#FFF5F5" />
                   <!-- Anatomical Heart & Aorta Vector -->
                   <path d="M -2,-18 C -14,-14 -18,2 -10,14 C -4,22 0,26 4,26 C 14,26 18,12 14,-2 C 10,-14 4,-20 -2,-18 Z"
                         fill="#FEB2B2" stroke="#9B2C2C" stroke-width="1.8" />
@@ -459,7 +463,7 @@
                 <!-- 2. Liver (Upper Right Abdomen - Viewer Left) -->
                 <g id="twin-organ-liver" class="twin-organ" data-organ-id="liver" tabindex="0" role="button"
                    transform="translate(340, 240)">
-                  <circle r="32" fill="#FFF5F5" stroke="#9B2C2C" stroke-width="2" />
+                  <circle r="32" fill="#FFF5F5" />
                   <!-- Anatomical Liver Lobe Vector -->
                   <path d="M -18,-12 C -6,-22 14,-18 20,-6 C 24,6 16,18 4,20 C -8,22 -20,14 -22,2 C -24,-6 -22,-10 -18,-12 Z"
                         fill="#FEB2B2" stroke="#742A2A" stroke-width="1.8" />
@@ -469,7 +473,7 @@
                 <!-- 3. Gut / Stomach & Intestines (Central & Lower Abdomen) -->
                 <g id="twin-organ-gut" class="twin-organ" data-organ-id="gut" tabindex="0" role="button"
                    transform="translate(430, 340)">
-                  <circle r="36" fill="#FFFAF0" stroke="#DD6B20" stroke-width="2" />
+                  <circle r="36" fill="#FFFAF0" />
                   <!-- Anatomical Stomach & Intestine Loop Vector -->
                   <path d="M -16,-14 C -6,-20 12,-20 16,-10 C 20,-2 10,6 2,8 C -6,10 -16,16 -10,24 C -4,30 10,28 16,20"
                         fill="none" stroke="#C05621" stroke-width="2.5" stroke-linecap="round" />
@@ -479,7 +483,7 @@
                 <!-- 4. Subcutaneous Infusion Site (Lower Abdomen Subq Layer) -->
                 <g id="twin-organ-subcutaneous" class="twin-organ" data-organ-id="subcutaneous" tabindex="0" role="button"
                    transform="translate(540, 410)">
-                  <circle r="32" fill="#FAF5FF" stroke="#6B46C1" stroke-width="2" />
+                  <circle r="32" fill="#FAF5FF" />
                   <!-- Infusion Patch & Cannula Vector -->
                   <rect x="-14" y="-10" width="28" height="18" rx="4"
                         fill="#E9D8FD" stroke="#553C9A" stroke-width="1.8" />
@@ -490,7 +494,7 @@
                 <!-- 5. Peripheral Muscle Tissue (Left Thigh / Oblique) -->
                 <g id="twin-organ-periphery" class="twin-organ" data-organ-id="periphery" tabindex="0" role="button"
                    transform="translate(290, 450)">
-                  <circle r="32" fill="#F0FFF4" stroke="#276749" stroke-width="2" />
+                  <circle r="32" fill="#F0FFF4" />
                   <!-- Muscle Fiber Bundle Vector -->
                   <path d="M -16,-10 Q 0,-20 16,-10 Q 20,0 16,10 Q 0,20 -16,10 Q -20,0 -16,-10 Z"
                         fill="#C6F6D5" stroke="#22543D" stroke-width="1.8" />

@@ -725,7 +725,16 @@ async function installAppUpdate() {
     setText("update-status", "Update installed. Restarting the app...");
     await nativeProcess.relaunch();
   } catch (error) {
-    setText("update-status", `Update install failed: ${errorMessage(error)}\n\nUse Download manually below instead.`);
+    const message = errorMessage(error);
+    // The Rust side already points $TMPDIR at a folder next to the running
+    // app bundle so this can't happen for a normal install; it still can if
+    // that folder couldn't be created (e.g. a read-only volume) or the app
+    // itself was moved mid-run. Cross-device is the one failure mode with a
+    // clear, actionable fix, so it gets its own message.
+    const guidance = /cross-device/i.test(message)
+      ? "\n\nThis usually means the app is running from a location the update process can't write next to (e.g. a read-only or restricted volume). Move the app to a writable folder such as Applications and try again, or use Download manually below."
+      : "\n\nUse Download manually below instead.";
+    setText("update-status", `Update install failed: ${message}${guidance}`);
   } finally {
     $("app-update-progress-panel").hidden = true;
     $("app-update-install-btn").disabled = false;

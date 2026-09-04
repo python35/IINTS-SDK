@@ -1847,11 +1847,47 @@ fn reveal_with_platform(path: &Path) -> Result<(), String> {
         .map_err(|error| format!("Could not reveal {}: {error}", path.display()))
 }
 
+// tauri-plugin-updater's macOS install path extracts the downloaded update
+// into the OS default temp directory, then does a plain `std::fs::rename`
+// into the app's own location -- with no same-filesystem check or fallback
+// (its Linux AppImage path has both; see its install_appimage). A `rename`
+// across filesystems always fails with EXDEV/"Cross-device link", which is
+// exactly what happens whenever the app is *not* running from the same
+// volume as the system temp directory -- for example a copy run directly
+// from an external drive rather than /Applications. `tempfile` (which the
+// plugin uses internally) honors `$TMPDIR` on Unix, so pointing it at a
+// folder next to the running app bundle keeps both sides of that rename on
+// the same filesystem, unconditionally. A no-op wherever the running binary
+// isn't inside a `.app` bundle (Windows, Linux, `cargo run` in development).
+/// The temp directory the updater should use, guaranteed to share a
+/// filesystem with `exe_path`'s `.app` bundle -- `None` when `exe_path`
+/// isn't inside one (Windows, Linux, or a `cargo run` dev build), in which
+/// case the caller leaves `$TMPDIR` untouched.
+fn updater_tmp_dir_for_exe(exe_path: &Path) -> Option<PathBuf> {
+    let app_bundle = exe_path
+        .ancestors()
+        .find(|path| path.extension().is_some_and(|ext| ext == "app"))?;
+    Some(app_bundle.parent()?.join(".iints-af-update-tmp"))
+}
+
+fn configure_updater_tmp_dir_for_cross_volume_installs() {
+    let Ok(exe_path) = env::current_exe() else {
+        return;
+    };
+    let Some(tmp_dir) = updater_tmp_dir_for_exe(&exe_path) else {
+        return;
+    };
+    if fs::create_dir_all(&tmp_dir).is_ok() {
+        env::set_var("TMPDIR", &tmp_dir);
+    }
+}
+
 fn main() {
     if env::args().any(|argument| argument == "--smoke") {
         println!("IINTS-AF Research Workbench smoke check passed");
         return;
     }
+    configure_updater_tmp_dir_for_cross_volume_installs();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -1910,6 +1946,30 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn updater_tmp_dir_sits_next_to_the_app_bundle_not_inside_it() {
+        let exe = Path::new(
+            "/Volumes/External Drive/IINTS-AF Research Workbench.app/Contents/MacOS/iints-af-tauri",
+        );
+        assert_eq!(
+            updater_tmp_dir_for_exe(exe),
+            Some(PathBuf::from(
+                "/Volumes/External Drive/.iints-af-update-tmp"
+            ))
+        );
+    }
+
+    #[test]
+    fn updater_tmp_dir_is_none_outside_a_macos_app_bundle() {
+        // A plain `cargo run`/`cargo build` binary, or any Windows/Linux install.
+        let exe = Path::new("/Users/dev/project/target/debug/iints-af-tauri");
+        assert_eq!(updater_tmp_dir_for_exe(exe), None);
+
+        let windows_exe =
+            Path::new(r"C:\Program Files\IINTS-AF Research Workbench\iints-af-tauri.exe");
+        assert_eq!(updater_tmp_dir_for_exe(windows_exe), None);
+    }
 
     #[test]
     fn evidence_urls_require_an_exact_allowlisted_https_host() {
