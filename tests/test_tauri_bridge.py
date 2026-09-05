@@ -81,6 +81,7 @@ def test_tauri_bridge_status_reports_sdk_context() -> None:
     assert isinstance(data, dict)
     assert data["bridge"] == "iints_desktop.tauri_bridge"
     assert data["bridge_api_version"] == 4
+    assert isinstance(data["python_version"], str)
     assert data["medical_device"] is False
 
 
@@ -105,6 +106,7 @@ def test_tauri_bridge_reports_desktop_diagnostics() -> None:
     assert "pandas" in data["optional_modules"]  # type: ignore[index]
     assert "roadrunner" in data["optional_modules"]  # type: ignore[index]
     assert "fmpy" in data["optional_modules"]  # type: ignore[index]
+    assert isinstance(data["ollama_installed"], bool)  # type: ignore[index]
     assert isinstance(data["recommended_checks"], list)  # type: ignore[index]
 
 

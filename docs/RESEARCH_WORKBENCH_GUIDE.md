@@ -8,6 +8,29 @@ The IINTS-AF Research Workbench is the native desktop interface for the Python S
 !!! info "About the screenshots"
     The screenshots below use a labelled documentation fixture. The values illustrate the interface only; they are not study results or validation evidence.
 
+## What The App Is
+
+The workbench is a controlled interface around the SDK, not a second simulation engine. Its layers are deliberately separated:
+
+```mermaid
+flowchart LR
+    UI["Tauri desktop interface"] --> RUST["Rust command boundary"]
+    RUST --> BRIDGE["Versioned Python bridge"]
+    BRIDGE --> SDK["IINTS-AF Python SDK"]
+    SDK --> FILES["Local CSV, JSON, PDF and evidence artifacts"]
+    FILES --> UI
+    UI -. "optional bounded prompt" .-> OLLAMA["Local Ollama model"]
+    OLLAMA -. "advisory text only" .-> UI
+```
+
+- **Tauri interface** provides navigation, native file selectors, charts, and status messages.
+- **Rust boundary** validates commands and paths before starting the fixed Python bridge.
+- **Python SDK** owns simulations, deterministic metrics, data contracts, and report generation.
+- **Local files** remain the reviewable source record. The interface does not rewrite result data.
+- **Ollama** may explain a loaded result, but it cannot replace deterministic calculations or authorize a dose.
+
+This separation matters when citing results: record the Python SDK version and run metadata, not only the desktop-app version.
+
 ## Install And Open
 
 Use the current native beta installer for your platform:
@@ -23,6 +46,14 @@ The native app delegates calculations to the Python SDK. If Overview reports tha
 The app opens a terminal with a fixed Rust-owned command, creates a private engine at `~/.iints-af/python-engine`, and installs the supported SDK dependencies there. After completion, return to the app and select **Refresh versions**. This avoids relying on the limited `PATH` inherited by a macOS Finder launch and does not modify an unrelated project environment.
 
 Python `3.10` through `3.14` must be available on the computer. The [installation guide](APP_INSTALL.md) includes a manual fallback when automatic discovery cannot find it.
+
+### First-run checklist
+
+1. Open **Settings** and choose a default output folder.
+2. Select **Install or update Python SDK** if the Overview cannot find a compatible engine.
+3. Return to **Overview** and select **Run diagnostics**.
+4. Confirm the SDK and Python versions before generating research artifacts.
+5. Start with **Reference baseline day** as an installation/reporting check, or use the shorter booth meal-response demo for interface practice.
 
 ### Native interaction
 
@@ -50,9 +81,11 @@ Use the left navigation in this order:
 3. **Inspect results** — review metrics, the glucose trace, and CSV rows.
 4. **Reproducibility** — create checksums, metadata, and an audit package.
 5. **Local AI review** — optionally ask Ollama to summarize the loaded result.
-6. **Research tools** — use independent biology, equation-model, or device-physics tools.
-7. **Evidence sources** — inspect connector status and open official resources.
-8. **Settings** — save local defaults, check versions, update software, and open help.
+6. **Foundation AI & Visualizer** — pretrain or inspect the independent GlucoFM-method reproduction.
+7. **Scientific Portfolio** — assemble only the local evidence files that actually exist.
+8. **Research tools** — use independent biology, equation-model, or device-physics tools.
+9. **Evidence sources** — inspect connector status and open official resources.
+10. **Settings** — save local defaults, check versions, update software, and open help.
 
 ## 1. Check The Environment
 
@@ -62,10 +95,12 @@ Select **Run diagnostics** before a new experiment. A normal ready environment s
 
 - the installed IINTS-AF SDK version
 - the Python version used by the app bridge
-- whether Ollama is available
+- whether an Ollama command was found and whether its local service/model is ready
 - readiness of optional modules such as MDMP, Plotly, libRoadRunner, and FMPy
 
 Missing optional modules do not always block a normal simulation. They only block the feature that depends on them.
+
+The Ollama command and the Ollama service are separate checks. On macOS the application may find Ollama inside `/Applications` even when a Finder-launched app does not inherit a terminal `PATH`. The Local AI page performs the service and model check.
 
 Equivalent terminal check:
 
@@ -85,6 +120,19 @@ python -c "import iints; print(iints.__version__)"
 5. Wait until the status field reports completion or a recorded error.
 
 Do not compare runs unless their protocol, SDK version, patient profile, time step, and seed policy are recorded.
+
+### Curated protocols
+
+| Protocol | Intended use | Interpretation boundary |
+| --- | --- | --- |
+| Doctor safety discussion | discuss an overnight low-glucose challenge with a clinical reviewer | a simulated challenge, not a treatment recommendation |
+| EUCYS experiment run | demonstrate a meal-stress experiment and its recorded safety events | evidence for the software experiment, not clinical effectiveness |
+| Booth meal-response demo | short public explanation of a meal response | target-range excursions are intentional; this is not a controlled reference day |
+| Pizza / delayed absorption | inspect delayed meal dynamics and forecasting uncertainty | a scenario assumption, not a universal pizza-response model |
+| Reference baseline day | verify installation, reports, and artifact generation | an SDK baseline, not a clinically validated reference trace |
+| Jury walkthrough (full day) | review a 24-hour, five-minute-step example with evidence artifacts | remains simulated and must be presented with its limitations |
+
+The run button is disabled while the SDK process is active. Cancelling stops the child process and records the cancellation in the visible status; it does not mark a partial folder as a completed run.
 
 The app calls the same SDK engine used by CLI workflows. A typical command-line equivalent is:
 
@@ -113,6 +161,10 @@ Review these parts together:
 - **Glucose trajectory** — a bounded visual preview with the configured 70–180 mg/dL reference band.
 - **Tabular preview** — the first bounded rows from the source CSV.
 - **MDMP certificate** — data-contract checks for the selected CSV.
+
+The **Diagram** compartment view shows model states and declared fluxes from the run's own schema. The **Illustrated view** maps the same values to an anatomical teaching diagram. Its organ shapes are explanatory graphics; they are not spatial finite-element anatomy. The model label and playback range are taken from the loaded run, so a 180-minute Bergman run is not presented as a 24-hour Hovorka run.
+
+The historical MDMP label `clinical_grade`, when encountered in an artifact, means that the strongest implemented **data-contract** checks passed. It does not mean that the physiology, cohort, model, or result has been clinically validated.
 
 The preview is read-only. It must not silently interpolate, repair, or overwrite the source CSV.
 
@@ -162,7 +214,7 @@ Local AI is optional and advisory.
 6. Write a focused research question.
 7. Select **Analyze loaded result**.
 
-The answer is separated into model metadata, policy status, warnings, headings, and lists. Verify every numerical or physiological claim against deterministic SDK outputs.
+The answer is separated into model metadata, policy status, warnings, headings, and lists. Verify every numerical or physiological claim against deterministic SDK outputs. Prompt instructions alone are not trusted: the Python bridge also hides lines containing unsupported quantities or treatment-adjustment suggestions before the app renders them. The metadata reports both filters.
 
 Example questions:
 
@@ -176,7 +228,40 @@ Summarize the glucose pattern, list possible simulation artifacts, and identify 
 
 Do not ask the model for dosing or treatment advice. Read [AI Safety Gates](LOCAL_AI_SAFETY_GATES.md) for the enforced boundaries.
 
-## 6. Use Research Tools
+## 6. Use Foundation AI
+
+The **Foundation AI & Visualizer** workspace is for CGM-representation research. It implements an independent, paper-aligned reproduction of the GlucoFM v2 method; it does not bundle or claim to be the official Google model or weights.
+
+### Pretrain a local reproduction
+
+1. Choose a multi-subject CGM CSV, TSV, or Parquet dataset.
+2. Choose an empty or dedicated output folder.
+3. Set epochs and batch size for the available hardware.
+4. Select **Pretrain local reproduction** and preserve its resolved configuration and logs.
+
+Subject-separated data and sufficient observations per subject are required for meaningful evaluation. A completed training process is not evidence of generalization.
+
+### Inspect a trained representation
+
+1. Choose a measured 24-hour CGM CSV.
+2. Choose a locally trained `glucofm_encoder.pt` checkpoint.
+3. Specify column names only when automatic detection is incorrect.
+4. Select **Extract trained 128D embedding**.
+
+The embedding chart is populated only from that checkpoint-backed operation. **Compare selected evidence** accepts comparable evaluation JSON artifacts; it does not compare arbitrary files as if their cohorts and protocols were equivalent. The Clarke chart states whether it shows held-out evidence or a fixed-seed demonstration.
+
+## 7. Build A Scientific Portfolio
+
+The **Scientific Portfolio** workspace creates a local dossier index from evidence already present on the computer.
+
+1. Choose a dedicated dossier output folder.
+2. Select **Generate evidence dossier**.
+3. Read the status summary and note every skipped or missing figure.
+4. Open the dossier and manifest, then verify captions, source paths, cohorts, units, and licences before sharing.
+
+The generator does not invent missing figures or convert absent validation into a positive claim. A dossier is a review aid, not peer review, statistical significance, clinical validation, or regulatory approval.
+
+## 8. Use Research Tools
 
 ![Research tools workspace with genomics, tissue stress, and independent reference model controls](assets/workbench/06-research-tools.png)
 
@@ -217,7 +302,7 @@ pLDDT describes local structure-prediction confidence and PAE describes confiden
 residue placement. Neither value is converted into pathogenicity, insulin sensitivity, disease
 severity, or treatment logic.
 
-## 7. Evidence Sources
+## 9. Evidence Sources
 
 The **Evidence sources** workspace describes whether a connector is:
 
@@ -228,7 +313,7 @@ The **Evidence sources** workspace describes whether a connector is:
 
 Opening a portal does not import its content into a simulation. External evidence must be cited, reviewed, licensed appropriately, and connected to a claim explicitly.
 
-## 8. Configure And Maintain The App
+## 10. Configure And Maintain The App
 
 ![Settings workspace with local preferences, app and SDK versions, update controls, and documentation links](assets/workbench/07-settings.png)
 
@@ -251,12 +336,13 @@ Select **Save settings** to apply these values to the Run and Local AI workspace
 The desktop app and Python SDK have separate version records:
 
 - **Install or update Python SDK** creates, repairs, or updates the private app engine through a fixed, Rust-owned command. The app does not accept arbitrary shell text.
-- **Download latest app update** opens the newest verified versioned Tauri beta release. Install the new signed installer for your platform after closing the current app.
+- **Check for app update** queries the signed Tauri update manifest. When a newer signed build is available, **Install update & restart** downloads, verifies, installs, and relaunches it.
+- **Download manually** opens the newest versioned beta release as a fallback when the native updater cannot complete.
 - **Refresh versions** compares the native app with versioned GitHub beta releases and the Python SDK with the stable PyPI release. The two components are never treated as one version.
 
 Successful checks are cached for six hours. When release services are unavailable, the app labels the result as unverified or uses clearly identified stale cache data; it does not claim that an unknown version is current. A separate warning appears when active Python source code and installed package metadata disagree.
 
-The beta deliberately does not replace its own executable silently. This keeps downloads, signatures, and release notes visible until a signed Tauri self-updater is introduced and audited.
+The updater never installs an unsigned payload: the downloaded artifact must match the public key embedded in the application. Updates are user-initiated and progress is visible. On macOS, place the app in a writable location such as `/Applications`; running it directly from a read-only disk image prevents replacement. The Python SDK is maintained separately because changing the scientific engine must not be confused with changing the interface.
 
 ### Help
 
@@ -271,7 +357,9 @@ The same workspace links to this user guide, installation troubleshooting, the c
 | Protocol list is empty | run diagnostics, verify the SDK installation, then select Refresh protocols |
 | Native selector does not open | confirm you are using the installed app rather than a browser preview |
 | CSV preview fails | select the file again with **Choose CSV...** and confirm it is a supported results CSV |
-| Ollama not found | install Ollama once, then select Start local AI |
+| Ollama command not found | install Ollama once; on macOS keep the app in `/Applications`, then run diagnostics again |
+| Ollama command found but service unavailable | open Local AI and select **Start local AI**, then run **Check connection** |
+| A run, report, test, or update fails with `No space left on device` | check free space on both the selected output volume and the operating system temporary volume; large jobs may still use temporary files even when results are stored on an external disk |
 | Model is missing | choose Refresh model list or allow Start local AI to pull the selected model |
 | Optional research engine missing | install or configure only the engine required for that lab |
 | macOS blocks the beta | follow the signed-build and Gatekeeper guidance in [Desktop App Installation](APP_INSTALL.md) |

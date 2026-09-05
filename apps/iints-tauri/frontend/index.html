@@ -300,11 +300,15 @@
         </div>
         <div class="button-row">
           <button id="open-csv-btn">Open CSV</button>
-          <button id="mdmp-btn">Create MDMP certificate</button>
+          <button id="mdmp-btn">Check MDMP data contract</button>
           <button id="open-certificate-btn">Open certificate</button>
         </div>
         <pre id="results-status" class="status-box compact" aria-live="polite">No result file loaded.</pre>
-        <pre id="mdmp-status" class="status-box compact">No MDMP certificate generated yet.</pre>
+        <pre id="mdmp-status" class="status-box compact">No MDMP data-contract certificate generated yet.</pre>
+        <p class="field-help mdmp-boundary">
+          MDMP checks schema, completeness, and integrity against a declared data contract. Its grade
+          does not establish physiological realism, clinical quality, or suitability for patient care.
+        </p>
         <div class="subsection-heading">
           <h3>Summary metrics</h3>
           <span>Calculated from the loaded preview</span>
@@ -347,7 +351,7 @@
             </div>
           </div>
           <div id="digital-twin-viewer" data-compartment-panel="twin" hidden>
-            <p class="muted">Illustrated view of the Hovorka compartment model. The liver shape has no
+            <p id="digital-twin-description" class="muted">Illustrated view of the loaded compartment model. The liver shape has no
               stored contents of its own -- it visualizes the live endogenous glucose
               production flux, not a tracked compartment.</p>
             <div class="digital-twin-controls">
@@ -558,7 +562,7 @@
                   <!-- Model Tag (Top Right Canvas) -->
                   <g transform="translate(600, 30)">
                     <rect x="0" y="0" width="230" height="38" rx="6" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.2" />
-                    <text x="16" y="24" fill="#4A5568" font-size="11" font-weight="700" letter-spacing="0.5">HOVORKA DIGITAL TWIN</text>
+                    <text id="digital-twin-model-label" x="16" y="24" fill="#4A5568" font-size="11" font-weight="700" letter-spacing="0.5">LOADED MODEL</text>
                   </g>
                 </g>
               </svg>
@@ -592,28 +596,6 @@
           privacy approval, or clinical validation.
         </p>
         <div class="academic-fields">
-          <div class="field-control academic-run-field">
-            <label for="foundation-glucofm-train-source">Pretraining dataset</label>
-            <div class="path-picker">
-              <input id="foundation-glucofm-train-source" placeholder="Choose a multi-subject CGM CSV, TSV, or Parquet file" spellcheck="false" />
-              <button id="foundation-glucofm-train-source-browse-btn" type="button">Choose dataset...</button>
-            </div>
-          </div>
-          <div class="field-control academic-run-field">
-            <label for="foundation-glucofm-train-output">Pretraining output folder</label>
-            <div class="path-picker">
-              <input id="foundation-glucofm-train-output" value="models/glucofm-reproduction" spellcheck="false" />
-              <button id="foundation-glucofm-train-output-browse-btn" type="button">Choose folder...</button>
-            </div>
-          </div>
-          <label>
-            Epochs
-            <input id="foundation-glucofm-epochs" type="number" min="1" value="120" />
-          </label>
-          <label>
-            Batch size
-            <input id="foundation-glucofm-batch-size" type="number" min="1" value="128" />
-          </label>
           <div class="field-control academic-run-field">
             <label for="academic-run-dir">Completed run folder</label>
             <div class="path-picker">
@@ -1049,6 +1031,42 @@
           </div>
         </div>
 
+        <div class="subsection-heading">
+          <h3>Pretrain the local reproduction</h3>
+          <span>Long-running, subject-separated research workflow</span>
+        </div>
+        <div class="academic-fields foundation-training-fields">
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-train-source">Pretraining dataset</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-train-source" placeholder="Choose a multi-subject CGM CSV, TSV, or Parquet file" spellcheck="false" />
+              <button id="foundation-glucofm-train-source-browse-btn" type="button">Choose dataset...</button>
+            </div>
+          </div>
+          <div class="field-control academic-run-field">
+            <label for="foundation-glucofm-train-output">Pretraining output folder</label>
+            <div class="path-picker">
+              <input id="foundation-glucofm-train-output" value="models/glucofm-reproduction" spellcheck="false" />
+              <button id="foundation-glucofm-train-output-browse-btn" type="button">Choose folder...</button>
+            </div>
+          </div>
+          <label>
+            Epochs
+            <input id="foundation-glucofm-epochs" type="number" min="1" value="120" />
+          </label>
+          <label>
+            Batch size
+            <input id="foundation-glucofm-batch-size" type="number" min="1" value="128" />
+          </label>
+        </div>
+        <div class="button-row">
+          <button id="foundation-glucofm-pretrain-btn" class="primary">Pretrain local reproduction</button>
+        </div>
+
+        <div class="subsection-heading">
+          <h3>Inspect and compare evidence</h3>
+          <span>Requires measured input and trained local weights</span>
+        </div>
         <div class="academic-fields">
           <div class="field-control academic-run-field">
             <label for="foundation-glucofm-csv">24-hour CGM CSV</label>
@@ -1082,10 +1100,8 @@
         </div>
 
         <div class="button-row">
-          <button id="foundation-glucofm-pretrain-btn">Pretrain local reproduction</button>
           <button id="foundation-glucofm-btn" class="primary">Extract trained 128D embedding</button>
           <button id="foundation-arena-btn">Compare selected evidence</button>
-          <button id="eucys-playbook-btn">Generate evidence dossier</button>
         </div>
 
         <div class="chart-tab-bar">
@@ -1105,6 +1121,45 @@
         </div>
 
         <pre id="foundation-status" class="status-box compact">Select measured input and trained weights to begin. No benchmark result is preloaded.</pre>
+      </section>
+
+      <section class="panel portfolio-panel" data-view-panel="eucys" hidden>
+        <div class="panel-heading">
+          <div>
+            <h2>Scientific evidence dossier</h2>
+          </div>
+          <p>Build a local index of figures and disclose missing evidence instead of filling gaps.</p>
+        </div>
+        <p class="muted">
+          The dossier generator assembles only artifacts supported by files available on this computer.
+          A generated dossier is a review aid; it is not peer review, publication acceptance, or clinical validation.
+        </p>
+        <div class="academic-fields portfolio-fields">
+          <div class="field-control academic-run-field">
+            <label for="portfolio-output-dir">Dossier output folder</label>
+            <div class="path-picker">
+              <input id="portfolio-output-dir" value="results/scientific_portfolio" spellcheck="false" />
+              <button id="portfolio-output-browse-btn" type="button">Choose folder...</button>
+            </div>
+            <small class="field-help">Existing evidence is indexed; unsupported figures are marked as not generated.</small>
+          </div>
+        </div>
+        <div class="button-row">
+          <button id="portfolio-generate-btn" class="primary">Generate evidence dossier</button>
+          <button id="portfolio-open-btn" disabled>Open dossier</button>
+          <button id="portfolio-manifest-btn" disabled>Open manifest</button>
+          <button id="portfolio-reveal-btn" disabled>Reveal output folder</button>
+        </div>
+        <pre id="portfolio-status" class="status-box compact" aria-live="polite">No evidence dossier generated in this session.</pre>
+        <div class="subsection-heading">
+          <h3>Interpretation boundary</h3>
+          <span>What this workspace does and does not claim</span>
+        </div>
+        <div class="portfolio-boundaries">
+          <p><strong>Included:</strong> traceable local figures, manifests, captions, and explicit missing-input notes.</p>
+          <p><strong>Not implied:</strong> clinical validation, external replication, statistical significance, or regulator approval.</p>
+          <p><strong>Before sharing:</strong> inspect every caption, source file, cohort definition, unit, and licence.</p>
+        </div>
       </section>
     </main>
 

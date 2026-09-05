@@ -24,13 +24,13 @@ import platform
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from typing import Any, Callable
 
 from iints_desktop.engine import (
     DesktopRunResult,
     get_desktop_preset,
-    list_desktop_presets,
     run_demo_preset,
 )
 
@@ -136,6 +136,71 @@ def _existing(*candidates: Any) -> tuple[str, ...]:
     return tuple(found)
 
 
+def _sensor_error_pairs(
+    run: DesktopRunResult | None,
+) -> tuple[Any, Any] | None:
+    """Return ``(model truth, value handed to the algorithm)`` from a run.
+
+    This is the pairing an error grid was designed for: a reference value
+    against the measurement a controller actually acted on. Here both come from
+    the simulator, so the grid characterises the sensor error model of the
+    simulation - it is not an evaluation of a physical CGM. If the two columns
+    are identical the grid would be a meaningless diagonal, so nothing is
+    returned and the figure stays honestly ungenerated.
+    """
+
+    if run is None or run.results_csv is None:
+        return None
+    try:
+        import pandas as pd
+
+        frame = pd.read_csv(run.results_csv)
+        reference = frame["glucose_actual_mgdl"]
+        measured = frame["glucose_to_algo_mgdl"]
+        usable = reference.notna() & measured.notna()
+        if usable.sum() < 10:
+            return None
+        reference, measured = reference[usable], measured[usable]
+        if bool((reference == measured).all()):
+            return None
+        return (reference.to_numpy(), measured.to_numpy())
+    except Exception:  # noqa: BLE001 - an optional figure, never a hard failure
+        return None
+
+
+def _glycemic_summary(results_csv: str | Path | None) -> dict[str, float] | None:
+    """Measure the consensus glycemic metrics of a run.
+
+    The operator has to know these before standing in front of an audience: a
+    jury that knows the Battelino (2019) targets will read them off the trace
+    whether or not they are mentioned.
+    """
+
+    if results_csv is None:
+        return None
+    try:
+        import pandas as pd
+
+        glucose = pd.read_csv(results_csv)["glucose_actual_mgdl"].dropna()
+        if glucose.empty:
+            return None
+        return {
+            "mean_mgdl": round(float(glucose.mean()), 1),
+            "cv_pct": round(float(glucose.std() / glucose.mean() * 100), 1),
+            "time_in_range_70_180_pct": round(
+                float(glucose.between(70, 180).mean() * 100), 1
+            ),
+            "time_below_70_pct": round(float((glucose < 70).mean() * 100), 1),
+            "time_below_54_pct": round(float((glucose < 54).mean() * 100), 1),
+            "time_above_180_pct": round(float((glucose > 180).mean() * 100), 1),
+            "time_above_250_pct": round(float((glucose > 250).mean() * 100), 1),
+            "min_mgdl": round(float(glucose.min()), 1),
+            "max_mgdl": round(float(glucose.max()), 1),
+        }
+    except Exception:  # noqa: BLE001 - reporting aid, never a hard failure
+        return None
+
+
 def build_jury_demo(
     *,
     output_dir: str | Path,
@@ -214,7 +279,7 @@ def build_jury_demo(
         )
 
     for key in (JURY_PRESET_KEY, *SUPPORTING_PRESET_KEYS):
-        record(f"Run preset '{key}'", "Run protocols", lambda k=key: run_preset(k))
+        record(f"Run preset '{key}'", "Run protocols", partial(run_preset, key))
 
     main_run = runs.get(JURY_PRESET_KEY) or next(iter(runs.values()), None)
 
@@ -304,26 +369,10 @@ def build_jury_demo(
 
     record("Export an academic bundle", "Reproducibility", bundle)
 
+    # Evidence the portfolio can consume has to exist before the portfolio is
+    # generated, so the benchmark and the paired-trace assembly run first.
     if include_portfolio:
-
-        def portfolio() -> tuple[str, tuple[str, ...]]:
-            from iints.research.eucys_playbook_generator import (
-                generate_complete_eucys_jury_portfolio,
-            )
-
-            resolved_portfolio.mkdir(parents=True, exist_ok=True)
-            built = generate_complete_eucys_jury_portfolio(output_dir=resolved_portfolio)
-            payload = built.to_dict()
-            figure_count = payload.get("total_figures", "unknown")
-            return (
-                f"{figure_count} portfolio figure(s) written where the panel looks: "
-                f"{resolved_portfolio}.",
-                _existing(
-                    payload.get("index_html_path"), payload.get("manifest_json_path")
-                ),
-            )
-
-        record("Generate the scientific portfolio", "Scientific Portfolio", portfolio)
+        portfolio_evidence: dict[str, Any] = {}
 
         def visualizations() -> tuple[str, tuple[str, ...]]:
             from iints.research.visualizer import (
@@ -351,6 +400,7 @@ def build_jury_demo(
             target.mkdir(parents=True, exist_ok=True)
             report = run_fda_safety_benchmark(output_dir=target)
             payload = report.to_dict()
+            portfolio_evidence["benchmark_dir"] = target
             return (
                 "Hazard detection rate "
                 f"{payload.get('hazard_detection_rate_pct')}% over "
@@ -362,6 +412,93 @@ def build_jury_demo(
             )
 
         record("Run the safety benchmark", "Foundation AI & Visualizer", safety_benchmark)
+
+        def pair_safety_trace() -> tuple[str, tuple[str, ...]]:
+            """Join one case's two measured traces into the shape the figure needs.
+
+            The benchmark writes the comparator and the supervised run of each
+            case to separate files; the portfolio figure wants both glucose
+            columns in one table. The case is chosen by sorted identifier
+            rather than by which one looks best, and the identifier is stated
+            wherever the figure is described.
+            """
+
+            import pandas as pd
+
+            benchmark_dir = portfolio_evidence.get("benchmark_dir")
+            if benchmark_dir is None:
+                raise RuntimeError(
+                    "The safety benchmark did not complete, so there is no trace to pair."
+                )
+            cases = sorted(
+                path.name.removesuffix("_unmitigated.csv")
+                for path in Path(benchmark_dir).glob("*_unmitigated.csv")
+            )
+            if not cases:
+                raise RuntimeError("The benchmark wrote no comparator traces.")
+            case_id = cases[0]
+            unmitigated = pd.read_csv(Path(benchmark_dir) / f"{case_id}_unmitigated.csv")
+            supervised = pd.read_csv(Path(benchmark_dir) / f"{case_id}_supervised.csv")
+            paired = (
+                unmitigated[["time_minutes", "glucose_actual_mgdl"]]
+                .rename(columns={"glucose_actual_mgdl": "unsupervised_glucose_mgdl"})
+                .merge(
+                    supervised[["time_minutes", "glucose_actual_mgdl"]].rename(
+                        columns={"glucose_actual_mgdl": "supervised_glucose_mgdl"}
+                    ),
+                    on="time_minutes",
+                    how="inner",
+                )
+                .sort_values("time_minutes")
+            )
+            if len(paired) < 2:
+                raise RuntimeError(
+                    f"Only {len(paired)} paired row(s) for {case_id}; the figure needs at least two."
+                )
+            target = Path(benchmark_dir) / f"{case_id}_paired_trace.csv"
+            paired.to_csv(target, index=False)
+            portfolio_evidence["safety_trace"] = target
+            portfolio_evidence["safety_case_id"] = case_id
+            return (
+                f"Paired comparator and supervisor trace for {case_id} "
+                f"({len(paired)} rows), both measured in this seeding run.",
+                _existing(target),
+            )
+
+        record(
+            "Pair a safety benchmark trace",
+            "Scientific Portfolio",
+            pair_safety_trace,
+        )
+
+        def portfolio() -> tuple[str, tuple[str, ...]]:
+            from iints.research.eucys_playbook_generator import (
+                generate_complete_eucys_jury_portfolio,
+            )
+
+            resolved_portfolio.mkdir(parents=True, exist_ok=True)
+            built = generate_complete_eucys_jury_portfolio(
+                output_dir=resolved_portfolio,
+                ega_pairs=_sensor_error_pairs(main_run),
+                safety_trace=portfolio_evidence.get("safety_trace"),
+            )
+            payload = built.to_dict()
+            rendered = [
+                figure
+                for figure in payload.get("figures", [])
+                if "Not generated" not in (figure.get("subtitle") or "")
+            ]
+            return (
+                f"{len(rendered)} of {payload.get('total_figures')} portfolio figures "
+                f"rendered where the panel looks ({resolved_portfolio}); the rest state "
+                "which evidence they still need.",
+                _existing(
+                    resolved_portfolio / "index.html",
+                    resolved_portfolio / "eucys_portfolio_manifest.json",
+                ),
+            )
+
+        record("Generate the scientific portfolio", "Scientific Portfolio", portfolio)
 
     def evidence() -> tuple[str, tuple[str, ...]]:
         from dataclasses import asdict
@@ -431,6 +568,7 @@ def build_jury_demo(
                     "output_dir": str(run.output_dir),
                     "results_csv": str(run.results_csv) if run.results_csv else None,
                     "report_pdf": str(run.report_pdf) if run.report_pdf else None,
+                    "glycemic_summary": _glycemic_summary(run.results_csv),
                 }
                 for key, run in runs.items()
             },
@@ -455,6 +593,96 @@ def build_jury_demo(
     record("Write the walkthrough", "Overview", write_documents)
 
     return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Seed a demonstration folder from the command line.
+
+    Exit status is 0 when every step completed and 1 when any step failed, so
+    the operator finds out at the terminal rather than in front of an audience.
+    """
+
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="python -m iints_desktop.jury_demo",
+        description=(
+            "Fill one folder with a worked example for every panel of the IINTS "
+            "desktop app, then write a walkthrough that names what is ready and "
+            "what is not. Research use only; the artifacts are simulated."
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        default=str(Path.home() / "iints-jury-demo"),
+        help="Folder to seed; set the app's output folder to this path.",
+    )
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--portfolio-dir",
+        default=None,
+        help=(
+            "Where to write the Scientific Portfolio. Defaults to "
+            f"~/{PORTFOLIO_PANEL_SUBPATH.as_posix()}, which is the path that panel reads."
+        ),
+    )
+    parser.add_argument(
+        "--skip-portfolio",
+        action="store_true",
+        help="Skip the slower figure and benchmark generation.",
+    )
+    parser.add_argument(
+        "--creator-name",
+        default=None,
+        help="Written into the academic bundle as supplied; omitted when absent.",
+    )
+    parser.add_argument("--creator-orcid", default=None)
+    args = parser.parse_args(argv)
+
+    result = build_jury_demo(
+        output_dir=args.output_dir,
+        seed=args.seed,
+        portfolio_dir=args.portfolio_dir,
+        include_portfolio=not args.skip_portfolio,
+        creator_name=args.creator_name,
+        creator_orcid=args.creator_orcid,
+        progress=lambda message: print(f"  {message}", flush=True),
+    )
+
+    print()
+    for step in result.steps:
+        print(f"{_status_mark(step.status):<10} {step.panel:<34} {step.name}")
+        if step.status != "ok":
+            print(f"{'':<10} -> {step.detail}")
+    print()
+    print(f"Walkthrough: {result.walkthrough_path}")
+    print(f"Set the app output folder to: {result.output_dir}")
+    if result.failed_steps:
+        print(f"{len(result.failed_steps)} step(s) failed; read the walkthrough before presenting.")
+        return 1
+    return 0
+
+
+def _rendered_portfolio_figures(portfolio_dir: Path) -> list[dict[str, Any]]:
+    """Read back which portfolio figures actually rendered.
+
+    The manifest counts every planned figure, including the ones it honestly
+    declined to draw, so the walkthrough reads the subtitles rather than the
+    total and reports only what an operator can really open.
+    """
+
+    manifest = Path(portfolio_dir) / "eucys_portfolio_manifest.json"
+    if not manifest.exists():
+        return []
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return [
+        figure
+        for figure in payload.get("figures", [])
+        if "Not generated" not in (figure.get("subtitle") or "")
+    ]
 
 
 def _status_mark(status: str) -> str:
@@ -539,6 +767,44 @@ def _build_walkthrough(
     )
     lines.append("")
 
+    summary = _glycemic_summary(main_run.results_csv if main_run else None)
+    if summary is not None:
+        lines.append(
+            "Measured on the seeded trace, so you are not guessing when the jury asks:"
+        )
+        lines.append("")
+        lines.append(
+            f"- Time in range 70-180 mg/dL: **{summary['time_in_range_70_180_pct']}%** "
+            f"(mean {summary['mean_mgdl']} mg/dL, CV {summary['cv_pct']}%)"
+        )
+        lines.append(
+            f"- Below 70 mg/dL: {summary['time_below_70_pct']}% "
+            f"(below 54: {summary['time_below_54_pct']}%)"
+        )
+        lines.append(
+            f"- Above 180 mg/dL: {summary['time_above_180_pct']}% "
+            f"(above 250: {summary['time_above_250_pct']}%)"
+        )
+        lines.append(
+            f"- Range spanned: {summary['min_mgdl']} to {summary['max_mgdl']} mg/dL"
+        )
+        lines.append("")
+        if summary["time_in_range_70_180_pct"] < 70.0:
+            lines.append(
+                "> A jury member who knows the consensus targets (Battelino et al., "
+                "2019) will notice this run sits below 70% time in range. That is the "
+                "**intended** behaviour of this profile, and saying so first is the "
+                "strong answer. `reference_free_living_t1d` was calibrated against "
+                "aggregate OhioT1DM statistics (12 subjects, 188,980 CGM rows, mean "
+                "glucose 159.6 mg/dL, time in range 63.8%), so the reference day "
+                "reproduces the control a real free-living cohort actually achieves "
+                "rather than an idealised one. A simulator that returned 90% here "
+                "would be the suspicious result. What this run demonstrates is the "
+                "pipeline on an empirically anchored day - it is not a controller "
+                "performance claim."
+            )
+            lines.append("")
+
     lines.append("### 3. Reproducibility - the strongest panel")
     lines.append("")
     lines.append(
@@ -557,6 +823,28 @@ def _build_walkthrough(
         "as its working directory. Seeding it elsewhere leaves the panel empty."
     )
     lines.append("")
+
+    rendered = _rendered_portfolio_figures(result.portfolio_dir)
+    if rendered:
+        lines.append(
+            f"{len(rendered)} figure(s) render from the evidence this seeding produced; "
+            "the others state on their own card which experiment they still need, which "
+            "is a better answer to a jury than a placeholder."
+        )
+        lines.append("")
+        for figure in rendered:
+            lines.append(f"- **{figure['figure_id']}** {figure['title']}")
+        lines.append("")
+        if any(figure["figure_id"] == "FIG-05" for figure in rendered):
+            lines.append(
+                "> Describe the error grid precisely. It pairs the simulator's own "
+                "glucose against the value handed to the controller, so it "
+                "characterises the **sensor error model of the simulation**. A high "
+                "Zone A percentage here is a property of that model, not a clinical "
+                "accuracy result, and claiming otherwise is the one thing a jury will "
+                "not forgive."
+            )
+            lines.append("")
 
     lines.append("### 5. Evidence sources and Research tools - scope, honestly")
     lines.append("")
@@ -604,12 +892,8 @@ def _build_walkthrough(
             lines.append(f"- `{artifact}`")
         lines.append("")
 
-    lines.append("## Panels in the app")
-    lines.append("")
-    lines.append(
-        "For reference, the shell exposes: "
-        + ", ".join(sorted({preset.audience for preset in list_desktop_presets()}))
-        + " audiences across the preset catalogue."
-    )
-    lines.append("")
     return "\n".join(lines)
+
+
+if __name__ == "__main__":  # pragma: no cover - console entry point
+    raise SystemExit(main())

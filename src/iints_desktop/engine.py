@@ -100,12 +100,14 @@ DESKTOP_PRESETS: tuple[DesktopPreset, ...] = (
     ),
     DesktopPreset(
         key="booth-demo",
-        title="Booth / public demo",
+        title="Booth meal-response demo",
         preset_name="quickstart_meal",
         audience="General audience",
         description=(
-            "A shorter visual scenario for explaining the digital patient idea "
-            "without asking the audience to read logs or code."
+            "A shorter meal-stress scenario for explaining the digital patient idea "
+            "without asking the audience to read logs or code. Transient glucose "
+            "above the target range is expected and should not be presented as a "
+            "well-controlled reference day."
         ),
         expected_output="Fast run artifacts that are easy to show live.",
         talk_track=(

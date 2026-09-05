@@ -73,6 +73,7 @@ nav:
       - Workflow Hub: WORKFLOWS.md
       - Desktop App:
           - Research Workbench Guide: RESEARCH_WORKBENCH_GUIDE.md
+          - Usability Audit: DESKTOP_APP_USABILITY_AUDIT.md
           - Use The Desktop App: DESKTOP_APP.md
           - Install The Desktop App: APP_INSTALL.md
           - Update The SDK: UPDATING.md

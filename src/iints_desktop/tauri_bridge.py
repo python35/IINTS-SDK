@@ -25,6 +25,7 @@ from iints_desktop.local_ai import (
     ask_local_ai,
     check_local_ai,
     list_local_ai_models,
+    resolve_ollama_executable,
     start_local_ai_stack,
 )
 from iints_desktop.results import load_compartment_timeline, load_results_preview
@@ -76,6 +77,7 @@ def _status(_args: argparse.Namespace) -> int:
         {
             "sdk_version": env.sdk_version,
             "python_executable": sys.executable,
+            "python_version": sys.version.split()[0],
             "bridge": "iints_desktop.tauri_bridge",
             "bridge_api_version": DESKTOP_BRIDGE_API_VERSION,
             "research_only": True,
@@ -133,8 +135,9 @@ def _diagnostics(_args: argparse.Namespace) -> int:
         recommended_checks.append(
             "Install the tauri-engine or fmi extra only when trusted FMU execution is needed; static inspection remains available."
         )
-    ollama_path = shutil.which("ollama")
-    if ollama_path is None:
+    ollama_on_path = shutil.which("ollama")
+    ollama_executable = resolve_ollama_executable()
+    if ollama_executable is None:
         recommended_checks.append("Install Ollama if you want local AI analysis.")
 
     return _ok(
@@ -148,8 +151,9 @@ def _diagnostics(_args: argparse.Namespace) -> int:
             "research_only": True,
             "medical_device": False,
             "optional_modules": optional_modules,
-            "ollama_on_path": ollama_path is not None,
-            "ollama_path": ollama_path,
+            "ollama_installed": ollama_executable is not None,
+            "ollama_on_path": ollama_on_path is not None,
+            "ollama_path": ollama_executable,
             "recommended_checks": recommended_checks,
         }
     )
@@ -648,6 +652,7 @@ def _ai_ask(args: argparse.Namespace) -> int:
             "numeric_claim_warnings": list(answer.numeric_claim_warnings),
             "deterministic_metrics": answer.deterministic_metrics or {},
             "suppressed_line_count": answer.suppressed_line_count,
+            "suppressed_advice_line_count": answer.suppressed_advice_line_count,
             "interpretation_restricted": answer.interpretation_restricted,
         }
     )

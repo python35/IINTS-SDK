@@ -30,8 +30,10 @@ from iints_desktop.local_ai import (
     LocalAIStartResult,
     audit_ai_numeric_claims,
     format_ai_answer,
+    renumber_ordered_lines,
     resolve_ollama_executable,
     restrict_ai_to_review_sections,
+    suppress_treatment_advice_lines,
     suppress_unsupported_numeric_lines,
 )
 from iints_desktop.mdmp import create_desktop_mdmp_certificate
@@ -295,6 +297,34 @@ def test_local_ai_csv_scope_keeps_only_review_sections() -> None:
     assert "Predictor error was not computed" in restricted
     assert "Inspect predictor uncertainty" in restricted
     assert "aggregate SDK metrics" in restricted
+
+
+def test_local_ai_hides_treatment_adjustment_suggestions() -> None:
+    answer = "\n".join(
+        [
+            "Limitations",
+            "• The run contains simulated data.",
+            "Next Checks",
+            "1. Replicate with adjusted insulin dosing to reduce the peak.",
+            "2. Inspect predictor uncertainty and clustered safety reasons.",
+        ]
+    )
+
+    filtered, count = suppress_treatment_advice_lines(answer)
+
+    assert count == 1
+    assert "adjusted insulin dosing" not in filtered
+    assert "Inspect predictor uncertainty" in filtered
+    assert "treatment-adjustment language was hidden" in filtered
+
+
+def test_local_ai_renumbers_checks_after_filtering() -> None:
+    answer = "Next Checks\n2. Inspect uncertainty.\n4) Compare compatible runs."
+
+    normalized = renumber_ordered_lines(answer)
+
+    assert "1. Inspect uncertainty." in normalized
+    assert "2. Compare compatible runs." in normalized
 
 
 def test_local_ai_can_resolve_ollama_from_extra_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -726,7 +756,18 @@ def test_tauri_app_has_academic_navigation_and_platform_icons() -> None:
     frontend_css = (app_root / "frontend/styles.css").read_text(encoding="utf-8")
     config = json.loads((app_root / "src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
 
-    views = {"overview", "run", "results", "reproducibility", "ai", "research", "evidence", "settings"}
+    views = {
+        "overview",
+        "run",
+        "results",
+        "reproducibility",
+        "ai",
+        "foundation",
+        "eucys",
+        "research",
+        "evidence",
+        "settings",
+    }
     assert all(f'data-view="{view}"' in frontend for view in views)
     assert all(f'data-view-panel="{view}"' in frontend for view in views)
     assert "VIEW_METADATA" in frontend_js

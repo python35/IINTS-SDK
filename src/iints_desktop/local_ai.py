@@ -43,6 +43,7 @@ class LocalAIAnswer:
     numeric_claim_warnings: tuple[str, ...] = ()
     deterministic_metrics: dict[str, str] | None = None
     suppressed_line_count: int = 0
+    suppressed_advice_line_count: int = 0
     interpretation_restricted: bool = False
 
 
@@ -311,6 +312,21 @@ def format_ai_answer(text: str) -> str:
 
 _NUMERIC_CLAIM_PATTERN = re.compile(r"(?<![A-Za-z_])\d+(?:\.\d+)?%?")
 
+_TREATMENT_ADJUSTMENT_PATTERN = re.compile(
+    r"\b(?:adjust(?:ed|ing)?|increase|decrease|raise|lower|change|modify|"
+    r"optimi[sz]e|tune|higher|split)\b(?:\s+[A-Za-z][A-Za-z/-]*){0,5}\s+"
+    r"(?:basal|bolus|insulin|glucagon|dose|dosing|correction)\b|"
+    r"\b(?:basal|bolus|insulin|glucagon|dose|dosing|correction)\b"
+    r"(?:\s+[A-Za-z][A-Za-z/-]*){0,5}\s+"
+    r"(?:adjust(?:ment|ed|ing)?|increase|decrease|raise|lower|change|modify|"
+    r"optimi[sz](?:e|ation)|tune|higher|split)\b|"
+    r"\b(?:use|give|deliver|administer|inject)\b"
+    r"(?:\s+[A-Za-z][A-Za-z/-]*){0,5}\s+"
+    r"(?:basal|bolus|insulin|glucagon|dose|dosing|correction)\b|"
+    r"\b(?:bolus|dose)\s+(?:earlier|later|more|less)\b",
+    re.IGNORECASE,
+)
+
 
 def audit_ai_numeric_claims(answer: str, deterministic_context: str) -> tuple[str, ...]:
     """Flag numbers not present in the deterministic context.
@@ -358,6 +374,56 @@ def suppress_unsupported_numeric_lines(
         )
         cleaned = f"{notice}\n\n{cleaned}" if cleaned else notice
     return cleaned, suppressed
+
+
+def suppress_treatment_advice_lines(answer: str) -> tuple[str, int]:
+    """Remove generated treatment-adjustment suggestions from desktop reviews.
+
+    Prompt instructions are not a safety boundary: local models can ignore them.
+    Aggregate result review therefore applies a deterministic line-level filter
+    before any generated text is shown in the desktop application.
+    """
+
+    kept: list[str] = []
+    suppressed = 0
+    for line in answer.splitlines():
+        if _TREATMENT_ADJUSTMENT_PATTERN.search(line):
+            suppressed += 1
+            continue
+        kept.append(line)
+    cleaned = "\n".join(kept).strip()
+    if suppressed:
+        notice = (
+            "AI-generated treatment-adjustment language was hidden. The desktop "
+            "assistant is limited to non-treatment research review."
+        )
+        cleaned = f"{notice}\n\n{cleaned}" if cleaned else notice
+    return cleaned, suppressed
+
+
+def renumber_ordered_lines(answer: str) -> str:
+    """Close numbering gaps left by deterministic post-generation filters."""
+
+    next_number = 1
+    lines: list[str] = []
+    for line in answer.splitlines():
+        stripped = line.strip()
+        if stripped.lower().rstrip(":") in {
+            "deterministic facts",
+            "interpretation",
+            "limitations",
+            "next checks",
+        }:
+            next_number = 1
+            lines.append(line)
+            continue
+        match = re.match(r"^(\s*)\d+[.)]\s+(.+)$", line)
+        if match:
+            lines.append(f"{match.group(1)}{next_number}. {match.group(2)}")
+            next_number += 1
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
 
 
 def restrict_ai_to_review_sections(answer: str) -> str:
@@ -437,15 +503,28 @@ def ask_local_ai(
     interpretation_restricted = result_csv is not None
     if interpretation_restricted:
         filtered = restrict_ai_to_review_sections(filtered)
+    filtered, suppressed_advice_line_count = suppress_treatment_advice_lines(filtered)
+    filtered = renumber_ordered_lines(filtered)
+    policy_warnings = guarded.warnings
+    policy_action = guarded.action
+    if suppressed_advice_line_count:
+        policy_warnings = tuple(
+            dict.fromkeys(
+                [*policy_warnings, "AI-generated treatment-adjustment language was removed"]
+            )
+        )
+        if policy_action == "allow":
+            policy_action = "warn"
     return LocalAIAnswer(
         answer=filtered,
         model=resolved,
         context_used=result_csv is not None,
         policy_violations=guarded.violations,
-        policy_warnings=guarded.warnings,
-        policy_action=guarded.action,
+        policy_warnings=policy_warnings,
+        policy_action=policy_action,
         numeric_claim_warnings=numeric_warnings,
         deterministic_metrics=deterministic_metrics,
         suppressed_line_count=suppressed_line_count,
+        suppressed_advice_line_count=suppressed_advice_line_count,
         interpretation_restricted=interpretation_restricted,
     )

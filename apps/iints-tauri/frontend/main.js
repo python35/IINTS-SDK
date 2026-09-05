@@ -40,6 +40,7 @@ let lastPreview = null;
 let lastRun = null;
 let lastMdmp = null;
 let lastAcademicBundle = null;
+let lastScientificPortfolio = null;
 let molecules = [];
 let evidenceConnectors = [];
 let updateInfo = null;
@@ -143,8 +144,8 @@ const VIEW_METADATA = {
   },
   eucys: {
     eyebrow: "Publication dossier",
-    title: "Scientific Portfolio & Dossier",
-    description: "Browse 11 publication-grade scientific figures, Clarke Error Grids, TIR distributions, Stem-Cell Islet kinetics, and Jetson hardware latency."
+    title: "Scientific evidence dossier",
+    description: "Assemble traceable local figures and a manifest; missing inputs remain explicitly ungenerated."
   },
   evidence: {
     eyebrow: "Provenance",
@@ -162,7 +163,7 @@ async function loadViewData(view) {
     await Promise.allSettled([loadWorkflows(), loadHistory()]);
   } else if (view === "ai") {
     await listAiModels();
-  } else if (view === "foundation" || view === "eucys") {
+  } else if (view === "foundation") {
     renderFoundationChart(activeChartTab);
   } else if (view === "research") {
     await Promise.allSettled([loadMolecules(), loadMechanisticStatus(), loadCrossScaleStatus()]);
@@ -177,7 +178,7 @@ function setActiveView(view, focusHeading = true) {
   const metadata = VIEW_METADATA[view];
   if (!metadata) return;
 
-  const effectiveView = view === "eucys" ? "foundation" : view;
+  const effectiveView = view;
   document.querySelectorAll("[data-view-panel]").forEach((panel) => {
     panel.hidden = panel.dataset.viewPanel !== effectiveView;
   });
@@ -536,8 +537,9 @@ async function loadStatus() {
     const bridgeApiVersion = Number(status.bridge_api_version || 0);
     engineCompatible = bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION;
     $("sdk-status").textContent = engineCompatible
-      ? `SDK ${status.sdk_version} via ${status.python_executable}`
+      ? `SDK ${status.sdk_version}${status.python_version ? ` · Python ${status.python_version}` : ""}`
       : `SDK ${status.sdk_version} needs a compatibility update`;
+    $("sdk-status").title = status.python_executable || "";
     $("sdk-status-dot").className = engineCompatible ? "status-dot ok" : "status-dot warn";
     $("install-engine-btn").hidden = engineCompatible;
     setText("settings-sdk-version", status.sdk_version || "Unknown");
@@ -1235,7 +1237,13 @@ function renderDiagnostics(payload) {
     bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION ? "good" : "bad"
   ));
   grid.appendChild(diagnosticRow("Python", payload.python_version, "good"));
-  grid.appendChild(diagnosticRow("Ollama", payload.ollama_on_path ? "Available on PATH" : "Not found on PATH", payload.ollama_on_path ? "good" : "warn"));
+  const ollamaInstalled = payload.ollama_installed ?? payload.ollama_on_path;
+  const ollamaState = ollamaInstalled
+    ? payload.ollama_on_path
+      ? "Installed and available on PATH"
+      : "Installed outside PATH; the app can still use it"
+    : "Not installed";
+  grid.appendChild(diagnosticRow("Ollama command", ollamaState, ollamaInstalled ? "good" : "warn"));
   const modules = payload.optional_modules || {};
   for (const [name, available] of Object.entries(modules)) {
     grid.appendChild(diagnosticRow(name, available ? "Ready" : "Optional dependency missing", available ? "good" : "warn"));
@@ -1324,6 +1332,13 @@ async function cancelSelectedWorkflow() {
   }
 }
 
+function resetResultDerivedArtifacts() {
+  lastMdmp = null;
+  lastAcademicBundle = null;
+  setText("mdmp-status", "No MDMP data-contract certificate generated for this selected result yet.");
+  setText("academic-status", "No reproducibility package generated for this selected run yet.");
+}
+
 async function runSelectedWorkflow() {
   if (!engineCompatible) {
     setText(
@@ -1364,15 +1379,15 @@ async function runSelectedWorkflow() {
     activeWorkflowJob = started.job_id;
     const result = await waitForWorkflowJob(activeWorkflowJob);
     lastRun = result;
-    lastAcademicBundle = null;
+    resetResultDerivedArtifacts();
     if (result.output_dir) {
       $("academic-run-dir").value = result.output_dir;
     }
     setText("run-status", result.summary || pretty(result));
     if (result.results_csv) {
       $("csv-path").value = result.results_csv;
-      await previewCsv();
       $("run-complete-actions").hidden = false;
+      await previewCsv({ deferCompartment: true });
     }
     await loadHistory();
   } catch (error) {
@@ -1390,7 +1405,7 @@ async function runSelectedWorkflow() {
   }
 }
 
-async function previewCsv() {
+async function previewCsv({ deferCompartment = false } = {}) {
   const csv = $("csv-path").value.trim();
   if (!csv) {
     setText("results-status", "Choose a results CSV before loading a preview.");
@@ -1400,18 +1415,23 @@ async function previewCsv() {
   try {
     const preview = await call("preview_results", { csv, maxRows: 80 });
     lastPreview = preview;
-    lastMdmp = null;
-    lastAcademicBundle = null;
+    resetResultDerivedArtifacts();
     $("academic-run-dir").value = parentPath(preview.csv_path || csv);
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
-    await loadCompartmentTimeline(preview.csv_path || csv);
     setText("results-status", `Loaded ${preview.row_count} rows.\n${csv}`);
     setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
     setText("ai-context", `Attached result CSV: ${csv}`);
     setActiveView("results", false);
     refreshActionAvailability();
+    setText("compartment-status", "Loading the run's compartment timeline in the background...");
+    const timelineLoad = loadCompartmentTimeline(preview.csv_path || csv);
+    if (deferCompartment) {
+      void timelineLoad;
+    } else {
+      await timelineLoad;
+    }
   } catch (error) {
     lastPreview = null;
     setText("results-status", errorMessage(error));
@@ -1464,7 +1484,7 @@ function renderHistory(entries) {
           results_csv: entry.results_csv,
           report_pdf: entry.report_pdf || null
         };
-        lastAcademicBundle = null;
+        resetResultDerivedArtifacts();
         $("academic-run-dir").value = entry.output_dir || parentPath(entry.results_csv);
         await previewCsv();
       });
@@ -1480,19 +1500,21 @@ async function certifyMdmp() {
     setText("mdmp-status", "Load or run a results CSV first.");
     return;
   }
-  setText("mdmp-status", "Creating MDMP certificate using the standard diabetes contract...");
+  setText("mdmp-status", "Checking the CSV against the standard diabetes data contract...");
   try {
     const payload = await call("certify_mdmp", { csv, quickRows: 5000, full: false });
     lastMdmp = payload;
     setText(
       "mdmp-status",
       [
-        `Grade: ${payload.grade}`,
-        `Compliance score: ${payload.compliance_score}`,
+        `Contract grade: ${payload.grade}`,
+        `Data-contract compliance score: ${payload.compliance_score}`,
         `Rows reviewed: ${payload.row_count}`,
         `Certificate: ${payload.certificate_path}`,
         `Report: ${payload.report_path}`,
-        `Public key: ${payload.public_key_path}`
+        `Public key: ${payload.public_key_path}`,
+        "",
+        "This grade concerns the declared data contract. It does not establish physiological realism, clinical quality, or suitability for patient care."
       ].join("\n")
     );
     refreshActionAvailability();
@@ -1774,6 +1796,7 @@ function renderAiAnswer(payload) {
   metadata.className = "ai-metadata";
   const guard = payload.policy_action || ((payload.policy_violations || []).length ? "blocked" : "clear");
   const suppressedLineCount = Number(payload.suppressed_line_count || 0);
+  const suppressedAdviceLineCount = Number(payload.suppressed_advice_line_count || 0);
   for (const [label, value] of [
     ["Model", payload.model || "unknown"],
     ["CSV context", payload.context_used ? "used" : "not used"],
@@ -1783,6 +1806,12 @@ function renderAiAnswer(payload) {
       suppressedLineCount
         ? `${suppressedLineCount} unsupported line${suppressedLineCount === 1 ? "" : "s"} hidden`
         : "no unsupported values detected"
+    ],
+    [
+      "Treatment-advice filter",
+      suppressedAdviceLineCount
+        ? `${suppressedAdviceLineCount} advisory line${suppressedAdviceLineCount === 1 ? "" : "s"} hidden`
+        : "no adjustment advice detected"
     ],
     ["AI scope", payload.interpretation_restricted ? "limitations + next checks" : "general research question"]
   ]) {
@@ -1836,10 +1865,12 @@ function renderAiAnswer(payload) {
 
 function appendReadableText(container, text) {
   let activeList = null;
+  let activeListKind = null;
   for (const rawLine of String(text).split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line) {
       activeList = null;
+      activeListKind = null;
       continue;
     }
     const normalized = line.replace(/^#{1,6}\s*/, "").replaceAll("**", "").trim();
@@ -1854,14 +1885,16 @@ function appendReadableText(container, text) {
       "Conclusions"
     ].includes(normalized)) {
       activeList = null;
+      activeListKind = null;
       const heading = document.createElement("h3");
       heading.textContent = normalized;
       container.appendChild(heading);
       continue;
     }
     if (/^(?:[-*]|•)\s+/.test(line)) {
-      if (!activeList) {
+      if (!activeList || activeListKind !== "ul") {
         activeList = document.createElement("ul");
+        activeListKind = "ul";
         container.appendChild(activeList);
       }
       const item = document.createElement("li");
@@ -1869,7 +1902,19 @@ function appendReadableText(container, text) {
       activeList.appendChild(item);
       continue;
     }
+    if (/^\d+[.)]\s+/.test(line)) {
+      if (!activeList || activeListKind !== "ol") {
+        activeList = document.createElement("ol");
+        activeListKind = "ol";
+        container.appendChild(activeList);
+      }
+      const item = document.createElement("li");
+      item.textContent = normalized.replace(/^\d+[.)]\s+/, "");
+      activeList.appendChild(item);
+      continue;
+    }
     activeList = null;
+    activeListKind = null;
     const paragraph = document.createElement("p");
     paragraph.textContent = normalized;
     container.appendChild(paragraph);
@@ -2484,6 +2529,9 @@ function refreshActionAvailability() {
   setDisabled("academic-open-metadata-btn", !lastAcademicBundle?.ro_crate_metadata);
   setDisabled("academic-open-audit-btn", !lastAcademicBundle?.audit_json);
   setDisabled("academic-open-guide-btn", !lastAcademicBundle?.readme_md);
+  setDisabled("portfolio-open-btn", !lastScientificPortfolio?.index_html_path);
+  setDisabled("portfolio-manifest-btn", !lastScientificPortfolio?.manifest_json_path);
+  setDisabled("portfolio-reveal-btn", !lastScientificPortfolio?.output_dir);
   setDisabled("ai-ask-btn", aiBusy || !aiQuestionValid);
   $("ai-ask-btn").textContent = aiBusy
     ? "Analyzing..."
@@ -2565,11 +2613,16 @@ function initializeFormState() {
     const value = $("csv-path").value.trim();
     $("csv-path").setAttribute("aria-invalid", String(Boolean(value) && !pathHasExtension(value, ["csv"])));
     lastPreview = null;
-    lastMdmp = null;
+    resetResultDerivedArtifacts();
     refreshActionAvailability();
   });
   $("academic-run-dir").addEventListener("input", () => {
     lastAcademicBundle = null;
+    refreshActionAvailability();
+  });
+  $("portfolio-output-dir").addEventListener("input", () => {
+    lastScientificPortfolio = null;
+    setText("portfolio-status", "No evidence dossier generated for this selected folder yet.");
     refreshActionAvailability();
   });
   $("mechanistic-model").addEventListener("input", () => {
@@ -3106,6 +3159,25 @@ function renderCompartmentTable(index, compartments) {
     `<tbody>${rows}</tbody>`;
 }
 
+function digitalTwinModelTag(schema) {
+  const modelKey = String(schema?.model_key || "").toLowerCase();
+  const modelLabel = String(schema?.model_label || "Loaded model");
+  let family = modelLabel.split(/[,(]/, 1)[0].trim() || "Loaded model";
+  if (modelKey.includes("hovorka") || modelLabel.toLowerCase().includes("hovorka")) family = "Hovorka";
+  if (modelKey.includes("bergman") || modelLabel.toLowerCase().includes("bergman")) family = "Bergman";
+  const stateCount = Array.isArray(schema?.compartments) ? schema.compartments.length : 0;
+  return `${family.toUpperCase()}${stateCount ? ` · ${stateCount} STATES` : ""}`;
+}
+
+function digitalTwinBounds() {
+  const times = (compartmentTimeline?.times || []).filter(Number.isFinite);
+  if (!times.length) return { minimum: 0, maximum: 0 };
+  return {
+    minimum: Math.min(...times),
+    maximum: Math.max(...times)
+  };
+}
+
 async function loadCompartmentTimeline(csv) {
   const viewer = $("compartment-viewer");
   try {
@@ -3130,11 +3202,23 @@ async function loadCompartmentTimeline(csv) {
         (timeline.stride > 1 ? ` (every ${timeline.stride}nd step)` : "")
     );
     setText("compartment-summary", timeline.schema.model_label);
+    setText(
+      "digital-twin-description",
+      `Illustrated view of ${timeline.schema.model_label}. The liver shape has no stored contents of its own -- it visualizes the live endogenous glucose production flux, not a tracked compartment.`
+    );
+    setText("digital-twin-model-label", digitalTwinModelTag(timeline.schema));
+    $("digital-twin-illustration").setAttribute(
+      "aria-label",
+      `Illustrated compartment diagram for ${timeline.schema.model_label}`
+    );
     renderCompartmentDiagram();
     stopDigitalTwinPlayback();
-    digitalTwinMinutes = 0;
-    $("digital-twin-time").value = "0";
-    setText("digital-twin-time-label", "0 min");
+    const bounds = digitalTwinBounds();
+    digitalTwinMinutes = bounds.minimum;
+    $("digital-twin-time").min = String(bounds.minimum);
+    $("digital-twin-time").max = String(bounds.maximum);
+    $("digital-twin-time").value = String(bounds.minimum);
+    setText("digital-twin-time-label", `${Math.round(bounds.minimum)} min`);
     renderDigitalTwinDiagram();
   } catch (error) {
     compartmentTimeline = null;
@@ -3162,7 +3246,10 @@ let digitalTwinMinutes = 0;
 let digitalTwinIntervalId = null;
 
 function currentDigitalTwinMinutes() {
-  return Number($("digital-twin-time").value) || 0;
+  const bounds = digitalTwinBounds();
+  const value = Number($("digital-twin-time").value);
+  if (!Number.isFinite(value)) return bounds.minimum;
+  return Math.min(bounds.maximum, Math.max(bounds.minimum, value));
 }
 
 function showDigitalTwinCard(html) {
@@ -3353,12 +3440,13 @@ function stopDigitalTwinPlayback() {
 }
 
 function tickDigitalTwinPlayback() {
+  const bounds = digitalTwinBounds();
   const nextMinutes = digitalTwinMinutes + (DIGITAL_TWIN_TICK_MS / 1000) * DIGITAL_TWIN_BASE_MINUTES_PER_SECOND * digitalTwinSpeed;
-  digitalTwinMinutes = Math.min(1440, nextMinutes);
+  digitalTwinMinutes = Math.min(bounds.maximum, nextMinutes);
   $("digital-twin-time").value = String(Math.round(digitalTwinMinutes));
   setText("digital-twin-time-label", `${Math.round(digitalTwinMinutes)} min`);
   renderDigitalTwinDiagram();
-  if (nextMinutes >= 1440) stopDigitalTwinPlayback(); // no auto-loop, per the plan
+  if (nextMinutes >= bounds.maximum) stopDigitalTwinPlayback(); // no auto-loop
 }
 
 function activateCompartmentMode(mode) {
@@ -3392,7 +3480,12 @@ $("digital-twin-play-btn").addEventListener("click", () => {
     stopDigitalTwinPlayback();
     return;
   }
-  if (digitalTwinMinutes >= 1440) digitalTwinMinutes = 0; // restart, not a Play no-op at the end
+  const bounds = digitalTwinBounds();
+  if (digitalTwinMinutes >= bounds.maximum) {
+    digitalTwinMinutes = bounds.minimum; // restart, not a Play no-op at the end
+    $("digital-twin-time").value = String(bounds.minimum);
+    setText("digital-twin-time-label", `${Math.round(bounds.minimum)} min`);
+  }
   digitalTwinPlaying = true;
   const button = $("digital-twin-play-btn");
   button.dataset.playing = "true";
@@ -3889,17 +3982,63 @@ document.querySelectorAll("[data-chart-tab]").forEach(btn => {
   });
 });
 
-// Scientific portfolio / evidence dossier button
-$("eucys-playbook-btn")?.addEventListener("click", async () => {
-  setText("foundation-status", "Generating the evidence dossier. Figures without required measured inputs are skipped rather than fabricated...");
+// Scientific portfolio / evidence dossier actions live in their own workspace.
+$("portfolio-output-browse-btn")?.addEventListener("click", () => chooseLocalPath({
+  inputId: "portfolio-output-dir",
+  buttonId: "portfolio-output-browse-btn",
+  statusId: "portfolio-status",
+  title: "Choose the scientific evidence dossier folder",
+  directory: true,
+  selectedLabel: "Dossier output folder selected"
+}));
+
+$("portfolio-generate-btn")?.addEventListener("click", async () => {
+  const outputDir = $("portfolio-output-dir").value.trim();
+  if (!outputDir) {
+    setText("portfolio-status", "Choose a dossier output folder first.");
+    return;
+  }
+  $("portfolio-generate-btn").disabled = true;
+  setText(
+    "portfolio-status",
+    "Generating the evidence dossier. Figures without required measured inputs are marked as ungenerated rather than fabricated..."
+  );
   try {
-    const result = await invoke("generate_eucys_playbook", { outputDir: "results/scientific_portfolio" });
-    setText("foundation-status", `Evidence portfolio generated successfully!\nTotal Figures: ${result.data?.total_figures}\nInteractive Dossier: ${result.data?.index_html_path}\nManifest: ${result.data?.manifest_json_path}`);
-    renderFoundationChart("clarke");
-  } catch (err) {
-    setText("foundation-status", `Evidence portfolio generation failed: ${err}`);
+    const result = await call("generate_eucys_playbook", { outputDir });
+    lastScientificPortfolio = result;
+    const figures = Array.isArray(result.figures) ? result.figures : [];
+    const renderedCount = figures.filter(
+      (figure) => figure.png_path && !String(figure.subtitle || "").toLowerCase().includes("not generated")
+    ).length;
+    setText(
+      "portfolio-status",
+      [
+        "Evidence dossier generated.",
+        `Rendered figures: ${renderedCount} of ${result.total_figures ?? figures.length}`,
+        `Interactive dossier: ${result.index_html_path}`,
+        `Manifest: ${result.manifest_json_path}`,
+        "",
+        "Review every figure, caption, source file, unit, cohort definition, and licence before sharing."
+      ].join("\n")
+    );
+  } catch (error) {
+    lastScientificPortfolio = null;
+    setText("portfolio-status", `Evidence dossier generation failed: ${errorMessage(error)}`);
+  } finally {
+    $("portfolio-generate-btn").disabled = false;
+    refreshActionAvailability();
   }
 });
+
+$("portfolio-open-btn")?.addEventListener("click", () =>
+  openPath(lastScientificPortfolio?.index_html_path, "portfolio-status")
+);
+$("portfolio-manifest-btn")?.addEventListener("click", () =>
+  openPath(lastScientificPortfolio?.manifest_json_path, "portfolio-status")
+);
+$("portfolio-reveal-btn")?.addEventListener("click", () =>
+  revealPath(lastScientificPortfolio?.output_dir, "portfolio-status")
+);
 
 // Foundation model inputs and evidence-only actions
 let foundationArenaResultFiles = [];
@@ -3978,15 +4117,15 @@ $("foundation-arena-btn")?.addEventListener("click", async () => {
   }
   setText("foundation-status", "Validating benchmark contracts and comparing supplied evidence...");
   try {
-    const result = await invoke("run_foundation_arena", {
+    const result = await call("run_foundation_arena", {
       outputDir: "results/foundation_arena",
       resultFiles: foundationArenaResultFiles
     });
-    const modelCount = result.data?.total_models_evaluated ?? result.data?.models?.length ?? 0;
+    const modelCount = result.total_models_evaluated ?? result.models?.length ?? 0;
     setText("metric-foundation-evaluation", `${modelCount} model${modelCount === 1 ? "" : "s"}`);
     setText(
       "foundation-status",
-      `Evidence comparison complete.\nBenchmark: ${result.data?.benchmark_id}\nModels: ${modelCount}\nReport: ${result.data?.report_md_path}`
+      `Evidence comparison complete.\nBenchmark: ${result.benchmark_id}\nModels: ${modelCount}\nReport: ${result.report_md_path}`
     );
   } catch (error) {
     setText("foundation-status", `Evidence comparison failed: ${errorMessage(error)}`);
@@ -4002,7 +4141,7 @@ $("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
   }
   setText("foundation-status", "Pretraining the independent GlucoFM reproduction. This can take a long time; the UI remains responsive...");
   try {
-    const result = await invoke("pretrain_glucofm", {
+    const result = await call("pretrain_glucofm", {
       source,
       outputDir,
       glucoseColumn: $("foundation-glucose-column").value.trim() || null,
@@ -4013,14 +4152,14 @@ $("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
       device: "auto",
       seed: 42
     });
-    const checkpoint = result.data?.checkpoint_path;
+    const checkpoint = result.checkpoint_path;
     if (checkpoint) {
       $("foundation-glucofm-checkpoint").value = checkpoint;
       setText("metric-glucofm-checkpoint", "Trained");
     }
     setText(
       "foundation-status",
-      `Pretraining complete.\\nTrain/validation subjects: ${result.data?.train_subjects}/${result.data?.validation_subjects}\\nBest validation loss: ${Number(result.data?.best_validation_loss).toFixed(6)}\\nCheckpoint: ${checkpoint}\\nReport: ${result.data?.report_path}`
+      `Pretraining complete.\nTrain/validation subjects: ${result.train_subjects}/${result.validation_subjects}\nBest validation loss: ${Number(result.best_validation_loss).toFixed(6)}\nCheckpoint: ${checkpoint}\nReport: ${result.report_path}`
     );
   } catch (error) {
     setText("foundation-status", `GlucoFM pretraining failed: ${errorMessage(error)}`);
@@ -4036,17 +4175,17 @@ $("foundation-glucofm-btn")?.addEventListener("click", async () => {
   }
   setText("foundation-status", "Extracting a checkpoint-backed 128D representation...");
   try {
-    const result = await invoke("extract_glucofm_embedding", {
+    const result = await call("extract_glucofm_embedding", {
       csv,
       checkpoint,
       glucoseColumn: $("foundation-glucose-column").value.trim() || null,
       timestampColumn: $("foundation-timestamp-column").value.trim() || null
     });
-    lastGlucoFMEmbedding = result.data?.embedding || null;
+    lastGlucoFMEmbedding = result.embedding || null;
     setText("metric-glucofm-checkpoint", "Verified");
     setText(
       "foundation-status",
-      `Embedding generated.\nModel: ${result.data?.model}\nOfficial Google checkpoint: no\nLatent dimension: ${result.data?.latent_dim}\nObserved-grid coverage: ${((result.data?.input_coverage || 0) * 100).toFixed(1)}%\nCheckpoint SHA-256: ${result.data?.checkpoint_sha256}`
+      `Embedding generated.\nModel: ${result.model}\nOfficial Google checkpoint: no\nLatent dimension: ${result.latent_dim}\nObserved-grid coverage: ${((result.input_coverage || 0) * 100).toFixed(1)}%\nCheckpoint SHA-256: ${result.checkpoint_sha256}`
     );
     document.querySelectorAll("[data-chart-tab]").forEach((button) => {
       button.classList.toggle("is-active", button.dataset.chartTab === "embedding");

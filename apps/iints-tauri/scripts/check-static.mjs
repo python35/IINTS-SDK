@@ -39,6 +39,15 @@ const script =
   "\n" +
   readFileSync(join(appRoot, "frontend/digital-twin-data.js"), "utf8");
 const styles = readFileSync(join(appRoot, "frontend/styles.css"), "utf8");
+
+// Rust already unwraps the Python bridge's {ok, data} envelope. Consuming
+// result.data here makes successful calls look empty and used to break the
+// Foundation workflows without a useful error.
+if (/\bresult\.data\b/.test(script)) {
+  console.error("Frontend must consume unwrapped bridge responses directly, not result.data.");
+  process.exit(1);
+}
+
 const tauriConfig = JSON.parse(readFileSync(join(appRoot, "src-tauri/tauri.conf.json"), "utf8"));
 const capabilities = JSON.parse(readFileSync(join(appRoot, "src-tauri/capabilities/main.json"), "utf8"));
 if (!html.includes("Research only") || !html.includes("Not a medical device")) {
@@ -58,6 +67,15 @@ if (!html.includes("skip-link") || !html.includes("guide-btn") || !html.includes
 
 if (!html.includes("ai-model-options") || !script.includes("renderAiAnswer")) {
   console.error("The local AI workspace must expose model choices and readable structured output.");
+  process.exit(1);
+}
+
+if (
+  !script.includes("Treatment-advice filter")
+  || !script.includes("suppressed_advice_line_count")
+  || !script.includes('document.createElement("ol")')
+) {
+  console.error("Local AI output must expose deterministic advice filtering and readable ordered checks.");
   process.exit(1);
 }
 
@@ -119,6 +137,11 @@ const pickerIds = [
   "output-browse-btn",
   "csv-browse-btn",
   "academic-run-browse-btn",
+  "portfolio-output-browse-btn",
+  "foundation-glucofm-train-source-browse-btn",
+  "foundation-glucofm-train-output-browse-btn",
+  "foundation-glucofm-csv-browse-btn",
+  "foundation-glucofm-checkpoint-browse-btn",
   "mechanistic-model-browse-btn",
   "copasi-model-browse-btn",
   "cellml-model-browse-btn",
@@ -194,11 +217,30 @@ if (!html.includes("FMI does not sandbox native code or OS access")) {
   process.exit(1);
 }
 
-for (const view of ["overview", "run", "results", "reproducibility", "ai", "research", "evidence", "settings"]) {
+for (const view of ["overview", "run", "results", "reproducibility", "ai", "foundation", "eucys", "research", "evidence", "settings"]) {
   if (!html.includes(`data-view="${view}"`) || !html.includes(`data-view-panel="${view}"`)) {
     console.error(`Missing navigation or panel mapping for ${view}.`);
     process.exit(1);
   }
+}
+
+if (
+  !html.includes('id="digital-twin-description"')
+  || !html.includes('id="digital-twin-model-label"')
+  || script.includes("Math.min(1440")
+  || script.includes(">= 1440")
+) {
+  console.error("The illustrated compartment view must use the loaded model label and the run's actual time bounds.");
+  process.exit(1);
+}
+
+if (
+  !html.includes('data-view-panel="eucys"')
+  || !html.includes('id="portfolio-generate-btn"')
+  || !script.includes('call("generate_eucys_playbook"')
+) {
+  console.error("Scientific Portfolio must have a dedicated, functioning evidence-dossier workspace.");
+  process.exit(1);
 }
 
 const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);

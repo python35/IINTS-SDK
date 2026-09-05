@@ -286,6 +286,19 @@ const previewClicks = registry.get("preview-btn")?.listeners.click || [];
 check(previewClicks.length > 0, "No click handler is bound to preview-btn.");
 await Promise.all(previewClicks.map((fn) => fn()));
 
+check(
+  byId("digital-twin-time").max === "10",
+  `Illustrated-view time bounds should end at the run's last sample (10), got ${byId("digital-twin-time").max}.`
+);
+check(
+  /FIXTURE/.test(String(byId("digital-twin-model-label").textContent)),
+  "Illustrated-view model tag should be derived from the loaded schema instead of naming a fixed model."
+);
+check(
+  /Fixture model/.test(String(byId("digital-twin-description").textContent)),
+  "Illustrated-view description should identify the loaded model."
+);
+
 // renderDigitalTwinDiagram() doesn't gate on which compartment-view tab is
 // active, so driving the time input alone is enough to exercise it here --
 // same as scrubbing while the "Illustrated view" tab happens to be open.

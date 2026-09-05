@@ -18,6 +18,7 @@ from iints_desktop import jury_demo
 from iints_desktop.engine import get_desktop_preset
 
 FRONTEND_JS = Path("apps/iints-tauri/frontend/main.js")
+FRONTEND_HTML = Path("apps/iints-tauri/frontend/index.html")
 TAURI_MAIN_RS = Path("apps/iints-tauri/src-tauri/src/main.rs")
 
 
@@ -36,7 +37,10 @@ def test_supporting_presets_exist() -> None:
         assert get_desktop_preset(key).preset_name
 
 
-@pytest.mark.skipif(not FRONTEND_JS.exists(), reason="Tauri frontend not present")
+@pytest.mark.skipif(
+    not FRONTEND_JS.exists() or not FRONTEND_HTML.exists(),
+    reason="Tauri frontend not present",
+)
 def test_portfolio_default_matches_the_path_the_panel_requests() -> None:
     """The panel asks the bridge for a relative path; the default must match it.
 
@@ -48,9 +52,12 @@ def test_portfolio_default_matches_the_path_the_panel_requests() -> None:
     """
 
     source = FRONTEND_JS.read_text(encoding="utf-8")
+    html = FRONTEND_HTML.read_text(encoding="utf-8")
     requested = jury_demo.PORTFOLIO_PANEL_SUBPATH.as_posix()
 
-    assert f'outputDir: "{requested}"' in source
+    assert f'id="portfolio-output-dir" value="{requested}"' in html
+    assert 'const outputDir = $("portfolio-output-dir").value.trim();' in source
+    assert 'call("generate_eucys_playbook", { outputDir })' in source
     assert (
         jury_demo.build_jury_demo.__doc__ is not None
     )  # the behaviour below is documented
@@ -135,6 +142,59 @@ def test_manifest_is_valid_json_and_marks_research_only(
     assert payload["medical_device"] is False
     assert payload["jury_preset_key"] == jury_demo.JURY_PRESET_KEY
     assert payload["failed_step_count"] >= 1
+
+
+class _FakeRun:
+    def __init__(self, results_csv: Path) -> None:
+        self.results_csv = results_csv
+
+
+def _write_csv(path: Path, reference: list[float], measured: list[float]) -> Path:
+    header = "time_minutes,glucose_actual_mgdl,glucose_to_algo_mgdl\n"
+    rows = "".join(
+        f"{index * 5},{ref},{meas}\n"
+        for index, (ref, meas) in enumerate(zip(reference, measured))
+    )
+    path.write_text(header + rows, encoding="utf-8")
+    return path
+
+
+def test_error_grid_pairs_are_withheld_when_the_columns_are_identical(
+    tmp_path: Path,
+) -> None:
+    """A grid of a perfect diagonal would imply an accuracy the model never claimed."""
+
+    values = [100.0 + index for index in range(30)]
+    csv = _write_csv(tmp_path / "identical.csv", values, list(values))
+
+    assert jury_demo._sensor_error_pairs(_FakeRun(csv)) is None
+
+
+def test_error_grid_pairs_are_returned_when_the_sensor_really_differs(
+    tmp_path: Path,
+) -> None:
+    reference = [100.0 + index for index in range(30)]
+    measured = [value + 4.0 for value in reference]
+    csv = _write_csv(tmp_path / "differs.csv", reference, measured)
+
+    pairs = jury_demo._sensor_error_pairs(_FakeRun(csv))
+
+    assert pairs is not None
+    assert len(pairs[0]) == len(pairs[1]) == 30
+
+
+def test_glycemic_summary_measures_the_consensus_metrics(tmp_path: Path) -> None:
+    # Half the samples in range, a quarter low, a quarter high.
+    reference = [120.0] * 20 + [60.0] * 10 + [220.0] * 10
+    csv = _write_csv(tmp_path / "mixed.csv", reference, reference)
+
+    summary = jury_demo._glycemic_summary(csv)
+
+    assert summary is not None
+    assert summary["time_in_range_70_180_pct"] == 50.0
+    assert summary["time_below_70_pct"] == 25.0
+    assert summary["time_above_180_pct"] == 25.0
+    assert summary["min_mgdl"] == 60.0
 
 
 @pytest.mark.skipif(
