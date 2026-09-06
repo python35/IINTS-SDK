@@ -1,0 +1,437 @@
+<!-- ══════════════════════════════════════════════════════════ CH 15 ═══ -->
+<section class="chapter" id="ch16" data-part="II · Physiology" data-n="15" data-title="Circadian / dawn (F10, F16)" style="--sys: var(--sys-action)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 15</div>
+    <h2>Circadian rhythm and the dawn phenomenon</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      Two components, one window. The second exists because the first is too easy for a
+      controller to defeat.
+    </p>
+    <div class="chips"><span class="chip chip--id">F10</span><span class="chip chip--id">F16</span><span class="chip chip--heuristic">heuristic</span><span class="chip">both default to 0</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F10 · F16</span><span class="fx__title">Shared raised-cosine window and its two effects</span></div>
+    <div class="fx__body">
+      $$w(t)=\tfrac12\left[1+\cos\!\left(\frac{\pi\,(t_{\mathrm{mod}}-t_m)}{h}\right)\right]
+      \quad\text{for } |t_{\mathrm{mod}}-t_m|\le h,\ \ 0 \text{ otherwise}$$
+      $$\underbrace{r_{\mathrm{dawn}}(t)=\frac{s_{\mathrm{dawn}}}{60}\,w(t)}_{\textbf{F10 — additive inflow}}
+      \qquad\qquad
+      \underbrace{M_{\mathrm{dawn}}(t)=1-f_{\mathrm{dawn}}\,w(t)}_{\textbf{F16 — loss of sensitivity}}$$
+    </div>
+    <div class="fx__foot">\(t_m\) is the window midpoint, \(h\) its half-width, \(t_{\mathrm{mod}} = t \bmod 1440\). One window function serves both, so they can never drift apart.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th><th class="num">Range</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">s<sub>dawn</sub></td><td>Peak glucose-rate perturbation</td><td class="unit">mg/dL/hour</td><td class="num">0.0</td><td class="num">≥ 0</td></tr>
+        <tr><td class="sym">f<sub>dawn</sub></td><td>Peak fractional sensitivity loss</td><td class="unit">—</td><td class="num">0.0</td><td class="num">[0, 1)</td></tr>
+        <tr><td class="sym">t<sub>start</sub></td><td>Window start</td><td class="unit">hour</td><td class="num">4.0</td><td class="num">[0, 24)</td></tr>
+        <tr><td class="sym">t<sub>end</sub></td><td>Window end</td><td class="unit">hour</td><td class="num">8.0</td><td class="num">(start, 24]</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">Why two components and not one</h4>
+  <p>
+    This is the most instructive design decision in the whole physiology layer, and it makes a good
+    answer to "how do you avoid flattering your own algorithms?"
+  </p>
+  <p>
+    An additive glucose inflow is <b>dose-cancellable</b>. A closed-loop controller can simply give
+    more insulin and completely erase it — which is not how the dawn phenomenon behaves in patients.
+    Clinically, dawn is in substantial part a <em>resistance</em> phenomenon: counter-regulatory
+    hormones blunt insulin's effect, so the same dose achieves less, and as resistance rises each
+    additional unit buys progressively less. Modelling dawn only as an inflow therefore lets an
+    algorithm look better overnight than it would be in a person. F16 exists to remove that free win.
+  </p>
+  <p>
+    \(f_{\mathrm{dawn}}\) is capped strictly below 1.0 so that insulin action can never be abolished
+    entirely — at \(f = 1\) the glucose trajectory would become independent of every dose the
+    algorithm gives, which is a degenerate test, not a hard one.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f10_f16_dawn}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 10</span> — one window, two effects.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: the shared raised-cosine window \(w(t)\) over 24 h. Centre: the F10 inflow rate at two strengths. Right: the F16 sensitivity multiplier at two fractions.</dd></div>
+        <div><dt>Parameters</dt><dd>Window 04:00–08:00 (\(t_m\) = 06:00, \(h\) = 2 h). \(s_{dawn}\) ∈ {15, 30} mg/dL/h; \(f_{dawn}\) ∈ {0.15, 0.30}.</dd></div>
+        <div><dt>Key observation</dt><dd>Both peak at exactly 06:00 and both reach zero effect smoothly at the window edges — no discontinuous rate at 04:00 or 08:00, which a rectangular window would produce.</dd></div>
+        <div><dt>Why it matters</dt><dd>Sharing \(w(t)\) is a correctness property: changing the window shape cannot silently move one component relative to the other.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <figure>
+    <div class="plate">{{FIG:dawn_effect}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 11</span> — what each component actually costs the controller.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Three otherwise-identical closed-loop days: dawn off, inflow only, and inflow plus resistance.</dd></div>
+        <div><dt>Parameters</dt><dd>Hovorka 70 kg, ISF 50, ICR 10, basal 0.8 U/h, meals 60/80/70 g, Clinical Baseline, seed 11. \(s_{dawn}\) = 30 mg/dL/h, \(f_{dawn}\) = 0.30.</dd></div>
+        <div><dt>Key observation</dt><dd>TIR 79.9% → 80.6% → 78.9%. The inflow-only case is <em>not worse</em> than dawn-off — the controller absorbs it entirely, exactly as predicted. Only adding resistance produces a measurable penalty.</dd></div>
+        <div><dt>Why it matters</dt><dd>This is the empirical justification for F16 existing at all, produced by the model rather than asserted.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Phenomenological, and off by default.</strong> The literature supports a circadian
+    fall in insulin sensitivity toward early morning. The raised-cosine shape and the peak values are
+    IINTS scenario heuristics, not coefficients estimated from any cited study, and this is not a
+    cortisol or growth-hormone model. Both parameters default to zero, so the default configuration
+    reproduces the pre-existing behaviour exactly.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Why a raised cosine rather than a step or a sine?</p>
+      <p class="qa__a">A step gives a discontinuous glucose rate at 04:00 and 08:00, which is both
+      unphysiological and hard on the integrator. A plain sine over the window would not reach zero at
+      the edges. The raised cosine is \(C^1\), is exactly zero outside the window and exactly 1 at the
+      midpoint, and needs only the two parameters a user already sets.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Where does F16 enter the equations?</p>
+      <p class="qa__a">Through the sensitivity multiplier, never through glucose directly. In Hovorka it
+      multiplies \(k_{b1}, k_{b2}, k_{b3}\) — that is, \(S_{IT}, S_{ID}\) and \(S_{IE}\) alike, so
+      transport, disposal and hepatic suppression all lose sensitivity together. In Bergman it
+      multiplies \(p_3\), because \(S_I = p_3/p_2\) and scaling \(p_3\) scales sensitivity itself rather
+      than the momentary effect.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 16 ═══ -->
+<section class="chapter" id="ch17" data-part="II · Physiology" data-n="16" data-title="Stress and exercise (F08)" style="--sys: var(--sys-action)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 16</div>
+    <h2>Stress and exercise</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Two first-order filters standing in for a great deal of endocrinology.</p>
+    <div class="chips"><span class="chip chip--id">F08</span><span class="chip chip--heuristic">heuristic</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F08</span><span class="fx__title">Pseudo-hormone states and their multipliers</span></div>
+    <div class="fx__body">
+      $$\frac{dH_{\mathrm{stress}}}{dt}=\frac{H_{\mathrm{stress}}^{\mathrm{target}}-H_{\mathrm{stress}}}{20},
+      \qquad
+      \frac{dH_{\mathrm{ex}}}{dt}=\frac{H_{\mathrm{ex}}^{\mathrm{target}}-H_{\mathrm{ex}}}{10}$$
+      $$S_{\mathrm{overall}}=\left(1-0.7\,H_{\mathrm{stress}}\right)\left(1+2\,H_{\mathrm{ex}}\right),
+      \qquad
+      \mathrm{EGP}_{\mathrm{stress}}=1+0.5\,H_{\mathrm{stress}}$$
+    </div>
+    <div class="fx__foot">Targets are the scenario intensities, each in [0,1]. Time constants: 20 min for stress, 10 min for exercise.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Effect</th><th>At intensity 1.0</th><th>Direction</th></tr></thead>
+      <tbody>
+        <tr><td>Stress → insulin sensitivity</td><td class="num">×0.30</td><td>70% loss of sensitivity</td></tr>
+        <tr><td>Stress → EGP</td><td class="num">×1.50</td><td>50% more hepatic output</td></tr>
+        <tr><td>Exercise → insulin sensitivity</td><td class="num">×3.00</td><td>tripled</td></tr>
+        <tr><td>Exercise → NIMGU (via GLUT4)</td><td class="num">×2.50</td><td>see <a class="xref" href="#ch10">F09</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Stress is therefore doubly hyperglycaemic — less insulin effect <em>and</em> more liver output —
+    while exercise is doubly hypoglycaemic, raising both insulin-dependent and insulin-independent
+    disposal. The two are not mirror images, which is correct: they act through different mechanisms.
+  </p>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>These are not hormone concentrations.</strong> The registry is blunt:
+    <em>"The stress branch is not a cortisol/adrenaline concentration model."</em> The sources support
+    the <em>direction</em> of exercise effects on glucose effectiveness, insulin sensitivity and
+    insulin-independent uptake; the filter time constants and the multiplier coefficients (0.7, 2, 0.5,
+    1.5) are heuristic scenario parameters, not values identified by those studies. Present them as
+    scenario dials with defensible signs, not as measured endocrinology.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Does your model reproduce post-exercise late hypoglycaemia?</p>
+      <p class="qa__a">Yes, and it emerges rather than being coded. The mechanism is the asymmetry in
+      F09: GLUT4 activates at 0.05 min⁻¹ but deactivates at 0.01 min⁻¹, so elevated insulin-independent
+      uptake persists for hours after \(H_{\mathrm{ex}}\) itself has returned to zero with its 10-minute
+      time constant. Whether the magnitude is right is unvalidated.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Exercise tripling insulin sensitivity seems extreme.</p>
+      <p class="qa__a">It is at the top of the plausible range and it applies only at maximum intensity,
+      which a scenario has to request explicitly. It is a heuristic coefficient, and I would treat any
+      quantitative result that depends strongly on it as a sensitivity finding rather than a
+      conclusion. The direction is well supported; the factor is not calibrated.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 17 ═══ -->
+<section class="chapter" id="ch18" data-part="II · Physiology" data-n="17" data-title="Beta-cell, graft &amp; immune terms" style="--sys: var(--sys-liver)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 17</div>
+    <h2>Beta-cell, graft and immune modelling</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      The smallest chapter in Part II, and deliberately so. Read the boundary note first.
+    </p>
+    <div class="chips"><span class="chip chip--heuristic">heuristic</span><span class="chip">Bergman backend only</span><span class="chip">off by default</span></div>
+  </div>
+
+  <div class="note note--stop">
+    <div class="note__ic">!</div>
+    <div>
+      <p><strong>Scope boundary — state this before anything else in this area.</strong>
+      IINTS-AF contains <em>no</em> immune-cell model, <em>no</em> beta-cell mass dynamics, and
+      <em>no</em> PD-L1 pharmacodynamics. There is no equation anywhere in the SDK in which a PD-L1
+      parameter appears. The only occurrence of the term is as a label inside a static reference
+      protein panel (<span class="mono">data/regenerative_protein_panels.json</span>) used for
+      annotation — it is data, not a modelled quantity.</p>
+      <p>If a jury member asks how PD-L1 expression affects your simulation, the correct and
+      complete answer is: <b>it does not, and the SDK does not claim it does.</b></p>
+    </div>
+  </div>
+
+  <h3 class="sec">What does exist</h3>
+  <p>
+    A single abstract graft state in the Bergman backend, with a first-order decay standing in for
+    immune rejection:
+  </p>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">graft</span><span class="fx__title">Functional graft mass and its rejection</span></div>
+    <div class="fx__body">
+      $$\frac{dM_{\mathrm{graft}}}{dt}=-k_{\mathrm{reject}}\,M_{\mathrm{graft}},
+      \qquad
+      q_{\mathrm{sec}}=\gamma\,M_{\mathrm{graft}}\max(G-h,0)\,V_I$$
+    </div>
+    <div class="fx__foot">Initial \(M_{\mathrm{graft}}\) is the configured engraftment percentage ÷ 100. Secretion may be routed to plasma directly or through the S₁ depot via \(f_{\mathrm{subq}}\).</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">stem_cell_engraftment_percent</td><td>Initial functional graft fraction</td><td class="unit">%</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">immune_rejection_rate</td><td>First-order graft decay</td><td class="unit">1/min</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">stem_cell_subq_fraction</td><td>0 = portal/immediate, 1 = SC/delayed</td><td class="unit">—</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">γ</td><td>Secretion gain</td><td class="unit">(mU/L)/(mg/dL)/min</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">h</td><td>Secretion threshold</td><td class="unit">mg/dL</td><td class="num">80.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What this can and cannot support</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">Can express</div><div class="beh__v">"If a graft restored a given fraction of glucose-responsive secretion, and that fraction decayed exponentially, what would the glucose trajectory look like?" — a what-if with an explicit, single assumption.</div></div>
+    <div class="beh__row"><div class="beh__k">Cannot express</div><div class="beh__v">Autoimmune attack kinetics, T-cell or macrophage populations, checkpoint signalling, inflammation, graft revascularisation, or any mechanism by which an immunomodulatory intervention would change \(k_{\mathrm{reject}}\).</div></div>
+    <div class="beh__row"><div class="beh__k">Guardrail</div><div class="beh__v">The patient factory <em>raises</em> if graft parameters are passed to a backend that does not implement them, rather than silently ignoring them — so a result can never come from a configuration that was quietly dropped.</div></div>
+    <div class="beh__row"><div class="beh__k">Honest framing</div><div class="beh__v">\(M_{\mathrm{graft}} = 1.0\) is an abstract functional fraction. The source comment states directly that 100% <em>"is not a clinical cure claim."</em></div></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">You mention regenerative medicine. What is the immune model?</p>
+      <p class="qa__a">There isn't one, and I would not want to imply otherwise. There is a single
+      exponential decay constant on an abstract graft-survival fraction. It is a placeholder that lets
+      the glucose model respond to a declining graft; it contains no immunology. Anything stronger
+      would need cell-population dynamics the SDK has neither the data nor the validation to support.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Could you extend it to model immunosuppression?</p>
+      <p class="qa__a">Structurally, yes — \(k_{\mathrm{reject}}\) is exactly the hook a
+      pharmacodynamic term would attach to, in the same pattern as the glucagon effect compartment.
+      What is missing is calibration data, not code. I would rather ship an honest one-parameter
+      placeholder than an elaborate model with no numbers behind it.</p>
+    </div>
+  </div>
+</section>
+
+
+<div class="part"><div class="part__n">Part III · Devices</div><div class="part__rule"></div></div>
+
+<!-- ══════════════════════════════════════════════════════════ CH 18 ═══ -->
+<section class="chapter" id="ch19" data-part="III · Devices" data-n="18" data-title="Insulin pump model" style="--sys: var(--sys-insulin)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 18</div>
+    <h2>Insulin pump and delivery</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">What the algorithm asks for is not what the patient receives.</p>
+    <div class="chips"><span class="chip">bench abstraction</span><span class="chip">seeded</span></div>
+  </div>
+
+  <p>
+    The pump sits between the supervisor and the patient. It applies, in this fixed order:
+    a non-negative clamp, a per-step cap, continuous delivery noise, quantisation with optional
+    per-micro-step errors, a delivery-interruption draw, and a final re-cap.
+  </p>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th>Meaning</th><th>Unit</th><th class="num">Default</th><th>Status returned</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">max_units_per_step</td><td>Hard per-step cap</td><td class="unit">U</td><td class="num">None</td><td class="mono">capped</td></tr>
+        <tr><td class="sym">quantization_units</td><td>Motor micro-step size</td><td class="unit">U</td><td class="num">None</td><td>—</td></tr>
+        <tr><td class="sym">delivery_noise_std</td><td>Continuous dose error</td><td class="unit">U</td><td class="num">0.0</td><td class="mono">delivery_error</td></tr>
+        <tr><td class="sym">step_error_probability</td><td>Per-micro-step fault chance</td><td class="unit">—</td><td class="num">None</td><td class="mono">delivery_error</td></tr>
+        <tr><td class="sym">dropout_prob</td><td>Whole-step delivery failure</td><td class="unit">—</td><td class="num">0.0</td><td class="mono">delivery_interruption</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:pump}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 12</span> — quantisation and step-error asymmetry, from the real <span class="mono">PumpModel</span>.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: delivered against requested units, zoomed to small doses, at two micro-step sizes. Right: the distribution of delivery error over 2000 identical 1.0 U commands with a 2% per-step fault rate.</dd></div>
+        <div><dt>Parameters</dt><dd>Quantisation 0.025 and 0.10 U; right panel 0.025 U with <span class="mono">step_error_probability</span> = 0.02, seed 3 / 5.</dd></div>
+        <div><dt>Key observation</dt><dd>Small doses are the ones quantisation distorts most — at 0.10 U granularity a 0.04 U request rounds to zero. The error distribution is <b>asymmetric and biased low</b> (mean −0.008 U), because a fault is 70% likely to be a missed actuation and 30% an extra one.</dd></div>
+        <div><dt>Why it matters</dt><dd>A controller that relies on fine basal modulation loses resolution first, and the loss is systematically in the under-delivery direction — a bias that accumulates over a day.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Not a motor or fluid model.</strong> The 70/30 miss-versus-extra split is a
+    configurable research assumption, explicitly <em>"not rotor physics"</em>. Occlusion, priming,
+    bubble formation, cannula kinking and temperature effects are not modelled. This is a
+    transparent bench abstraction of dose-domain uncertainty.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Why model pump error at all — isn't it negligible?</p>
+      <p class="qa__a">Per dose, yes. Over a day it is not, because the error is biased rather than
+      zero-mean: with the default asymmetry the pump systematically under-delivers by about 0.8% of
+      commanded insulin. A controller tuned against a perfect actuator will slowly run higher than it
+      expects, and that only shows up if the actuator is modelled.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 19 ═══ -->
+<section class="chapter" id="ch20" data-part="III · Devices" data-n="19" data-title="CGM sensor model (F15)" style="--sys: var(--sys-sensor)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 19</div>
+    <h2>CGM sensor simulation</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The single largest source of difficulty for any controller in this SDK.</p>
+    <div class="chips"><span class="chip chip--id">F15</span><span class="chip chip--adapted">adapted</span><span class="chip">seeded, reproducible</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F15</span><span class="fx__title">Blood-to-interstitial lag and the observation equation</span></div>
+    <div class="fx__body">
+      $$\tau_{\mathrm{ISF}}\frac{d\,\mathrm{ISF}}{dt}=\mathrm{BG}_{\mathrm{lagged}}-\mathrm{ISF}$$
+      $$\alpha=1-e^{-\Delta t/\tau_{\mathrm{ISF}}},\qquad
+      \mathrm{ISF}_{k+1}=\mathrm{ISF}_k+\alpha\left(\mathrm{BG}_{\mathrm{lagged}}-\mathrm{ISF}_k\right)$$
+      $$\mathrm{CGM}=\mathrm{ISF}+b+d+\varepsilon-o_{\mathrm{compression}}$$
+    </div>
+    <div class="fx__foot">The discrete update is the <em>exact</em> solution for constant input over the step, not an Euler approximation.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">τ<sub>ISF</sub></td><td>Interstitial time constant</td><td class="unit">min</td><td class="num">5.0</td></tr>
+        <tr><td class="sym">lag_minutes</td><td>Transport dead time</td><td class="unit">min</td><td class="num">5</td></tr>
+        <tr><td class="sym">b</td><td>Calibration bias</td><td class="unit">mg/dL</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">σ<sub>noise</sub></td><td>Noise standard deviation</td><td class="unit">mg/dL</td><td class="num">8.5</td></tr>
+        <tr><td class="sym">φ</td><td>AR(1) noise correlation</td><td class="unit">—</td><td class="num">0.85</td></tr>
+        <tr><td class="sym">H</td><td>Hurst exponent (long memory)</td><td class="unit">—</td><td class="num">0.78</td></tr>
+        <tr><td class="sym">d</td><td>Calibration drift</td><td class="unit">mg/dL</td><td class="num">0.0 (random walk)</td></tr>
+        <tr><td class="sym">o<sub>comp</sub></td><td>Compression-low offset</td><td class="unit">mg/dL</td><td class="num">12–28 when triggered</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">Two separate lags — do not conflate them</h4>
+  <p>
+    \(\tau_{\mathrm{ISF}}\) is the time constant of a first-order interstitial compartment;
+    <span class="mono">lag_minutes</span> is an explicit transport dead time applied <em>before</em> it.
+    The source is emphatic that these <em>"are separate assumptions and should not both be fitted to
+    the same observed total CGM lag."</em> Doing so would double-count the delay.
+  </p>
+
+  <h4 class="sub">Why the noise is not white</h4>
+  <p>
+    White noise is trivially filtered — a controller could average it away in two samples. Real CGM
+    error is strongly autocorrelated: a sensor reading 15 mg/dL high now will still read high in five
+    minutes. The SDK offers two colouring models, and the default is the harder one:
+  </p>
+  <ul>
+    <li><b>AR(1)</b>: \(\varepsilon_k = \phi\,\varepsilon_{k-1} + \eta_k\) with \(\eta_k \sim \mathcal{N}(0,\sigma\sqrt{1-\phi^2})\). The \(\sqrt{1-\phi^2}\) factor is what keeps the <em>stationary</em> variance equal to \(\sigma^2\) regardless of \(\phi\) — without it, raising the correlation would silently raise the noise amplitude too.</li>
+    <li><b>Fractional-noise approximation (default)</b>: three superposed AR(1) processes at \(\phi\) = 0.5, 0.85, 0.98, weighted by scale\(^{H-0.5}\) and normalised. This produces long-memory behaviour closer to real sensor drift. The source is explicit that it is <em>"a compact CGM-noise approximation, not an exact fBM sampler."</em></li>
+  </ul>
+
+  <h4 class="sub">Compression lows</h4>
+  <p>
+    A distinctive failure mode worth mentioning unprompted: lying on a sensor restricts local
+    perfusion and produces a transient <em>false low</em>. The model triggers it probabilistically only
+    when true glucose is already below <span class="mono">compression_low_max_glucose</span> (140 mg/dL),
+    subtracts 12–28 mg/dL for 3–8 steps, and flags the reading
+    <span class="mono">compression_low</span>. This is the single most dangerous CGM artefact for a
+    closed loop, because it asks the controller to suspend insulin in a patient who does not need it —
+    or, worse, looks like a hypo that the controller then over-treats.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f15_cgm}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 13</span> — true glucose against what the controller receives.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: hidden true BG, the noise-free interstitial signal, and the delivered CGM trace. Right: the resulting error over time.</dd></div>
+        <div><dt>Parameters</dt><dd>Real <span class="mono">SensorModel</span>, σ = 8.5 mg/dL, lag 5 min, τ<sub>ISF</sub> 5 min, Hurst 0.78, seed 7; 12 h at 5-min sampling.</dd></div>
+        <div><dt>Key observation</dt><dd>Mean absolute error is <b>6.3 mg/dL</b>, but the peak error reaches <b>20.6 mg/dL</b> and it is not random in time — the largest errors cluster where glucose is changing fastest, because that is where the lag bites.</dd></div>
+        <div><dt>Why it matters</dt><dd>Lag error is systematic, not noise: during a fast fall the CGM reads high, precisely when a controller most needs to suspend. Averaging cannot fix it.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Is 8.5 mg/dL a realistic noise level? What MARD does that correspond to?</p>
+      <p class="qa__a">At a mean glucose around 145 mg/dL, a 6.3 mg/dL mean absolute error is roughly
+      4–5% — better than most commercial sensors, whose MARD is typically 8–10%. So the default is if
+      anything optimistic on noise, though the lag and compression-low behaviour make it harder in other
+      respects. I would not quote it as a MARD claim: MARD is defined against reference blood samples
+      over a specific study protocol, and this is a simulated error statistic.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Can a controller "cheat" by reading true glucose?</p>
+      <p class="qa__a">No. The simulator passes <span class="mono">glucose_to_algo_mgdl</span> to the
+      algorithm and keeps <span class="mono">glucose_actual_mgdl</span> for scoring only. The results
+      frame contains both columns, which is what makes the error analysis in this chapter possible —
+      but the algorithm interface never receives the true value.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Is the noise reproducible?</p>
+      <p class="qa__a">Yes. The sensor holds its own seeded NumPy generator and stores its initial
+      bit-generator state, so <span class="mono">reset()</span> reproduces the identical noise
+      realisation. Sensor state — including the RNG state and the full history buffer — is part of the
+      saveable snapshot.</p>
+    </div>
+  </div>
+</section>

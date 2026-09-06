@@ -1,0 +1,358 @@
+<!-- ═══════════════════════════════════════════════════════════ CH 7 ═══ -->
+<section class="chapter" id="ch8" data-part="II · Physiology" data-n="7" data-title="Insulin action (F07 / F02)" style="--sys: var(--sys-action)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 7</div>
+    <h2>Insulin action</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      Three channels, three time constants, three sensitivities. This is where every
+      "sensitivity" knob in the SDK ultimately lands.
+    </p>
+    <div class="chips"><span class="chip chip--id">F07</span><span class="chip chip--heuristic">heuristic (scalars)</span><span class="chip chip--id">F02</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F07</span><span class="fx__title">Hovorka insulin-action channels</span></div>
+    <div class="fx__body">
+      $$\begin{aligned}
+      \frac{dx_1}{dt}&=-k_{a1}x_1+k_{b1}I &&\text{transport } Q_1 \to Q_2\\
+      \frac{dx_2}{dt}&=-k_{a2}x_2+k_{b2}I &&\text{disposal from } Q_2\\
+      \frac{dx_3}{dt}&=-k_{a3}x_3+k_{b3}I &&\text{suppression of EGP}
+      \end{aligned}$$
+      <p style="font-size:13.5px;color:var(--ink-3);margin:4px 0 8px">with the gains assembled deterministically before integration:</p>
+      $$\begin{aligned}
+      k_{b1}&=S_{IT}\,k_{a1}\cdot M_{\mathrm{sens}}\\
+      k_{b2}&=S_{ID}\,k_{a2}\cdot M_{\mathrm{sens}}\cdot \sigma_{\mathrm{muscle}}\\
+      k_{b3}&=S_{IE}\,k_{a3}\cdot M_{\mathrm{sens}}\cdot \sigma_{\mathrm{liver}}\\[4pt]
+      M_{\mathrm{sens}}&=\underbrace{(1-0.7H_{\mathrm{stress}})(1+2H_{\mathrm{ex}})}_{\text{F08}}
+      \cdot \underbrace{M_{\mathrm{dawn}}}_{\text{F16}}
+      \cdot A_{\mathrm{affinity}}\cdot \rho_{\mathrm{basal}}\cdot \tfrac{\mathrm{ISF}}{50}
+      \end{aligned}$$
+    </div>
+    <div class="fx__foot">Every sensitivity modifier in the SDK multiplies into \(M_{\mathrm{sens}}\) at exactly one place.</div>
+  </div>
+
+  <h4 class="sub">Variables</h4>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th><th class="num">Time constant 1/k</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">k<sub>a1</sub></td><td>Deactivation, transport channel</td><td class="unit">1/min</td><td class="num">0.006</td><td class="num">167 min</td></tr>
+        <tr><td class="sym">k<sub>a2</sub></td><td>Deactivation, disposal channel</td><td class="unit">1/min</td><td class="num">0.06</td><td class="num">17 min</td></tr>
+        <tr><td class="sym">k<sub>a3</sub></td><td>Deactivation, EGP channel</td><td class="unit">1/min</td><td class="num">0.03</td><td class="num">33 min</td></tr>
+        <tr><td class="sym">S<sub>IT</sub></td><td>Sensitivity, transport</td><td class="unit">L/mU/min</td><td class="num">51.2 × 10⁻⁴</td><td class="num">—</td></tr>
+        <tr><td class="sym">S<sub>ID</sub></td><td>Sensitivity, disposal</td><td class="unit">L/mU/min</td><td class="num">8.2 × 10⁻⁴</td><td class="num">—</td></tr>
+        <tr><td class="sym">S<sub>IE</sub></td><td>Sensitivity, EGP</td><td class="unit">L/mU</td><td class="num">520 × 10⁻⁴</td><td class="num">—</td></tr>
+        <tr><td class="sym">σ<sub>muscle</sub></td><td>Muscle sensitivity scalar</td><td class="unit">—</td><td class="num">1.0</td><td class="num">user</td></tr>
+        <tr><td class="sym">σ<sub>liver</sub></td><td>Liver sensitivity scalar</td><td class="unit">—</td><td class="num">1.0</td><td class="num">user</td></tr>
+        <tr><td class="sym">A<sub>affinity</sub></td><td>Molecular affinity scalar</td><td class="unit">—</td><td class="num">1.0</td><td class="num">user, ≤ 2.0</td></tr>
+        <tr><td class="sym">ρ<sub>basal</sub></td><td>Basal calibration scalar</td><td class="unit">—</td><td class="num">derived</td><td class="num">no</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What it represents</h4>
+  <p>
+    Insulin in plasma does not act instantly on tissue. It must cross the capillary endothelium,
+    bind its receptor and trigger a signalling cascade. Each channel is a first-order low-pass filter
+    on plasma insulin, and the three have genuinely different biology behind them — hepatic
+    suppression is fast and highly sensitive, peripheral transport is slow, peripheral disposal is
+    intermediate. Splitting them is what allows the model to be right about <em>when</em> insulin
+    acts, not just how much.
+  </p>
+
+  <h4 class="sub">Why three channels</h4>
+  <p>
+    Because insulin's two jobs have different dose–response curves. Note the sensitivities:
+    \(S_{IE}\) is roughly <b>10× larger</b> than \(S_{IT}\) and <b>63× larger</b> than \(S_{ID}\).
+    Physiologically this says the liver responds to far lower insulin concentrations than muscle
+    does — half-maximal EGP suppression arrives at about <b>9.6 mU/L</b>, near basal levels, while
+    meaningful peripheral disposal needs a post-prandial peak. A single-channel model has to pick
+    one of those behaviours and be wrong about the other.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f06_f07_action}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 3</span> — channel speeds, and the hepatic dose–response they produce.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: each channel's step response to a sudden insulin change, normalised to its own steady state, so only <em>speed</em> is compared. Right: steady-state EGP against plasma insulin, at three liver-sensitivity scalars.</dd></div>
+        <div><dt>Parameters</dt><dd>Left: 30 mU/L step, \(k_{a1..3}\) at SDK defaults. Right: EGP₀ = 202.9 mg/min (70 kg), \(x_3^{ss} = S_{IE}\sigma_{\mathrm{liver}} I\).</dd></div>
+        <div><dt>Key observation</dt><dd>Half-times are 116 / 12 / 23 min. Disposal reacts within minutes; transport is still equilibrating an hour later. On the right, EGP reaches full suppression near 19 mU/L and then stays flat — the \(\max(0,\cdot)\) floor.</dd></div>
+        <div><dt>Why it matters</dt><dd>It explains why the same bolus produces an early fall (disposal) followed by a long low tail (transport), and why halving liver sensitivity does not halve fasting glucose.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h4 class="sub">Behaviour</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">S<sub>IT</sub> ↑ (transport)</div><div class="beh__v">Glucose moves faster into \(Q_2\). Lowers the peak of an excursion but stores glucose rather than removing it — some returns via \(k_{12}Q_2\).</div></div>
+    <div class="beh__row"><div class="beh__k">S<sub>ID</sub> ↑ (disposal)</div><div class="beh__v">Genuine removal from the body accelerates. This is the channel that determines total glucose lowering.</div></div>
+    <div class="beh__row"><div class="beh__k">S<sub>IE</sub> ↑ (EGP)</div><div class="beh__v">Liver shuts off at lower insulin. Dominates <em>fasting</em> and overnight glucose; barely visible post-prandially because EGP is already floored at zero.</div></div>
+    <div class="beh__row"><div class="beh__k">k<sub>a,i</sub> ↑</div><div class="beh__v">Faster on <em>and</em> faster off. Note \(k_{b,i} \propto k_{a,i}\), so the steady-state action \(k_{b,i}I/k_{a,i} = S_i \cdot M_{\mathrm{sens}} \cdot I\) is unchanged — \(k_a\) sets timing only, never magnitude. A frequent misreading.</div></div>
+    <div class="beh__row"><div class="beh__k">Strongly coupled</div><div class="beh__v">All three share the single multiplier \(M_{\mathrm{sens}}\), so stress, exercise, dawn resistance and the clinical ISF move all three together. Only \(\sigma_{\mathrm{muscle}}\) and \(\sigma_{\mathrm{liver}}\) act on one channel each.</div></div>
+    <div class="beh__row"><div class="beh__k">Edge case</div><div class="beh__v">\(A_{\mathrm{affinity}}\) is hard-capped at 2.0 and rejected if negative — an unbounded affinity scalar would let a configuration produce arbitrarily strong insulin.</div></div>
+  </div>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Where the honesty line sits.</strong> The channel <em>topology</em> and the
+    \(k_a\)/\(S_I\) values are literature-based. The three scalars — overall, tissue-specific and
+    molecular affinity — are explicit IINTS scenario assumptions. The registry states plainly that they
+    <em>"are not inferred from AlphaFold confidence or ClinVar labels and require independent
+    calibration before quantitative interpretation."</em> If asked whether a structure-prediction score
+    sets insulin sensitivity here: it does not, and the source says so.</p></div>
+  </div>
+
+  <h3 class="sec">The Bergman single channel</h3>
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F02</span><span class="fx__title">Remote insulin action</span><span class="chip chip--adapted">adapted</span></div>
+    <div class="fx__body">$$\frac{dX}{dt}=-p_2X+p_{3,\mathrm{eff}}\,(I-I_{\mathrm{ref}})$$</div>
+    <div class="fx__foot">\(p_2 = 0.025\) min⁻¹, \(p_3 = 5\times10^{-6}\) (mU/L)⁻¹min⁻². Insulin sensitivity in the minimal model is \(S_I = p_3/p_2\).</div>
+  </div>
+  <p>
+    Because \(S_I = p_3/p_2\), the SDK applies dawn resistance and exercise to \(p_3\) rather than to
+    \(X\) directly — scaling \(p_3\) scales sensitivity itself, while scaling \(X\) would only scale the
+    momentary effect and would be undone at the next step.
+  </p>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">What happens if insulin sensitivity halves?</p>
+      <p class="qa__a">Concretely, from the runs in <a class="xref" href="#ch28">Chapter 27</a>: taking
+      ISF from 50 to 30 mg/dL/U on an identical scenario moves mean glucose from 145 to 206 mg/dL and
+      time-in-range from 80% to 33%, with time above 180 rising from 20% to 68%. Structurally, halving
+      sensitivity halves every \(k_{b,i}\), so all three steady-state actions halve — but the effect is
+      not symmetric. Hepatic suppression is on the flat part of its curve, so it loses least; peripheral
+      disposal loses most. That asymmetry is why the excursions widen more than the fasting level rises.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why is \(S_{IE}\) 63 times larger than \(S_{ID}\)? That looks like a typo.</p>
+      <p class="qa__a">They have different units, so they are not directly comparable as numbers —
+      \(S_{IT}\) and \(S_{ID}\) are L/mU/min and \(S_{IE}\) is L/mU, because \(x_3\) is a dimensionless
+      fraction while \(x_1, x_2\) are rate constants. The physiological content is nonetheless real:
+      the liver is far more insulin-sensitive than skeletal muscle, and half-maximal EGP suppression
+      sits at roughly basal insulin concentration.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Is \(\rho_{\mathrm{basal}}\) a fudge factor?</p>
+      <p class="qa__a">It is a declared reconciliation, and the source says why. The published Hovorka
+      parameters describe a population; the SDK's public API accepts a patient-specific basal rate.
+      \(\rho_{\mathrm{basal}}\) is found by bisection so that the configured basal is a genuine fasting
+      steady state at the reference ISF. The alternative would be to hide a large startup transient in
+      the initial conditions, which is worse: it would look like physiology.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════ CH 8 ═══ -->
+<section class="chapter" id="ch9" data-part="II · Physiology" data-n="8" data-title="Hepatic glucose production" style="--sys: var(--sys-liver)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 8</div>
+    <h2>Hepatic glucose production</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      The largest inflow outside a meal — and the one term with no compartment behind it.
+    </p>
+    <div class="chips"><span class="chip chip--id">F06 · EGP term</span><span class="chip chip--adapted">adapted</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">EGP</span><span class="fx__title">Effective endogenous glucose production</span></div>
+    <div class="fx__body">
+      $$\mathrm{EGP}(t)=\underbrace{\mathrm{EGP}_{0/\mathrm{kg}}\,w}_{202.9\ \mathrm{mg/min}}
+      \cdot\underbrace{(1+0.5H_{\mathrm{stress}})}_{\text{F08}}
+      \cdot\underbrace{R_{\mathrm{rescue}}}_{\text{F11}}
+      \cdot\max\!\left(0,\;1-x_3+x_{\mathrm{gluc}}\right)$$
+    </div>
+    <div class="fx__foot">Suppressed by insulin through \(x_3\); raised by glucagon (\(x_{\mathrm{gluc}}\)), stress, and counter-regulation.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">EGP<sub>0/kg</sub></td><td>Basal production per kg</td><td class="unit">mg/kg/min</td><td class="num">2.898</td></tr>
+        <tr><td class="sym">EGP₀</td><td>— at 70 kg</td><td class="unit">mg/min</td><td class="num">202.9</td></tr>
+        <tr><td class="sym">x₃</td><td>Insulin action on EGP</td><td class="unit">—</td><td class="num">state</td></tr>
+        <tr><td class="sym">x<sub>gluc</sub></td><td>Glucagon action on EGP</td><td class="unit">—</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">R<sub>rescue</sub></td><td>Counter-regulatory multiplier</td><td class="unit">—</td><td class="num">1.0 above 70</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <div class="note__ic">i</div>
+    <div><p><strong>The liver is a boundary flux, not a compartment.</strong> There is no hepatic
+    glycogen state in this model. EGP appears as a source term on \(dQ_1/dt\) with no reservoir behind
+    it, so it never depletes. In the desktop app's digital-twin view the liver is drawn as a
+    <em>flux proxy</em> and labelled as such, precisely so nobody reads it as a stored quantity.</p></div>
+  </div>
+
+  <h4 class="sub">Original unit conversion</h4>
+  <p>
+    The published value is in molar units; the SDK works in mass. The conversion is applied once, in
+    the parameter definition, and is worth being able to reproduce on a whiteboard:
+  </p>
+  <div class="fx">
+    <div class="fx__body">
+      $$\begin{aligned}
+      \mathrm{EGP}_0 &= 16.1\ \frac{\mu\mathrm{mol}}{\mathrm{kg\cdot min}}
+      \times 0.18\ \frac{\mathrm{mg}}{\mu\mathrm{mol}}
+      = 2.898\ \frac{\mathrm{mg}}{\mathrm{kg\cdot min}}\\
+      F_{01} &= 9.7\ \frac{\mu\mathrm{mol}}{\mathrm{kg\cdot min}}\times 0.18 = 1.746\ \frac{\mathrm{mg}}{\mathrm{kg\cdot min}}
+      \end{aligned}$$
+    </div>
+    <div class="fx__foot">Glucose molar mass is 180.16 g/mol, so 1 µmol ≈ 0.18 mg. At 70 kg: EGP₀ = 202.9 and F₀₁ = 122.2 mg/min.</div>
+  </div>
+  <p>
+    A useful sanity figure: 202.9 mg/min ÷ 112.0 dL is about <b>1.8 mg/dL per minute</b>, or roughly
+    109 mg/dL per hour, if nothing opposed it. Basal insulin exists to cancel almost exactly this.
+  </p>
+
+  <h4 class="sub">Behaviour</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">σ<sub>liver</sub> ↑</div><div class="beh__v">EGP suppressed at lower insulin. Lowers fasting and overnight glucose most; post-prandial effect is small because EGP is already at the floor.</div></div>
+    <div class="beh__row"><div class="beh__k">σ<sub>liver</sub> ↓</div><div class="beh__v">Hepatic insulin resistance. Fasting glucose drifts up, and the basal rate needed to hold steady state rises.</div></div>
+    <div class="beh__row"><div class="beh__k">Saturation</div><div class="beh__v">Once \(x_3 \ge 1 + x_{\mathrm{gluc}}\) the term is exactly zero and stays there. Extra insulin has <em>no</em> further hepatic effect — a real and important non-linearity.</div></div>
+    <div class="beh__row"><div class="beh__k">Glucagon interaction</div><div class="beh__v">\(x_{\mathrm{gluc}}\) is <em>added inside</em> the max, so glucagon can lift the liver back off the floor even under full insulin suppression. That is the mechanism a bi-hormonal controller exploits.</div></div>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:liver_sweep}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 4</span> — altered hepatic insulin selectivity, everything else held fixed.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Three 24-hour closed-loop days that differ only in \(\sigma_{\mathrm{liver}}\), the scalar on \(S_{IE}\).</dd></div>
+        <div><dt>Parameters</dt><dd>Hovorka 70 kg, ISF 50, ICR 10, basal 0.8 U/h, meals 60/80/70 g at 07:00/12:00/19:00, Clinical Baseline controller, seed 11.</dd></div>
+        <div><dt>Key observation</dt><dd>TIR moves 78.2% → 79.9% → 67.5% across 0.5 / 1.0 / 1.6. The <em>high</em>-selectivity case is the worse one: it produces 9.0% time below 70, because over-suppressed EGP removes the body's own defence against a bolus.</dd></div>
+        <div><dt>Why it matters</dt><dd>It is a direct counter-example to "more insulin sensitivity is better", and it is the kind of asymmetry a single-channel model cannot express at all.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Why is there no glycogen store? Surely the liver can run out.</p>
+      <p class="qa__a">It can, and that is a stated limitation. Over the 24-hour horizons this bench
+      runs, hepatic glycogen depletion is not the binding constraint — but for a multi-day fast or
+      prolonged endurance exercise it would be, and the model would over-produce glucose. Adding a
+      glycogen compartment would need a depletion and repletion rate that this SDK has no data to
+      calibrate, so the honest choice was to leave it out and say so rather than invent one.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">How can you have a hepatic term when you have no portal-vein insulin?</p>
+      <p class="qa__a">We do not model the portal circulation, so hepatic and systemic insulin are the
+      same variable \(I\); the hepatic/systemic distinction is carried entirely by the separate
+      sensitivity \(S_{IE}\) and the \(\sigma_{\mathrm{liver}}\) scalar. That is a first-order
+      approximation of hepatic selectivity, not a two-compartment portal model, and a ratio like
+      \(S_H = I_{sys}/I_{pv}\) is not something this model can compute.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════ CH 9 ═══ -->
+<section class="chapter" id="ch10" data-part="II · Physiology" data-n="9" data-title="Peripheral &amp; non-insulin uptake (F09)" style="--sys: var(--sys-periph)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 9</div>
+    <h2>Peripheral and non-insulin-mediated uptake</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The brain's non-negotiable draw, and why it protects against hypoglycaemia.</p>
+    <div class="chips"><span class="chip chip--id">F09</span><span class="chip chip--heuristic">heuristic (GLUT4)</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F09</span><span class="fx__title">Insulin-independent uptake and its exercise amplification</span></div>
+    <div class="fx__body">
+      $$\begin{aligned}
+      F_{01c}&=F_{01}\cdot\min\!\left(1,\;\max\!\left(0,\;\frac{G}{81}\right)\right) && \text{glucose-limited below 4.5 mmol/L}\\
+      \frac{d\,\mathrm{GLUT4}}{dt}&=k_{\mathrm{act}}H_{\mathrm{ex}}(1-\mathrm{GLUT4})-k_{\mathrm{deact}}\mathrm{GLUT4}\\
+      \mathrm{NIMGU}&=F_{01c}\,(1+1.5\,\mathrm{GLUT4})
+      \end{aligned}$$
+      <p style="font-size:13.5px;color:var(--ink-3);margin:4px 0 8px">and the insulin-dependent side, which lives in the \(Q_2\) equation:</p>
+      $$\text{peripheral disposal} = x_2 Q_2$$
+    </div>
+    <div class="fx__foot">\(k_{\mathrm{act}} = 0.05\), \(k_{\mathrm{deact}} = 0.01\) min⁻¹.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default (70 kg)</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">F₀₁</td><td>Maximal insulin-independent uptake</td><td class="unit">mg/min</td><td class="num">122.2</td></tr>
+        <tr><td class="sym">F<sub>01c</sub></td><td>— after the low-glucose limit</td><td class="unit">mg/min</td><td class="num">≤ 122.2</td></tr>
+        <tr><td class="sym">GLUT4</td><td>Exercise uptake state, bounded [0,1]</td><td class="unit">—</td><td class="num">0.0</td></tr>
+        <tr><td class="sym">k<sub>act</sub></td><td>Activation rate</td><td class="unit">1/min</td><td class="num">0.05</td></tr>
+        <tr><td class="sym">k<sub>deact</sub></td><td>Deactivation rate</td><td class="unit">1/min</td><td class="num">0.01</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What it represents</h4>
+  <p>
+    The brain and red blood cells consume glucose continuously and do not need insulin to do it.
+    That draw is roughly constant at normal glucose, but below about 81 mg/dL (4.5 mmol/L) transport
+    into tissue becomes concentration-limited and the uptake falls proportionally. This branch is
+    canonical Hovorka, and it is one of the most important safety features of the model.
+  </p>
+
+  <h4 class="sub">Why it matters more than it looks</h4>
+  <p>
+    At 81 mg/dL, NIMGU is the single largest glucose sink in the fasting state — 122 mg/min against
+    an EGP of 203 mg/min. If it stayed constant as glucose fell, a hypoglycaemic excursion would
+    accelerate: the lower you go, the faster you fall. The proportional cut-off makes it decelerate
+    instead. Together with F11's counter-regulatory rise in EGP, this is why the model has a natural
+    floor rather than diverging.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f09_nimgu}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 5</span> — the glucose-limited branch, and what exercise does to it.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>NIMGU against plasma glucose at three GLUT4 activation levels, from fully rested to fully activated.</dd></div>
+        <div><dt>Parameters</dt><dd>\(F_{01} = 122.2\) mg/min (70 kg), knee fixed at 81 mg/dL, exercise multiplier 1 + 1.5·GLUT4.</dd></div>
+        <div><dt>Key observation</dt><dd>The knee at 81 mg/dL is sharp, and full exercise activation raises the plateau by 2.5× — to over 300 mg/min, which exceeds basal EGP on its own.</dd></div>
+        <div><dt>Why it matters</dt><dd>It is the mechanistic reason exercise causes hypoglycaemia in this model: a sink larger than the liver's maximum output, switched on within minutes and switched off over an hour.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h4 class="sub">Behaviour</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">Exercise starts</div><div class="beh__v">\(H_{\mathrm{ex}}\) rises with a 10-minute time constant; GLUT4 then follows with its own ~20-minute rise. Uptake therefore lags the start of exercise by roughly half an hour.</div></div>
+    <div class="beh__row"><div class="beh__k">Exercise stops</div><div class="beh__v">Asymmetric by design: \(k_{\mathrm{deact}} = 0.01\) is five times slower than \(k_{\mathrm{act}}\), so elevated uptake persists for hours. This reproduces post-exercise late hypoglycaemia.</div></div>
+    <div class="beh__row"><div class="beh__k">G below 81</div><div class="beh__v">NIMGU falls linearly to zero at G = 0. The largest sink self-limits.</div></div>
+    <div class="beh__row"><div class="beh__k">Bounded</div><div class="beh__v">GLUT4 is confined to [0,1] by construction; a value above 1 fails the step rather than being clipped.</div></div>
+  </div>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>GLUT4 here is a latent scenario state, not a molecular measurement.</strong> The
+    literature supports exercise-mediated insulin-independent uptake; the activation constants and the
+    1.5 multiplier are IINTS heuristics. The registry says so explicitly: it is <em>"not measured
+    receptor abundance or a cell-level translocation assay"</em>. Do not present it as proteomics.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Why call it GLUT4 if it is not a GLUT4 measurement?</p>
+      <p class="qa__a">Fair criticism, and the naming is a compromise between readability and precision.
+      The variable is named after the mechanism it abstracts, but the source docstring, the compartment
+      schema and the formula registry all mark it as an extension and a heuristic. If a jury pushes on
+      it, the correct answer is that it is a bounded exercise-uptake state whose name is suggestive and
+      whose parameters are assumptions.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why is the knee at 81 mg/dL specifically?</p>
+      <p class="qa__a">It is 4.5 mmol/L, the canonical Hovorka low-glucose branch point, converted to
+      mg/dL. It is not a tuned value — it comes straight from the published model, and the comment in
+      the source records both the mmol/L original and the conversion.</p>
+    </div>
+  </div>
+</section>

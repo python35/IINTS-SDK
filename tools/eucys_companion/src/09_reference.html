@@ -1,0 +1,332 @@
+<div class="part"><div class="part__n">Part VI · Reference</div><div class="part__rule"></div></div>
+
+<!-- ══════════════════════════════════════════════════════════ CH 29 ═══ -->
+<section class="chapter" id="ch30" data-part="VI · Reference" data-n="29" data-title="Parameter reference">
+  <div class="ch-head">
+    <div class="ch-head__n">APPENDIX A</div>
+    <h2>Parameter reference</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      Every value read from the shipped source. "User" means exposed through the public API or a
+      patient profile; "internal" means it requires editing a parameters dataclass.
+    </p>
+  </div>
+
+  <h3 class="sec">A.1 · Hovorka physiological parameters</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th>Symbol</th><th class="num">Default</th><th>Unit</th><th>Physiological meaning</th><th>Module</th><th>User</th><th class="num">Expected range</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">body_weight_kg</td><td class="sym">w</td><td class="num">70.0</td><td class="unit">kg</td><td>Scales every per-kg parameter</td><td class="sym">hovorka</td><td>yes</td><td class="num">30–150</td></tr>
+        <tr><td class="sym">V_G_per_kg</td><td class="sym">V<sub>G</sub></td><td class="num">0.16</td><td class="unit">L/kg</td><td>Glucose distribution volume</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.13–0.20</td></tr>
+        <tr><td class="sym">V_I_per_kg</td><td class="sym">V<sub>I</sub></td><td class="num">0.12</td><td class="unit">L/kg</td><td>Insulin distribution volume</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.10–0.15</td></tr>
+        <tr><td class="sym">k_12</td><td class="sym">k₁₂</td><td class="num">0.066</td><td class="unit">1/min</td><td>Periphery → plasma transfer</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.04–0.10</td></tr>
+        <tr><td class="sym">k_e</td><td class="sym">k<sub>e</sub></td><td class="num">0.138</td><td class="unit">1/min</td><td>Insulin elimination (t½ ≈ 5 min)</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.10–0.20</td></tr>
+        <tr><td class="sym">EGP_0_per_kg</td><td class="sym">EGP₀</td><td class="num">2.898</td><td class="unit">mg/kg/min</td><td>Basal hepatic production (16.1 µmol/kg/min)</td><td class="sym">hovorka</td><td>internal</td><td class="num">2.0–3.5</td></tr>
+        <tr><td class="sym">F_01c_per_kg</td><td class="sym">F₀₁</td><td class="num">1.746</td><td class="unit">mg/kg/min</td><td>Insulin-independent uptake (9.7 µmol/kg/min)</td><td class="sym">hovorka</td><td>internal</td><td class="num">1.3–2.2</td></tr>
+        <tr><td class="sym">k_a1</td><td class="sym">k<sub>a1</sub></td><td class="num">0.006</td><td class="unit">1/min</td><td>Transport-channel deactivation</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.004–0.012</td></tr>
+        <tr><td class="sym">k_a2</td><td class="sym">k<sub>a2</sub></td><td class="num">0.06</td><td class="unit">1/min</td><td>Disposal-channel deactivation</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.04–0.10</td></tr>
+        <tr><td class="sym">k_a3</td><td class="sym">k<sub>a3</sub></td><td class="num">0.03</td><td class="unit">1/min</td><td>EGP-channel deactivation</td><td class="sym">hovorka</td><td>internal</td><td class="num">0.02–0.05</td></tr>
+        <tr><td class="sym">S_IT</td><td class="sym">S<sub>IT</sub></td><td class="num">51.2e-4</td><td class="unit">L/mU/min</td><td>Sensitivity, glucose transport</td><td class="sym">hovorka</td><td>internal</td><td class="num">20e-4 – 90e-4</td></tr>
+        <tr><td class="sym">S_ID</td><td class="sym">S<sub>ID</sub></td><td class="num">8.2e-4</td><td class="unit">L/mU/min</td><td>Sensitivity, peripheral disposal</td><td class="sym">hovorka</td><td>internal</td><td class="num">3e-4 – 15e-4</td></tr>
+        <tr><td class="sym">S_IE</td><td class="sym">S<sub>IE</sub></td><td class="num">520e-4</td><td class="unit">L/mU</td><td>Sensitivity, EGP suppression</td><td class="sym">hovorka</td><td>internal</td><td class="num">200e-4 – 900e-4</td></tr>
+        <tr><td class="sym">t_max_I</td><td class="sym">t<sub>max,I</sub></td><td class="num">55.0</td><td class="unit">min</td><td>Insulin absorption time-to-peak</td><td class="sym">hovorka</td><td>via type</td><td class="num">35 / 55 / 90</td></tr>
+        <tr><td class="sym">t_max_G</td><td class="sym">t<sub>max,G</sub></td><td class="num">40.0</td><td class="unit">min</td><td>Meal absorption time constant</td><td class="sym">hovorka</td><td>yes</td><td class="num">20–120</td></tr>
+        <tr><td class="sym">A_G</td><td class="sym">A<sub>G</sub></td><td class="num">0.8</td><td class="unit">—</td><td>Carbohydrate bioavailability</td><td class="sym">hovorka</td><td>yes</td><td class="num">0.6–1.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sec">A.2 · Clinical and scenario settings (public API)</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th class="num">Default</th><th>Unit</th><th>Meaning</th><th>User</th><th class="num">Expected range</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">insulin_sensitivity (ISF)</td><td class="num">50.0</td><td class="unit">mg/dL/U</td><td>Clinical correction factor; scales all three channels</td><td>yes</td><td class="num">20–120</td></tr>
+        <tr><td class="sym">carb_factor (ICR)</td><td class="num">10.0</td><td class="unit">g/U</td><td>Carbohydrate ratio used by controllers</td><td>yes</td><td class="num">5–25</td></tr>
+        <tr><td class="sym">basal_insulin_rate</td><td class="num">0.8</td><td class="unit">U/h</td><td><b>Dose <em>and</em> sensitivity calibration input</b> — see <a class="xref" href="#ch28">Ch 27</a></td><td>yes</td><td class="num">0.2–2.5</td></tr>
+        <tr><td class="sym">initial_glucose</td><td class="num">120.0</td><td class="unit">mg/dL</td><td>Starting plasma glucose</td><td>yes</td><td class="num">≥ 20</td></tr>
+        <tr><td class="sym">insulin_action_duration (DIA)</td><td class="num">300.0</td><td class="unit">min</td><td>IOB bookkeeping window</td><td>yes</td><td class="num">180–420</td></tr>
+        <tr><td class="sym">insulin_peak_time</td><td class="num">75.0</td><td class="unit">min</td><td>IOB curve peak</td><td>yes</td><td class="num">45–120</td></tr>
+        <tr><td class="sym">carb_absorption_duration_minutes</td><td class="num">240.0</td><td class="unit">min</td><td>COB bookkeeping window</td><td>yes</td><td class="num">120–360</td></tr>
+        <tr><td class="sym">meal_mismatch_epsilon</td><td class="num">1.0</td><td class="unit">—</td><td>True carbs ÷ announced carbs</td><td>yes</td><td class="num">0.5–2.0</td></tr>
+        <tr><td class="sym">molecular_affinity_scalar</td><td class="num">1.0</td><td class="unit">—</td><td>Experimental affinity multiplier</td><td>yes</td><td class="num">0–2.0 (hard cap)</td></tr>
+        <tr><td class="sym">muscle_sensitivity_scalar</td><td class="num">1.0</td><td class="unit">—</td><td>Scales \(S_{ID}\) only</td><td>yes</td><td class="num">0.3–2.0</td></tr>
+        <tr><td class="sym">liver_sensitivity_scalar</td><td class="num">1.0</td><td class="unit">—</td><td>Scales \(S_{IE}\) only</td><td>yes</td><td class="num">0.3–2.0</td></tr>
+        <tr><td class="sym">dawn_phenomenon_strength</td><td class="num">0.0</td><td class="unit">mg/dL/h</td><td>F10 additive inflow peak</td><td>yes</td><td class="num">0–60</td></tr>
+        <tr><td class="sym">dawn_insulin_resistance_fraction</td><td class="num">0.0</td><td class="unit">—</td><td>F16 sensitivity loss peak</td><td>yes</td><td class="num">[0, 1)</td></tr>
+        <tr><td class="sym">dawn_start_hour / end_hour</td><td class="num">4.0 / 8.0</td><td class="unit">h</td><td>Shared window bounds</td><td>yes</td><td class="num">0 ≤ start &lt; end ≤ 24</td></tr>
+        <tr><td class="sym">max_glucose_rate_mgdl_per_min</td><td class="num">3.0</td><td class="unit">mg/dL/min</td><td>Post-integration plausibility guard; 0 disables</td><td>yes</td><td class="num">0–10</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sec">A.3 · Bergman parameters</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th class="num">Default</th><th>Unit</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">p1</td><td class="num">0.028</td><td class="unit">1/min</td><td>Glucose effectiveness (insulin-independent uptake)</td></tr>
+        <tr><td class="sym">p2</td><td class="num">0.025</td><td class="unit">1/min</td><td>Remote insulin degradation</td></tr>
+        <tr><td class="sym">p3</td><td class="num">5.0e-6</td><td class="unit">(mU/L)⁻¹min⁻²</td><td>Insulin action gain; \(S_I = p_3/p_2\)</td></tr>
+        <tr><td class="sym">Gb</td><td class="num">120.0</td><td class="unit">mg/dL</td><td>Basal glucose</td></tr>
+        <tr><td class="sym">Vg</td><td class="num">1.569</td><td class="unit">dL/kg</td><td>Glucose distribution volume</td></tr>
+        <tr><td class="sym">n</td><td class="num">0.23</td><td class="unit">1/min</td><td>Fractional insulin degradation</td></tr>
+        <tr><td class="sym">Ib</td><td class="num">7.0</td><td class="unit">mU/L</td><td>Basal insulin (used only when basal delivery is 0)</td></tr>
+        <tr><td class="sym">Vi</td><td class="num">0.05</td><td class="unit">L/kg</td><td>Insulin distribution volume</td></tr>
+        <tr><td class="sym">k_a</td><td class="num">0.018</td><td class="unit">1/min</td><td>SC insulin absorption rate</td></tr>
+        <tr><td class="sym">tau_meal</td><td class="num">40.0</td><td class="unit">min</td><td>Gastric emptying time constant</td></tr>
+        <tr><td class="sym">k_abs</td><td class="num">0.05</td><td class="unit">1/min</td><td>Intestinal absorption rate</td></tr>
+        <tr><td class="sym">f_bio</td><td class="num">0.90</td><td class="unit">—</td><td>Bioavailability</td></tr>
+        <tr><td class="sym">gamma</td><td class="num">0.0</td><td class="unit">(mU/L)/(mg/dL)/min</td><td>Endogenous/graft secretion gain</td></tr>
+        <tr><td class="sym">h</td><td class="num">80.0</td><td class="unit">mg/dL</td><td>Secretion threshold</td></tr>
+        <tr><td class="sym">immune_rejection_rate</td><td class="num">0.0</td><td class="unit">1/min</td><td>Graft decay constant</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sec">A.4 · Glucagon, sensor, pump and safety</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Parameter</th><th class="num">Default</th><th>Unit</th><th>Group</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">t_max_glucagon</td><td class="num">25.0</td><td class="unit">min</td><td>glucagon PK (k₁ = 0.04)</td></tr>
+        <tr><td class="sym">k_e_glucagon</td><td class="num">0.165</td><td class="unit">1/min</td><td>glucagon PK (k₂)</td></tr>
+        <tr><td class="sym">glucagon_clearance_ml_kg_min</td><td class="num">120.0</td><td class="unit">mL/kg/min</td><td>glucagon PK</td></tr>
+        <tr><td class="sym">glucagon_ec50_pg_ml</td><td class="num">350.0</td><td class="unit">pg/mL</td><td>glucagon PD</td></tr>
+        <tr><td class="sym">k_a_glucagon</td><td class="num">0.05</td><td class="unit">1/min</td><td>glucagon effect compartment</td></tr>
+        <tr><td class="sym">S_glucagon</td><td class="num">1.0</td><td class="unit">—</td><td>max fractional EGP increase</td></tr>
+        <tr><td class="sym">noise_std</td><td class="num">8.5</td><td class="unit">mg/dL</td><td>sensor</td></tr>
+        <tr><td class="sym">isf_tau_minutes</td><td class="num">5.0</td><td class="unit">min</td><td>sensor</td></tr>
+        <tr><td class="sym">lag_minutes</td><td class="num">5</td><td class="unit">min</td><td>sensor (separate from τ)</td></tr>
+        <tr><td class="sym">noise_ar1_phi</td><td class="num">0.85</td><td class="unit">—</td><td>sensor</td></tr>
+        <tr><td class="sym">noise_fbm_hurst</td><td class="num">0.78</td><td class="unit">—</td><td>sensor, range 0.5–0.95</td></tr>
+        <tr><td class="sym">compression_low_max_glucose</td><td class="num">140.0</td><td class="unit">mg/dL</td><td>sensor artefact gate</td></tr>
+        <tr><td class="sym">compression_low_mgdl_range</td><td class="num">12–28</td><td class="unit">mg/dL</td><td>sensor artefact depth</td></tr>
+        <tr><td class="sym">compression_low_duration_steps</td><td class="num">3–8</td><td class="unit">steps</td><td>sensor artefact length</td></tr>
+        <tr><td class="sym">SENSOR_MAX_GLUCOSE_DELTA_PER_5_MIN</td><td class="num">55.0</td><td class="unit">mg/dL</td><td>safety, plausibility ceiling</td></tr>
+        <tr><td class="sym">SENSOR_FAIL_SOFT_MAX_FOLLOW_PER_5_MIN</td><td class="num">20.0</td><td class="unit">mg/dL</td><td>safety, damping</td></tr>
+        <tr><td class="sym">SIMULATION_GLUCOSE_FLOOR / CEILING</td><td class="num">20 / 600</td><td class="unit">mg/dL</td><td>safety, support envelope</td></tr>
+        <tr><td class="sym">CONTROLLER_HYPO_GUARD</td><td class="num">90.0</td><td class="unit">mg/dL</td><td>safety</td></tr>
+        <tr><td class="sym">CONTROLLER_HIGH_IOB_GUARD</td><td class="num">4.0</td><td class="unit">U</td><td>safety</td></tr>
+        <tr><td class="sym">ML_MAX_INSULIN_CANDIDATE_PER_STEP</td><td class="num">1.0</td><td class="unit">U</td><td>safety, AI boundary</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 30 ═══ -->
+<section class="chapter" id="ch31" data-part="VI · Reference" data-n="30" data-title="Formula index (cheat sheet)">
+  <div class="ch-head">
+    <div class="ch-head__n">APPENDIX B</div>
+    <h2>Formula index</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      All sixteen registered formulas, in registry order. This page is the cheat sheet — scan the
+      ID, read the equation, follow the link for the full treatment.
+    </p>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-glucose)">
+    <div class="fx__head"><span class="fx__id">F01</span><span class="fx__title">Bergman glucose balance</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch5">→ Ch 4</a></div>
+    <div class="fx__body">$$\frac{dG}{dt}=-(p_{1,\mathrm{eff}}+X)G+p_{1,\mathrm{eff}}G_{b,\mathrm{eff}}+R_a+D_{\mathrm{dawn}}-U_{\mathrm{exercise}}-F_R$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F02</span><span class="fx__title">Remote insulin action</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch8">→ Ch 7</a></div>
+    <div class="fx__body">$$\frac{dX}{dt}=-p_2X+p_{3,\mathrm{eff}}(I-I_{\mathrm{ref}})$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-insulin)">
+    <div class="fx__head"><span class="fx__id">F03</span><span class="fx__title">Plasma insulin balance</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch7">→ Ch 6</a></div>
+    <div class="fx__body">$$q_{\mathrm{sec}}=\gamma M_{\mathrm{graft}}\max(G-h,0)V_I,\qquad \frac{dI}{dt}=-nI+\frac{q_{\mathrm{sec}}(1-f_{\mathrm{subq}})+R_{a,I}}{V_I}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-insulin)">
+    <div class="fx__head"><span class="fx__id">F04</span><span class="fx__title">Two-depot SC insulin absorption</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch6">→ Ch 5</a></div>
+    <div class="fx__body">$$\frac{dS_1}{dt}=u_I-kS_1,\qquad \frac{dS_2}{dt}=kS_1-kS_2,\qquad U_I=kS_2$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-gut)">
+    <div class="fx__head"><span class="fx__id">F05</span><span class="fx__title">Meal absorption chain</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch11">→ Ch 10</a></div>
+    <div class="fx__body">$$\frac{dD_1}{dt}=-\frac{D_1}{t_{\max,G}},\qquad \frac{dD_2}{dt}=\frac{D_1-D_2}{t_{\max,G}},\qquad U_G=A_G\frac{D_2}{t_{\max,G}}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-glucose)">
+    <div class="fx__head"><span class="fx__id">F06</span><span class="fx__title">Hovorka glucose mass balance</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch5">→ Ch 4</a></div>
+    <div class="fx__body">$$\begin{aligned}\frac{dQ_1}{dt}&=-(\mathrm{NIMGU}+F_R)-x_1Q_1+k_{12}Q_2+\mathrm{EGP}_0\max(0,1-x_3+x_{\mathrm{gluc}})+U_G+V_Gr_{\mathrm{dawn}}\\ \frac{dQ_2}{dt}&=x_1Q_1-(k_{12}+x_2)Q_2\end{aligned}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F07</span><span class="fx__title">Insulin action channels</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch8">→ Ch 7</a></div>
+    <div class="fx__body">$$\frac{dx_i}{dt}=-k_{ai}x_i+k_{bi}I,\quad i=1,2,3,\qquad k_{bi}\propto A_{\mathrm{affinity}}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F08</span><span class="fx__title">Stress / exercise sensitivity</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch17">→ Ch 16</a></div>
+    <div class="fx__body">$$S_{\mathrm{overall}}=(1-0.7H_{\mathrm{stress}})(1+2H_{\mathrm{ex}}),\qquad \mathrm{EGP}_{\mathrm{stress}}=1+0.5H_{\mathrm{stress}}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-periph)">
+    <div class="fx__head"><span class="fx__id">F09</span><span class="fx__title">GLUT4 / NIMGU with exercise</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch10">→ Ch 9</a></div>
+    <div class="fx__body">$$\frac{d\mathrm{GLUT4}}{dt}=k_{\mathrm{act}}H_{\mathrm{ex}}(1-\mathrm{GLUT4})-k_{\mathrm{deact}}\mathrm{GLUT4},\qquad \mathrm{NIMGU}=F_{01c}(1+1.5\,\mathrm{GLUT4})$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F10</span><span class="fx__title">Dawn glucose-rate perturbation</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch16">→ Ch 15</a></div>
+    <div class="fx__body">$$w(t)=\tfrac12\left[1+\cos\frac{\pi(t-t_m)}{h}\right],\qquad r_{\mathrm{dawn}}=\frac{s_{\mathrm{dawn}}}{60}w(t)$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-safety)">
+    <div class="fx__head"><span class="fx__id">F11</span><span class="fx__title">Hypoglycaemia rescue multiplier</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch14">→ Ch 13</a></div>
+    <div class="fx__body">$$\Delta=\max(0,70-G),\quad a=\frac{\Delta}{16+\Delta},\quad R_{\mathrm{rescue}}=1+a(1-\mathrm{HAAF})$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-safety)">
+    <div class="fx__head"><span class="fx__id">F12</span><span class="fx__title">HAAF memory</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch15">→ Ch 14</a></div>
+    <div class="fx__body">$$s=\operatorname{clip}\left(\frac{70-G}{16},0,1.5\right),\qquad \frac{d\mathrm{HAAF}}{dt}=\frac{s(1-\mathrm{HAAF})}{360}-\frac{\mathrm{HAAF}}{4320}$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-liver)">
+    <div class="fx__head"><span class="fx__id">F13</span><span class="fx__title">Glucagon PK/PD</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch13">→ Ch 12</a></div>
+    <div class="fx__body">$$\frac{dY_1}{dt}=u_G-k_1Y_1,\ \ \frac{dY_2}{dt}=k_1Y_1-k_2Y_2,\ \ \Gamma=\frac{k_2Y_2}{W\,Cl},\ \ a_G=\frac{\Gamma}{CE_{50}+\Gamma},\ \ \frac{dx_{\mathrm{gluc}}}{dt}=k_{aG}(S_Ga_G-x_{\mathrm{gluc}})$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-renal)">
+    <div class="fx__head"><span class="fx__id">F14</span><span class="fx__title">Smooth renal clearance</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch12">→ Ch 11</a></div>
+    <div class="fx__body">$$\operatorname{softplus}_s(z)=s\ln(1+e^{z/s}),\qquad F_R=c\operatorname{softplus}_s(G-162)$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-sensor)">
+    <div class="fx__head"><span class="fx__id">F15</span><span class="fx__title">CGM lag and observation</span><span class="chip chip--adapted">adapted</span><a class="xref" href="#ch20">→ Ch 19</a></div>
+    <div class="fx__body">$$\alpha=1-e^{-\Delta t/\tau_{\mathrm{ISF}}},\quad \mathrm{ISF}_{k+1}=\mathrm{ISF}_k+\alpha(\mathrm{BG}_{\mathrm{lagged}}-\mathrm{ISF}_k),\quad \mathrm{CGM}=\mathrm{ISF}+b+d+\varepsilon-o$$</div>
+  </div>
+
+  <div class="fx" style="--sys: var(--sys-action)">
+    <div class="fx__head"><span class="fx__id">F16</span><span class="fx__title">Dawn insulin-resistance multiplier</span><span class="chip chip--heuristic">heuristic</span><a class="xref" href="#ch16">→ Ch 15</a></div>
+    <div class="fx__body">$$M_{\mathrm{dawn}}(t)=1-f_{\mathrm{dawn}}\,w(t),\qquad 0\le f_{\mathrm{dawn}}&lt;1$$</div>
+  </div>
+
+  <h3 class="sec">Quick conversions</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>From</th><th>To</th><th>Factor</th><th>Worked example</th></tr></thead>
+      <tbody>
+        <tr><td>mg/dL</td><td>mmol/L</td><td class="sym">÷ 18.0182</td><td>180 mg/dL = 10.0 mmol/L</td></tr>
+        <tr><td>µmol glucose</td><td>mg</td><td class="sym">× 0.18</td><td>16.1 µmol/kg/min = 2.898 mg/kg/min</td></tr>
+        <tr><td>Insulin units</td><td>mU</td><td class="sym">× 1000</td><td>5 U = 5000 mU</td></tr>
+        <tr><td>U/h</td><td>mU/min</td><td class="sym">× 1000 ÷ 60</td><td>0.8 U/h = 13.33 mU/min</td></tr>
+        <tr><td>mg glucagon</td><td>pg</td><td class="sym">× 10⁹</td><td>1 mg = 1 × 10⁹ pg</td></tr>
+        <tr><td>Glucose mass</td><td>concentration</td><td class="sym">÷ V<sub>G,dL</sub></td><td>Q₁ = 13 440 mg ÷ 112 dL = 120 mg/dL</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 31 ═══ -->
+<section class="chapter" id="ch32" data-part="VI · Reference" data-n="31" data-title="Jury answer index" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">APPENDIX C</div>
+    <h2>Jury answer index</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The nine questions most likely to arrive first, with the shortest defensible answer and where to go for detail.</p>
+  </div>
+
+  <div class="jury" style="border-top-color: var(--sys-safety)">
+    <div class="jury__label">The opening nine</div>
+
+    <div class="qa">
+      <p class="qa__q">1 · Is this clinically validated?</p>
+      <p class="qa__a">No. It is a research and educational simulator, not a medical device, and no
+      number it produces may determine a real insulin dose. Software correctness is tested extensively;
+      physiological plausibility is supported with tools; experimental validation is partial; clinical
+      validation is not claimed. <a class="xref" href="#ch1">→ 0.1</a> <a class="xref" href="#ch29">→ Ch 28</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">2 · Did you invent these equations?</p>
+      <p class="qa__a">No. Sixteen formulas are registered in the source with LaTeX, units, literature
+      DOIs and an evidence class. Seven are adapted from published models, nine are marked heuristic —
+      the code labels its own assumptions. <a class="xref" href="#ch31">→ App B</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">3 · Why an ODE rather than machine learning?</p>
+      <p class="qa__a">Because insulin acts with memory over hours, and every term needs a unit and a
+      source. An ODE expresses insulin-on-board as a physical state, so dose stacking emerges rather
+      than being coded. ML exists here, but as a bounded predictor behind four gates.
+      <a class="xref" href="#ch3">→ Ch 2</a> <a class="xref" href="#ch23">→ Ch 22</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">4 · Could an AI change a dose?</p>
+      <p class="qa__a">Only as a candidate capped at 1.0 U per step, and only through the same
+      independent supervisor as every other controller. A language model has no numerical authority
+      at all — the registry exports <span class="mono">ai_numeric_authority: false</span>.
+      <a class="xref" href="#ch2">→ Ch 1</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">5 · What happens if insulin sensitivity halves?</p>
+      <p class="qa__a">Measured on an identical scenario: mean glucose 145 → 206 mg/dL, TIR 80% → 33%,
+      time above 180 rising from 20% to 68%. The effect is asymmetric because hepatic suppression is
+      already saturated while peripheral disposal is not.
+      <a class="xref" href="#ch28">→ Ch 27</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">6 · How do you know a parameter is biologically realistic?</p>
+      <p class="qa__a">For the published ones — \(k_{12}\), \(k_e\), EGP₀, \(V_G\), the action-channel
+      constants — from the source paper, with the unit conversion recorded. For the IINTS scalars, I do
+      not: they are declared assumptions, default to inert, and the registry states they require
+      calibration before quantitative interpretation. <a class="xref" href="#ch30">→ App A</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">7 · How does PD-L1 or the immune system enter the model?</p>
+      <p class="qa__a">It does not. There is no immune-cell model, no beta-cell mass dynamics and no
+      PD-L1 term in any equation; the only occurrence is a label in a static reference protein panel.
+      The graft extension is a single exponential decay on an abstract survival fraction, off by
+      default. <a class="xref" href="#ch18">→ Ch 17</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">8 · What is the weakest part of the work?</p>
+      <p class="qa__a">Parameter identifiability — a nineteen-state model has more parameters than the
+      available inputs can identify — and, in the results, the 6.45% mean time below 70 mg/dL in the
+      clean benchmark arm, which is above the 4% consensus target and is the principal open finding.
+      <a class="xref" href="#ch29">→ Ch 28</a> <a class="xref" href="#ch27">→ Ch 26</a></p>
+    </div>
+
+    <div class="qa">
+      <p class="qa__q">9 · What would make it credible enough to use?</p>
+      <p class="qa__a">Parameter identification against clamp or well-characterised CGM data; external
+      validation by replaying real patient days and reporting the error; and cross-validation against a
+      certified simulator on a shared protocol. None is done, and more simulation does not substitute
+      for any of them. <a class="xref" href="#ch29">→ Ch 28</a></p>
+    </div>
+  </div>
+
+  <div class="note note--stop">
+    <div class="note__ic">!</div>
+    <div><p><strong>If you take one habit into the room:</strong> when a question could be about
+    mathematics, physiology, experiment or clinic, say which one you are answering before you answer
+    it. Almost every difficult question in this field is difficult only because those four are being
+    conflated.</p></div>
+  </div>
+</section>
+
+<div class="foot">
+  <p>
+    <b>IINTS-AF Model Companion</b> — generated against SDK v1.5.36, formula registry
+    <span class="mono">iints-formula-registry-v6</span>, safety contract
+    <span class="mono">iints-safety-formulas-v2</span>. All figures produced by executing the SDK's own
+    model code; all defaults read from source. Research and educational software only — not a medical
+    device, and not for clinical use.
+  </p>
+</div>
+
+</main>
+</div>

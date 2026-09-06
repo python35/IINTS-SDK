@@ -1,0 +1,448 @@
+<!-- ══════════════════════════════════════════════════════════ CH 10 ═══ -->
+<section class="chapter" id="ch11" data-part="II · Physiology" data-n="10" data-title="Meal absorption (F05)" style="--sys: var(--sys-gut)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 10</div>
+    <h2>Meal and carbohydrate absorption</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The other side of the timing problem: carbohydrate is also delayed, and by a different amount.</p>
+    <div class="chips"><span class="chip chip--id">F05</span><span class="chip chip--adapted">adapted</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F05</span><span class="fx__title">Two-compartment meal absorption</span></div>
+    <div class="fx__body">
+      $$\begin{aligned}
+      \frac{dD_1}{dt}&=-\frac{D_1}{t_{\max,G}}\\
+      \frac{dD_2}{dt}&=\frac{D_1}{t_{\max,G}}-\frac{D_2}{t_{\max,G}}\\
+      U_G&=A_G\,\frac{D_2}{t_{\max,G}}
+      \end{aligned}$$
+    </div>
+    <div class="fx__foot">Structurally identical to F04 — the same serial-depot idea, applied to the gut. A meal of \(m\) grams enters as \(D_1 \mathrel{+}= 1000\,m\) mg.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th><th>Configurable</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">D₁, D₂</td><td>Serial gut compartments</td><td class="unit">mg</td><td class="num">state</td><td>—</td></tr>
+        <tr><td class="sym">t<sub>max,G</sub></td><td>Absorption time constant</td><td class="unit">min</td><td class="num">40</td><td>yes</td></tr>
+        <tr><td class="sym">A<sub>G</sub></td><td>Bioavailability</td><td class="unit">—</td><td class="num">0.8</td><td>yes, [0,1]</td></tr>
+        <tr><td class="sym">U<sub>G</sub></td><td>Rate of appearance</td><td class="unit">mg/min</td><td class="num">derived</td><td>—</td></tr>
+        <tr><td class="sym">ε<sub>meal</sub></td><td>Meal-mismatch factor</td><td class="unit">—</td><td class="num">1.0</td><td>yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What it represents</h4>
+  <p>
+    Carbohydrate must be emptied from the stomach and absorbed across the intestinal wall before it
+    appears as plasma glucose. As with insulin, two serial compartments give the right qualitative
+    shape: no appearance at the instant of eating, a peak at \(t = t_{\max,G}\), and a tail.
+    \(A_G\) is the fraction that ever arrives — the rest is not absorbed.
+  </p>
+
+  <h4 class="sub">The mismatch factor</h4>
+  <p>
+    \(\varepsilon_{\mathrm{meal}}\) multiplies the <em>true</em> carbohydrate the patient absorbs while
+    the algorithm is told the announced amount. Combined with the simulator's
+    <span class="mono">reported_value</span> on a meal event and the
+    <span class="mono">missed_meal</span> event type, this is how the bench tests carb-counting
+    error and unannounced meals — the dominant real-world failure mode for bolus calculators.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f05_meal}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 6</span> — appearance rate and cumulative absorption after 60 g.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: \(U_G\) for three absorption speeds. Right: cumulative grams actually absorbed, at three bioavailabilities.</dd></div>
+        <div><dt>Parameters</dt><dd>60 g (60 000 mg) into \(D_1\) at t=0. Left: \(A_G\) = 0.8 fixed, \(t_{\max,G}\) ∈ {20, 40, 80} min. Right: \(t_{\max,G}\) = 40 fixed.</dd></div>
+        <div><dt>Key observation</dt><dd>At defaults, appearance peaks at <b>40 min</b> and <b>441 mg/min</b>, and total absorbed converges to <b>48.0 g</b> — exactly 60 × 0.8, confirming the bioavailability accounting.</dd></div>
+        <div><dt>Why it matters</dt><dd>Peak carbohydrate appearance (40 min) arrives well before peak insulin action (~2 h, Fig 1). That mismatch, not dose size, is what produces the post-prandial spike.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h4 class="sub">Behaviour</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">t<sub>max,G</sub> ↑ (fat, fibre)</div><div class="beh__v">Flatter, later, longer appearance. Lower peak glucose but a much longer tail — the classic "pizza effect". Total absorbed is unchanged.</div></div>
+    <div class="beh__row"><div class="beh__k">A<sub>G</sub> ↑</div><div class="beh__v">Scales the whole curve, changing the asymptote but not the shape or timing.</div></div>
+    <div class="beh__row"><div class="beh__k">ε<sub>meal</sub> ≠ 1</div><div class="beh__v">Decouples what the patient absorbs from what the algorithm was told. This is the carb-counting-error lever.</div></div>
+    <div class="beh__row"><div class="beh__k">Edge case</div><div class="beh__v">Meals stack additively into \(D_1\). Two meals an hour apart produce one merged appearance curve, not two resolvable peaks — correct behaviour, but it means the model cannot attribute a rise to a specific meal.</div></div>
+  </div>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Two different meal chains exist.</strong> The Hovorka backend uses the published
+    two-compartment \(D_1 \to D_2\) chain above. The Bergman and advanced backends retain a
+    three-stage stomach → gut adaptation (\(Q_{sto1} \to Q_{sto2} \to Q_{gut}\), with \(\tau_{meal}\),
+    \(k_{abs}\), \(f_{bio}\)) which is an IINTS adaptation and, per the registry, <em>"requires dataset
+    calibration"</em>. Do not present numbers from the two branches as equivalent.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Does your model distinguish glycaemic index?</p>
+      <p class="qa__a">Only through \(t_{\max,G}\), which is a single lumped speed. It captures fast
+      versus slow carbohydrate but not the biphasic appearance of a mixed meal with substantial fat and
+      protein, and there is no protein-to-glucose conversion at all. For a mixed-meal study this is a
+      real limitation and would need the Dalla Man-style variable gastric emptying rate.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why is bioavailability 0.8 rather than 1.0?</p>
+      <p class="qa__a">It is the published Hovorka value and reflects that not all ingested carbohydrate
+      reaches the systemic circulation as glucose — first-pass hepatic extraction and incomplete
+      absorption. It is configurable, and the figure verifies the accounting: 60 g in, 48 g absorbed.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 11 ═══ -->
+<section class="chapter" id="ch12" data-part="II · Physiology" data-n="11" data-title="Renal clearance (F14)" style="--sys: var(--sys-renal)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 11</div>
+    <h2>Renal glucose clearance</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">A small term with an outsized numerical importance: it is where a naive model gets a discontinuity.</p>
+    <div class="chips"><span class="chip chip--id">F14</span><span class="chip chip--heuristic">heuristic</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F14</span><span class="fx__title">Differentiable renal clearance</span></div>
+    <div class="fx__body">
+      $$\operatorname{softplus}_s(z)=s\,\ln\!\left(1+e^{z/s}\right),\qquad
+      F_R = c\cdot V_{G,\mathrm{dL}}\cdot\operatorname{softplus}_s\!\left(G-162\right)$$
+    </div>
+    <div class="fx__foot">\(c = 0.003\), \(s = 10\) mg/dL, threshold 162 mg/dL (9 mmol/L). Bergman omits the \(V_{G,\mathrm{dL}}\) factor because it works in the concentration domain.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">c</td><td>Clearance coefficient</td><td class="unit">1/min</td><td class="num">0.003</td></tr>
+        <tr><td class="sym">s</td><td>Splay (transition width)</td><td class="unit">mg/dL</td><td class="num">10.0</td></tr>
+        <tr><td class="sym">θ</td><td>Renal threshold</td><td class="unit">mg/dL</td><td class="num">162.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What it represents</h4>
+  <p>
+    Above the renal threshold the kidneys cannot reabsorb all filtered glucose and the excess is lost
+    in urine. Physiologically the transition is not sharp — nephrons have a distribution of reabsorptive
+    capacities, which clinicians call <em>splay</em> — so a smooth function is the more faithful choice
+    as well as the more convenient one.
+  </p>
+
+  <h4 class="sub">Why softplus specifically</h4>
+  <p>
+    The obvious implementation is \(F_R = c\max(0, G-\theta)\). It is wrong for two reasons.
+    Physiologically it has no splay. Numerically, its derivative jumps from 0 to \(c\) at the
+    threshold, and an adaptive solver crossing that point repeatedly must shrink its step
+    dramatically — expensive, and a source of step-size chatter. Softplus is \(C^\infty\), so
+    \(dF_R/dG\) is continuous everywhere and the solver crosses the threshold without noticing.
+  </p>
+  <div class="fx">
+    <div class="fx__body">
+      $$\lim_{s\to 0^{+}}\operatorname{softplus}_s(z)=\max(0,z),\qquad
+      \frac{d}{dz}\operatorname{softplus}_s(z)=\frac{1}{1+e^{-z/s}}=\sigma\!\left(z/s\right)$$
+    </div>
+    <div class="fx__foot">The derivative is exactly the logistic sigmoid — so the smoothed threshold has a logistic dose–response, which is what a nephron-capacity distribution would predict.</div>
+  </div>
+
+  <div class="note">
+    <div class="note__ic">i</div>
+    <div><p>The implementation is a <em>numerically stable</em> softplus: it returns \(s\cdot z/s\) for
+    \(z/s &gt; 50\) and \(s\,e^{z/s}\) for \(z/s &lt; -50\), avoiding both overflow in \(e^{z/s}\) and
+    catastrophic cancellation in \(\ln(1+\varepsilon)\). Between those it uses <span class="mono">log1p(exp(z))</span>.</p></div>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:f14_renal}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 7</span> — the smooth threshold against the discontinuous one.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Renal glucose loss versus plasma glucose, at three splay values plus the hard cut-off the SDK deliberately does not use.</dd></div>
+        <div><dt>Parameters</dt><dd>\(c\) = 0.003, \(V_{G,\mathrm{dL}}\) = 112 dL (70 kg), threshold 162 mg/dL, \(s\) ∈ {2, 10, 30}.</dd></div>
+        <div><dt>Key observation</dt><dd>All curves converge above ~200 mg/dL; the splay only matters within roughly ±2s of the threshold. At 300 mg/dL the loss is about 46 mg/min — real, but an order of magnitude below EGP.</dd></div>
+        <div><dt>Why it matters</dt><dd>It shows the choice is about differentiability near the knee, not about changing the magnitude of the term. That is the honest framing.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>The threshold is a configurable approximation.</strong> A real renal threshold varies
+    between individuals (roughly 160–200 mg/dL) and is altered by SGLT2 inhibitors and by renal
+    impairment. 162 mg/dL is one value, chosen as 9 mmol/L; there is no per-patient identification
+    behind it. A second helper, <span class="mono">renal_glucose_clearance_concentration</span>,
+    defaults to 180 mg/dL for concentration-domain use — do not quote the two thresholds as one number.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Is renal clearance even significant at these glucose levels?</p>
+      <p class="qa__a">Modestly. At 250 mg/dL it removes about 30 mg/min against an EGP of roughly 200,
+      so it is a real brake on severe hyperglycaemia — it is part of why glucose plateaus rather than
+      rising without limit when insulin is withheld. Below 162 mg/dL it is essentially zero, so it
+      plays no part in normal control.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why not simply use <span class="mono">max(0, G−θ)</span>?</p>
+      <p class="qa__a">Two reasons, and I would give the numerical one first because it is checkable: the
+      hard version is not differentiable at the threshold, so an adaptive RK45 integrator repeatedly
+      rejects and shrinks steps when the trajectory hovers near 162 mg/dL. The physiological reason is
+      that renal splay is a documented phenomenon — the sharp version is the less realistic of the two,
+      not merely the less convenient.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 12 ═══ -->
+<section class="chapter" id="ch13" data-part="II · Physiology" data-n="12" data-title="Glucagon PK/PD (F13)" style="--sys: var(--sys-liver)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 12</div>
+    <h2>Exogenous glucagon</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The second hormone. Structurally a mirror of insulin absorption, with a saturating effect compartment.</p>
+    <div class="chips"><span class="chip chip--id">F13</span><span class="chip chip--adapted">adapted</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F13</span><span class="fx__title">Two-depot glucagon PK and bounded PD</span></div>
+    <div class="fx__body">
+      $$\begin{aligned}
+      \frac{dY_1}{dt}&=u_G-k_1Y_1, & \frac{dY_2}{dt}&=k_1Y_1-k_2Y_2 &&\text{(PK)}\\
+      \Gamma&=\frac{k_2Y_2}{w\cdot Cl_{F,C}}, & a_G&=\frac{\Gamma}{CE_{50}+\Gamma} &&\text{(saturating)}\\
+      \frac{dx_{\mathrm{gluc}}}{dt}&=k_{aG}\left(S_G\,a_G-x_{\mathrm{gluc}}\right) &&&&\text{(effect compartment)}
+      \end{aligned}$$
+    </div>
+    <div class="fx__foot">\(k_1 = 1/t_{\max,glucagon}\). Doses convert exactly: 1 mg = 10⁹ pg.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">t<sub>max,G</sub></td><td>First transfer time constant</td><td class="unit">min</td><td class="num">25 (k₁ = 0.04)</td></tr>
+        <tr><td class="sym">k₂</td><td>Second transfer / elimination</td><td class="unit">1/min</td><td class="num">0.165</td></tr>
+        <tr><td class="sym">Cl<sub>F,C</sub></td><td>Apparent clearance</td><td class="unit">mL/kg/min</td><td class="num">120.0</td></tr>
+        <tr><td class="sym">CE₅₀</td><td>Half-maximal effect concentration</td><td class="unit">pg/mL</td><td class="num">350.0</td></tr>
+        <tr><td class="sym">k<sub>aG</sub></td><td>Effect-compartment rate</td><td class="unit">1/min</td><td class="num">0.05</td></tr>
+        <tr><td class="sym">S<sub>G</sub></td><td>Maximum fractional EGP increase</td><td class="unit">—</td><td class="num">1.0</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">Why a saturating effect and a separate effect compartment</h4>
+  <p>
+    Two distinct non-linearities are needed, and conflating them is a common error.
+    The <b>Hill/Michaelis–Menten term</b> \(a_G = \Gamma/(CE_{50}+\Gamma)\) says receptor occupancy
+    saturates: doubling the dose past \(CE_{50}\) does not double the effect. The <b>effect
+    compartment</b> \(x_{\mathrm{gluc}}\) says the effect also <em>lags</em> the concentration, because
+    the hepatic response takes time. One is about magnitude, the other about timing.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:f13_glucagon}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 8</span> — glucagon PK and the bounded effect it drives.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: plasma glucagon Γ after a subcutaneous dose. Right: the resulting \(x_{\mathrm{gluc}}\), the fractional lift applied to EGP.</dd></div>
+        <div><dt>Parameters</dt><dd>0.5 and 1.0 mg SC, 70 kg, \(Cl\) = 8400 mL/min, \(CE_{50}\) = 350 pg/mL, \(k_{aG}\) = 0.05 min⁻¹, \(S_G\) = 1.0.</dd></div>
+        <div><dt>Key observation</dt><dd>Γ peaks around <b>11 min</b> and far exceeds \(CE_{50}\) — about 3026 pg/mL for 1 mg — so \(a_G\) is deeply saturated and the two doses give a nearly identical effect curve.</dd></div>
+        <div><dt>Why it matters</dt><dd>It shows a real dosing insight the model produces on its own: at these doses glucagon is on the plateau of its dose–response, so more drug buys duration, not intensity.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Split evidence.</strong> The two-state PK and the clearance output follow published
+    T1D glucagon parameter ranges. The bounded effect compartment coupling into EGP is an
+    <em>unvalidated IINTS adaptation</em>. Say which half is which if asked — the registry does.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Your simulated glucagon peaks near 3000 pg/mL — is that physiological?</p>
+      <p class="qa__a">It is far above endogenous levels, which sit in the tens of pg/mL, but this is a
+      1 mg pharmacological rescue dose, not endogenous secretion, and supraphysiological peaks are
+      expected. What the figure really shows is that at that dose the effect term is saturated, so the
+      model is insensitive to the exact peak — which is reassuring, because the peak is the part of the
+      PK we are least confident about.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Does the model include endogenous glucagon secretion?</p>
+      <p class="qa__a">Not as a hormone with its own kinetics. Endogenous counter-regulation is
+      represented separately and more crudely by the rescue multiplier F11, which lifts EGP directly as
+      glucose falls. The Γ state here is exogenous glucagon only. Merging the two would be the natural
+      next extension.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 13 ═══ -->
+<section class="chapter" id="ch14" data-part="II · Physiology" data-n="13" data-title="Hypoglycaemia response (F11)" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 13</div>
+    <h2>Counter-regulatory hypoglycaemia response</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The body's own defence — and the state that can switch it off.</p>
+    <div class="chips"><span class="chip chip--id">F11</span><span class="chip chip--heuristic">heuristic</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F11</span><span class="fx__title">Endogenous rescue multiplier</span></div>
+    <div class="fx__body">
+      $$\Delta_{\mathrm{hypo}}=\max(0,\,70-G),\qquad
+      a=\frac{\Delta_{\mathrm{hypo}}}{16+\Delta_{\mathrm{hypo}}},\qquad
+      R_{\mathrm{rescue}}=1+a\,(1-\mathrm{HAAF})$$
+    </div>
+    <div class="fx__foot">Multiplies EGP₀ inside F06. Bounded above by 2 when HAAF = 0.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">θ<sub>hypo</sub></td><td>Activation threshold</td><td class="unit">mg/dL</td><td class="num">70.0</td></tr>
+        <tr><td class="sym">k<sub>half</sub></td><td>Half-activation deficit</td><td class="unit">mg/dL</td><td class="num">16.0</td></tr>
+        <tr><td class="sym">S<sub>max</sub></td><td>Max fractional EGP increase</td><td class="unit">—</td><td class="num">1.0</td></tr>
+        <tr><td class="sym">HAAF</td><td>Exposure memory, blunts the response</td><td class="unit">—</td><td class="num">state</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">What it represents</h4>
+  <p>
+    As glucose falls below 70 mg/dL a healthy autonomic response releases adrenaline and glucagon,
+    and the liver increases output. The functional form is again a saturating Michaelis–Menten term:
+    the response ramps up over the first tens of mg/dL of deficit and then plateaus. Half-maximal
+    activation is at a 16 mg/dL deficit — that is, at <b>54 mg/dL</b>, which is exactly the clinical
+    Level 2 hypoglycaemia threshold. That alignment is deliberate.
+  </p>
+
+  <h4 class="sub">Behaviour</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">G above 70</div><div class="beh__v">\(\Delta = 0\), \(a = 0\), multiplier exactly 1. The term is completely inert in normal range — no hidden contribution.</div></div>
+    <div class="beh__row"><div class="beh__k">G = 54</div><div class="beh__v">\(a = 0.5\); EGP is raised by 50% if HAAF = 0.</div></div>
+    <div class="beh__row"><div class="beh__k">G → 0</div><div class="beh__v">\(a \to 1\); EGP at most doubles. The response is bounded, so it cannot rescue an arbitrarily large insulin overdose.</div></div>
+    <div class="beh__row"><div class="beh__k">HAAF → 1</div><div class="beh__v">\((1-\mathrm{HAAF}) \to 0\) and the multiplier collapses to 1 regardless of how low glucose goes. The defence is gone.</div></div>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:f11_f12_hypo}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 9</span> — the rescue curve, and the memory state that erodes it.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: \(R_{\mathrm{rescue}}\) against glucose at four HAAF levels. Right: the HAAF state integrated through ten days with one nocturnal hypo per day, then four days of recovery.</dd></div>
+        <div><dt>Parameters</dt><dd>Left: θ = 70, \(k_{half}\) = 16. Right: G = 58 mg/dL for ~86 min each night, otherwise 130; build τ = 360 min, recovery τ = 4320 min.</dd></div>
+        <div><dt>Key observation</dt><dd>The family of curves collapses toward the flat line as HAAF rises — at HAAF = 1 the patient has no counter-regulatory defence at any glucose. On the right, ten nights of modest hypoglycaemia accumulate to HAAF ≈ <b>0.41</b>, and recovery is visibly far slower than build-up.</dd></div>
+        <div><dt>Why it matters</dt><dd>Together these produce a vicious cycle without it being hand-coded: hypos blunt the defence, and the blunted defence makes the next hypo deeper.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Is this a validated model of counter-regulation?</p>
+      <p class="qa__a">No, and the registry says so: it <em>"captures the concept of blunted
+      counterregulation; not a diagnostic HAAF model"</em>. It has the right direction, the right
+      saturation and a clinically meaningful half-activation point, but the coefficients are not
+      identified from clamp data. It should be read as a mechanism that prevents the model from
+      diverging in hypoglycaemia, not as a prediction of any individual's response.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why cap the response at a doubling of EGP?</p>
+      <p class="qa__a">Because an uncapped counter-regulation would make the simulator unfalsifiable —
+      any insulin overdose would eventually be rescued, and no controller could ever be shown to be
+      dangerous. Bounding it at \(S_{max} = 1.0\) means a sufficiently large overdose still produces
+      severe hypoglycaemia, which is exactly the outcome the bench needs to be able to report.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 14 ═══ -->
+<section class="chapter" id="ch15" data-part="II · Physiology" data-n="14" data-title="HAAF memory (F12)" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 14</div>
+    <h2>Hypoglycaemia-associated autonomic failure</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">A memory state with two very different time constants — the only place the model remembers days rather than hours.</p>
+    <div class="chips"><span class="chip chip--id">F12</span><span class="chip chip--heuristic">heuristic</span></div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">F12</span><span class="fx__title">Antecedent-hypoglycaemia exposure memory</span></div>
+    <div class="fx__body">
+      $$s=\operatorname{clip}\!\left(\frac{70-G}{70-54},\,0,\,1.5\right),\qquad
+      \frac{d\,\mathrm{HAAF}}{dt}=\underbrace{\frac{s\,(1-\mathrm{HAAF})}{360}}_{\text{build}}-\underbrace{\frac{\mathrm{HAAF}}{4320}}_{\text{recovery}}$$
+    </div>
+    <div class="fx__foot">Severity width is the gap between the awareness (70) and severe (54) thresholds, so \(s = 1\) at exactly 54 mg/dL.</div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Symbol</th><th>Meaning</th><th>Unit</th><th class="num">Default</th><th>Interpretation</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">τ<sub>build</sub></td><td>Build time constant</td><td class="unit">min</td><td class="num">360</td><td>6 hours</td></tr>
+        <tr><td class="sym">τ<sub>recover</sub></td><td>Recovery time constant</td><td class="unit">min</td><td class="num">4320</td><td>3 days</td></tr>
+        <tr><td class="sym">θ<sub>aware</sub></td><td>Awareness threshold</td><td class="unit">mg/dL</td><td class="num">70.0</td><td>severity zero point</td></tr>
+        <tr><td class="sym">θ<sub>severe</sub></td><td>Severe threshold</td><td class="unit">mg/dL</td><td class="num">54.0</td><td>severity = 1</td></tr>
+        <tr><td class="sym">s<sub>max</sub></td><td>Severity cap</td><td class="unit">—</td><td class="num">1.5</td><td>reached at 46 mg/dL</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4 class="sub">Why the asymmetry is the whole point</h4>
+  <p>
+    \(\tau_{\mathrm{recover}} / \tau_{\mathrm{build}} = 12\). Impairment accumulates in hours and
+    resolves over days. That single ratio is what makes repeated mild hypoglycaemia progressively
+    dangerous rather than merely repetitive, and it is the clinically observed pattern the state is
+    abstracting. A symmetric state would be pointless — it would simply track current glucose.
+  </p>
+
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">Bounded by construction</div><div class="beh__v">The \((1-\mathrm{HAAF})\) factor makes build vanish as HAAF → 1, and the linear decay makes it fall whenever severity is zero. HAAF cannot leave [0,1] without a numerical fault.</div></div>
+    <div class="beh__row"><div class="beh__k">Equilibrium</div><div class="beh__v">Steady state under constant severity: \(\mathrm{HAAF}^{*} = s/(s + 360/4320) = s/(s+0.0833)\). Even \(s = 0.1\) — glucose at 68.4 mg/dL — equilibrates at HAAF ≈ 0.55.</div></div>
+    <div class="beh__row"><div class="beh__k">Enforcement</div><div class="beh__v">Material excursions outside [0,1] fail the step. Only solver-scale tolerance is projected back — the model does not quietly clip a physiological error.</div></div>
+  </div>
+
+  <div class="note note--stop">
+    <div class="note__ic">!</div>
+    <div><p><strong>Never report HAAF as a clinical finding.</strong> The registry's validation note is
+    explicit: <em>"Research memory state only; never report as clinical hypo-awareness diagnosis."</em>
+    Impaired hypoglycaemia awareness is diagnosed with validated instruments such as Gold or Clarke
+    scores, not by a simulator state.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Where do 6 hours and 3 days come from?</p>
+      <p class="qa__a">They are order-of-magnitude choices consistent with the clamp literature —
+      antecedent hypoglycaemia blunts counter-regulation within the same day and recovery takes
+      days to weeks — but they are not fitted values. The source docstring says the constants are
+      <em>"deliberately explicit so they can be calibrated against clamp-study data instead of being
+      hidden in model code"</em>. That is the strongest honest claim: the structure is right, the
+      numbers are a starting point.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why does severity cap at 1.5 rather than 1.0?</p>
+      <p class="qa__a">So that glucose below the severe threshold still builds memory faster than
+      glucose at it — the cap is reached at 46 mg/dL. Without a cap, an extremely low excursion would
+      dominate the entire history; without any headroom above 1.0, severity would be flat across the
+      whole Level-2 range, which would lose real information.</p>
+    </div>
+  </div>
+</section>

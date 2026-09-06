@@ -1,0 +1,311 @@
+<div class="part"><div class="part__n">Part V · Evidence</div><div class="part__rule"></div></div>
+
+<!-- ══════════════════════════════════════════════════════════ CH 26 ═══ -->
+<section class="chapter" id="ch27" data-part="V · Evidence" data-n="26" data-title="Simulation results" style="--sys: var(--sys-glucose)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 26</div>
+    <h2>Simulation results</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The reference day, and the locked benchmark — including the parts of it that are not flattering.</p>
+  </div>
+
+  <h3 class="sec">Reference closed-loop day</h3>
+  <figure>
+    <div class="plate">{{FIG:closed_loop_day}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 18</span> — 24 hours, three meals, full device chain.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Hidden true glucose against the CGM the controller receives, with the basal/bolus split below.</dd></div>
+        <div><dt>Parameters</dt><dd>Hovorka 70 kg, ISF 50 mg/dL/U, ICR 10 g/U, basal 0.8 U/h, novolog; meals 60 g at 07:00, 80 g at 12:00, 70 g at 19:00; Clinical Baseline controller; CGM σ 8.5 mg/dL, lag 5 min; 5-min steps; seed 11.</dd></div>
+        <div><dt>Key observation</dt><dd>TIR 79.9%, time below 70 <b>0.0%</b>, time above 180 20.1%, CV 28.5%, LBGI 0.11. All out-of-range time is post-prandial and on the high side.</dd></div>
+        <div><dt>Why it matters</dt><dd>It is the baseline every other figure in this handbook varies from, and it establishes that the default configuration produces a physiologically ordinary day rather than a degenerate one.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="stats">
+    <div class="stat"><div class="stat__v">79.9<small>%</small></div><div class="stat__k">TIR 70–180</div></div>
+    <div class="stat"><div class="stat__v">0.0<small>%</small></div><div class="stat__k">below 70</div></div>
+    <div class="stat"><div class="stat__v">20.1<small>%</small></div><div class="stat__k">above 180</div></div>
+    <div class="stat"><div class="stat__v">28.5<small>%</small></div><div class="stat__k">CV</div></div>
+    <div class="stat"><div class="stat__v">0.11</div><div class="stat__k">LBGI</div></div>
+    <div class="stat"><div class="stat__v">145<small> mg/dL</small></div><div class="stat__k">mean glucose</div></div>
+  </div>
+
+  <h3 class="sec">Hypo-, normo- and hyperglycaemic days</h3>
+  <figure>
+    <div class="plate">{{FIG:scenarios}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 19</span> — three outcomes from one parameter.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>The reference day repeated with the carb ratio set to 6, 10 and 20 g/U — that is, systematic over-bolusing, correct bolusing, and under-bolusing.</dd></div>
+        <div><dt>Parameters</dt><dd>As the reference day; only <span class="mono">carb_factor</span> changes, and the controller reads it, so the bolus size changes with it.</dd></div>
+        <div><dt>Key observation</dt><dd>Over-bolusing (ICR 6) gives TIR 49.5% with <b>19.4% below 70 and 31.1% above 180</b> — it is worse at <em>both</em> ends, because each hypo is followed by a rebound. Under-bolusing (ICR 20) gives 52.6% TIR but no hypoglycaemia at all.</dd></div>
+        <div><dt>Why it matters</dt><dd>The two failures have similar TIR and radically different risk profiles. It is the clearest single argument in this document for reporting TBR and LBGI beside TIR.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h3 class="sec">The locked EUCYS benchmark</h3>
+  <p>
+    A fixed matrix: 6 patient profiles × 4 scenario families × 3 study arms × 5 algorithm paths ×
+    10 seeds = <b>3600 runs</b>. The three arms are clean certified input, deliberately corrupted
+    uncertified input, and a supervisor-off ablation.
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Study arm</th><th class="num">Runs</th><th class="num">Mean TIR</th><th class="num">Below 70</th><th class="num">Above 180</th><th class="num">Supervisor interventions</th></tr></thead>
+      <tbody>
+        <tr><td>Clean, certified</td><td class="num">1200</td><td class="num">90.30%</td><td class="num">6.45%</td><td class="num">3.25%</td><td class="num">177.19</td></tr>
+        <tr><td>Corrupted, uncertified</td><td class="num">1200</td><td class="num">73.19%</td><td class="num">3.69%</td><td class="num">23.12%</td><td class="num">219.72</td></tr>
+        <tr><td>Supervisor-off ablation</td><td class="num">1200</td><td class="num">80.78%</td><td class="num">3.88%</td><td class="num">15.35%</td><td class="num">198.02</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>
+    Weighted across the equally sized arms, mean TIR is approximately <b>81.42%</b>. The
+    clean-versus-corrupted difference is <b>17.11 percentage points</b>.
+  </p>
+
+  <h4 class="sub">What this supports</h4>
+  <ul>
+    <li>The SDK can execute a large locked matrix over profiles, scenarios, algorithms, arms and seeds.</li>
+    <li>Clean and deliberately corrupted data conditions produce measurably different outcomes.</li>
+    <li>Algorithm and safety-event trade-offs are exported in reviewable tables.</li>
+    <li>A result can be traced back to protocol and run artefacts.</li>
+    <li>The platform exposes undesirable outcomes instead of hiding them.</li>
+  </ul>
+
+  <h4 class="sub">What it does not support</h4>
+  <ul>
+    <li>That any candidate algorithm is clinically safe.</li>
+    <li>That a high TIR compensates for excessive time below range.</li>
+    <li>That every supervisor intervention is appropriate.</li>
+    <li>That the virtual population represents a clinical population.</li>
+    <li>That the same performance would occur on an external dataset or a certified simulator.</li>
+    <li>That the simulator can be used to determine a real dose.</li>
+  </ul>
+
+  <div class="note note--stop">
+    <div class="note__ic">!</div>
+    <div>
+      <p><strong>Raise this before the jury does.</strong> The clean arm reports <b>6.45% mean time
+      below 70 mg/dL</b>. The consensus target is under 4%. That is not a result to present as
+      satisfactory control, and it is the single most important open finding in the benchmark. It
+      requires investigation by profile, scenario, algorithm and seed.</p>
+      <p>Note also the counter-intuitive pattern: the <em>corrupted</em> arm has <em>less</em> time
+      below range (3.69%) than the clean arm. That is not the corruption helping — it is that
+      corruption pushes runs hyperglycaemic (23.12% above 180), which mechanically reduces time below.
+      Reading the two numbers together is the point.</p>
+    </div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Your best arm has 6.45% time below range. Isn't that dangerous?</p>
+      <p class="qa__a">Yes, it is above the consensus limit of 4%, and I flag it as the benchmark's
+      principal open finding rather than defending it. What I would not do is average it away — the
+      arm's 90.3% TIR looks excellent and is not, and that is precisely the failure mode this platform
+      is built to expose. The next step is disaggregation by profile and algorithm to establish
+      whether it is concentrated in specific configurations or systemic.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why does turning the supervisor off improve TIR?</p>
+      <p class="qa__a">Because the supervisor's job is not to maximise TIR — it is to prevent
+      unsafe delivery, and every intervention it makes costs some in-range time. The ablation arm
+      reaching 80.78% against the corrupted arm's 73.19% is expected. The comparison to read is against
+      the clean arm, and the honest reading is that this single table cannot establish that every
+      one of the 177 mean interventions was appropriate. That is listed under what the benchmark
+      does not support.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Is 3600 runs enough?</p>
+      <p class="qa__a">It is enough to characterise the matrix that was specified, with 10 seeds per
+      cell. It is not enough to make a population claim, because the six profiles are not a sample of
+      any real population — they are configurations. Increasing seeds narrows the confidence interval
+      around a number whose external validity is the actual limitation.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 27 ═══ -->
+<section class="chapter" id="ch28" data-part="V · Evidence" data-n="27" data-title="Sensitivity analysis" style="--sys: var(--sys-action)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 27</div>
+    <h2>Sensitivity analysis</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Which parameters actually move the answer — and which move it in a way you would not guess.</p>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:tornado}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 20</span> — one-at-a-time sensitivity on mean glucose.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Change in 24-hour mean glucose when each parameter is moved ±25% from the reference configuration, sorted by total span.</dd></div>
+        <div><dt>Parameters</dt><dd>Baseline mean 145 mg/dL. Identical scenario, controller and seed (11) in all nine runs; one parameter varied at a time.</dd></div>
+        <div><dt>Key observation</dt><dd>Insulin sensitivity dominates (169 → 135 mg/dL across the range). The carb ratio is <b>non-monotone</b> — both −25% and +25% raise mean glucose to 160, for opposite reasons.</dd></div>
+        <div><dt>Why it matters</dt><dd>A non-monotone response means a local gradient is misleading, and it is the reason a one-at-a-time screen is a starting point rather than a conclusion.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Parameter varied ±25%</th><th class="num">−25% mean</th><th class="num">Baseline</th><th class="num">+25% mean</th><th>Reading</th></tr></thead>
+      <tbody>
+        <tr><td>ISF (insulin sensitivity)</td><td class="num">169</td><td class="num">145</td><td class="num">135</td><td>Monotone, largest span. The dominant parameter.</td></tr>
+        <tr><td>ICR (carb ratio)</td><td class="num">160</td><td class="num">145</td><td class="num">160</td><td><b>Non-monotone.</b> Over-bolus causes hypo then rebound; under-bolus causes plain hyper.</td></tr>
+        <tr><td>Basal setting *</td><td class="num">115</td><td class="num">145</td><td class="num">162</td><td>Inverted from intuition — see the note below.</td></tr>
+        <tr><td>Liver scalar \(S_{IE}\)</td><td class="num">152</td><td class="num">145</td><td class="num">133</td><td>Monotone, moderate. Acts mostly on the fasting level.</td></tr>
+        <tr><td>Muscle scalar \(S_{ID}\)</td><td class="num">155</td><td class="num">145</td><td class="num">136</td><td>Monotone, moderate. Acts mostly on excursion height.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div>
+      <p><strong>* The basal setting is not a pure dose — and this is worth raising yourself.</strong>
+      <span class="mono">basal_insulin_rate</span> does two things at once. It sets the delivered basal,
+      and it is <em>also</em> the calibration input to
+      <span class="mono">_derive_basal_parameter_scale</span>, which back-solves \(\rho_{\mathrm{basal}}\)
+      by bisection so that the configured basal is a genuine fasting steady state.</p>
+      <p>Measured directly from the model: \(\rho_{\mathrm{basal}}\) = 1.231 at 0.3 U/h,
+      0.462 at 0.8 U/h and 0.264 at 1.4 U/h. A higher configured basal therefore describes a
+      <em>more insulin-resistant</em> patient, and the resistance outweighs the extra insulin — which is
+      why raising it raises mean glucose. That is intended behaviour, documented in the source, and it
+      is a genuine trap for anyone reading the parameter as a dose knob.</p>
+    </div>
+  </div>
+
+  <h3 class="sec">Sensitivity to insulin sensitivity, in full</h3>
+  <figure>
+    <div class="plate">{{FIG:isf_sweep}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 21</span> — the dominant parameter across a realistic clinical range.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: 24-hour trajectories at ISF 30, 50 and 80 mg/dL/U. Right: the TIR / below / above split for each.</dd></div>
+        <div><dt>Parameters</dt><dd>Reference day; only <span class="mono">insulin_sensitivity</span> varies. The controller reads it, so its correction doses scale with it.</dd></div>
+        <div><dt>Key observation</dt><dd>The response is strongly asymmetric. ISF 30 gives 32.5% TIR, all of the loss above range and none below. ISF 80 gives 64.4% TIR but <b>20.8% below 70</b> — the sensitive patient is the dangerous one.</dd></div>
+        <div><dt>Why it matters</dt><dd>Equal-magnitude parameter error in opposite directions produces qualitatively different harm. Reporting only TIR would rank ISF 80 as better than ISF 30; by risk it is worse.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h4 class="sub">Method and its limits</h4>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">Design</div><div class="beh__v">One-at-a-time (OAT) around a single nominal point, ±25%, identical seed and scenario so differences are attributable to the parameter alone.</div></div>
+    <div class="beh__row"><div class="beh__k">What OAT cannot find</div><div class="beh__v">Interactions. Reduced hepatic <em>and</em> reduced peripheral sensitivity together is not the sum of the two rows above, and OAT will never show that.</div></div>
+    <div class="beh__row"><div class="beh__k">What OAT cannot find</div><div class="beh__v">Non-local behaviour. The ICR row is already non-monotone within ±25%; a larger perturbation could reverse the sign of a gradient measured here.</div></div>
+    <div class="beh__row"><div class="beh__k">Honest next step</div><div class="beh__v">A variance-based global method — Sobol indices over a joint parameter distribution — would give first-order and total-effect indices including interactions. That is not implemented here, and I would not claim OAT as a substitute.</div></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Have you done a proper global sensitivity analysis?</p>
+      <p class="qa__a">No. What is shown is a one-at-a-time screen around a single nominal point, which
+      identifies the dominant parameter and — usefully — flags one non-monotone response. A proper
+      global analysis would be Sobol or Morris over a joint distribution, giving total-effect indices
+      that capture interactions. OAT cannot see interactions at all, so I would present these as a
+      screening result, not a variance decomposition.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Which parameter would you most want measured in a real patient?</p>
+      <p class="qa__a">Insulin sensitivity, unambiguously — it has the largest span in the screen and it
+      is the one whose error is asymmetric in risk. The second would be the carb ratio, not because its
+      span is large but because its response is non-monotone, so an adaptive controller tuning it on a
+      mean-glucose objective could move in the wrong direction and still see the metric improve.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 28 ═══ -->
+<section class="chapter" id="ch29" data-part="V · Evidence" data-n="28" data-title="Model limitations" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 28</div>
+    <h2>Model limitations</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">The consolidated list. Being able to recite this is worth more than any result in the document.</p>
+  </div>
+
+  <h3 class="sec">Physiological simplifications</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Not modelled</th><th>Consequence</th></tr></thead>
+      <tbody>
+        <tr><td>Hepatic glycogen store</td><td>EGP never depletes. Multi-day fasting and prolonged endurance exercise would be over-optimistic.</td></tr>
+        <tr><td>Portal vein / first-pass insulin</td><td>Hepatic and systemic insulin are one variable. Hepatic selectivity is a sensitivity scalar, not a two-compartment ratio.</td></tr>
+        <tr><td>Endogenous glucagon secretion</td><td>Counter-regulation is a direct EGP multiplier (F11), not a hormone with kinetics.</td></tr>
+        <tr><td>Free fatty acids, ketones, protein → glucose</td><td>No DKA pathway; a mixed meal's protein contribution is absent.</td></tr>
+        <tr><td>Injection site, temperature, local perfusion</td><td>\(t_{\max,I}\) is a discrete choice, not a state-dependent quantity.</td></tr>
+        <tr><td>Variable gastric emptying</td><td>Single lumped \(t_{\max,G}\); no biphasic mixed-meal appearance.</td></tr>
+        <tr><td>Immune-cell dynamics, beta-cell mass, PD-L1</td><td>Only a one-parameter exponential graft decay. See <a class="xref" href="#ch18">Chapter 17</a>.</td></tr>
+        <tr><td>Renal impairment, SGLT2 inhibition</td><td>Fixed renal threshold; no per-patient identification.</td></tr>
+        <tr><td>Insulin antibodies, lipohypertrophy, site rotation</td><td>Absorption is stationary over a run.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sec">Mathematical and methodological limitations</h3>
+  <ul>
+    <li><b>Parameter identifiability.</b> Nineteen states and dozens of parameters cannot be identified from glucose and insulin inputs alone. Several — the tissue scalars, the affinity scalar, the HAAF time constants — are set, not fitted.</li>
+    <li><b>Population parameters, individual claims.</b> The Hovorka values describe a population. \(\rho_{\mathrm{basal}}\) reconciles a patient-specific basal against them, which is a declared approximation.</li>
+    <li><b>Sensitivity screening only.</b> No variance-based global analysis; interactions are unmeasured.</li>
+    <li><b>Model mismatch in MPC.</b> The controller predicts with Bergman against a possibly-Hovorka plant. Realistic, but it means MPC results are not an optimal-control upper bound.</li>
+    <li><b>The 6.45% low-glucose burden</b> in the clean benchmark arm is unexplained and above target.</li>
+    <li><b>Nine of sixteen formulas are heuristic.</b> Their coefficients require calibration before any quantitative interpretation.</li>
+  </ul>
+
+  <h3 class="sec">Validation status</h3>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+      <tbody>
+        <tr><td>Does the code integrate the stated equations?</td><td><b>Yes</b> — tested extensively, 175 test modules, flux set pinned against the schema.</td></tr>
+        <tr><td>Are trajectories physiologically plausible?</td><td><b>Within documented envelopes</b>, with violations raising rather than clipping.</td></tr>
+        <tr><td>Are the parameters experimentally identified?</td><td><b>Partially.</b> Published structure and some ranges; IINTS scalars are not.</td></tr>
+        <tr><td>Is it validated against an external dataset?</td><td><b>Not demonstrated.</b> Real cohorts inform the sensor plausibility ceiling, not the physiology parameters.</td></tr>
+        <tr><td>Is it validated against a certified simulator?</td><td><b>No.</b></td></tr>
+        <tr><td>Is it clinically validated?</td><td><b>No, and not claimed.</b> Not a medical device.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">What is the single biggest weakness of your project?</p>
+      <p class="qa__a">Parameter identifiability. The model's structure is defensible and mostly
+      published, but a nineteen-state system has far more parameters than the available inputs can
+      identify, so several are asserted rather than fitted. That is why the SDK marks nine of sixteen
+      formulas heuristic in the source itself, defaults every extension to inert, and separates
+      mathematical correctness from experimental validation everywhere it reports. The honest position
+      is that this is a well-instrumented bench with a partly-calibrated plant.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">What would you need to make this clinically credible?</p>
+      <p class="qa__a">Three things, in order. First, parameter identification against clamp or
+      well-characterised CGM data, at minimum for insulin sensitivity and the meal chain. Second,
+      external validation — replay real patient days and compare predicted against observed
+      trajectories, reporting the error rather than tuning it away. Third, cross-validation against a
+      certified simulator on a shared protocol. None of that is done, and no amount of additional
+      simulation substitutes for it.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why should anyone trust results from an uncalibrated model?</p>
+      <p class="qa__a">They should not trust the absolute numbers, and I don't ask them to. What
+      survives an uncalibrated plant is <em>comparative and structural</em> findings: that corrupted
+      input costs 17 percentage points of TIR, that an inflow-only dawn model is dose-cancellable and
+      therefore flatters a controller, that a sensitive patient is at higher risk than a resistant one
+      at equal parameter error. Those depend on the model's structure and sign conventions, which are
+      defensible, not on its exact coefficients.</p>
+    </div>
+  </div>
+</section>

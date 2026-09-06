@@ -1,0 +1,127 @@
+<script>
+(function () {
+  "use strict";
+
+  var chapters = Array.prototype.slice.call(document.querySelectorAll(".chapter"));
+  var toc = document.getElementById("toc");
+  var q = document.getElementById("q");
+  var qcount = document.getElementById("qcount");
+  var noresult = document.getElementById("noresult");
+  var parts = Array.prototype.slice.call(document.querySelectorAll(".part"));
+
+  /* ---------------------------------------------------- build the TOC --- */
+  var links = [];
+  var lastPart = null;
+
+  chapters.forEach(function (ch) {
+    var part = ch.getAttribute("data-part") || "";
+    if (part !== lastPart) {
+      var h = document.createElement("div");
+      h.className = "toc__part";
+      h.textContent = part;
+      h.setAttribute("data-part-head", part);
+      toc.appendChild(h);
+      lastPart = part;
+    }
+    var a = document.createElement("a");
+    a.href = "#" + ch.id;
+    var n = document.createElement("span");
+    n.textContent = ch.getAttribute("data-n") || "";
+    var t = document.createElement("em");
+    t.style.fontStyle = "normal";
+    t.textContent = ch.getAttribute("data-title") || "";
+    a.appendChild(n);
+    a.appendChild(t);
+    toc.appendChild(a);
+    links.push({ el: a, ch: ch });
+  });
+
+  var partHeads = Array.prototype.slice.call(toc.querySelectorAll(".toc__part"));
+
+  /* ------------------------------------------------------- the filter --- */
+  var haystacks = chapters.map(function (ch) {
+    return ((ch.getAttribute("data-title") || "") + " " +
+            (ch.getAttribute("data-n") || "") + " " +
+            ch.textContent).toLowerCase();
+  });
+
+  function applyFilter(term) {
+    term = term.trim().toLowerCase();
+    var shown = 0;
+
+    chapters.forEach(function (ch, i) {
+      var match = term === "" || haystacks[i].indexOf(term) !== -1;
+      ch.classList.toggle("is-hidden", !match);
+      links[i].el.classList.toggle("is-hidden", !match);
+      if (match) shown++;
+    });
+
+    /* Part rules and TOC part headings follow their chapters. */
+    var filtering = term !== "";
+    parts.forEach(function (p) { p.style.display = filtering ? "none" : ""; });
+    partHeads.forEach(function (h) {
+      if (!filtering) { h.style.display = ""; return; }
+      var name = h.getAttribute("data-part-head");
+      var any = links.some(function (l) {
+        return l.ch.getAttribute("data-part") === name && !l.el.classList.contains("is-hidden");
+      });
+      h.style.display = any ? "" : "none";
+    });
+
+    noresult.classList.toggle("is-on", shown === 0);
+    qcount.textContent = filtering ? (shown + " of " + chapters.length + " chapters") : "";
+  }
+
+  if (q) {
+    q.addEventListener("input", function () { applyFilter(q.value); });
+    q.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { q.value = ""; applyFilter(""); q.blur(); }
+    });
+  }
+
+  document.addEventListener("keydown", function (e) {
+    var tag = (e.target && e.target.tagName) || "";
+    if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
+      e.preventDefault();
+      if (q) { q.focus(); q.select(); }
+    }
+  });
+
+  /* -------------------------------------------- current-chapter marker -- */
+  if ("IntersectionObserver" in window) {
+    var visible = new Map();
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (en.isIntersecting) visible.set(en.target, en.intersectionRatio);
+        else visible.delete(en.target);
+      });
+      var best = null, bestTop = Infinity;
+      visible.forEach(function (_, el) {
+        var top = el.getBoundingClientRect().top;
+        if (top < bestTop) { bestTop = top; best = el; }
+      });
+      links.forEach(function (l) { l.el.classList.toggle("is-current", l.ch === best); });
+    }, { rootMargin: "-10% 0px -70% 0px", threshold: [0, 0.01, 0.2] });
+    chapters.forEach(function (ch) { io.observe(ch); });
+  }
+
+  /* ------------------------------------------------- mg/dL <-> mmol/L --- */
+  var mgdl = document.getElementById("mgdl");
+  var mmol = document.getElementById("mmol");
+  var FACTOR = 18.0182;
+  var guard = false;
+
+  function bind(from, to, fn, digits) {
+    if (!from || !to) return;
+    from.addEventListener("input", function () {
+      if (guard) return;
+      guard = true;
+      var v = parseFloat(from.value);
+      to.value = isFinite(v) ? fn(v).toFixed(digits) : "";
+      guard = false;
+    });
+  }
+  bind(mgdl, mmol, function (v) { return v / FACTOR; }, 1);
+  bind(mmol, mgdl, function (v) { return v * FACTOR; }, 0);
+})();
+</script>

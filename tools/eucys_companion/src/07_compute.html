@@ -1,0 +1,527 @@
+<div class="part"><div class="part__n">Part IV · Computation, control and safety</div><div class="part__rule"></div></div>
+
+<!-- ══════════════════════════════════════════════════════════ CH 20 ═══ -->
+<section class="chapter" id="ch21" data-part="IV · Computation" data-n="20" data-title="Digital twin schema" style="--sys: var(--sys-compute)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 20</div>
+    <h2>The digital-twin compartment schema</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">
+      How the visualiser knows what it is allowed to draw — and why that is a scientific
+      question, not a design one.
+    </p>
+  </div>
+
+  <p>
+    The desktop workbench renders a live compartment view. It does not hard-code the anatomy:
+    it reads a schema from the model, because the three backends have different state vectors and a
+    viewer that assumed one would silently mislabel the others. Three distinctions in that schema are
+    load-bearing.
+  </p>
+
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">kind</div><div class="beh__v"><span class="mono">pool</span> (mass) and <span class="mono">concentration</span> are physical contents and may be drawn as a filled volume. <span class="mono">effect</span> states are dimensionless or rate-valued — drawing one as a tank would imply a substance the model never tracks. <span class="mono">legacy</span> exists only so old snapshots restore.</div></div>
+    <div class="beh__row"><div class="beh__k">provenance</div><div class="beh__v"><span class="mono">canonical</span> = from the published equations; <span class="mono">extension</span> = added by this project. A view that renders an extension alongside a canonical state without saying so is misrepresenting the model.</div></div>
+    <div class="beh__row"><div class="beh__k">rate_expression</div><div class="beh__v">The flux term exactly as it appears in the ODE. Deliberately <em>not</em> reduced to a constant, because most fluxes are state-dependent — \(x_1 Q_1\) is not a rate constant.</div></div>
+  </div>
+
+  <h3 class="sec">Instantaneous flux snapshot</h3>
+  <p>
+    For live numbers the model re-evaluates its own ODE right-hand side at the state the integrator
+    finished on, recording each transfer term into a dictionary. This is a deliberate design choice
+    with a real property: the displayed numbers come from <em>the same expressions that produced the
+    trajectory</em>, not from a second implementation that could drift out of step. Recording only
+    copies subexpressions that are computed anyway, so an integration with recording enabled is
+    numerically identical to one without it.
+  </p>
+
+  <div class="note">
+    <div class="note__ic">i</div>
+    <div><p>A snapshot is an <b>instantaneous rate at one instant</b>, never a mass transferred over the
+    preceding step. The integrator evaluates the RHS several times per step, so the two are different
+    quantities. A test pins the recorded flux set against what the ODE actually writes, so the schema
+    cannot drift away from the equations unnoticed.</p></div>
+  </div>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Flux key</th><th>Expression</th><th>Unit</th></tr></thead>
+      <tbody>
+        <tr><td class="sym">glucose_appearance</td><td class="sym">A_G · D₂ / t_max_G</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">endogenous_production</td><td class="sym">EGP₀ · max(0, 1 − x₃ + x_gluc)</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">glucose_to_periphery</td><td class="sym">x₁ · Q₁</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">glucose_from_periphery</td><td class="sym">k₁₂ · Q₂</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">peripheral_disposal</td><td class="sym">x₂ · Q₂</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">nimgu</td><td class="sym">F_01c · (1 + 1.5 · GLUT4)</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">renal_clearance</td><td class="sym">0.003 · V_G_dL · softplus(G − 162)</td><td class="unit">mg/min</td></tr>
+        <tr><td class="sym">insulin_appearance</td><td class="sym">S₂ / t_max_I</td><td class="unit">mU/min</td></tr>
+        <tr><td class="sym">insulin_elimination</td><td class="sym">k_e · I</td><td class="unit">mU/L/min</td></tr>
+        <tr><td class="sym">glucagon_appearance</td><td class="sym">k₂ · Y₂ / (w · Cl)</td><td class="unit">pg/mL</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Your visualiser shows a liver. Where is it in the equations?</p>
+      <p class="qa__a">It is not a compartment — there is no hepatic state. It is drawn as a flux proxy
+      fed by <span class="mono">endogenous_production</span>, and the inspection card says explicitly
+      that EGP is a boundary source term with no reservoir behind it. That distinction is enforced by
+      the schema's <span class="mono">kind</span> field rather than left to whoever draws the picture.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 21 ═══ -->
+<section class="chapter" id="ch22" data-part="IV · Computation" data-n="21" data-title="Control algorithms" style="--sys: var(--sys-compute)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 21</div>
+    <h2>Control algorithms</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Everything implements one interface, so everything is comparable on one bench.</p>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Controller</th><th>Type</th><th>Basis of decision</th></tr></thead>
+      <tbody>
+        <tr><td><b>Clinical Baseline</b></td><td>rule-based</td><td>Steady basal + meal coverage + partial correction above 145 mg/dL, with hypo and falling-trend guards.</td></tr>
+        <tr><td><b>PID</b></td><td>classical</td><td>Error, integral and derivative on glucose, with a PK feed-forward term that damps the integral by insulin on board.</td></tr>
+        <tr><td><b>MPC</b></td><td>optimal</td><td>Optimises a dose sequence over a 60-minute horizon against an internal Bergman model.</td></tr>
+        <tr><td><b>Fixed basal-bolus</b></td><td>open-loop</td><td>Reference arm; no feedback.</td></tr>
+        <tr><td><b>LSTM / neural / imitation</b></td><td>learned</td><td>Candidate proposals, capped at 1.0 U per step and always supervised.</td></tr>
+        <tr><td><b>Hybrid</b></td><td>composite</td><td>Deterministic core with a learned component in an advisory role.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 class="sec">The MPC cost function</h3>
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">MPC</span><span class="fx__title">Asymmetric horizon cost</span></div>
+    <div class="fx__body">
+      $$J(\mathbf{u})=\sum_{k=1}^{N}\Big[
+      \underbrace{w_{\pm}(G_k)\,e_k^2}_{\text{tracking}}
+      +\underbrace{5000\cdot\mathbb{1}[G_k<70]\,(70-G_k)^2}_{\text{hypo barrier}}
+      +\underbrace{250\cdot\mathbb{1}[G_k<100]\,u_k^2}_{\text{dose-when-low penalty}}
+      +\underbrace{0.5\,u_k^2}_{\text{regularisation}}\Big]$$
+      $$e_k = G_k - G_{\mathrm{target}},\qquad
+      w_{\pm}(G_k)=\begin{cases}50 & e_k<0 \ \ (\text{below target})\\ 1 & e_k\ge 0\end{cases}$$
+    </div>
+    <div class="fx__foot">Horizon 60 min at 5-min steps (N = 12). Predictions come from a cloned Bergman model seeded with the current state.</div>
+  </div>
+
+  <p>
+    The weights encode a clinical value judgement, and it is worth being able to defend it explicitly:
+    being <b>50 times</b> more averse to undershooting than overshooting, plus a barrier term that is a
+    further 100× steeper below 70 mg/dL. This is not symmetric tracking, and it should not be —
+    hypoglycaemia is acutely dangerous while equivalent hyperglycaemia is not. The
+    dose-when-low penalty is separate and does something subtly different: it discourages giving
+    insulin at all when glucose is already under 100, even if the horizon prediction looks acceptable.
+  </p>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>Model mismatch is deliberate.</strong> The MPC predicts with a Bergman model while
+    the patient may be running Hovorka. That is realistic — a real controller never has the true plant —
+    and it means MPC results here include structural mismatch, not just parameter error. Do not present
+    MPC performance as an upper bound on what optimal control could achieve.</p></div>
+  </div>
+
+  <h3 class="sec">A worked negative result</h3>
+  <p>
+    Textbook PID gains are a good illustration of why a bench like this exists. With
+    \(k_p = 0.1\) U per mg/dL of error, a patient sitting at 130 mg/dL against a 120 target receives
+    1 U every five minutes — 12 U/h — and the outcome is not subtle.
+  </p>
+
+  <figure>
+    <div class="plate">{{FIG:pid_failure}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 14</span> — the bench reporting a failure rather than a score.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>The same patient, scenario and seed under the Clinical Baseline controller and under the demonstration PID controller.</dd></div>
+        <div><dt>Parameters</dt><dd>Hovorka 70 kg, ISF 50, ICR 10, basal 0.8 U/h, meals 60/80/70 g, seed 11. PID: \(k_p\)=0.1, \(k_i\)=0.01, \(k_d\)=0.05, target 120 mg/dL.</dd></div>
+        <div><dt>Key observation</dt><dd>The PID run is <b>terminated at 140 minutes</b> — glucose below 40 mg/dL for 30 minutes — with 41.4% of its truncated run below 70 and an LBGI of 18.5. The baseline completes the day at 79.9% TIR with no time below range.</dd></div>
+        <div><dt>Why it matters</dt><dd>The simulator refuses to return a tidy metric for a lethal trajectory. A platform that reported "TIR 58.6%" here — technically true of the truncated run — would be hiding the finding.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Your PID controller fails badly. Isn't that a flaw in your platform?</p>
+      <p class="qa__a">It is the platform working. Those are the untuned textbook gains that ship as a
+      teaching example, and the correct outcome for them is catastrophic hypoglycaemia — a proportional
+      gain of 0.1 U per mg/dL is enormous for this plant. What the bench adds is that the failure is
+      <em>reported as a termination with a reason</em>, not averaged into a summary statistic. I would be
+      far more worried about a simulator in which that configuration scored acceptably.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why is the hypoglycaemia penalty 5000 and not some other number?</p>
+      <p class="qa__a">It is a chosen weight, not a derived one, and I would not defend the specific
+      value — only the ordering of magnitudes. What matters is that it is large enough that no
+      realistic hyperglycaemia term can outweigh a predicted excursion below 70. If a jury wanted a
+      principled version, the honest route is a risk-space cost built on LBGI
+      (<a class="xref" href="#ch26">Chapter 25</a>), which has a published basis, rather than
+      hand-picked quadratic weights.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 22 ═══ -->
+<section class="chapter" id="ch23" data-part="IV · Computation" data-n="22" data-title="AI and decision support" style="--sys: var(--sys-compute)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 22</div>
+    <h2>AI and decision support</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Where machine learning is allowed to act, and the four gates it passes through first.</p>
+  </div>
+
+  <p>
+    Predictors estimate glucose 30 minutes ahead and can trigger a preventive response. They cannot
+    deliver insulin, and every prediction passes a gate chain that <b>fails closed</b> to a
+    deterministic heuristic. The results frame records which path was taken on every single step —
+    <span class="mono">predictor_used</span>, <span class="mono">predictor_gate_reason</span> — so a
+    run can be audited for how often the AI was actually trusted.
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Gate</th><th>Mechanism</th><th class="num">Default threshold</th><th>On failure</th></tr></thead>
+      <tbody>
+        <tr><td>Uncertainty</td><td>MC-dropout, 30 samples, isolated seeded generator</td><td class="num">σ &gt; 20 mg/dL</td><td>fall back to heuristic</td></tr>
+        <tr><td>Out-of-distribution</td><td>Per-feature z-score against training statistics</td><td class="num">|z| &gt; 4.0</td><td>fall back to heuristic</td></tr>
+        <tr><td>OOD breadth</td><td>Fraction of features flagged</td><td class="num">&gt; 30%</td><td>fall back to heuristic</td></tr>
+        <tr><td>Integrity</td><td>Missing checkpoint, missing scaler metadata, non-finite output, exception</td><td class="num">any</td><td>fall back to heuristic</td></tr>
+        <tr><td>Dose cap</td><td>Applied to any ML-originated candidate</td><td class="num">1.0 U / step</td><td>clamp</td></tr>
+        <tr><td>Supervisor</td><td>The same independent check every controller passes</td><td class="num">see <a class="xref" href="#ch25">Ch 24</a></td><td>clamp or reject</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <div class="note__ic">i</div>
+    <div><p>MC-dropout uses an <b>isolated</b> seeded generator. Its mean or standard deviation can
+    trigger a fallback, but <em>a stochastic sample is never delivered as an insulin result.</em>
+    Randomness informs a gate; it never becomes a dose.</p></div>
+  </div>
+
+  <h3 class="sec">Language models</h3>
+  <p>
+    A local LLM can explain results and formulas. Its boundary is enforced by construction rather than
+    by prompt discipline alone: it receives the formula registry as immutable context with the
+    instruction <em>"Use these pre-registered formulas as immutable context. Do not derive or solve
+    formulas,"</em> and the exported context carries the flag
+    <span class="mono">ai_formula_authority: false</span>. Each formula's own policy field reads:
+    <em>"LLM may explain only; never derive, solve, or alter this formula."</em>
+  </p>
+
+  <div class="note note--stop">
+    <div class="note__ic">!</div>
+    <div><p><strong>The clean answer.</strong> No number that reaches an actuator in this SDK was
+    produced by a language model. Physiology is deterministic Python; controllers are deterministic;
+    the supervisor is deterministic; ML may propose but never dispose.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">How do you know your predictor isn't confidently wrong on out-of-distribution data?</p>
+      <p class="qa__a">I don't know it, so the design does not depend on knowing it. Two independent
+      gates run: an uncertainty gate on MC-dropout spread, and an OOD gate on per-feature z-scores with
+      a breadth criterion so a single odd feature does not trip it but a broadly unfamiliar input does.
+      Either one failing reverts to the deterministic heuristic, and the reason is written to the
+      results frame so the fallback rate is measurable rather than assumed.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Is this "AI for diabetes"?</p>
+      <p class="qa__a">No, and I'd resist that framing. It is a mechanistic simulator with strictly
+      bounded machine-learning components. The interesting research question here is not whether a
+      network can predict glucose — it can — but what governance structure lets you use one without
+      giving it authority it should not have. That is what the gate chain and the authority order are.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 23 ═══ -->
+<section class="chapter" id="ch24" data-part="IV · Computation" data-n="23" data-title="Loss functions" style="--sys: var(--sys-action)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 23</div>
+    <h2>Loss functions and optimisation</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Training objectives that weight errors by danger rather than by frequency.</p>
+  </div>
+
+  <p>
+    Plain MSE optimises for the common case. In glucose data the common case is euglycaemia, so a
+    plain-MSE forecaster becomes most accurate exactly where accuracy matters least. Every loss here
+    corrects that.
+  </p>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">L1</span><span class="fx__title">Band-weighted MSE</span></div>
+    <div class="fx__body">
+      $$\mathcal{L}=\frac{1}{N}\sum_i w_i\,(\hat y_i-y_i)^2,\qquad
+      w_i=\min\!\Big(w_{\max},\;1+w_{lo}\,\mathbb{1}[\ell_i<70]+w_{hi}\,\mathbb{1}[\ell_i>180]\Big)$$
+    </div>
+    <div class="fx__foot">Defaults \(w_{lo}\)=2.0, \(w_{hi}\)=1.5, \(w_{\max}\)=5.0. \(\ell_i\) is the glucose <em>level</em>, not the target.</div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">L2</span><span class="fx__title">Physiology-informed penalty (PINN-style)</span></div>
+    <div class="fx__body">
+      $$\mathcal{P}=10\left[\overline{\mathrm{relu}(20-\hat y)^2}+\overline{\mathrm{relu}(\hat y-600)^2}\right]
+      +5\left[\overline{\mathrm{relu}(|\dot{\hat y}|-\rho_{\max})^2}\right]$$
+      $$\mathcal{L}_{\mathrm{total}}=\mathcal{L}_{\mathrm{band}}+\lambda\,\mathcal{P},
+      \qquad \lambda=0.5,\ \ \rho_{\max}=3\ \mathrm{mg/dL/min}$$
+    </div>
+    <div class="fx__foot">Bounds 20–600 mg/dL are the declared simulator support envelope, not a diagnostic boundary.</div>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">L3</span><span class="fx__title">Quantile (pinball) loss</span></div>
+    <div class="fx__body">
+      $$\mathcal{L}_q=\overline{\max\big(q\,(y-\hat y),\;(q-1)(y-\hat y)\big)}$$
+    </div>
+    <div class="fx__foot">For probabilistic forecasting; \(q\)=0.9 gives a conservative upper prediction band.</div>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:loss_weights}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 15</span> — where the optimiser is told to care.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Per-sample weight against the glucose level of the target, for band-weighted MSE versus plain MSE.</dd></div>
+        <div><dt>Parameters</dt><dd>\(w_{lo}\)=2.0 below 70, \(w_{hi}\)=1.5 above 180, cap 5.0.</dd></div>
+        <div><dt>Key observation</dt><dd>The step is asymmetric: a hypoglycaemic sample counts 3× and a hyperglycaemic one 2.5×, against 1× in range.</dd></div>
+        <div><dt>Why it matters</dt><dd>It is a small, auditable change that shifts a model's errors out of the range where they hurt — and it is visible in the code rather than buried in a training script.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="note note--assume">
+    <div class="note__ic">△</div>
+    <div><p><strong>A subtle failure the code guards against explicitly.</strong> When a model predicts
+    a <em>delta</em> rather than a level, applying a level threshold to the raw delta is meaningless —
+    a 5 mg/dL drop is not hypoglycaemia, and almost no change is above 180 or below 70. Every sample
+    would land in the "low" band, producing a constant weight, which is plain MSE with a rescaled
+    learning rate: nothing raises, the run simply stops doing what its config says. The losses take an
+    <span class="mono">anchor_index</span> and reconstruct the level from the last observed glucose
+    before applying any threshold, and raise if the anchor is configured but the window is missing.</p></div>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Is this really a physics-informed neural network?</p>
+      <p class="qa__a">Not in the strict sense, and the class name is historical — it is retained for
+      checkpoint compatibility, which the docstring says. A true PINN penalises the residual of a
+      governing differential equation. This penalises <em>violations of declared bounds and rate
+      limits</em>: glucose outside 20–600 mg/dL and rates beyond 3 mg/dL/min. It is a constraint
+      regulariser informed by physiology, and calling it anything grander would overstate it.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Why not penalise the IOB and COB relationships too?</p>
+      <p class="qa__a">That was considered and deliberately excluded — the comment in the source
+      explains why. Rules like "glucose must fall when IOB is high" are not universal: stress, exercise,
+      illness and unannounced meals all break them. Penalising a non-universal rule would teach the
+      model to be wrong precisely in the situations that matter most.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 24 ═══ -->
+<section class="chapter" id="ch25" data-part="IV · Computation" data-n="24" data-title="Safety constraints" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 24</div>
+    <h2>Safety constraints and the supervisor</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">One central configuration, fingerprinted, that no controller can reach around.</p>
+    <div class="chips"><span class="chip">SAFETY_FORMULA_VERSION iints-safety-formulas-v2</span></div>
+  </div>
+
+  <p>
+    Every limit lives in one dataclass, <span class="mono">SafetyConfig</span>, which carries a formula
+    version and a SHA-256 fingerprint so a result can be tied to the exact envelope it ran under.
+    Centralising it is the point: MPC, ML fallbacks and the AI boundary cannot silently drift apart if
+    they read the same constants.
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Constraint</th><th class="num">Default</th><th>Unit</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td>Hypoglycaemia threshold</td><td class="num">70</td><td class="unit">mg/dL</td><td>Level 1 alert</td></tr>
+        <tr><td>Severe hypoglycaemia</td><td class="num">54</td><td class="unit">mg/dL</td><td>Level 2</td></tr>
+        <tr><td>Hyperglycaemia threshold</td><td class="num">250</td><td class="unit">mg/dL</td><td>alert</td></tr>
+        <tr><td>Controller hypo guard</td><td class="num">90</td><td class="unit">mg/dL</td><td>no bolus below this</td></tr>
+        <tr><td>Falling-trend guard</td><td class="num">−1.0</td><td class="unit">mg/dL/min</td><td>suppress dosing on a fall</td></tr>
+        <tr><td>High-IOB guard</td><td class="num">4.0</td><td class="unit">U</td><td>stacking limit</td></tr>
+        <tr><td>Max insulin per bolus</td><td class="num">15.0</td><td class="unit">U</td><td>actuator envelope</td></tr>
+        <tr><td>Max insulin per hour</td><td class="num">20.0</td><td class="unit">U</td><td>rate envelope</td></tr>
+        <tr><td>Max IOB</td><td class="num">20.0</td><td class="unit">U</td><td>cumulative envelope</td></tr>
+        <tr><td>Max basal multiplier</td><td class="num">3.0</td><td class="unit">×</td><td>temp-basal ceiling</td></tr>
+        <tr><td>ML candidate cap</td><td class="num">1.0</td><td class="unit">U/step</td><td>learned-component limit</td></tr>
+        <tr><td>Predicted-hypo threshold</td><td class="num">60</td><td class="unit">mg/dL</td><td>over a 30-min horizon</td></tr>
+        <tr><td>Critical termination</td><td class="num">40 for 30</td><td class="unit">mg/dL, min</td><td>ends the run</td></tr>
+        <tr><td>Glucagon per step / hour</td><td class="num">1.0 / 2.0</td><td class="unit">mg</td><td>bi-hormonal rails</td></tr>
+        <tr><td>Glucagon permitted below</td><td class="num">110</td><td class="unit">mg/dL</td><td>no glucagon above this</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <div class="plate">{{FIG:supervisor}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 16</span> — the envelope, drawn from the shipped <span class="mono">SafetyConfig</span>.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Maximum bolus the supervisor will permit, as a function of sensor glucose, with the clinical thresholds marked.</dd></div>
+        <div><dt>Parameters</dt><dd>Read directly from <span class="mono">SafetyConfig()</span> defaults — hypo guard 90 mg/dL, max bolus 15 U.</dd></div>
+        <div><dt>Key observation</dt><dd>The guard sits at 90 mg/dL, deliberately <em>above</em> the 70 mg/dL hypo threshold — the supervisor stops dosing before the patient is low, not once they already are.</dd></div>
+        <div><dt>Why it matters</dt><dd>This is a hard boundary in the shaded region, independent of the controller. No algorithm in the SDK, learned or otherwise, can cross it.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <h3 class="sec">Two rate limits that must not be confused</h3>
+  <p>
+    An instructive piece of engineering, and a good answer if asked how thresholds were chosen. The SDK
+    originally used one constant for two opposite jobs. It now uses two:
+  </p>
+  <div class="beh">
+    <div class="beh__row"><div class="beh__k">Plausibility ceiling<br>55 mg/dL per 5 min</div><div class="beh__v">How large a CGM step may be before it is rejected as an artefact. It must be <em>permissive</em>, or it discards real physiology.</div></div>
+    <div class="beh__row"><div class="beh__k">Fail-soft follow<br>20 mg/dL per 5 min</div><div class="beh__v">How fast the reported value may follow a reading that was <em>already</em> rejected. It must be <em>tight</em>, or injected sensor corruption reaches the algorithm in one step.</div></div>
+  </div>
+  <p>
+    The ceiling was raised from 20 to 55 mg/dL on measured evidence, not intuition. Across three
+    prepared cohorts on exact 5-minute steps:
+  </p>
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Cohort</th><th class="num">n steps</th><th class="num">p99</th><th class="num">p99.9</th><th class="num">max</th><th class="num">share &gt; 20 mg/dL</th></tr></thead>
+      <tbody>
+        <tr><td>AZT1D</td><td class="num">283 921</td><td class="num">21.0</td><td class="num">34.1</td><td class="num">163.0</td><td class="num">1.03%</td></tr>
+        <tr><td>HUPA-UCM</td><td class="num">309 342</td><td class="num">17.0</td><td class="num">54.0</td><td class="num">259.0</td><td class="num">0.64%</td></tr>
+        <tr><td>OhioT1DM</td><td class="num">188 959</td><td class="num">17.6</td><td class="num">34.8</td><td class="num">85.0</td><td class="num">0.61%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    A 20 mg/dL ceiling discarded 0.61–1.03% of real steps — and discarded them where it mattered most,
+    because a fall steeper than 20 mg/dL per 5 min is precisely the situation the supervisor exists for.
+    The ceiling now sits above the highest measured p99.9, rejecting 0.009–0.094% instead of 1 in 100.
+  </p>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">What makes the supervisor "independent"?</p>
+      <p class="qa__a">It is a separate object with its own copy of the safety configuration, it runs
+      after the algorithm has produced its output, and it has no access to the algorithm's internal
+      state or reasoning. An algorithm cannot disable it, weaken it, or pass it a justification. The
+      simulator records every intervention with a reason and a latency, and there is an explicit
+      supervisor-off ablation arm in the benchmark so its contribution can be measured rather than
+      assumed.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Are these thresholds clinically validated?</p>
+      <p class="qa__a">The <em>clinical</em> thresholds — 70 and 54 mg/dL, and the 70–180 target range —
+      are the international consensus values. The <em>engineering</em> envelopes — 15 U per bolus, 20 U
+      per hour, the 90 mg/dL guard — are configurable defaults chosen to permit ordinary meal coverage
+      with the bundled carb ratios while still bounding an unbounded actuator command. They are not
+      patient-specific prescriptions, and the source says so.</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══════════════════════════════════════════════════════════ CH 25 ═══ -->
+<section class="chapter" id="ch26" data-part="IV · Computation" data-n="25" data-title="Metrics and risk space" style="--sys: var(--sys-safety)">
+  <div class="ch-head">
+    <div class="ch-head__n">CHAPTER 25</div>
+    <h2>Metrics and the glucose risk space</h2>
+    <div class="ch-rule"></div>
+    <p class="ch-head__note">Why time-in-range alone is an inadequate summary, and what to use instead.</p>
+  </div>
+
+  <div class="fx">
+    <div class="fx__head"><span class="fx__id">RISK</span><span class="fx__title">Kovatchev symmetrisation</span><span class="chip chip--canonical">canonical</span></div>
+    <div class="fx__body">
+      $$f(\mathrm{BG})=1.509\left[\left(\ln \mathrm{BG}\right)^{1.084}-5.381\right],\qquad
+      r(\mathrm{BG})=10\,f(\mathrm{BG})^2$$
+      $$\mathrm{LBGI}=\frac{1}{N}\sum_{f_i<0} r_i,\qquad
+      \mathrm{HBGI}=\frac{1}{N}\sum_{f_i>0} r_i,\qquad
+      \mathrm{BGRI}=\mathrm{LBGI}+\mathrm{HBGI}$$
+    </div>
+    <div class="fx__foot">Both indices divide by the <em>total</em> count of valid readings, not the count on that branch. Averaging over one branch only would inflate both.</div>
+  </div>
+
+  <p>
+    The blood-glucose scale is highly skewed: the distance from 120 down to 40 mg/dL is clinically far
+    larger than the distance from 120 up to 200, but numerically it is smaller. The Kovatchev transform
+    fixes this. Two details in the implementation are worth knowing because they are easy to get wrong:
+  </p>
+  <ul>
+    <li>The factor <b>10</b> is not cosmetic. It is what makes \(r(\mathrm{BG})\) span [0, 100] over
+    20–600 mg/dL, which every published LBGI/HBGI reference range assumes. Dropping it shifts every
+    value by an order of magnitude — and therefore across the published risk categories. A test pins
+    \(r(20) = r(600) = 100\) for exactly this reason.</li>
+    <li>The euglycaemic centre is <b>derived, not assumed</b>: \(f = 0\) at
+    \(\exp(5.381^{1/1.084}) = 112.5\) mg/dL. It is computed from the constants rather than hard-coded,
+    so the two can never disagree.</li>
+    <li>Non-positive and non-finite readings are <em>dropped</em>, not clipped — the logarithm is
+    undefined there, and substituting a value would invent data.</li>
+  </ul>
+
+  <figure>
+    <div class="plate">{{FIG:risk_space}}</div>
+    <figcaption>
+      <span class="fig-n">FIG 17</span> — the asymmetry that time-in-range cannot see.
+      <div class="fig-grid">
+        <div><dt>What is shown</dt><dd>Left: the symmetrised scale \(f(\mathrm{BG})\). Right: the risk function \(r(\mathrm{BG})\), split into its low and high branches. Log x-axis.</dd></div>
+        <div><dt>Parameters</dt><dd>Published constants 1.509 / 1.084 / 5.381, amplitude 10, evaluated by the SDK's own <span class="mono">glycemic_risk</span> module.</dd></div>
+        <div><dt>Key observation</dt><dd>Risk at 40 mg/dL is <b>36.4</b>; at 240 mg/dL it is <b>20.2</b>. A reading 80 mg/dL below range carries nearly twice the risk of one 60 above — and both count identically as "out of range".</dd></div>
+        <div><dt>Why it matters</dt><dd>It is the quantitative argument for always reporting LBGI beside TIR, and it is why the benchmark's 6.45% time-below-70 is treated as a finding rather than rounding error.</dd></div>
+      </div>
+    </figcaption>
+  </figure>
+
+  <div class="tw">
+    <table class="tight">
+      <thead><tr><th>Metric</th><th>Definition</th><th>Target</th><th>Caveat</th></tr></thead>
+      <tbody>
+        <tr><td><b>TIR</b></td><td>% of readings in 70–180 mg/dL</td><td class="num">&gt; 70%</td><td>Blind to how bad the out-of-range time is.</td></tr>
+        <tr><td><b>TBR</b></td><td>% below 70 (and below 54)</td><td class="num">&lt; 4% / &lt; 1%</td><td>The number to read first.</td></tr>
+        <tr><td><b>CV</b></td><td>SD / mean × 100</td><td class="num">≤ 36%</td><td>Variability, independent of level.</td></tr>
+        <tr><td><b>GMI</b></td><td>3.31 + 0.02392 × mean glucose</td><td class="num">—</td><td>An <em>estimate</em> of HbA1c from mean glucose. Clamped to [0, 15]%. Not a laboratory value.</td></tr>
+        <tr><td><b>LBGI</b></td><td>Kovatchev low-branch risk</td><td class="num">&lt; 1.1 minimal</td><td>Bands 1.1 / 2.5 / 5.0 are population descriptors, not an individual decision rule.</td></tr>
+        <tr><td><b>HBGI</b></td><td>Kovatchev high-branch risk</td><td class="num">—</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="jury">
+    <div class="jury__label">Likely jury questions</div>
+    <div class="qa">
+      <p class="qa__q">Your algorithm reaches 80% time in range. Is that good?</p>
+      <p class="qa__a">It clears the consensus target, but on its own it is not enough to say. The
+      figure I would give alongside it is time below 70, which for that run is 0.0%, and LBGI, which is
+      0.11 — minimal risk. The reason to insist on both is visible in the benchmark: the clean arm
+      reports 90.3% TIR <em>and</em> 6.45% below 70, and the second number makes the first one not a
+      success. A high TIR does not compensate for excessive time below range.</p>
+    </div>
+    <div class="qa">
+      <p class="qa__q">Can you report an HbA1c?</p>
+      <p class="qa__a">Only GMI, which is a linear estimate from mean glucose and is explicitly not a
+      laboratory HbA1c. It ignores red-cell lifespan and glycation-rate variation between individuals,
+      which is why the same mean glucose can correspond to meaningfully different measured HbA1c.
+      In a simulation it is doubly indirect, and I would report mean glucose and TIR in preference.</p>
+    </div>
+  </div>
+</section>

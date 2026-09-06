@@ -1,0 +1,257 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   PAGED-OUTPUT STYLESHEET
+   Loaded only for the PDF build. Chrome is the print engine; the running
+   footer and page numbers come from the CDP footerTemplate, so the page
+   box only has to reserve room for them.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@page {
+  size: A4;
+  margin: 16mm 15mm 17mm 15mm;
+}
+
+
+html, body {
+  background: #ffffff !important;
+}
+
+body {
+  font-size: 9.8pt;
+  line-height: 1.52;
+}
+
+/* ---- strip the application chrome ---------------------------------- */
+.rail, .search, .tool, .noresult, .hero { display: none !important; }
+.shell { display: block !important; }
+.main { padding: 0 !important; }
+
+/* Full measure: a PDF page is narrower than the screen column was. */
+.chapter, .part, .foot { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+p, ul, ol, .qa__q, .qa__a, .ch-head__note { max-width: none !important; }
+
+/* ---- cover ---------------------------------------------------------- */
+.cover {
+  page-break-after: always;
+  break-after: page;
+  height: 252mm;
+  padding: 18mm 0 0;
+  display: flex;
+  flex-direction: column;
+  color: #0f171d;
+  background: #ffffff;
+  border-top: 7mm solid #0d6a75;
+}
+.cover__eyebrow {
+  font-family: var(--f-mono);
+  font-size: 9pt;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #0d6a75;
+}
+.cover h1 {
+  font-family: var(--f-display);
+  font-size: 33pt;
+  font-weight: 700;
+  line-height: 1.07;
+  letter-spacing: -0.025em;
+  margin: 9mm 0 0;
+  max-width: 15cm;
+}
+.cover__lede {
+  font-size: 12pt;
+  color: #45555f;
+  margin: 7mm 0 0;
+  max-width: 13cm;
+  line-height: 1.5;
+}
+.cover__spacer { flex: 1 1 auto; }
+.cover__parts { margin-top: 13mm; }
+.cover__partsLabel {
+  font-family: var(--f-display);
+  font-size: 7.5pt; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #6d808c;
+  padding-bottom: 2mm; border-bottom: 0.3mm solid #d5e0e7;
+}
+.cover__parts ol { list-style: none; margin: 0; padding: 0; counter-reset: part; }
+.cover__parts li {
+  counter-increment: part;
+  display: grid; grid-template-columns: 9mm 34mm 1fr; gap: 3mm;
+  align-items: baseline;
+  padding: 2.6mm 0; border-bottom: 0.2mm solid #eaf0f4;
+  margin: 0;
+}
+.cover__parts li::before {
+  content: counter(part, upper-roman);
+  font-family: var(--f-mono); font-size: 8pt; color: #0d6a75; font-weight: 700;
+}
+.cover__parts li b { font-family: var(--f-display); font-size: 10pt; color: #0f171d; }
+.cover__parts li span { font-size: 8.6pt; color: #45555f; line-height: 1.4; }
+.cover__appx {
+  margin-top: 3mm; font-family: var(--f-mono); font-size: 8pt; color: #6d808c;
+}
+.cover__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3mm 12mm;
+  font-family: var(--f-mono);
+  font-size: 8.5pt;
+  color: #6d808c;
+  border-top: 0.4mm solid #d5e0e7;
+  padding-top: 5mm;
+}
+.cover__meta b { color: #0f171d; font-weight: 500; }
+.cover__warn {
+  margin-top: 6mm;
+  padding: 4mm 5mm;
+  border: 0.4mm solid #e8a3b2;
+  background: #fdeef1;
+  color: #8d1230;
+  font-size: 9pt;
+  line-height: 1.45;
+  border-radius: 1.5mm;
+}
+.cover__warn b { font-family: var(--f-display); }
+
+/* ---- table of contents ---------------------------------------------- */
+.pdftoc { page-break-after: always; break-after: page; }
+.pdftoc h2 {
+  font-family: var(--f-display);
+  font-size: 17pt;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 2mm;
+}
+.pdftoc__rule { height: 0.8mm; width: 18mm; background: #0d6a75; margin-bottom: 6mm; }
+.pdftoc__part {
+  font-family: var(--f-display);
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6d808c;
+  margin: 5mm 0 1.5mm;
+  break-after: avoid;
+}
+.pdftoc__row {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  font-size: 9.5pt;
+  padding: 0.9mm 0;
+  break-inside: avoid;
+}
+.pdftoc__n {
+  font-family: var(--f-mono);
+  font-size: 8pt;
+  color: #6d808c;
+  width: 11mm;
+  flex: none;
+}
+.pdftoc__t { font-family: var(--f-display); color: #0f171d; flex: none; max-width: 13cm; }
+.pdftoc__dots { flex: 1 1 auto; border-bottom: 0.25mm dotted #b6c6d1; transform: translateY(-1mm); min-width: 6mm; }
+.pdftoc__p {
+  font-family: var(--f-mono);
+  font-size: 8.5pt;
+  color: #45555f;
+  width: 8mm;
+  text-align: right;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- part dividers stay inline, they are cheap ---------------------- */
+.part {
+  display: block !important;
+  break-before: avoid;
+  break-after: avoid;
+  margin: 0 0 3mm !important;
+  padding-bottom: 2mm !important;
+  border-bottom: 0.6mm solid #0d6a75;
+}
+.part__n { font-size: 8.5pt; }
+.part__rule { display: none; }
+
+/* ---- chapters -------------------------------------------------------- */
+.chapter {
+  break-before: page;
+  break-inside: auto;
+}
+.chapter.is-hidden { display: block !important; }
+
+.ch-head { padding: 0 0 1mm !important; break-after: avoid; }
+.ch-head__n { font-size: 8.5pt; }
+.ch-head h2 { font-size: 19pt; margin-top: 1.5mm; }
+.ch-head__note { font-size: 10pt; margin-top: 2.5mm !important; }
+.ch-rule { height: 0.8mm; margin-top: 3mm; }
+
+h3.sec { font-size: 12.5pt; margin: 7mm 0 2mm; break-after: avoid; }
+h4.sub, div.sub { font-size: 7.5pt; margin: 5mm 0 1.5mm; break-after: avoid; }
+p { margin-bottom: 2.6mm; }
+ul, ol { margin-bottom: 3mm; }
+li { margin-bottom: 1.2mm; }
+
+/* ---- keep coherent blocks whole -------------------------------------- */
+.fx, figure, .note, .stats, .chain, .qa, .beh__row, .fig-grid, .cover__warn { break-inside: avoid; }
+.jury { break-before: auto; }
+.jury__label { break-after: avoid; }
+figcaption { break-before: avoid; }
+
+/* ---- tables ---------------------------------------------------------- */
+.tw { break-inside: auto; }
+table { font-size: 8.6pt; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+thead th { padding: 2mm 2.5mm; font-size: 7.2pt; }
+tbody td { padding: 1.7mm 2.5mm; }
+td.sym, td.num, td.unit { font-size: 8.2pt; }
+tbody tr:hover td { background: transparent; }
+
+/* ---- figures --------------------------------------------------------- */
+figure { margin: 5mm 0; }
+.plate { padding: 2mm; }
+.plate img { max-height: 175mm; width: auto; max-width: 100%; margin: 0 auto; }
+figcaption { font-size: 8.6pt; margin-top: 2.5mm; }
+/* Four keys read better as a balanced 2x2 than as 3 + 1 on a page. */
+.fig-grid { margin-top: 2.5mm; grid-template-columns: 1fr 1fr; }
+.fig-grid > div:nth-child(2n) { border-right: none; }
+.fig-grid > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+.fig-grid > div { padding: 2mm 2.5mm; }
+.fig-grid dt { font-size: 6.8pt; }
+.fig-grid dd { font-size: 8.2pt; line-height: 1.42; }
+
+/* ---- equations ------------------------------------------------------- */
+.fx { margin: 3.5mm 0; }
+.fx__head { padding: 2mm 3.5mm; }
+.fx__id { font-size: 8.5pt; }
+.fx__title { font-size: 9.5pt; }
+.fx__body { padding: 1mm 3.5mm; }
+.fx__foot { padding: 2mm 3.5mm; font-size: 8pt; }
+mjx-container[display="true"] { margin: 2.5mm 0 !important; }
+mjx-container svg { max-width: 100%; }
+
+/* ---- misc components ------------------------------------------------- */
+.note { padding: 2.5mm 3.5mm; margin: 3.5mm 0; font-size: 9.2pt; }
+.beh__k { padding: 2mm 3mm; font-size: 8.4pt; }
+.beh__v { padding: 2mm 3mm; font-size: 9.2pt; }
+.chain__node { padding: 2mm 2.5mm; }
+.chain__v { font-size: 8.6pt; }
+.chain__k, .chain__u { font-size: 7.2pt; }
+.stat { padding: 2.5mm 3mm; }
+.stat__v { font-size: 15pt; }
+.stat__k { font-size: 7pt; }
+.qa { padding: 2.2mm 0; }
+.qa__q { font-size: 9.8pt; }
+.qa__a { font-size: 9.2pt; }
+.chip { font-size: 7pt; padding: 0.6mm 1.4mm; }
+
+/* Links print as ink; cross-references keep the accent so they read as
+   pointers into the document rather than dead text. */
+a { color: #0f171d; text-decoration: none; }
+a.xref { color: #0d6a75; }
+
+.foot {
+  break-before: page;
+  border-top: 0.4mm solid #d5e0e7;
+  padding-top: 4mm !important;
+  font-size: 8.5pt;
+}

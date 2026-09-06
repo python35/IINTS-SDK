@@ -1,0 +1,10 @@
+# Generated artefacts -- rebuild with make_all.sh
+figures/
+src/91_fonts.css
+pdfbuild/node_modules/
+pdfbuild/package-lock.json
+*.pdf
+iints-af-model-companion.html
+iints-af-model-companion.print.html
+chapters.json
+pages.json
