@@ -21,6 +21,8 @@ import {
   compartmentRange,
   interpolateSeries,
   lookupEquation,
+  resolvePhysiologyBindings,
+  nearestRecordedTime,
   normalizeFillLevel,
   resolveHypoState,
 } from "../frontend/digital-twin-data.js";
@@ -357,13 +359,13 @@ check(
 
 // --- Status pill tracks the same hypo/hyper thresholds as the organ color -
 check(
-  byId("twin-status-text").textContent === "ALERT: HYPOGLYCEMIA (<70)",
+  byId("twin-status-text").textContent === "GLUCOSE BELOW 70 mg/dL",
   `Status pill should read the hypoglycemia alert at 60 mg/dL, got "${byId("twin-status-text").textContent}".`
 );
 timeInput.value = "0"; // 180 mg/dL: above the 70-180 band's ceiling is not exercised by this fixture, but 180 itself is not > 180
 timeInput.listeners.input.forEach((fn) => fn({ target: timeInput }));
 check(
-  byId("twin-status-text").textContent === "EUGLYCEMIA (STABLE)",
+  byId("twin-status-text").textContent === "GLUCOSE IN 70–180 mg/dL",
   `Status pill should read stable at 180 mg/dL (not strictly above the high threshold), got "${byId("twin-status-text").textContent}".`
 );
 timeInput.value = "10";
@@ -382,6 +384,38 @@ liverClicks.forEach((fn) => fn());
 check(/EGP/.test(card.innerHTML), "Clicking the liver should show the endogenous_production flux's label.");
 check(/EGP_0/.test(card.innerHTML), "Clicking the liver should show the flux's literal rate_expression.");
 check(new RegExp(LIVER_CARD_CAPTION.slice(0, 30).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).test(card.innerHTML), "Clicking the liver should show its fixed caption.");
+
+// A Bergman run has no separate peripheral glucose pool and uses basal_production.
+const bergman = {
+  compartments: [
+    {key: "S1", site: "subcutaneous", label: "Insulin depot 1"},
+    {key: "S2", site: "subcutaneous", label: "Insulin depot 2"},
+    {key: "Y2", site: "subcutaneous", label: "Glucagon depot 2"},
+  ],
+  fluxes: [{key: "basal_production"}, {key: "glucose_uptake"}, {key: "insulin_appearance", source: "S2"}],
+};
+const binding = resolvePhysiologyBindings(bergman);
+check(binding.liver === "basal_production", "Bergman EGP must use its actual recorded key.");
+check(binding.periphery === "glucose_uptake", "Bergman disposal must not invent a peripheral pool.");
+check(binding.subcutaneous === "S2", "A glucagon depot must never be labelled insulin.");
+check(resolvePhysiologyBindings({}).liver === null, "Missing channels must stay absent.");
+check(nearestRecordedTime([0, 5, 10], 6) === 5, "Map values must use a recorded sample.");
+// Reverse a signed flux and ensure direction is not silently clamped.
+timeline.fluxes.glucose_to_periphery[2] = -0.7;
+timeInput.value = "10";
+timeInput.listeners.input.forEach((fn) => fn({target: timeInput}));
+check(byId("twin-edge-periphery").attributes["marker-start"] === "url(#twin-arrow)", "Negative flow must reverse its arrow.");
+check(byId("twin-val-periphery").textContent === "-0.70 mg/min", "Signed values must be preserved.");
+// Replacing the schema must clear old values, not leave illustrative defaults.
+timeline.schema.fluxes = [];
+timeline.fluxes = {};
+timeline.plasma_glucose_mgdl[2] = null;
+timeInput.listeners.input.forEach((fn) => fn({target: timeInput}));
+check(byId("twin-val-liver").textContent === "Not recorded", "Missing EGP must clear the previous value.");
+check(byId("twin-edge-liver").attributes.visibility === "hidden", "Missing flow must not have an arrow.");
+check(byId("twin-status-text").textContent === "Glucose not recorded", "Missing glucose must not become normal/stable.");
+check(!html.includes("twin-torso"), "The map must not suggest anatomical accuracy.");
+check(!html.includes("124.5 mg/dL"), "Illustrative numbers must not ship as live model values.");
 
 if (failures.length) {
   for (const failure of failures) console.error(failure);

@@ -782,6 +782,10 @@ fn start_workflow_job(
     workflow_key: String,
     output_dir: String,
     seed: i64,
+    auto_prepare: Option<bool>,
+    ai_review: Option<bool>,
+    ai_model: Option<String>,
+    ai_host: Option<String>,
 ) -> Result<Value, String> {
     if workflow_key.trim().is_empty() {
         return Err("workflow_key is required".to_string());
@@ -805,6 +809,15 @@ fn start_workflow_job(
         let mut jobs = workflow_jobs()
             .lock()
             .map_err(|_| "Workflow job registry is unavailable".to_string())?;
+        if jobs
+            .values()
+            .any(|job| matches!(job.status.as_str(), "queued" | "running" | "cancelling"))
+        {
+            return Err(
+                "A protocol is already running. Finish or cancel it before starting another."
+                    .to_string(),
+            );
+        }
         if jobs.len() >= 64 {
             if let Some(stale_id) = jobs
                 .iter()
@@ -845,7 +858,7 @@ fn start_workflow_job(
                 job.message = "Starting Python research engine".to_string();
             }
         }
-        let args = vec![
+        let mut args = vec![
             "run".to_string(),
             "--workflow-key".to_string(),
             workflow_key,
@@ -858,6 +871,20 @@ fn start_workflow_job(
             "--cancel-file".to_string(),
             cancel_path.to_string_lossy().into_owned(),
         ];
+        if auto_prepare == Some(false) {
+            args.push("--no-auto-prepare".to_string());
+        }
+        if ai_review == Some(true) {
+            args.push("--ai-review".to_string());
+            args.extend([
+                "--ai-model".to_string(),
+                ai_model.unwrap_or_else(|| "ministral-3:8b".to_string()),
+            ]);
+            args.extend([
+                "--ai-host".to_string(),
+                ai_host.unwrap_or_else(|| "http://127.0.0.1:11434".to_string()),
+            ]);
+        }
         let result = run_python_bridge(&args);
         if let Ok(mut jobs) = workflow_jobs().lock() {
             if let Some(job) = jobs.get_mut(&thread_job_id) {

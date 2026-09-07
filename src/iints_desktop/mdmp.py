@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -42,7 +43,8 @@ def create_desktop_mdmp_certificate(
 
     certificate_dir = Path(output_dir).expanduser().resolve() if output_dir else source.parent / "mdmp_certificates"
     certificate_dir.mkdir(parents=True, exist_ok=True)
-    key_dir = certificate_dir / "keys"
+    # Keep the signing secret outside result folders that users may share.
+    key_dir = Path.home() / ".iints-af" / "keys" / "mdmp"
     private_key = key_dir / "iints_desktop_mdmp_private.pem"
     public_key = key_dir / "iints_desktop_mdmp_public.pem"
     if not private_key.exists() or not public_key.exists():
@@ -55,6 +57,8 @@ def create_desktop_mdmp_certificate(
         )
         private_key = Path(str(generated["private_key"]))
         public_key = Path(str(generated["public_key"]))
+    exported_public_key = certificate_dir / public_key.name
+    shutil.copyfile(public_key, exported_public_key)
 
     dataframe = pd.read_csv(source, nrows=max(1, int(quick_rows)) if quick else None)
     report = certify_dataset(
@@ -84,7 +88,7 @@ def create_desktop_mdmp_certificate(
     return DesktopMDMPCertificateResult(
         certificate_path=certificate_path,
         report_path=report_path,
-        public_key_path=public_key,
+        public_key_path=exported_public_key,
         private_key_path=private_key,
         grade=report.mdmp_grade,
         compliance_score=report.compliance_score,

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>IINTS-AF Research Workbench</title>
     <link rel="icon" type="image/png" href="./app-mark.png" />
-    <link rel="stylesheet" href="./styles.css?v=workbench-12" />
+    <link rel="stylesheet" href="./styles.css?v=workbench-flow-1" />
   </head>
   <body>
     <a class="skip-link" href="#workspace-content">Skip to workspace content</a>
@@ -74,12 +74,24 @@
         </header>
 
     <main class="layout" id="workspace-content">
+      <section class="panel welcome-panel" data-view-panel="overview">
+        <div class="panel-heading"><h2>Research workspace</h2><span class="muted">Local experiments</span></div>
+        <div class="welcome-body">
+          <div><h3>From a protocol to a complete research record.</h3>
+            <p>Choose a scenario. The workbench prepares the glucose curve, PDF report, data-contract check and reproducibility files together.</p>
+            <div class="button-row"><button id="new-run-btn" class="primary">New experiment</button><button id="resume-result-btn" disabled>Open latest result</button></div>
+          </div>
+          <ol class="workflow-outline"><li><strong>Select a protocol</strong><span>A fixed scenario and repeatable seed.</span></li><li><strong>Run and prepare</strong><span>Calculation, checks and reports in one flow.</span></li><li><strong>Review and share</strong><span>One results page with every generated file.</span></li></ol>
+        </div>
+        <p id="workspace-summary" class="workspace-summary">Checking your workspace...</p>
+        <div id="recent-runs" class="history-list"></div>
+      </section>
       <section class="panel diagnostics-panel" data-view-panel="overview">
         <div class="panel-heading">
           <div>
-            <h2>Environment readiness</h2>
+            <h2>Engine and optional tools</h2>
           </div>
-          <p>Verify the scientific engine before running work.</p>
+          <p id="engine-readiness">Checking the local engine...</p>
         </div>
         <div class="button-row">
           <button id="diagnostics-btn" class="primary">Run diagnostics</button>
@@ -122,6 +134,12 @@
           <input id="settings-auto-diagnostics" type="checkbox" checked />
           <span>Run environment diagnostics when the application starts.</span>
         </label>
+        <div class="settings-automation">
+          <h3>After each run</h3>
+          <label class="checkbox-field"><input id="settings-auto-prepare" type="checkbox" checked /><span>Prepare the full MDMP data-contract check and reproducibility package.</span></label>
+          <label class="checkbox-field"><input id="settings-auto-ai" type="checkbox" /><span>Also request a review from the selected local Ollama model.</span></label>
+          <p class="field-help">AI review uses an available local model. If it is unavailable, the simulation and reports remain ready.</p>
+        </div>
         <div class="button-row">
           <button id="settings-save-btn" class="primary">Save settings</button>
           <button id="settings-reset-btn">Restore defaults</button>
@@ -217,7 +235,7 @@
       <section class="panel protocol-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
           <div>
-            <h2>Select a protocol</h2>
+            <h2>1. Select a protocol</h2>
           </div>
           <p>Protocols fix the scenario and expected output type.</p>
         </div>
@@ -229,10 +247,11 @@
       <section class="panel run-panel" data-view-panel="run" hidden>
         <div class="panel-heading">
           <div>
-            <h2>Configure and run</h2>
+            <h2>2. Run and prepare</h2>
           </div>
           <p>The seed makes repeated runs deterministic.</p>
         </div>
+        <p id="selected-protocol-summary" class="selected-protocol-summary">Select a protocol to see what will run.</p>
         <div class="field-grid">
           <div class="field-control wide-field">
             <label for="output-dir">Output folder</label>
@@ -247,14 +266,20 @@
             <input id="seed" type="number" min="0" max="2147483647" value="42" />
           </label>
         </div>
+        <p id="run-preparation-help" class="muted">Automatic preparation availability is checked with the Python engine.</p>
+        <div class="run-options">
+          <label class="checkbox-field"><input id="run-auto-prepare" type="checkbox" checked /><span>Prepare data checks and reproducibility files</span></label>
+          <label class="checkbox-field"><input id="run-auto-ai" type="checkbox" /><span>Add local AI review</span></label>
+        </div>
         <div class="button-row">
-          <button id="run-btn" class="primary">Run selected protocol</button>
+          <button id="run-btn" class="primary">Run and prepare results</button>
           <button id="refresh-btn">Refresh protocols</button>
-          <button id="history-btn">Load run history</button>
+          <button id="history-btn" class="quiet">Refresh history</button>
           <button id="open-run-folder-btn">Open run folder</button>
           <button id="open-report-btn">Open report</button>
         </div>
         <div id="run-progress-panel" class="run-progress-panel" hidden aria-live="polite">
+          <ol id="run-stages" class="run-stages"><li data-stage="simulation">Simulation</li><li data-stage="review">Metrics &amp; figure</li><li data-stage="mdmp">Data check</li><li data-stage="package">Research record</li></ol>
           <div class="run-progress-heading">
             <span id="run-progress-label">Preparing workflow...</span>
             <strong id="run-progress-value">0%</strong>
@@ -281,9 +306,18 @@
       </section>
 
       <section class="panel results-panel" data-view-panel="results" hidden>
+        <div id="result-handover" class="result-handover" hidden>
+          <div class="handover-heading"><div><span class="eyebrow">Current experiment</span><h2 id="result-run-title">Run results</h2><p id="result-run-meta" data-copyable></p></div><span id="result-ready-label" class="result-state">Ready</span></div>
+          <div id="result-stage-list" class="result-stage-list"></div>
+          <div id="result-artifacts" class="artifact-actions"></div>
+          <details id="result-extra-files" class="secondary-details"><summary>Data checks and supporting files</summary><div id="result-extra-artifacts" class="artifact-actions"></div></details>
+          <div class="button-row"><button id="result-folder-btn" class="quiet">Show run folder</button><button id="result-ai-btn" class="quiet">Review with local AI</button><button id="result-package-btn" class="quiet">Reproducibility details</button></div>
+        </div>
+        <details id="result-source-controls" class="result-source-controls" open>
+          <summary>Choose another CSV or inspect data-contract details</summary>
         <div class="panel-heading">
           <div>
-            <h2>Load a result file</h2>
+            <h2>Result data</h2>
           </div>
           <p>Preview is read-only and does not change the CSV.</p>
         </div>
@@ -294,7 +328,7 @@
               <input id="csv-path" placeholder="Choose a results.csv file" spellcheck="false" aria-describedby="csv-path-help" />
               <button id="csv-browse-btn" type="button">Choose CSV...</button>
             </div>
-            <small id="csv-path-help" class="field-help">Only the selected local CSV is previewed; it is not modified or uploaded.</small>
+            <small id="csv-path-help" class="field-help">The latest run loads automatically. Choose a CSV to inspect another experiment.</small>
           </div>
           <button id="preview-btn" class="primary">Load preview</button>
         </div>
@@ -309,11 +343,13 @@
           MDMP checks schema, completeness, and integrity against a declared data contract. Its grade
           does not establish physiological realism, clinical quality, or suitability for patient care.
         </p>
+        </details>
         <div class="subsection-heading">
           <h3>Summary metrics</h3>
-          <span>Calculated from the loaded preview</span>
+          <span>Calculated from the full CSV</span>
         </div>
         <div id="metrics" class="metrics"></div>
+        <details id="technical-metrics-details" class="secondary-details" hidden><summary>All metrics and column information</summary><div id="technical-metrics" class="metrics"></div></details>
         <div class="subsection-heading">
           <h3>Glucose trajectory</h3>
           <span>Research preview, mg/dL</span>
@@ -329,7 +365,7 @@
         <div id="compartment-viewer" hidden>
           <div class="chart-tab-bar" id="compartment-view-mode">
             <button class="chart-tab-btn is-active" data-compartment-mode="diagram" type="button">Diagram</button>
-            <button class="chart-tab-btn" data-compartment-mode="twin" type="button">Illustrated view</button>
+            <button class="chart-tab-btn" data-compartment-mode="twin" type="button">Physiology map</button>
           </div>
           <div id="compartment-diagram-panel" data-compartment-panel="diagram">
             <div class="compartment-controls">
@@ -351,9 +387,7 @@
             </div>
           </div>
           <div id="digital-twin-viewer" data-compartment-panel="twin" hidden>
-            <p id="digital-twin-description" class="muted">Illustrated view of the loaded compartment model. The liver shape has no
-              stored contents of its own -- it visualizes the live endogenous glucose
-              production flux, not a tracked compartment.</p>
+            <p id="digital-twin-description" class="muted">A pathway map of the loaded model, not an anatomical reconstruction. Values come from recorded simulation samples.</p>
             <div class="digital-twin-controls">
               <label class="field-control" for="digital-twin-time">
                 <span>Simulation time</span>
@@ -364,209 +398,63 @@
               <label class="field-control" for="digital-twin-speed">
                 <span>Speed</span>
                 <select id="digital-twin-speed">
-                  <option value="1">1x</option>
-                  <option value="4">4x</option>
-                  <option value="15">15x</option>
+                  <option value="1">24 simulated min/s</option>
+                  <option value="4">96 simulated min/s</option>
+                  <option value="15">360 simulated min/s</option>
                 </select>
               </label>
             </div>
             <div class="digital-twin-canvas-wrap">
-              <svg id="digital-twin-illustration" viewBox="0 0 760 520" role="img"
-                   aria-label="Illustrated torso diagram of the simulated patient">
-                <defs>
-                  <!-- Background grid pattern -->
-                  <pattern id="twin-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255, 255, 255, 0.04)" stroke-width="1" />
-                    <circle cx="20" cy="20" r="1" fill="rgba(56, 189, 248, 0.15)" />
-                  </pattern>
-
-                  <!-- Flow Conduit Gradients -->
-                  <linearGradient id="grad-subq-plasma" x1="0%" y1="100%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.8" />
-                  </linearGradient>
-                  <linearGradient id="grad-gut-plasma" x1="0%" y1="100%" x2="0%" y2="0%">
-                    <stop offset="0%" stop-color="#ff9f43" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.8" />
-                  </linearGradient>
-                  <linearGradient id="grad-liver-plasma" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stop-color="#ef4444" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.8" />
-                  </linearGradient>
-                  <linearGradient id="grad-plasma-periphery" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
-                    <stop offset="100%" stop-color="#22c55e" stop-opacity="0.8" />
-                  </linearGradient>
-                </defs>
-
-                <!-- Medical Grid Overlay -->
-                <rect width="100%" height="100%" fill="url(#twin-grid)" />
-
-                <!-- Futuristic Anatomical Torso Silhouette & Landmarks -->
-                <g class="twin-torso-group" fill="none" stroke="#2D3748" stroke-linecap="round" stroke-linejoin="round">
-                  <!-- Outer Body Silhouette -->
-                  <path id="twin-torso" class="twin-torso" d="M 330,30
-                    C 300,35 270,55 250,95
-                    C 230,135 220,175 215,225
-                    C 210,275 225,325 240,375
-                    C 255,425 270,470 285,580
-                    L 575,580
-                    C 590,470 605,425 620,375
-                    C 635,325 650,275 645,225
-                    C 640,175 630,135 610,95
-                    C 590,55 560,35 530,30
-                    C 490,20 370,20 330,30 Z" fill="#FFFFFF" stroke="#4A5568" stroke-width="2" />
-
-                  <!-- Anatomical Landmarks: Neck, Clavicles, Ribcage & Spine -->
-                  <path d="M 430,20 L 430,570" stroke="#CBD5E0" stroke-width="1.5" stroke-dasharray="4 4" />
-                  <!-- Neck & Clavicles -->
-                  <path d="M 390,30 Q 430,60 470,30" stroke="#718096" stroke-width="1.5" />
-                  <path d="M 330,55 Q 430,80 530,55" stroke="#718096" stroke-width="1.5" />
-                  <!-- Ribcage Curves -->
-                  <path d="M 430,120 Q 360,145 280,165" stroke="#E2E8F0" stroke-width="1.5" />
-                  <path d="M 430,120 Q 500,145 580,165" stroke="#E2E8F0" stroke-width="1.5" />
-                  <path d="M 430,180 Q 350,210 270,230" stroke="#E2E8F0" stroke-width="1.5" />
-                  <path d="M 430,180 Q 510,210 590,230" stroke="#E2E8F0" stroke-width="1.5" />
-                  <!-- Diaphragm Arch -->
-                  <path d="M 280,210 Q 430,165 580,210" stroke="#A0AEC0" stroke-width="1.5" stroke-dasharray="3 3" />
-                  <!-- Vascular Aorta Tree -->
-                  <path d="M 430,80 L 430,380 M 430,380 L 370,540 M 430,380 L 490,540" stroke="#E53E3E" stroke-width="2.5" opacity="0.6" />
-                  <path d="M 422,80 L 422,380 M 422,380 L 362,540 M 422,380 L 482,540" stroke="#3182CE" stroke-width="2" opacity="0.5" />
+              <svg id="digital-twin-illustration" viewBox="0 0 840 520" role="group" aria-label="Recorded model pathways">
+                <defs><marker id="twin-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#637783" /></marker></defs>
+                <g transform="translate(20 16)"><rect id="twin-status-bg" width="300" height="32" rx="3" fill="#f4f6f7" stroke="#bac5cc" /><circle id="twin-status-dot" cx="14" cy="16" r="4" /><text id="twin-status-text" x="26" y="21" class="twin-state-text">No recorded glucose</text></g>
+                <text id="digital-twin-model-label" x="20" y="72" class="twin-schema-text">LOADED MODEL</text>
+                <g class="twin-pathways" fill="none" stroke="#637783" stroke-width="1.5">
+                  <path id="twin-edge-gut" d="M240 150 H265 V220 H295" marker-end="url(#twin-arrow)" />
+                  <path id="twin-edge-liver" d="M240 310 H280 V250 H295" marker-end="url(#twin-arrow)" />
+                  <path id="twin-edge-periphery" d="M525 230 H590" marker-end="url(#twin-arrow)" />
+                  <path id="twin-edge-subcutaneous" d="M410 365 V285" marker-end="url(#twin-arrow)" />
+                  <text x="425" y="329" class="twin-node-note" fill="#596b75" stroke="none">Insulin appearance</text>
                 </g>
-
-                <!-- Dynamic Physiological Conduits (Pulsing Flow Lines) -->
-                <g class="twin-conduits">
-                  <!-- Subcutaneous -> Plasma -->
-                  <path id="conduit-subq-plasma" d="M 540,410 C 520,290 430,240 430,140"
-                        fill="none" stroke="url(#grad-subq-plasma)" stroke-width="3" stroke-dasharray="6 4" />
-                  <!-- Gut -> Plasma -->
-                  <path id="conduit-gut-plasma" d="M 430,340 L 430,140"
-                        fill="none" stroke="url(#grad-gut-plasma)" stroke-width="3.5" stroke-dasharray="6 4" />
-                  <!-- Liver -> Plasma -->
-                  <path id="conduit-liver-plasma" d="M 340,240 C 370,200 400,170 430,140"
-                        fill="none" stroke="url(#grad-liver-plasma)" stroke-width="3" stroke-dasharray="6 4" />
-                  <!-- Plasma -> Periphery -->
-                  <path id="conduit-plasma-periphery" d="M 430,140 C 430,270 330,350 290,450"
-                        fill="none" stroke="url(#grad-plasma-periphery)" stroke-width="3.5" stroke-dasharray="6 4" />
+                <g id="twin-organ-gut" class="twin-organ" data-organ-id="gut" transform="translate(20 95)" tabindex="0" role="button" aria-label="Inspect Meal absorption">
+                  <rect width="220" height="110" rx="3" fill="#ffffff" />
+                  <text id="twin-title-gut" x="13" y="25" class="twin-node-title">Meal absorption</text>
+                  <text id="twin-val-gut" x="13" y="57" class="twin-node-value">Not recorded</text>
+                  <text id="twin-note-gut" x="13" y="81" class="twin-node-note">Recorded glucose appearance</text>
+                  <text x="13" y="99" class="twin-node-note">Select for values and equation</text>
                 </g>
-
-                <!-- 1. Vascular System & Heart (Central Thorax) -->
-                <g id="twin-organ-plasma" class="twin-organ" data-organ-id="plasma" tabindex="0" role="button"
-                   transform="translate(430, 140)">
-                  <!-- Outer badge ring: no fixed stroke -- it inherits stroke/stroke-width
-                       from the parent <g>, which renderDigitalTwinDiagram() (main.js) sets
-                       per frame from the live value/hypo state. The icon below keeps its
-                       own fixed anatomical colors; only this ring responds to data. -->
-                  <circle r="34" fill="#FFF5F5" />
-                  <!-- Anatomical Heart & Aorta Vector -->
-                  <path d="M -2,-18 C -14,-14 -18,2 -10,14 C -4,22 0,26 4,26 C 14,26 18,12 14,-2 C 10,-14 4,-20 -2,-18 Z"
-                        fill="#FEB2B2" stroke="#9B2C2C" stroke-width="1.8" />
-                  <path d="M 0,-18 C 4,-28 14,-24 12,-14" fill="none" stroke="#C53030" stroke-width="2.5" />
+                <g id="twin-organ-liver" class="twin-organ" data-organ-id="liver" transform="translate(20 255)" tabindex="0" role="button" aria-label="Inspect Endogenous production">
+                  <rect width="220" height="110" rx="3" fill="#ffffff" />
+                  <text id="twin-title-liver" x="13" y="25" class="twin-node-title">Endogenous production</text>
+                  <text id="twin-val-liver" x="13" y="57" class="twin-node-value">Not recorded</text>
+                  <text id="twin-note-liver" x="13" y="81" class="twin-node-note">Boundary source, not liver mass</text>
+                  <text x="13" y="99" class="twin-node-note">Select for values and equation</text>
                 </g>
-
-                <!-- 2. Liver (Upper Right Abdomen - Viewer Left) -->
-                <g id="twin-organ-liver" class="twin-organ" data-organ-id="liver" tabindex="0" role="button"
-                   transform="translate(340, 240)">
-                  <circle r="32" fill="#FFF5F5" />
-                  <!-- Anatomical Liver Lobe Vector -->
-                  <path d="M -18,-12 C -6,-22 14,-18 20,-6 C 24,6 16,18 4,20 C -8,22 -20,14 -22,2 C -24,-6 -22,-10 -18,-12 Z"
-                        fill="#FEB2B2" stroke="#742A2A" stroke-width="1.8" />
-                  <path d="M -2,-14 L 4,16" stroke="#9B2C2C" stroke-width="1.2" stroke-dasharray="2 2" />
+                <g id="twin-organ-plasma" class="twin-organ" data-organ-id="plasma" transform="translate(295 175)" tabindex="0" role="button" aria-label="Inspect Plasma glucose">
+                  <rect width="230" height="110" rx="3" fill="#ffffff" />
+                  <text id="twin-title-plasma" x="13" y="25" class="twin-node-title">Plasma: glucose and insulin</text>
+                  <text id="twin-val-plasma" x="13" y="57" class="twin-node-value">Not recorded</text>
+                  <text id="twin-note-plasma" x="13" y="81" class="twin-node-note">Concentration, not a heart model</text>
+                  <text x="13" y="99" class="twin-node-note">Select for values and equation</text>
                 </g>
-
-                <!-- 3. Gut / Stomach & Intestines (Central & Lower Abdomen) -->
-                <g id="twin-organ-gut" class="twin-organ" data-organ-id="gut" tabindex="0" role="button"
-                   transform="translate(430, 340)">
-                  <circle r="36" fill="#FFFAF0" />
-                  <!-- Anatomical Stomach & Intestine Loop Vector -->
-                  <path d="M -16,-14 C -6,-20 12,-20 16,-10 C 20,-2 10,6 2,8 C -6,10 -16,16 -10,24 C -4,30 10,28 16,20"
-                        fill="none" stroke="#C05621" stroke-width="2.5" stroke-linecap="round" />
-                  <ellipse cx="-4" cy="-6" rx="10" ry="7" fill="#FBD38D" stroke="#DD6B20" stroke-width="1.5" />
+                <g id="twin-organ-periphery" class="twin-organ" data-organ-id="periphery" transform="translate(590 175)" tabindex="0" role="button" aria-label="Inspect Glucose disposition">
+                  <rect width="220" height="110" rx="3" fill="#ffffff" />
+                  <text id="twin-title-periphery" x="13" y="25" class="twin-node-title">Glucose disposition</text>
+                  <text id="twin-val-periphery" x="13" y="57" class="twin-node-value">Not recorded</text>
+                  <text id="twin-note-periphery" x="13" y="81" class="twin-node-note">Model-specific removal or exchange</text>
+                  <text x="13" y="99" class="twin-node-note">Select for values and equation</text>
                 </g>
-
-                <!-- 4. Subcutaneous Infusion Site (Lower Abdomen Subq Layer) -->
-                <g id="twin-organ-subcutaneous" class="twin-organ" data-organ-id="subcutaneous" tabindex="0" role="button"
-                   transform="translate(540, 410)">
-                  <circle r="32" fill="#FAF5FF" />
-                  <!-- Infusion Patch & Cannula Vector -->
-                  <rect x="-14" y="-10" width="28" height="18" rx="4"
-                        fill="#E9D8FD" stroke="#553C9A" stroke-width="1.8" />
-                  <circle cx="0" cy="-1" r="4" fill="#6B46C1" />
-                  <path d="M 0,8 L 0,16 M -6,16 L 6,16" stroke="#553C9A" stroke-width="1.8" />
+                <g id="twin-organ-subcutaneous" class="twin-organ" data-organ-id="subcutaneous" transform="translate(295 365)" tabindex="0" role="button" aria-label="Inspect Subcutaneous insulin">
+                  <rect width="230" height="110" rx="3" fill="#ffffff" />
+                  <text id="twin-title-subcutaneous" x="13" y="25" class="twin-node-title">Subcutaneous insulin</text>
+                  <text id="twin-val-subcutaneous" x="13" y="57" class="twin-node-value">Not recorded</text>
+                  <text id="twin-note-subcutaneous" x="13" y="81" class="twin-node-note">Recorded depot; not insulin on board</text>
+                  <text x="13" y="99" class="twin-node-note">Select for values and equation</text>
                 </g>
-
-                <!-- 5. Peripheral Muscle Tissue (Left Thigh / Oblique) -->
-                <g id="twin-organ-periphery" class="twin-organ" data-organ-id="periphery" tabindex="0" role="button"
-                   transform="translate(290, 450)">
-                  <circle r="32" fill="#F0FFF4" />
-                  <!-- Muscle Fiber Bundle Vector -->
-                  <path d="M -16,-10 Q 0,-20 16,-10 Q 20,0 16,10 Q 0,20 -16,10 Q -20,0 -16,-10 Z"
-                        fill="#C6F6D5" stroke="#22543D" stroke-width="1.8" />
-                  <path d="M -10,-4 Q 0,-10 10,-4 M -12,4 Q 0,10 12,4" stroke="#276749" stroke-width="1.5" />
-                </g>
-
-                <!-- Thin Pointer Lines & Clean Medical HUD Overlay Cards -->
-                <g class="twin-hud-labels" font-family="system-ui, -apple-system, sans-serif">
-                  <!-- Vascular HUD Badge (Top Right of Heart) -->
-                  <line x1="464" y1="140" x2="550" y2="100" stroke="#718096" stroke-width="1.2" stroke-dasharray="3 3" />
-                  <circle cx="464" cy="140" r="3.5" fill="#C53030" />
-                  <g transform="translate(550, 70)" filter="url(#card-shadow)">
-                    <rect x="0" y="0" width="230" height="58" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2" />
-                    <text x="14" y="22" fill="#718096" font-size="11" font-weight="700" letter-spacing="0.5">PLASMA GLUCOSE</text>
-                    <text id="twin-val-plasma" x="14" y="44" fill="#2B6CB0" font-size="18" font-weight="800">124.5 mg/dL</text>
-                  </g>
-
-                  <!-- Liver HUD Badge (Left of Liver) -->
-                  <line x1="308" y1="240" x2="220" y2="200" stroke="#718096" stroke-width="1.2" stroke-dasharray="3 3" />
-                  <circle cx="308" cy="240" r="3.5" fill="#9B2C2C" />
-                  <g transform="translate(20, 170)" filter="url(#card-shadow)">
-                    <rect x="0" y="0" width="220" height="58" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2" />
-                    <text x="14" y="22" fill="#718096" font-size="11" font-weight="700" letter-spacing="0.5">LIVER (EGP SOURCE)</text>
-                    <text id="twin-val-liver" x="14" y="44" fill="#9B2C2C" font-size="17" font-weight="800">1.45 mg/dL/min</text>
-                  </g>
-
-                  <!-- Gut HUD Badge (Right of Gut) -->
-                  <line x1="466" y1="340" x2="570" y2="310" stroke="#718096" stroke-width="1.2" stroke-dasharray="3 3" />
-                  <circle cx="466" cy="340" r="3.5" fill="#DD6B20" />
-                  <g transform="translate(570, 280)" filter="url(#card-shadow)">
-                    <rect x="0" y="0" width="230" height="58" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2" />
-                    <text x="14" y="22" fill="#718096" font-size="11" font-weight="700" letter-spacing="0.5">GUT ABSORPTION (Ra)</text>
-                    <text id="twin-val-gut" x="14" y="44" fill="#C05621" font-size="17" font-weight="800">2.10 mg/dL/min</text>
-                  </g>
-
-                  <!-- Subq HUD Badge (Right of Subq) -->
-                  <line x1="572" y1="410" x2="630" y2="440" stroke="#718096" stroke-width="1.2" stroke-dasharray="3 3" />
-                  <circle cx="572" cy="410" r="3.5" fill="#6B46C1" />
-                  <g transform="translate(610, 440)" filter="url(#card-shadow)">
-                    <rect x="0" y="0" width="230" height="58" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2" />
-                    <text x="14" y="22" fill="#718096" font-size="11" font-weight="700" letter-spacing="0.5">PUMP INFUSION SITE</text>
-                    <text id="twin-val-subcutaneous" x="14" y="44" fill="#553C9A" font-size="17" font-weight="800">0.85 U/hr</text>
-                  </g>
-
-                  <!-- Periphery HUD Badge (Left of Periphery Muscle) -->
-                  <line x1="258" y1="450" x2="190" y2="460" stroke="#718096" stroke-width="1.2" stroke-dasharray="3 3" />
-                  <circle cx="258" cy="450" r="3.5" fill="#276749" />
-                  <g transform="translate(10, 440)" filter="url(#card-shadow)">
-                    <rect x="0" y="0" width="230" height="58" rx="8" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.2" />
-                    <text x="14" y="22" fill="#718096" font-size="11" font-weight="700" letter-spacing="0.5">PERIPHERAL UPTAKE (X)</text>
-                    <text id="twin-val-periphery" x="14" y="44" fill="#22543D" font-size="17" font-weight="800">1.82 mg/dL/min</text>
-                  </g>
-
-                  <!-- Clinical Status Pill (Top Left Canvas) -->
-                  <g id="twin-status-group" transform="translate(30, 30)">
-                    <rect id="twin-status-bg" x="0" y="0" width="230" height="38" rx="19" fill="#F0FFF4" stroke="#38A169" stroke-width="1.5" />
-                    <circle id="twin-status-dot" cx="20" cy="19" r="6" fill="#38A169" />
-                    <text id="twin-status-text" x="36" y="24" fill="#22543D" font-size="12" font-weight="800" letter-spacing="0.5">EUGLYCEMIA (STABLE)</text>
-                  </g>
-
-                  <!-- Model Tag (Top Right Canvas) -->
-                  <g transform="translate(600, 30)">
-                    <rect x="0" y="0" width="230" height="38" rx="6" fill="#FFFFFF" stroke="#CBD5E0" stroke-width="1.2" />
-                    <text id="digital-twin-model-label" x="16" y="24" fill="#4A5568" font-size="11" font-weight="700" letter-spacing="0.5">LOADED MODEL</text>
-                  </g>
-                </g>
+                <text x="20" y="506" class="twin-node-note">Selected pathways only. Arrow direction follows the recorded sign; width is not magnitude. Dashed = zero.</text>
               </svg>
-              <div id="digital-twin-card" class="digital-twin-card" hidden></div>
+              <div id="digital-twin-card" class="digital-twin-card" hidden aria-live="polite"></div>
+              <details class="secondary-details"><summary>All recorded flow values at this time</summary><div class="table-wrap"><table id="digital-twin-flux-table"></table></div></details>
             </div>
           </div>
         </div>
@@ -672,7 +560,7 @@
       <section class="panel biology-panel" data-view-panel="research" hidden>
         <div class="panel-heading">
           <div>
-            <h2>Biology and algorithm stressors</h2>
+            <h2 id="lab-structures">Biology and algorithm stressors</h2>
           </div>
           <p>Evidence layers stay separate from physiological calibration.</p>
         </div>
@@ -680,6 +568,7 @@
           <button id="molecule-refresh-btn">Load molecule assets</button>
           <button id="open-structural-folder-btn">Open structural folder</button>
         </div>
+        <nav class="research-jump" aria-label="Research tool sections"><a href="#lab-structures">Structures</a><a href="#lab-genomics">Genomics</a><a href="#lab-tissue">Tissue stress</a><a href="#lab-mechanistic">SBML models</a><a href="#lab-cross-scale">Reference labs</a></nav>
         <div id="molecule-list" class="molecule-list" aria-live="polite"></div>
         <section id="molecule-viewer-panel" class="molecule-viewer-panel" hidden>
           <div class="molecule-viewer-heading">
@@ -715,7 +604,7 @@
 
         <div class="research-tools">
           <article class="tool-card">
-            <h3>Genomics multi-scale simulation</h3>
+            <h3 id="lab-genomics">Genomics multi-scale simulation</h3>
             <p>
               Compare a baseline virtual patient with an explicitly assumed functional-scalar scenario.
               AlphaFold confidence is structural evidence and is never converted into disease severity.
@@ -737,7 +626,7 @@
           </article>
 
           <article class="tool-card">
-            <h3>Tissue-specific resistance stress test</h3>
+            <h3 id="lab-tissue">Tissue-specific resistance stress test</h3>
             <p>Stress-test pump logic with separated muscle/peripheral and liver/hepatic resistance.</p>
             <div class="field-grid">
               <label>
@@ -756,7 +645,7 @@
           </article>
 
           <article class="tool-card mechanistic-card">
-            <h3>Mechanistic Reference Model Lab</h3>
+            <h3 id="lab-mechanistic">Mechanistic Reference Model Lab</h3>
             <p>
               Safely inspect a local SBML model, then optionally execute it through libRoadRunner as an
               independent ODE reference. IINTS never assumes that model time or concentrations equal minutes
@@ -810,7 +699,7 @@
           <article class="tool-card cross-scale-card">
             <div class="cross-scale-heading">
               <div>
-                <h3>Cross-scale Reference Labs</h3>
+                <h3 id="lab-cross-scale">Cross-scale Reference Labs</h3>
                 <p>
                   Keep sensitivity analysis, independent physiology, physical-device simulation, and measured
                   affinity evidence separate. Results are evidence bundles; none changes IINTS patient parameters

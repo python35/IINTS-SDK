@@ -9,10 +9,9 @@ import {
   HYPO_VASCULAR_COLOR,
   LIVER_CARD_CAPTION,
   ORGAN_LAYOUT,
-  averageFillLevel,
-  interpolateSeries,
+  nearestRecordedTime,
+  resolvePhysiologyBindings,
   lookupEquation,
-  normalizeFillLevel,
   resolveHypoState,
 } from "./digital-twin-data.js";
 
@@ -38,6 +37,11 @@ let selectedWorkflow = null;
 let workflows = [];
 let lastPreview = null;
 let lastRun = null;
+let lastRunBundle = null;
+let recentRuns = [];
+let historyRequestId = 0;
+let previewRequestId = 0;
+let previewBusy = false;
 let lastMdmp = null;
 let lastAcademicBundle = null;
 let lastScientificPortfolio = null;
@@ -57,6 +61,8 @@ let activeWorkflowJob = null;
 let researchBusy = false;
 let aiBusy = false;
 let engineCompatible = false;
+let supportsAutoPreparation = false;
+let moleculeReturnFocus = null;
 const REQUIRED_BRIDGE_API_VERSION = 4;
 const ESSENTIAL_RESULT_COLUMNS = new Set([
   "time_minutes",
@@ -95,7 +101,9 @@ const DEFAULT_SETTINGS = Object.freeze({
   seed: 42,
   aiModel: "ministral-3:8b",
   aiHost: "http://127.0.0.1:11434",
-  autoDiagnostics: true
+  autoDiagnostics: true,
+  autoPrepare: true,
+  autoAi: false
 });
 let workbenchSettings = { ...DEFAULT_SETTINGS };
 
@@ -104,8 +112,8 @@ const $ = (id) => document.getElementById(id);
 const VIEW_METADATA = {
   overview: {
     eyebrow: "Workspace",
-    title: "System overview",
-    description: "Check the local research engine and optional tooling before starting an experiment."
+    title: "Research workspace",
+    description: "Start an experiment or continue reviewing your latest results."
   },
   settings: {
     eyebrow: "Application",
@@ -115,7 +123,7 @@ const VIEW_METADATA = {
   run: {
     eyebrow: "Experiment",
     title: "Protocols and runs",
-    description: "Choose a curated protocol, fix the random seed, and execute it through the Python SDK."
+    description: "Select a scenario. Calculation, reports and research records follow automatically."
   },
   results: {
     eyebrow: "Analysis",
@@ -158,6 +166,7 @@ const loadedViews = new Set(["overview"]);
 
 async function loadViewData(view) {
   if (loadedViews.has(view)) return;
+  if (!engineCompatible && view !== "settings") return;
   loadedViews.add(view);
   if (view === "run") {
     await Promise.allSettled([loadWorkflows(), loadHistory()]);
@@ -189,7 +198,6 @@ function setActiveView(view, focusHeading = true) {
   // leaving it spinning in the background.
   if (effectiveView !== "results") {
     stopDigitalTwinPlayback();
-    stopTwinConduitFlow();
   }
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
@@ -262,6 +270,8 @@ function readStoredSettings() {
         ? stored.aiModel.trim()
         : DEFAULT_SETTINGS.aiModel,
       aiHost: isAllowedLocalAiHost(stored.aiHost) ? stored.aiHost : DEFAULT_SETTINGS.aiHost,
+      autoPrepare: typeof stored.autoPrepare === "boolean" ? stored.autoPrepare : DEFAULT_SETTINGS.autoPrepare,
+      autoAi: typeof stored.autoAi === "boolean" ? stored.autoAi : DEFAULT_SETTINGS.autoAi,
       autoDiagnostics: typeof stored.autoDiagnostics === "boolean"
         ? stored.autoDiagnostics
         : DEFAULT_SETTINGS.autoDiagnostics
@@ -299,11 +309,15 @@ function applyWorkbenchSettings(settings) {
   $("settings-ai-model").value = settings.aiModel;
   $("settings-ai-host").value = settings.aiHost;
   $("settings-auto-diagnostics").checked = settings.autoDiagnostics;
+  $("settings-auto-prepare").checked = settings.autoPrepare;
+  $("settings-auto-ai").checked = settings.autoAi;
+  $("run-auto-prepare").checked = settings.autoPrepare;
+  $("run-auto-ai").checked = settings.autoAi;
 }
 
 function collectSettingsForm() {
   const outputDir = $("settings-output-dir").value.trim();
-  const seed = Number.parseInt($("settings-seed").value, 10);
+  const seed = Number($("settings-seed").value);
   const aiModel = $("settings-ai-model").value.trim();
   const aiHost = $("settings-ai-host").value.trim();
   if (!outputDir) throw new Error("Default output folder is required.");
@@ -319,7 +333,9 @@ function collectSettingsForm() {
     seed,
     aiModel,
     aiHost,
-    autoDiagnostics: $("settings-auto-diagnostics").checked
+    autoDiagnostics: $("settings-auto-diagnostics").checked,
+    autoPrepare: $("settings-auto-prepare").checked,
+    autoAi: $("settings-auto-ai").checked
   };
 }
 
@@ -329,7 +345,7 @@ function saveWorkbenchSettings() {
     const outputChanged = settings.outputDir !== workbenchSettings.outputDir;
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
     applyWorkbenchSettings(settings);
-    if (outputChanged) lastRun = null;
+    if (outputChanged) void loadHistory();
     refreshActionAvailability();
     setText("settings-status", "Settings saved locally and applied to this workbench session.");
   } catch (error) {
@@ -420,6 +436,7 @@ async function chooseLocalPath({
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
     setText(statusId, `${selectedLabel}:\n${path}`);
+    return path;
   } catch (error) {
     setText(statusId, `Could not open the native selector.\n${errorMessage(error)}`);
   } finally {
@@ -450,7 +467,7 @@ async function chooseRunOutputFolder() {
 }
 
 async function chooseResultsCsv() {
-  await chooseLocalPath({
+  const chosen = await chooseLocalPath({
     inputId: "csv-path",
     buttonId: "csv-browse-btn",
     statusId: "results-status",
@@ -458,6 +475,7 @@ async function chooseResultsCsv() {
     filters: [{ name: "CSV results", extensions: ["csv"] }],
     selectedLabel: "Results CSV selected"
   });
+  if (chosen) await previewCsv({ deferCompartment: true });
 }
 
 async function chooseAcademicRunFolder() {
@@ -526,7 +544,10 @@ function markSelectedWorkflow() {
 }
 
 function selectWorkflow(key) {
+  if (runBusy) return;
   selectedWorkflow = key;
+  const workflow = workflows.find((item) => item.key === key);
+  setText("selected-protocol-summary", workflow ? `${workflow.title} · ${workflow.expected_output}` : "Select a protocol.");
   markSelectedWorkflow();
   refreshActionAvailability();
 }
@@ -536,12 +557,17 @@ async function loadStatus() {
     const status = await call("desktop_status");
     const bridgeApiVersion = Number(status.bridge_api_version || 0);
     engineCompatible = bridgeApiVersion >= REQUIRED_BRIDGE_API_VERSION;
+    supportsAutoPreparation = Array.isArray(status.features) && status.features.includes("automatic_run_bundle");
+    setText("run-preparation-help", supportsAutoPreparation
+      ? "Metrics, plots, full CSV check and reproducibility metadata are prepared in a new folder for each run."
+      : "This engine can run simulations. Update the Python SDK in Settings to enable automatic preparation and saved run handovers.");
     $("sdk-status").textContent = engineCompatible
       ? `SDK ${status.sdk_version}${status.python_version ? ` · Python ${status.python_version}` : ""}`
       : `SDK ${status.sdk_version} needs a compatibility update`;
     $("sdk-status").title = status.python_executable || "";
     $("sdk-status-dot").className = engineCompatible ? "status-dot ok" : "status-dot warn";
     $("install-engine-btn").hidden = engineCompatible;
+    setText("engine-readiness", engineCompatible ? "Ready to run. Optional tools are listed below." : "Update the Python engine in Settings.");
     setText("settings-sdk-version", status.sdk_version || "Unknown");
     setText("settings-python-path", status.python_executable || "Python path unavailable");
     setText(
@@ -555,11 +581,18 @@ async function loadStatus() {
           ].join("\n")
     );
     refreshActionAvailability();
+    if (engineCompatible) {
+      void loadHistory();
+      const activeView = document.querySelector("[data-view][aria-current='page']")?.dataset.view;
+      if (activeView) void loadViewData(activeView);
+    }
   } catch (error) {
     engineCompatible = false;
     $("sdk-status").textContent = "Python bridge unavailable";
     $("sdk-status-dot").className = "status-dot error";
     $("install-engine-btn").hidden = false;
+    setText("engine-readiness", "Engine unavailable. Open Settings to repair it, then refresh versions.");
+    setText("workspace-summary", "Your runs stay on disk. Connect the Python engine to load this workspace.");
     setText("settings-sdk-version", "Unavailable");
     setText("settings-python-path", errorMessage(error));
     setText("run-status", errorMessage(error));
@@ -1032,6 +1065,7 @@ function openMoleculeViewer(molecule) {
     );
     return;
   }
+  moleculeReturnFocus = document.activeElement;
   moleculeViewer.molecule = molecule;
   const panel = $("molecule-viewer-panel");
   panel.hidden = false;
@@ -1054,6 +1088,7 @@ function closeMoleculeViewer() {
   setMoleculeAutoRotate(false);
   moleculeViewer.molecule = null;
   $("molecule-viewer-panel").hidden = true;
+  moleculeReturnFocus?.focus?.({ preventScroll: true });
   refreshActionAvailability();
 }
 
@@ -1182,6 +1217,7 @@ async function generateMoleculePae(molecule) {
     setText("biology-status", "Choose an output folder before generating a PAE heatmap.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("biology-status", `Downloading AlphaFold PAE evidence for ${molecule.title}...`);
   try {
@@ -1286,6 +1322,8 @@ async function loadWorkflows() {
     renderWorkflows();
     setText("run-status", `Loaded ${workflows.length} workflows.`);
   } catch (error) {
+    $("workflow-list").replaceChildren(statusPill("bad", `Protocols could not be loaded. ${errorMessage(error)}`));
+    loadedViews.delete("run");
     setText("run-status", errorMessage(error));
   }
 }
@@ -1301,6 +1339,13 @@ function renderWorkflowProgress(job) {
   $("run-progress").textContent = `${Math.round(percent)}%`;
   setText("run-progress-value", `${Math.round(percent)}%`);
   setText("run-progress-label", job?.message || job?.phase || "Workflow running");
+  const phases = ["simulation", "review", "mdmp", "ai", "package", "complete"];
+  const current = phases.indexOf(job?.phase);
+  document.querySelectorAll("[data-stage]").forEach((item) => {
+    const index = phases.indexOf(item.dataset.stage);
+    item.classList.toggle("is-current", index === current);
+    item.classList.toggle("is-complete", current > index);
+  });
   $("run-cancel-btn").disabled = !["queued", "running"].includes(job?.status);
 }
 
@@ -1335,11 +1380,13 @@ async function cancelSelectedWorkflow() {
 function resetResultDerivedArtifacts() {
   lastMdmp = null;
   lastAcademicBundle = null;
+  setText("ai-answer", "Ask a question about the selected result, or enable automatic local review for your next run.");
   setText("mdmp-status", "No MDMP data-contract certificate generated for this selected result yet.");
   setText("academic-status", "No reproducibility package generated for this selected run yet.");
 }
 
 async function runSelectedWorkflow() {
+  if (runBusy || researchBusy || aiBusy) return;
   if (!engineCompatible) {
     setText(
       "run-status",
@@ -1352,7 +1399,7 @@ async function runSelectedWorkflow() {
     return;
   }
   const outputDir = $("output-dir").value.trim();
-  const seed = Number.parseInt($("seed").value || "42", 10);
+  const seed = Number($("seed").value);
   if (!outputDir) {
     $("output-dir").setAttribute("aria-invalid", "true");
     setText("run-status", "Choose an output folder before starting the protocol.");
@@ -1374,7 +1421,11 @@ async function runSelectedWorkflow() {
     const started = await call("start_workflow_job", {
       workflowKey: selectedWorkflow,
       outputDir,
-      seed
+      seed,
+      autoPrepare: supportsAutoPreparation ? $("run-auto-prepare").checked : null,
+      aiReview: supportsAutoPreparation && $("run-auto-ai").checked,
+      aiModel: $("ai-model").value.trim(),
+      aiHost: $("ai-host").value.trim()
     });
     activeWorkflowJob = started.job_id;
     const result = await waitForWorkflowJob(activeWorkflowJob);
@@ -1388,7 +1439,9 @@ async function runSelectedWorkflow() {
       $("csv-path").value = result.results_csv;
       $("run-complete-actions").hidden = false;
       await previewCsv({ deferCompartment: true });
+      applyRunBundle(result.bundle);
     }
+    setText("run-status", `Completed: ${result.workflow_title || selectedWorkflow}. Results and preparation status are ready to review.`);
     await loadHistory();
   } catch (error) {
     const message = errorMessage(error);
@@ -1411,19 +1464,27 @@ async function previewCsv({ deferCompartment = false } = {}) {
     setText("results-status", "Choose a results CSV before loading a preview.");
     return;
   }
-  setText("results-status", `Loading preview:\n${csv}`);
+  const requestId = ++previewRequestId;
+  stopDigitalTwinPlayback();
+  $("compartment-viewer").hidden = true;
+  previewBusy = true;
+  refreshActionAvailability();
+  setText("results-status", "Loading results and calculating the full-file summary...");
   try {
     const preview = await call("preview_results", { csv, maxRows: 80 });
+    if (requestId !== previewRequestId) return;
     lastPreview = preview;
     resetResultDerivedArtifacts();
+    lastRunBundle = null;
+    if (lastRun?.results_csv !== String(preview.csv_path)) lastRun = null;
     $("academic-run-dir").value = parentPath(preview.csv_path || csv);
     renderMetrics(preview.metrics || {});
     renderTable(preview.columns || [], preview.rows || []);
     drawGlucoseChart(preview);
-    setText("results-status", `Loaded ${preview.row_count} rows.\n${csv}`);
-    setText("run-status", `Preview loaded: ${preview.row_count} rows\n${csv}`);
+    setText("results-status", `${preview.row_count} samples in the full file. The table shows up to 80 representative rows.`);
     setText("ai-context", `Attached result CSV: ${csv}`);
     setActiveView("results", false);
+    applyRunBundle(preview.bundle);
     refreshActionAvailability();
     setText("compartment-status", "Loading the run's compartment timeline in the background...");
     const timelineLoad = loadCompartmentTimeline(preview.csv_path || csv);
@@ -1433,13 +1494,17 @@ async function previewCsv({ deferCompartment = false } = {}) {
       await timelineLoad;
     }
   } catch (error) {
+    if (requestId !== previewRequestId) return;
     lastPreview = null;
     setText("results-status", errorMessage(error));
+  } finally {
+    if (requestId === previewRequestId) previewBusy = false;
     refreshActionAvailability();
   }
 }
 
 async function loadHistory() {
+  const requestId = ++historyRequestId;
   const outputDir = $("output-dir").value.trim();
   if (!outputDir) {
     setText("run-status", "Output folder is required before loading history.");
@@ -1447,8 +1512,12 @@ async function loadHistory() {
   }
   try {
     const payload = await call("run_history", { outputDir, limit: 25 });
-    renderHistory(payload.history || []);
+    if (requestId !== historyRequestId || outputDir !== $("output-dir").value.trim()) return;
+    recentRuns = payload.history || [];
+    renderHistory(recentRuns);
+    renderRecentRuns();
   } catch (error) {
+    if (requestId !== historyRequestId) return;
     setText("run-status", String(error));
   }
 }
@@ -1476,22 +1545,76 @@ function renderHistory(entries) {
     if (entry.results_csv) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = "Preview";
-      button.addEventListener("click", async () => {
-        $("csv-path").value = entry.results_csv;
-        lastRun = {
-          output_dir: entry.output_dir,
-          results_csv: entry.results_csv,
-          report_pdf: entry.report_pdf || null
-        };
-        resetResultDerivedArtifacts();
-        $("academic-run-dir").value = entry.output_dir || parentPath(entry.results_csv);
-        await previewCsv();
-      });
+      button.textContent = "Open results";
+      button.disabled = runBusy;
+      button.addEventListener("click", () => openHistoryEntry(entry));
       item.appendChild(button);
     }
     container.appendChild(item);
   }
+}
+
+async function openHistoryEntry(entry) {
+  if (runBusy || !entry?.results_csv) return;
+  lastRun = entry;
+  $("csv-path").value = entry.results_csv;
+  await previewCsv({ deferCompartment: true });
+}
+
+function renderRecentRuns() {
+  const list = $("recent-runs");
+  list.replaceChildren();
+  setText("workspace-summary", recentRuns.length ? `Recent experiments in ${$("output-dir").value.trim()}` : "No experiments here yet. Start with New experiment.");
+  setDisabled("resume-result-btn", runBusy || !recentRuns[0]?.results_csv);
+  for (const entry of recentRuns.slice(0, 4)) {
+    const row = document.createElement("article");
+    row.className = "recent-run";
+    const date = new Date(entry.timestamp_utc);
+    row.innerHTML = `<div><strong>${escapeHtml(entry.workflow_title)}</strong><span>${escapeHtml(Number.isNaN(date.getTime()) ? entry.timestamp_utc : date.toLocaleString())} · seed ${escapeHtml(String(entry.seed ?? "—"))}</span></div>`;
+    row.appendChild(actionButton("Open results", () => openHistoryEntry(entry), runBusy || !entry.results_csv));
+    list.appendChild(row);
+  }
+}
+
+function applyRunBundle(bundle) {
+  lastRunBundle = bundle || null;
+  $("result-handover").hidden = !lastPreview;
+  if (!lastPreview) return;
+  $("result-source-controls").open = !bundle;
+  if (bundle) lastRun = { ...lastRun, ...bundle };
+  setText("result-run-title", bundle?.workflow_title || lastRun?.workflow_title || "Imported result");
+  setText("result-run-meta", bundle ? `${bundle.preset_name} · seed ${bundle.seed} · ${bundle.row_count ?? lastPreview.row_count} samples` : `${lastPreview.row_count} samples · ${lastPreview.csv_path}`);
+  setText("result-ready-label", bundle?.status === "preparing" ? "Preparation interrupted; inspect saved outputs" : bundle?.status === "ready_with_warnings" ? "Review preparation warnings" : "Ready to inspect");
+  $("result-ready-label").classList.toggle("has-warning", bundle?.status === "ready_with_warnings");
+  const steps = $("result-stage-list");
+  steps.replaceChildren();
+  for (const step of bundle?.steps || []) {
+    const row = document.createElement("div");
+    row.className = `prepared-step ${step.status}`;
+    row.innerHTML = `<strong>${escapeHtml(step.title)}</strong><span>${escapeHtml(step.status === "warning" ? "Needs attention" : step.status)}</span>`;
+    if (step.detail) {
+      const detail = document.createElement("p");
+      detail.textContent = step.detail;
+      row.appendChild(detail);
+    }
+    steps.appendChild(row);
+  }
+  const artifacts = $("result-artifacts");
+  artifacts.replaceChildren();
+  const extraArtifacts = $("result-extra-artifacts");
+  extraArtifacts.replaceChildren();
+  const files = bundle?.artifacts || [{ label: "Results CSV", path: lastPreview.csv_path }, ...(lastRun?.report_pdf ? [{ label: "PDF report", path: lastRun.report_pdf }] : [])];
+  for (const file of files) {
+    const primary = ["Results CSV", "PDF report", "Glucose figure", "Run guide"].includes(file.label);
+    (primary ? artifacts : extraArtifacts).appendChild(actionButton(file.label, () => openPath(file.path, "results-status")));
+  }
+  $("result-extra-files").hidden = !extraArtifacts.children.length;
+  lastMdmp = bundle?.mdmp || null;
+  lastAcademicBundle = bundle?.academic_bundle || null;
+  if (lastMdmp) setText("mdmp-status", `Full CSV checked · contract grade ${lastMdmp.grade} · ${lastMdmp.row_count} rows. Certificate and report are available above.`);
+  if (lastAcademicBundle) setText("academic-status", `Prepared automatically: ${lastAcademicBundle.artifact_count} artifacts inventoried. Readiness: ${String(lastAcademicBundle.readiness_status).replaceAll("_", " ")}. Add authorship and licence details when ready.`);
+  if (bundle?.ai_review) renderAiAnswer(bundle.ai_review);
+  refreshActionAvailability();
 }
 
 async function certifyMdmp() {
@@ -1585,13 +1708,17 @@ async function openAcademicGuide() {
 
 function renderMetrics(metrics) {
   const container = $("metrics");
+  const technical = $("technical-metrics");
   container.replaceChildren();
+  technical.replaceChildren();
+  const primary = new Set(["Mean glucose", "Time in 70-180", "Time below 70", "Time above 180", "Glucose CV", "Duration"]);
   for (const [key, value] of Object.entries(metrics)) {
     const item = document.createElement("div");
     item.className = "metric";
     item.innerHTML = `<small>${escapeHtml(key)}</small><strong>${escapeHtml(String(value))}</strong>`;
-    container.appendChild(item);
+    (primary.has(key) ? container : technical).appendChild(item);
   }
+  $("technical-metrics-details").hidden = !technical.children.length;
 }
 
 function renderTable(columns, rows) {
@@ -1763,6 +1890,7 @@ async function listAiModels() {
 }
 
 async function askAi() {
+  if (aiBusy || runBusy || researchBusy) return;
   const question = $("ai-question").value.trim();
   if (!question) {
     setText("ai-answer", "Write a question first.");
@@ -1992,6 +2120,7 @@ async function runGenomicsSimulation() {
     return;
   }
   setText("biology-status", `Running genomics simulation for ${gene} ${variant}...`);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   try {
     const payload = await call("run_genomics_simulation", {
@@ -2024,6 +2153,7 @@ async function runTissueStressTest() {
   const musclePercent = Number.parseFloat($("tissue-muscle").value || "30");
   const liverPercent = Number.parseFloat($("tissue-liver").value || "100");
   setText("biology-status", `Running tissue stress test: muscle ${musclePercent}%, liver ${liverPercent}%...`);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   try {
     const payload = await call("run_tissue_stress", {
@@ -2078,6 +2208,7 @@ async function inspectMechanisticModel() {
     setText("mechanistic-status", "Choose a local .xml or .sbml model first.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("mechanistic-status", "Inspecting SBML structure without executing equations...");
   try {
@@ -2123,6 +2254,7 @@ async function runMechanisticModel() {
   const start = Number.parseFloat($("mechanistic-start").value || "0");
   const end = Number.parseFloat($("mechanistic-end").value || "1440");
   const points = Number.parseInt($("mechanistic-points").value || "289", 10);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("mechanistic-status", "Executing independent SBML reference model through libRoadRunner...");
   try {
@@ -2205,6 +2337,7 @@ async function inspectCopasiModel() {
     setText("copasi-status", "Choose a local .cps model first.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("copasi-status", "Inspecting COPASI tasks without executing them...");
   try {
@@ -2248,6 +2381,7 @@ async function runCopasiAnalysis() {
   const outputDir = joinPath($("output-dir").value.trim(), "copasi");
   const task = $("copasi-task").value.trim();
   const timeoutSeconds = Number.parseInt($("copasi-timeout").value || "900", 10);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("copasi-status", "Running the reviewed COPASI task in an evidence directory...");
   try {
@@ -2285,6 +2419,7 @@ async function inspectCellmlModel() {
     setText("cellml-status", "Choose a local .cellml or .xml model first.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("cellml-status", "Inspecting CellML metadata without resolving imports...");
   try {
@@ -2318,6 +2453,7 @@ async function validateCellmlModel() {
   }
   const outputDir = joinPath($("output-dir").value.trim(), "cellml");
   const timeoutSeconds = Number.parseInt($("cellml-timeout").value || "120", 10);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("cellml-status", "Validating CellML through OpenCOR CellMLTools...");
   try {
@@ -2349,6 +2485,7 @@ async function inspectFmiModel() {
     setText("fmi-status", "Choose a local .fmu first.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("fmi-status", "Reading FMU archive metadata only; native code is not being loaded...");
   try {
@@ -2391,6 +2528,7 @@ async function runFmiModel() {
   const outputInterval = Number.parseFloat($("fmi-interval").value || "0.1");
   const timeoutSeconds = Number.parseInt($("fmi-timeout").value || "300", 10);
   const variables = $("fmi-variables").value.split(",").map((value) => value.trim()).filter(Boolean);
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("fmi-status", "Executing the explicitly trusted FMU through FMPy...");
   try {
@@ -2434,6 +2572,7 @@ async function queryBindingEvidence() {
     setText("binding-status", "Enter one UniProt accession first.");
     return;
   }
+  if (runBusy || researchBusy || aiBusy) return;
   setResearchBusy(true);
   setText("binding-status", `Fetching measured BindingDB records for ${uniprot} over verified HTTPS...`);
   try {
@@ -2494,8 +2633,9 @@ function pathHasExtension(path, extensions) {
 }
 
 function refreshActionAvailability() {
+  const operationBusy = runBusy || researchBusy || aiBusy;
   const outputDir = $("output-dir").value.trim();
-  const seed = Number.parseInt($("seed").value, 10);
+  const seed = Number($("seed").value);
   const seedValid = Number.isInteger(seed) && seed >= 0 && seed <= 2147483647;
   const csv = $("csv-path").value.trim();
   const csvValid = pathHasExtension(csv, ["csv"]);
@@ -2512,12 +2652,19 @@ function refreshActionAvailability() {
   const cellmlValid = pathHasExtension(cellmlModel, ["cellml", "xml"]);
   const fmiValid = pathHasExtension(fmiModel, ["fmu"]);
 
-  setDisabled("run-btn", runBusy || !engineCompatible || !selectedWorkflow || !outputDir || !seedValid);
+  setDisabled("run-btn", runBusy || researchBusy || aiBusy || !engineCompatible || !selectedWorkflow || !outputDir || !seedValid);
+  setDisabled("resume-result-btn", runBusy || !recentRuns[0]?.results_csv);
+  setDisabled("new-run-btn", runBusy);
+  setDisabled("result-folder-btn", !lastRun?.output_dir);
+  for (const id of ["output-dir", "seed", "run-auto-prepare", "run-auto-ai", "settings-save-btn", "settings-reset-btn"]) setDisabled(id, runBusy);
+  setDisabled("run-auto-prepare", runBusy || !supportsAutoPreparation);
+  setDisabled("run-auto-ai", runBusy || !supportsAutoPreparation);
+  document.querySelectorAll(".history-list button").forEach((button) => { button.disabled = runBusy; });
   setDisabled("run-cancel-btn", !runBusy || !activeWorkflowJob);
   setDisabled("refresh-btn", runBusy);
   setDisabled("history-btn", runBusy || !outputDir);
   setDisabled("output-browse-btn", runBusy);
-  setDisabled("preview-btn", runBusy || !csvValid);
+  setDisabled("preview-btn", runBusy || previewBusy || !csvValid);
   setDisabled("csv-browse-btn", runBusy);
   setDisabled("open-csv-btn", runBusy || !csvValid);
   setDisabled("mdmp-btn", runBusy || !csvValid);
@@ -2532,7 +2679,7 @@ function refreshActionAvailability() {
   setDisabled("portfolio-open-btn", !lastScientificPortfolio?.index_html_path);
   setDisabled("portfolio-manifest-btn", !lastScientificPortfolio?.manifest_json_path);
   setDisabled("portfolio-reveal-btn", !lastScientificPortfolio?.output_dir);
-  setDisabled("ai-ask-btn", aiBusy || !aiQuestionValid);
+  setDisabled("ai-ask-btn", aiBusy || runBusy || researchBusy || !aiQuestionValid);
   $("ai-ask-btn").textContent = aiBusy
     ? "Analyzing..."
     : csvValid
@@ -2545,64 +2692,71 @@ function refreshActionAvailability() {
     "cellml-model-browse-btn",
     "fmi-model-browse-btn"
   ]) {
-    setDisabled(id, researchBusy);
+    setDisabled(id, operationBusy);
   }
-  setDisabled("molecule-refresh-btn", researchBusy);
-  setDisabled("open-structural-folder-btn", researchBusy || !outputDir);
+  setDisabled("molecule-refresh-btn", operationBusy);
+  setDisabled("open-structural-folder-btn", operationBusy || !outputDir);
   setDisabled("molecule-viewer-reset-btn", !moleculeViewer.molecule);
   setDisabled("molecule-viewer-rotate-btn", !moleculeViewer.molecule);
   document.querySelectorAll("#molecule-list button[data-unavailable]").forEach((button) => {
-    button.disabled = researchBusy || button.dataset.unavailable === "true";
+    button.disabled = operationBusy || button.dataset.unavailable === "true";
   });
-  setDisabled("genomics-run-btn", researchBusy);
-  setDisabled("genomics-open-btn", researchBusy || !lastGenomics?.html_path);
-  setDisabled("tissue-run-btn", researchBusy);
-  setDisabled("tissue-open-btn", researchBusy || !lastTissue?.html_path);
-  setDisabled("mechanistic-status-btn", researchBusy);
-  setDisabled("mechanistic-inspect-btn", researchBusy || !mechanisticValid);
-  setDisabled("mechanistic-run-btn", researchBusy || !mechanisticValid || !outputDir);
-  setDisabled("mechanistic-open-folder-btn", researchBusy || !lastMechanistic?.run_dir);
-  setDisabled("mechanistic-open-report-btn", researchBusy || !lastMechanistic?.report_md);
-  setDisabled("mechanistic-open-results-btn", researchBusy || !lastMechanistic?.results_csv);
-  setDisabled("cross-scale-status-btn", researchBusy);
-  setDisabled("copasi-inspect-btn", researchBusy || !copasiValid);
-  setDisabled("copasi-run-btn", researchBusy || !copasiValid || !outputDir || !$("copasi-consent").checked);
-  setDisabled("copasi-open-btn", researchBusy || !lastCopasi?.run_dir);
-  setDisabled("cellml-inspect-btn", researchBusy || !cellmlValid);
-  setDisabled("cellml-validate-btn", researchBusy || !cellmlValid || !outputDir);
-  setDisabled("cellml-open-btn", researchBusy || !lastCellml?.run_dir);
-  setDisabled("fmi-inspect-btn", researchBusy || !fmiValid);
-  setDisabled("fmi-run-btn", researchBusy || !fmiValid || !outputDir || !$("fmi-consent").checked);
-  setDisabled("fmi-open-btn", researchBusy || !lastFmi?.run_dir);
-  setDisabled("fmi-results-btn", researchBusy || !lastFmi?.results_csv);
-  setDisabled("binding-query-btn", researchBusy || !$("binding-uniprot").value.trim() || !outputDir);
-  setDisabled("binding-open-btn", researchBusy || !lastBinding?.output_dir);
-  setDisabled("binding-csv-btn", researchBusy || !lastBinding?.records_csv);
+  setDisabled("genomics-run-btn", operationBusy);
+  setDisabled("genomics-open-btn", operationBusy || !lastGenomics?.html_path);
+  setDisabled("tissue-run-btn", operationBusy);
+  setDisabled("tissue-open-btn", operationBusy || !lastTissue?.html_path);
+  setDisabled("mechanistic-status-btn", operationBusy);
+  setDisabled("mechanistic-inspect-btn", operationBusy || !mechanisticValid);
+  setDisabled("mechanistic-run-btn", operationBusy || !mechanisticValid || !outputDir);
+  setDisabled("mechanistic-open-folder-btn", operationBusy || !lastMechanistic?.run_dir);
+  setDisabled("mechanistic-open-report-btn", operationBusy || !lastMechanistic?.report_md);
+  setDisabled("mechanistic-open-results-btn", operationBusy || !lastMechanistic?.results_csv);
+  setDisabled("cross-scale-status-btn", operationBusy);
+  setDisabled("copasi-inspect-btn", operationBusy || !copasiValid);
+  setDisabled("copasi-run-btn", operationBusy || !copasiValid || !outputDir || !$("copasi-consent").checked);
+  setDisabled("copasi-open-btn", operationBusy || !lastCopasi?.run_dir);
+  setDisabled("cellml-inspect-btn", operationBusy || !cellmlValid);
+  setDisabled("cellml-validate-btn", operationBusy || !cellmlValid || !outputDir);
+  setDisabled("cellml-open-btn", operationBusy || !lastCellml?.run_dir);
+  setDisabled("fmi-inspect-btn", operationBusy || !fmiValid);
+  setDisabled("fmi-run-btn", operationBusy || !fmiValid || !outputDir || !$("fmi-consent").checked);
+  setDisabled("fmi-open-btn", operationBusy || !lastFmi?.run_dir);
+  setDisabled("fmi-results-btn", operationBusy || !lastFmi?.results_csv);
+  setDisabled("binding-query-btn", operationBusy || !$("binding-uniprot").value.trim() || !outputDir);
+  setDisabled("binding-open-btn", operationBusy || !lastBinding?.output_dir);
+  setDisabled("binding-csv-btn", operationBusy || !lastBinding?.records_csv);
+  setDisabled("foundation-glucofm-pretrain-btn", operationBusy || !engineCompatible || !$("foundation-glucofm-train-source").value.trim() || !$("foundation-glucofm-train-output").value.trim());
+  setDisabled("foundation-glucofm-btn", operationBusy || !engineCompatible || !$("foundation-glucofm-csv").value.trim() || !$("foundation-glucofm-checkpoint").value.trim());
+  setDisabled("foundation-arena-btn", operationBusy || !engineCompatible || !foundationArenaResultFiles.length);
 }
 
 function setBusy(isBusy) {
   runBusy = Boolean(isBusy);
   document.documentElement.classList.toggle("run-busy", runBusy);
-  $("run-btn").textContent = runBusy ? "Running protocol..." : "Run selected protocol";
-  $("workspace-content").setAttribute("aria-busy", String(runBusy || researchBusy));
+  $("run-btn").textContent = runBusy ? "Preparing experiment..." : "Run and prepare results";
+  $("run-progress-panel").setAttribute("aria-busy", String(runBusy));
   refreshActionAvailability();
 }
 
 function setResearchBusy(isBusy) {
   researchBusy = Boolean(isBusy);
   document.documentElement.classList.toggle("research-busy", researchBusy);
-  $("workspace-content").setAttribute("aria-busy", String(runBusy || researchBusy));
+  $("run-progress-panel").setAttribute("aria-busy", String(runBusy));
   refreshActionAvailability();
 }
 
 function initializeFormState() {
+  $("output-dir").addEventListener("change", () => { if (engineCompatible && $("output-dir").value.trim()) void loadHistory(); });
   $("output-dir").addEventListener("input", () => {
+    historyRequestId += 1;
+    recentRuns = [];
+    renderHistory([]);
+    renderRecentRuns();
     $("output-dir").setAttribute("aria-invalid", String(!$("output-dir").value.trim()));
-    lastRun = null;
     refreshActionAvailability();
   });
   $("seed").addEventListener("input", () => {
-    const seed = Number.parseInt($("seed").value, 10);
+    const seed = Number($("seed").value);
     $("seed").setAttribute(
       "aria-invalid",
       String(!Number.isInteger(seed) || seed < 0 || seed > 2147483647)
@@ -2610,9 +2764,21 @@ function initializeFormState() {
     refreshActionAvailability();
   });
   $("csv-path").addEventListener("input", () => {
+    previewRequestId += 1;
+    previewBusy = false;
     const value = $("csv-path").value.trim();
     $("csv-path").setAttribute("aria-invalid", String(Boolean(value) && !pathHasExtension(value, ["csv"])));
     lastPreview = null;
+    lastRun = null;
+    lastRunBundle = null;
+    $("result-handover").hidden = true;
+    $("metrics").replaceChildren();
+    $("technical-metrics").replaceChildren();
+    $("technical-metrics-details").hidden = true;
+    $("glucose-chart").replaceChildren(svgText(24, 40, "Load the selected CSV to show its glucose trajectory."));
+    $("preview-table").replaceChildren();
+    $("compartment-viewer").hidden = true;
+    stopDigitalTwinPlayback();
     resetResultDerivedArtifacts();
     refreshActionAvailability();
   });
@@ -3179,10 +3345,14 @@ function digitalTwinBounds() {
 }
 
 async function loadCompartmentTimeline(csv) {
+  const requestId = previewRequestId;
   const viewer = $("compartment-viewer");
   try {
     const timeline = await call("compartment_timeline", { csv, maxPoints: 400 });
+    if (requestId !== previewRequestId) return;
     compartmentTimeline = timeline;
+    selectedTwinPart = null;
+    $("digital-twin-card").hidden = true;
     if (!timeline.available) {
       viewer.hidden = true;
       setText("compartment-status", timeline.reason);
@@ -3204,12 +3374,12 @@ async function loadCompartmentTimeline(csv) {
     setText("compartment-summary", timeline.schema.model_label);
     setText(
       "digital-twin-description",
-      `Illustrated view of ${timeline.schema.model_label}. The liver shape has no stored contents of its own -- it visualizes the live endogenous glucose production flux, not a tracked compartment.`
+      `Recorded pathways in ${timeline.schema.model_label}. This is a model map, not an anatomical reconstruction. Values snap to recorded samples; source and sink terms are not organ volumes.`
     );
     setText("digital-twin-model-label", digitalTwinModelTag(timeline.schema));
     $("digital-twin-illustration").setAttribute(
       "aria-label",
-      `Illustrated compartment diagram for ${timeline.schema.model_label}`
+      `Recorded pathway map for ${timeline.schema.model_label}`
     );
     renderCompartmentDiagram();
     stopDigitalTwinPlayback();
@@ -3221,6 +3391,7 @@ async function loadCompartmentTimeline(csv) {
     setText("digital-twin-time-label", `${Math.round(bounds.minimum)} min`);
     renderDigitalTwinDiagram();
   } catch (error) {
+    if (requestId !== previewRequestId) return;
     compartmentTimeline = null;
     viewer.hidden = true;
     setText("compartment-status", errorMessage(error));
@@ -3230,14 +3401,7 @@ async function loadCompartmentTimeline(csv) {
 $("compartment-time").addEventListener("input", renderCompartmentDiagram);
 $("compartment-show-signals").addEventListener("change", renderCompartmentDiagram);
 
-// --- Illustrated torso diagram --------------------------------------------
-// Alternative, illustrated view of the same compartmentTimeline data the SVG
-// "Diagram" tab above already draws -- no separate fetch, no re-implemented
-// physiology (see digital-twin-data.js's header comment for the same house
-// rule the SVG diagram follows). Organs are static shapes declared in
-// index.html (#digital-twin-illustration); this only ever changes their
-// color/opacity/glow and reads clicks, so there is no heavy library to lazy
-// load and no canvas render loop -- a plain interval drives playback.
+// Model-aware pathway map: all values and equations are read from the run.
 const DIGITAL_TWIN_BASE_MINUTES_PER_SECOND = 24; // full 1440-minute run in ~60s at 1x
 const DIGITAL_TWIN_TICK_MS = 100;
 let digitalTwinPlaying = false;
@@ -3249,7 +3413,7 @@ function currentDigitalTwinMinutes() {
   const bounds = digitalTwinBounds();
   const value = Number($("digital-twin-time").value);
   if (!Number.isFinite(value)) return bounds.minimum;
-  return Math.min(bounds.maximum, Math.max(bounds.minimum, value));
+  return nearestRecordedTime(compartmentTimeline?.times, Math.min(bounds.maximum, Math.max(bounds.minimum, value)));
 }
 
 function showDigitalTwinCard(html) {
@@ -3265,20 +3429,19 @@ function organCompartmentKeys(organConfig) {
 }
 
 function renderCompartmentCard(organLabel, compartmentKeys) {
-  const minutes = currentDigitalTwinMinutes();
   const rows = compartmentKeys.map((key) => {
     const schemaEntry = (compartmentTimeline?.schema?.compartments || []).find((c) => c.key === key);
     const series = compartmentTimeline?.compartments?.[key];
-    const value = interpolateSeries(compartmentTimeline?.times || [], series || [], minutes);
+    const value = recordedTwinValue(series);
     return `<div>${escapeHtml(schemaEntry?.label || key)}: <strong>${Number.isFinite(value) ? value.toFixed(2) : "--"}</strong> ${escapeHtml(schemaEntry?.unit || "")}</div>`;
   });
-  showDigitalTwinCard(`<h4>${escapeHtml(organLabel)}</h4>${rows.join("") || "<div>No recorded contents.</div>"}`);
+  showDigitalTwinCard(`<h4>${escapeHtml(organLabel)}</h4>${rows.join("") || "<div>No separately stored state at this site in the loaded model. Inspect its recorded flux instead.</div>"}`);
 }
 
 function renderFluxCard(fluxKey, { isLiver = false } = {}) {
   const schemaEntry = (compartmentTimeline?.schema?.fluxes || []).find((f) => f.key === fluxKey);
   const series = compartmentTimeline?.fluxes?.[fluxKey];
-  const value = interpolateSeries(compartmentTimeline?.times || [], series || [], currentDigitalTwinMinutes());
+  const value = recordedTwinValue(series);
   const equation = lookupEquation(compartmentTimeline?.schema || {}, fluxKey);
   showDigitalTwinCard(`
     <h4>${escapeHtml(schemaEntry?.label || fluxKey)}</h4>
@@ -3288,144 +3451,99 @@ function renderFluxCard(fluxKey, { isLiver = false } = {}) {
   `);
 }
 
-// Recomputed on every scrub/tick rather than cached: there are only 5 organs
-// and at most a couple of compartments each, so re-deriving each range here
-// costs nothing next to a 100ms playback tick.
-function organFillLevel(organConfig) {
-  if (organConfig.kind === "flux-proxy") {
-    const series = compartmentTimeline.fluxes[organConfig.boundFluxKey];
-    const range = compartmentRange((series || []).map((value) => Math.abs(value)));
-    const value = Math.abs(interpolateSeries(compartmentTimeline.times, series, currentDigitalTwinMinutes()));
-    return normalizeFillLevel(value, range);
+let selectedTwinPart = null;
+
+function recordedTwinValue(series) {
+  const index = compartmentTimeline?.times?.indexOf(currentDigitalTwinMinutes()) ?? -1;
+  const value = index >= 0 ? series?.[index] : null;
+  return Number.isFinite(value) ? value : NaN;
+}
+
+function updateTwinSelection() {
+  if (!selectedTwinPart || !compartmentTimeline) return;
+  const binding = resolvePhysiologyBindings(compartmentTimeline.schema);
+  const organ = ORGAN_LAYOUT.find((item) => item.id === selectedTwinPart);
+  if (selectedTwinPart === "plasma") {
+    renderCompartmentCard("Plasma states", organCompartmentKeys(organ));
+  } else if (selectedTwinPart === "subcutaneous") {
+    renderCompartmentCard("Subcutaneous insulin states", organCompartmentKeys(organ).filter((key) => {
+      const state = compartmentTimeline.schema.compartments.find((c) => c.key === key);
+      return /insulin/i.test(state?.label || "") || ["S1", "S2"].includes(key);
+    }));
+  } else if (binding[selectedTwinPart]) {
+    renderFluxCard(binding[selectedTwinPart], { isLiver: selectedTwinPart === "liver" });
+    if (selectedTwinPart === "gut") {
+      const card = $("digital-twin-card");
+      const heading = card.innerHTML;
+      renderCompartmentCard("Gastrointestinal states", organCompartmentKeys(organ));
+      card.innerHTML = heading + card.innerHTML;
+    }
+  } else {
+    showDigitalTwinCard("<h4>Not represented as a recorded pathway</h4><p>The loaded model does not provide this channel. No value or organ mass is inferred.</p>");
   }
-  const levels = organCompartmentKeys(organConfig).map((key) => {
-    const series = compartmentTimeline.compartments[key];
-    const range = compartmentRange(series);
-    const value = interpolateSeries(compartmentTimeline.times, series, currentDigitalTwinMinutes());
-    return normalizeFillLevel(value, range);
-  });
-  return averageFillLevel(levels);
 }
 
 function renderDigitalTwinDiagram() {
-  if (!compartmentTimeline || !compartmentTimeline.available) return;
-  const minutes = currentDigitalTwinMinutes();
-  const glucose = interpolateSeries(compartmentTimeline.times, compartmentTimeline.plasma_glucose_mgdl, minutes);
+  if (!compartmentTimeline?.available) return;
+  const schema = compartmentTimeline.schema;
+  const bindings = resolvePhysiologyBindings(schema);
+  const glucose = recordedTwinValue(compartmentTimeline.plasma_glucose_mgdl);
   const isHypo = resolveHypoState(glucose);
+  const sampleIndex = compartmentTimeline.times.indexOf(currentDigitalTwinMinutes());
+  setText("digital-twin-time-label", `${currentDigitalTwinMinutes()} min · sample ${sampleIndex + 1}/${compartmentTimeline.times.length}`);
 
-  for (const organConfig of ORGAN_LAYOUT) {
-    const el = $(organConfig.elementId);
-    if (!el) continue;
-    const level = organFillLevel(organConfig);
-    const color = isHypo && organConfig.id === "plasma" ? HYPO_VASCULAR_COLOR : organConfig.color;
-    el.style.stroke = color;
-    el.style.strokeWidth = String(1.6 + level * 1.2);
-    el.style.opacity = String(0.75 + level * 0.25);
+  for (const organ of ORGAN_LAYOUT) {
+    const el = $(organ.elementId);
+    el.style.stroke = organ.id === "plasma" && isHypo ? HYPO_VASCULAR_COLOR : organ.color;
+    el.style.strokeWidth = "1.5";
+    el.style.opacity = "1";
   }
-
-  // Update In-SVG HUD Badges with Live Values.
-  const valPlasma = $("twin-val-plasma");
-  if (valPlasma && Number.isFinite(glucose)) {
-    valPlasma.textContent = `${glucose.toFixed(1)} mg/dL`;
-    valPlasma.setAttribute("fill", isHypo ? "#C53030" : "#2B6CB0");
+  setText("twin-val-plasma", Number.isFinite(glucose) ? `${glucose.toFixed(1)} mg/dL` : "Not recorded");
+  const plasmaInsulin = schema.compartments.find((c) => c.site === "plasma" && (c.key === "I" || c.label === "Plasma insulin"));
+  const insulin = recordedTwinValue(compartmentTimeline.compartments?.[plasmaInsulin?.key]);
+  setText("twin-note-plasma", Number.isFinite(insulin) ? `Insulin ${insulin.toFixed(2)} ${plasmaInsulin.unit}` : "Plasma insulin not recorded");
+  for (const key of ["gut", "liver", "periphery", "subcutaneous"]) {
+    const isDepot = key === "subcutaneous";
+    const entries = isDepot ? schema.compartments : schema.fluxes;
+    const entry = entries.find((item) => item.key === bindings[key]);
+    const series = isDepot ? compartmentTimeline.compartments?.[entry?.key] : compartmentTimeline.fluxes?.[entry?.key];
+    const value = recordedTwinValue(series);
+    const label = Number.isFinite(value) ? `${Math.abs(value) >= 100000 ? value.toExponential(2) : value.toFixed(isDepot ? 1 : 2)} ${entry?.unit || ""}` : "Not recorded";
+    setText(`twin-val-${key}`, label);
+    const edge = $( `twin-edge-${key}` );
+    const edgeValue = isDepot ? recordedTwinValue(compartmentTimeline.fluxes?.[bindings.insulinFlux]) : value;
+    edge.setAttribute("visibility", Number.isFinite(edgeValue) ? "visible" : "hidden");
+    edge.setAttribute("marker-end", edgeValue > 0 ? "url(#twin-arrow)" : "none");
+    edge.setAttribute("marker-start", edgeValue < 0 ? "url(#twin-arrow)" : "none");
+    edge.setAttribute("stroke-dasharray", edgeValue === 0 ? "3 3" : "none");
+    edge.setAttribute("aria-label", `${isDepot ? "Insulin appearance" : entry?.label || key}: ${edgeValue < 0 ? "reverse" : edgeValue === 0 ? "zero" : "forward"} recorded flow`);
   }
-
-  function updateTwinFluxBadge(elementId, fluxKey) {
-    const el = $(elementId);
-    const schemaEntry = (compartmentTimeline.schema?.fluxes || []).find((f) => f.key === fluxKey);
-    const series = compartmentTimeline.fluxes?.[fluxKey];
-    if (!el || !schemaEntry || !series) return;
-    const value = interpolateSeries(compartmentTimeline.times, series, minutes);
-    if (Number.isFinite(value)) el.textContent = `${value.toFixed(2)} ${schemaEntry.unit || ""}`;
-  }
-  updateTwinFluxBadge("twin-val-liver", "endogenous_production");
-  updateTwinFluxBadge("twin-val-gut", "glucose_appearance");
-  updateTwinFluxBadge("twin-val-periphery", "glucose_to_periphery");
-
-  const valSubq = $("twin-val-subcutaneous");
-  if (valSubq) {
-    const subqKeys = organCompartmentKeys(ORGAN_LAYOUT.find((organ) => organ.id === "subcutaneous"));
-    const key = subqKeys[subqKeys.length - 1];
-    const schemaEntry = (compartmentTimeline.schema?.compartments || []).find((c) => c.key === key);
-    const series = key ? compartmentTimeline.compartments?.[key] : null;
-    if (schemaEntry && series) {
-      const value = interpolateSeries(compartmentTimeline.times, series, minutes);
-      if (Number.isFinite(value)) valSubq.textContent = `${value.toFixed(1)} ${schemaEntry.unit || ""}`;
-    }
-  }
-
-  // Update Clinical Status Pill
-  const statusBg = $("twin-status-bg");
-  const statusDot = $("twin-status-dot");
-  const statusText = $("twin-status-text");
-  if (statusBg && statusDot && statusText) {
-    if (isHypo) {
-      statusBg.setAttribute("fill", "#FFF5F5");
-      statusBg.setAttribute("stroke", "#E53E3E");
-      statusDot.setAttribute("fill", "#E53E3E");
-      statusText.setAttribute("fill", "#9B2C2C");
-      statusText.textContent = "ALERT: HYPOGLYCEMIA (<70)";
-    } else if (glucose > 180) {
-      statusBg.setAttribute("fill", "#FFFAF0");
-      statusBg.setAttribute("stroke", "#DD6B20");
-      statusDot.setAttribute("fill", "#DD6B20");
-      statusText.setAttribute("fill", "#7B341E");
-      statusText.textContent = "HIGH GLUCOSE (>180)";
-    } else {
-      statusBg.setAttribute("fill", "#F0FFF4");
-      statusBg.setAttribute("stroke", "#38A169");
-      statusDot.setAttribute("fill", "#38A169");
-      statusText.setAttribute("fill", "#22543D");
-      statusText.textContent = "EUGLYCEMIA (STABLE)";
-    }
-  }
+  setText("twin-title-periphery", bindings.periphery === "glucose_uptake" ? "Glucose disappearance" : "Peripheral exchange");
+  setText("twin-note-periphery", bindings.periphery === "glucose_uptake" ? "Lumped term; no separate tissue mass" : "Exchange is not total uptake");
+  setText("twin-note-subcutaneous", bindings.subcutaneous ? `Depot ${bindings.subcutaneous}; not total IOB` : "No insulin depot recorded");
+  const high = glucose > 180;
+  const known = Number.isFinite(glucose);
+  setText("twin-status-text", !known ? "Glucose not recorded" : isHypo ? "GLUCOSE BELOW 70 mg/dL" : high ? "GLUCOSE ABOVE 180 mg/dL" : "GLUCOSE IN 70–180 mg/dL");
+  $("twin-status-bg").setAttribute("fill", isHypo ? "#fff2f1" : high ? "#fff8ef" : "#f3f6f5");
+  $("twin-status-bg").setAttribute("stroke", "#b3c0c7");
+  $("twin-status-dot").setAttribute("fill", !known ? "#6b7780" : isHypo ? "#b44238" : high ? "#a76620" : "#477164");
+  const table = $("digital-twin-flux-table");
+  table.innerHTML = "<thead><tr><th>Recorded term</th><th>Signed value</th><th>Unit</th><th>Source → target</th></tr></thead><tbody>" + schema.fluxes.filter((f) => f.recorded !== false && compartmentTimeline.fluxes?.[f.key]).map((f) => {
+    const value = recordedTwinValue(compartmentTimeline.fluxes[f.key]);
+    return `<tr><td>${escapeHtml(f.label)}</td><td>${Number.isFinite(value) ? value.toPrecision(5) : "Not recorded"}</td><td>${escapeHtml(f.unit)}</td><td>${escapeHtml(f.source || "boundary")} → ${escapeHtml(f.target || "boundary")}</td></tr>`;
+  }).join("") + "</tbody>";
+  updateTwinSelection();
 }
 
-for (const organConfig of ORGAN_LAYOUT) {
-  const el = $(organConfig.elementId);
-  if (!el) continue;
-  const activate = () => {
-    if (!compartmentTimeline || !compartmentTimeline.available) return;
-    if (organConfig.kind === "flux-proxy") {
-      renderFluxCard(organConfig.boundFluxKey, { isLiver: organConfig.id === "liver" });
-    } else {
-      renderCompartmentCard(organConfig.label, organCompartmentKeys(organConfig));
-    }
-  };
+for (const organ of ORGAN_LAYOUT) {
+  const el = $(organ.elementId);
+  const activate = () => { selectedTwinPart = organ.id; updateTwinSelection(); };
   el.addEventListener("click", activate);
   el.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     activate();
   });
-}
-
-// Ambient flow along the flux conduits (index.html's .twin-conduits paths),
-// independent of simulation playback -- it runs whenever the illustrated
-// view is open, not just while scrubbing/playing. This app disables CSS
-// `animation`/`transition` globally with `!important`, so a @keyframes rule
-// here would silently no-op; a plain per-frame style write is not a CSS
-// animation and is unaffected by that rule.
-let twinConduitAnimationFrame = null;
-let twinConduitDashOffset = 0;
-
-function tickTwinConduitFlow() {
-  twinConduitDashOffset -= 0.4;
-  document.querySelectorAll(".twin-conduits path").forEach((path) => {
-    path.style.strokeDashoffset = String(twinConduitDashOffset);
-  });
-  twinConduitAnimationFrame = requestAnimationFrame(tickTwinConduitFlow);
-}
-
-function startTwinConduitFlow() {
-  if (twinConduitAnimationFrame === null) twinConduitAnimationFrame = requestAnimationFrame(tickTwinConduitFlow);
-}
-
-function stopTwinConduitFlow() {
-  if (twinConduitAnimationFrame !== null) {
-    cancelAnimationFrame(twinConduitAnimationFrame);
-    twinConduitAnimationFrame = null;
-  }
 }
 
 function stopDigitalTwinPlayback() {
@@ -3458,10 +3576,8 @@ function activateCompartmentMode(mode) {
   });
   if (mode === "twin") {
     renderDigitalTwinDiagram();
-    startTwinConduitFlow();
   } else {
     stopDigitalTwinPlayback();
-    stopTwinConduitFlow();
   }
 }
 
@@ -3498,6 +3614,11 @@ $("digital-twin-speed").addEventListener("change", (event) => {
 });
 
 $("run-btn").addEventListener("click", runSelectedWorkflow);
+$("new-run-btn").addEventListener("click", () => setActiveView("run"));
+$("resume-result-btn").addEventListener("click", () => openHistoryEntry(recentRuns[0]));
+$("result-folder-btn").addEventListener("click", () => revealPath(lastRun?.output_dir, "results-status"));
+$("result-ai-btn").addEventListener("click", () => setActiveView("ai"));
+$("result-package-btn").addEventListener("click", () => setActiveView("reproducibility"));
 $("view-results-btn").addEventListener("click", async () => {
   setActiveView("results");
   await activateCompartmentMode("twin");
@@ -4099,6 +4220,7 @@ $("foundation-arena-results-browse-btn")?.addEventListener("click", async () => 
     foundationArenaResultFiles = (Array.isArray(selected) ? selected : [selected])
       .filter((path) => typeof path === "string" && path.trim());
     $("foundation-arena-results").value = foundationArenaResultFiles.join("; ");
+    refreshActionAvailability();
     setText(
       "foundation-status",
       foundationArenaResultFiles.length
@@ -4111,11 +4233,13 @@ $("foundation-arena-results-browse-btn")?.addEventListener("click", async () => 
 });
 
 $("foundation-arena-btn")?.addEventListener("click", async () => {
+  if (runBusy || researchBusy || aiBusy) return;
   if (!foundationArenaResultFiles.length) {
     setText("foundation-status", "Choose measured evaluation JSON files first. The app does not generate placeholder scores.");
     return;
   }
   setText("foundation-status", "Validating benchmark contracts and comparing supplied evidence...");
+  setResearchBusy(true);
   try {
     const result = await call("run_foundation_arena", {
       outputDir: "results/foundation_arena",
@@ -4129,10 +4253,13 @@ $("foundation-arena-btn")?.addEventListener("click", async () => {
     );
   } catch (error) {
     setText("foundation-status", `Evidence comparison failed: ${errorMessage(error)}`);
+  } finally {
+    setResearchBusy(false);
   }
 });
 
 $("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
+  if (runBusy || researchBusy || aiBusy) return;
   const source = $("foundation-glucofm-train-source").value.trim();
   const outputDir = $("foundation-glucofm-train-output").value.trim();
   if (!source || !outputDir) {
@@ -4140,6 +4267,7 @@ $("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
     return;
   }
   setText("foundation-status", "Pretraining the independent GlucoFM reproduction. This can take a long time; the UI remains responsive...");
+  setResearchBusy(true);
   try {
     const result = await call("pretrain_glucofm", {
       source,
@@ -4163,10 +4291,13 @@ $("foundation-glucofm-pretrain-btn")?.addEventListener("click", async () => {
     );
   } catch (error) {
     setText("foundation-status", `GlucoFM pretraining failed: ${errorMessage(error)}`);
+  } finally {
+    setResearchBusy(false);
   }
 });
 
 $("foundation-glucofm-btn")?.addEventListener("click", async () => {
+  if (runBusy || researchBusy || aiBusy) return;
   const csv = $("foundation-glucofm-csv").value.trim();
   const checkpoint = $("foundation-glucofm-checkpoint").value.trim();
   if (!csv || !checkpoint) {
@@ -4174,6 +4305,7 @@ $("foundation-glucofm-btn")?.addEventListener("click", async () => {
     return;
   }
   setText("foundation-status", "Extracting a checkpoint-backed 128D representation...");
+  setResearchBusy(true);
   try {
     const result = await call("extract_glucofm_embedding", {
       csv,
@@ -4193,9 +4325,14 @@ $("foundation-glucofm-btn")?.addEventListener("click", async () => {
     renderFoundationChart("embedding");
   } catch (error) {
     setText("foundation-status", `GlucoFM embedding failed: ${errorMessage(error)}`);
+  } finally {
+    setResearchBusy(false);
   }
 });
 
+for (const id of ["foundation-glucofm-train-source", "foundation-glucofm-train-output", "foundation-glucofm-csv", "foundation-glucofm-checkpoint"]) {
+  $(id).addEventListener("input", refreshActionAvailability);
+}
 initializeNativeInteractionPolicy();
 initializeFormState();
 initializeMoleculeViewer();

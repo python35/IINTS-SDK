@@ -13,9 +13,7 @@
 // simulator already computed (compartmentTimeline.compartments/fluxes); this
 // file only interpolates, normalizes, and looks values up for rendering.
 
-// Hovorka v1 scope only (see the implementation plan): Bergman's `periphery`
-// site has no dedicated pool compartment the way Hovorka's Q2 does, so a
-// second, model-aware layout is a later iteration, not this one.
+// Both supported model families are resolved through their recorded schema.
 export const HYPO_THRESHOLD_MGDL = 70;
 
 // Per-organ shape/color/role in the illustration (index.html's
@@ -35,7 +33,7 @@ export const ORGAN_LAYOUT = [
     kind: "compartment-group",
     site: "gut",
     elementId: "twin-organ-gut",
-    color: "#ff9f43", // orange
+    color: "#956239", // orange
   },
   {
     id: "subcutaneous",
@@ -43,7 +41,7 @@ export const ORGAN_LAYOUT = [
     kind: "compartment-group",
     site: "subcutaneous",
     elementId: "twin-organ-subcutaneous",
-    color: "#8b5cf6", // purple/blue
+    color: "#5e6990", // purple/blue
   },
   {
     id: "plasma",
@@ -51,7 +49,7 @@ export const ORGAN_LAYOUT = [
     kind: "compartment-group",
     site: "plasma",
     elementId: "twin-organ-plasma",
-    color: "#38bdf8", // cyan
+    color: "#376785", // cyan
   },
   {
     id: "periphery",
@@ -59,7 +57,7 @@ export const ORGAN_LAYOUT = [
     kind: "compartment-group",
     site: "periphery",
     elementId: "twin-organ-periphery",
-    color: "#22c55e", // green
+    color: "#477164", // green
   },
   {
     id: "liver",
@@ -67,12 +65,12 @@ export const ORGAN_LAYOUT = [
     kind: "flux-proxy",
     boundFluxKey: "endogenous_production",
     elementId: "twin-organ-liver",
-    color: "#ef4444", // red
+    color: "#98574f", // red
   },
 ];
 
 // The fixed, alarm-state red for the vascular organ during hypoglycemia,
-// kept visually distinct from the liver's steady red (#ef4444 above) so the
+// kept visually distinct from the liver's steady red (#98574f above) so the
 // two don't read as the same signal when both are on screen at once.
 export const HYPO_VASCULAR_COLOR = "#dc2626";
 
@@ -199,3 +197,29 @@ export function lookupEquation(schema, fluxKey) {
 export const LIVER_CARD_CAPTION =
   "Endogenous glucose production is an external source flux in this model, " +
   "not a stored compartment -- this backend does not track hepatic glycogen mass.";
+
+/** Select explicit model keys only; a missing channel is never a zero. */
+export function resolvePhysiologyBindings(schema) {
+  const fluxes = schema?.fluxes || [];
+  const pick = (...keys) => keys.find((key) => fluxes.some((f) => f.key === key && f.recorded !== false)) || null;
+  const insulinFlux = pick("insulin_appearance");
+  const source = fluxes.find((f) => f.key === insulinFlux)?.source;
+  const compartments = schema?.compartments || [];
+  const insulinDepot = compartments.find((c) => c.key === source && c.site === "subcutaneous")
+    || compartments.find((c) => c.site === "subcutaneous" && c.key === "S2")
+    || compartments.find((c) => c.site === "subcutaneous" && /insulin/i.test(c.label || ""));
+  return {
+    gut: pick("glucose_appearance"),
+    liver: pick("endogenous_production", "basal_production"),
+    periphery: pick("glucose_to_periphery", "glucose_uptake"),
+    subcutaneous: insulinDepot?.key || null,
+    insulinFlux,
+  };
+}
+
+/** Snap display values to a recorded sample; do not invent intermediate states. */
+export function nearestRecordedTime(times, minutes) {
+  const finite = (times || []).filter(Number.isFinite);
+  if (!finite.length) return NaN;
+  return finite.reduce((best, time) => Math.abs(time - minutes) < Math.abs(best - minutes) ? time : best, finite[0]);
+}

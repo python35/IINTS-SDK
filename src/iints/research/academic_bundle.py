@@ -201,7 +201,9 @@ def _iter_artifacts(run_dir: Path) -> list[Path]:
         relative = path.relative_to(run_dir)
         if any(part.startswith(".") for part in relative.parts):
             continue
-        if relative.name == "ro-crate-metadata.json":
+        if relative.name in {"ro-crate-metadata.json", "desktop_run_bundle.json"}:
+            continue
+        if path.suffix.lower() in {".pem", ".key", ".p12", ".pfx"} and "public" not in path.name.lower():
             continue
         artifacts.append(path)
     return artifacts

@@ -80,6 +80,7 @@ def _status(_args: argparse.Namespace) -> int:
             "python_version": sys.version.split()[0],
             "bridge": "iints_desktop.tauri_bridge",
             "bridge_api_version": DESKTOP_BRIDGE_API_VERSION,
+            "features": ["automatic_run_bundle"],
             "research_only": True,
             "medical_device": False,
         }
@@ -472,7 +473,7 @@ def _run(args: argparse.Namespace) -> int:
         if cancel_path is not None and cancel_path.exists():
             raise RuntimeError("Workflow cancelled by the desktop user.")
         duration_value = max(1, int(duration))
-        progress = min(99.0, max(0.0, float(step) / float(duration_value) * 100.0))
+        progress = min(80.0, max(0.0, float(step) / float(duration_value) * 80.0))
         _write_progress(
             progress_path,
             {
@@ -490,6 +491,19 @@ def _run(args: argparse.Namespace) -> int:
         desktop_preset_key=args.workflow_key,
         seed=int(args.seed),
         step_callback=step_callback,
+    )
+    from iints_desktop.run_bundle import prepare_run_bundle
+
+    bundle = prepare_run_bundle(
+        result,
+        auto_prepare=not getattr(args, "no_auto_prepare", False),
+        ai_review=getattr(args, "ai_review", False),
+        ai_model=getattr(args, "ai_model", "ministral-3:8b"),
+        ai_host=getattr(args, "ai_host", "http://127.0.0.1:11434"),
+        progress=lambda phase, percent, message: _write_progress(
+            progress_path, {"phase": phase, "progress_percent": percent, "message": message}
+        ),
+        cancelled=lambda: cancel_path is not None and cancel_path.exists(),
     )
     _write_progress(
         progress_path,
@@ -510,11 +524,14 @@ def _run(args: argparse.Namespace) -> int:
             "report_pdf": result.report_pdf,
             "config_path": result.config_path,
             "summary": result.summary,
+            "bundle": bundle,
         }
     )
 
 
 def _preview(args: argparse.Namespace) -> int:
+    from iints_desktop.run_bundle import load_run_bundle
+
     preview = load_results_preview(Path(args.csv), max_rows=int(args.max_rows))
     return _ok(
         {
@@ -524,6 +541,7 @@ def _preview(args: argparse.Namespace) -> int:
             "rows": preview.rows,
             "metrics": preview.metrics,
             "graph_path": preview.graph_path,
+            "bundle": load_run_bundle(preview.csv_path),
         }
     )
 
@@ -881,6 +899,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--seed", type=int, default=42)
     run.add_argument("--progress-file", default=None)
     run.add_argument("--cancel-file", default=None)
+    run.add_argument("--no-auto-prepare", action="store_true")
+    run.add_argument("--ai-review", action="store_true")
+    run.add_argument("--ai-model", default="ministral-3:8b")
+    run.add_argument("--ai-host", default="http://127.0.0.1:11434")
     run.set_defaults(func=_run)
 
     preview = subcommands.add_parser("preview")

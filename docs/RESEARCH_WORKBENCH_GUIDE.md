@@ -6,7 +6,7 @@ The IINTS-AF Research Workbench is the native desktop interface for the Python S
     IINTS-AF is research and education software. It is not a medical device and must not be used for diagnosis, insulin dosing, treatment decisions, or real-time patient care.
 
 !!! info "About the screenshots"
-    The screenshots below use a labelled documentation fixture. The values illustrate the interface only; they are not study results or validation evidence.
+    Screenshots in the automatic-workflow section were captured from the native macOS app during a real **simulated** booth protocol. Other screenshots use labelled documentation fixtures. Neither is clinical validation evidence. The automatic workflow requires a Python engine advertising `automatic_run_bundle`; update both components if these options are unavailable.
 
 ## What The App Is
 
@@ -79,7 +79,7 @@ Use the left navigation in this order:
 1. **Overview** — verify the local engine and optional tools.
 2. **Run protocols** — choose a protocol, output folder, and deterministic seed.
 3. **Inspect results** — review metrics, the glucose trace, and CSV rows.
-4. **Reproducibility** — create checksums, metadata, and an audit package.
+4. **Reproducibility** — inspect the automatically created package; add authorship and licence details if appropriate.
 5. **Local AI review** — optionally ask Ollama to summarize the loaded result.
 6. **Foundation AI & Visualizer** — pretrain or inspect the independent GlucoFM-method reproduction.
 7. **Scientific Portfolio** — assemble only the local evidence files that actually exist.
@@ -89,7 +89,7 @@ Use the left navigation in this order:
 
 ## 1. Check The Environment
 
-![IINTS-AF overview showing engine readiness and software versions](assets/workbench/01-overview.png)
+![Native research workspace with recent experiments](assets/workbench/automatic/01-workspace.png)
 
 Select **Run diagnostics** before a new experiment. A normal ready environment shows:
 
@@ -111,15 +111,83 @@ python -c "import iints; print(iints.__version__)"
 
 ## 2. Run A Protocol
 
-![Protocol selection, deterministic seed, output folder, and run history](assets/workbench/02-run-protocol.png)
+![Native protocol selection and automatic preparation options](assets/workbench/automatic/02-protocol.png)
 
 1. Select one protocol in the left panel.
 2. Select **Choose folder...** and choose an output location you can archive later.
 3. Record the seed. The default `42` is suitable for a reproducible first run.
-4. Select **Run selected protocol**.
-5. Wait until the status field reports completion or a recorded error.
+4. Leave **Prepare data checks and reproducibility files** enabled. Add **local AI review** only if you want it.
+5. Select **Run and prepare results**. The results page opens automatically after preparation.
+6. Review the per-stage status. An optional step can fail without discarding the successful simulation.
 
 Do not compare runs unless their protocol, SDK version, patient profile, time step, and seed policy are recorded.
+
+### Automatic preparation and reopening
+
+Every run receives a new timestamped directory; repeating a protocol does not overwrite the previous experiment.
+The standard flow prepares the following from the actual simulation output:
+
+| Step | Output | What it means |
+| --- | --- | --- |
+| Simulation | CSV, PDF and run configuration | The SDK computes the trajectory; the UI does not invent it. |
+| Result review | Glucose figure and `desktop_metrics.json` | Metrics use the full CSV, not only the rows displayed in the table. |
+| Data contract | Signed MDMP certificate, report and public key | A full-file schema/completeness check, not clinical validation. |
+| Optional local AI | `local_ai_review.md` and JSON | Advisory interpretation; may fail or be filtered without invalidating the simulation. |
+| Research record | `ro-crate-metadata.json`, `academic_audit.json`, `ACADEMIC_BUNDLE.md` | Checksums and provenance; authorship and licence may still need review. |
+
+![Automatically prepared run with its primary files and summary](assets/workbench/automatic/03-results.png)
+
+The most-used files are shown first. Expand **Data checks and supporting files** for certificates,
+configuration and metadata. Expand **All metrics and column information** for technical details.
+Use **Open latest result** on Overview, or a history entry, to reopen an experiment without rerunning it.
+Changing the output folder reloads its own history. Changing a CSV clears the old review context;
+previously prepared checks are not restored if the file's SHA-256 has changed.
+
+`OPEN_FIRST.md` is the run's entry point outside the app. `desktop_run_bundle.json` records final
+preparation status and paths, including warnings. Files remain on disk if an optional exporter fails.
+A saved intermediate preparation state is marked as interrupted rather than presented as complete.
+
+The signing private key stays in `~/.iints-af/keys/mdmp`, outside the shareable run folder.
+Only the public verification key accompanies the certificate. Review files and data permissions before sharing.
+
+![Automatically prepared reproducibility package](assets/workbench/automatic/04-reproducibility.png)
+
+### Recorded physiology map
+
+Use **Inspect results → Compartment model → Physiology map** for a compact pathway overview.
+The adjacent **Diagram** tab retains the detailed state/flux schematic.
+
+![Model-aware pathway map with signed recorded rates](assets/workbench/automatic/06-physiology-map.png)
+
+This is **not a 3D anatomical reconstruction**. It presents selected relationships from the loaded model:
+
+- **Plasma glucose** is a concentration; the box is not a heart model.
+- **Endogenous production** uses the model's actual recorded EGP term, including Bergman's `basal_production`. It is not stored liver glycogen.
+- **Meal absorption** shows the recorded glucose-appearance rate with its source units.
+- **Subcutaneous insulin** shows an identified insulin depot, not a glucagon depot or total insulin on board.
+- **Glucose disposition** distinguishes Bergman's lumped disappearance term from peripheral exchange when the loaded schema provides it. It does not invent a separate muscle mass.
+
+Select a box to inspect its recorded states or equation. The explanation appears **below** the map,
+not on top of other values. Expand **All recorded flow values at this time** for the complete recorded list.
+The overview intentionally omits some pathways; it is not a complete mass-balance diagram.
+
+Values snap to a recorded sample and show its time/index. Playback moves the time cursor only;
+there are no decorative flow particles. Arrows reverse for negative signed rates, have no arrowhead
+at zero, and disappear for unrecorded channels. Width is constant and does not compare incompatible units.
+A value inside 70–180 mg/dL is labelled **in range**, not **stable**; a single value cannot establish stability.
+
+### Optional local review
+
+The run preference uses the Ollama model/host selected in Settings. The automatic run step does not
+silently download models or start remote services. Use **Local AI review → Start local AI** to prepare
+Ollama first; this can involve a model download. Without a ready model, the run retains its artifacts
+and records a warning for that optional step.
+
+![A real local AI response with factuality filtering](assets/workbench/automatic/05-ai-review.png)
+
+Numeric-claim and advice filters may remove all narrative notes. In that case the app says so and
+keeps the deterministic metrics visible. A successful LLM request is not verification of physiological realism.
+In **Settings → After each run**, save automatic preparation/review defaults for future runs.
 
 ### Curated protocols
 
@@ -151,7 +219,7 @@ The exact equivalent command can differ by curated desktop protocol. Treat the g
 ![Results workspace with summary metrics and a glucose trajectory](assets/workbench/03-results.png)
 
 After a desktop protocol completes, the app loads its `results.csv` automatically. To inspect an
-existing run, select **Choose CSV...**, choose the local file, and then select **Load preview**.
+existing run, select **Choose CSV...**, choose the local file; its preview loads automatically. If you edit the path manually, select **Load preview**.
 Advanced users may still edit the displayed path directly.
 
 Review these parts together:
@@ -159,10 +227,10 @@ Review these parts together:
 - **Result status** — confirms the file and row count that were loaded.
 - **Summary metrics** — compact orientation metrics, not a complete analysis.
 - **Glucose trajectory** — a bounded visual preview with the configured 70–180 mg/dL reference band.
-- **Tabular preview** — the first bounded rows from the source CSV.
+- **Tabular preview** — a bounded selection of rows from the source CSV; it is not the full dataset.
 - **MDMP certificate** — data-contract checks for the selected CSV.
 
-The **Diagram** compartment view shows model states and declared fluxes from the run's own schema. The **Illustrated view** maps the same values to an anatomical teaching diagram. Its organ shapes are explanatory graphics; they are not spatial finite-element anatomy. The model label and playback range are taken from the loaded run, so a 180-minute Bergman run is not presented as a 24-hour Hovorka run.
+The **Diagram** view shows model states and declared fluxes. The **Physiology map** provides a model-aware overview of selected pathways with recorded values and a non-overlapping detail panel. See the map instructions above for its limits.
 
 The historical MDMP label `clinical_grade`, when encountered in an artifact, means that the strongest implemented **data-contract** checks passed. It does not mean that the physiology, cohort, model, or result has been clinically validated.
 

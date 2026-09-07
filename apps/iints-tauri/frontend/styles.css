@@ -363,6 +363,58 @@ h3 {
   padding: 16px 18px 24px;
 }
 
+.welcome-panel { grid-column: 1 / -1; }
+.welcome-body { display: grid; grid-template-columns: 1.15fr 1fr; gap: 32px; padding: 8px 0 20px; }
+.welcome-body h3 { font-size: 1.22rem; line-height: 1.4; max-width: 32ch; }
+.welcome-body p { color: var(--ink-muted); line-height: 1.65; max-width: 56ch; }
+.workflow-outline { margin: 0; padding-left: 25px; display: grid; gap: 14px; }
+.workflow-outline li { padding-left: 5px; color: var(--blue); }
+.workflow-outline strong, .workflow-outline span { display: block; }
+.workflow-outline strong { color: var(--ink); font-size: .9rem; }
+.workflow-outline span { color: var(--ink-muted); font-size: .83rem; margin-top: 3px; }
+.workspace-summary { color: var(--ink-muted); font-size: .81rem; border-top: 1px solid var(--line); padding-top: 14px; overflow-wrap: anywhere; }
+.recent-run { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.recent-run:last-child { border-bottom: 0; }
+.recent-run strong, .recent-run span { display: block; }
+.recent-run strong { font-size: .9rem; }
+.recent-run span { color: var(--ink-muted); font-size: .79rem; margin-top: 5px; }
+.recent-run button { flex-shrink: 0; }
+.selected-protocol-summary { padding: 12px; background: var(--surface-muted); border-left: 3px solid var(--blue); font-size: .87rem; line-height: 1.6; }
+.run-options, .settings-automation { border-top: 1px solid var(--line); margin: 18px 0; padding-top: 12px; }
+.run-options .checkbox-field { align-items: start; }
+.run-stages { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; list-style: none; margin: 0 0 18px; padding: 0; }
+.run-stages li { color: var(--ink-muted); border-top: 3px solid var(--line); padding-top: 7px; font-size: .73rem; }
+.run-stages .is-current { color: var(--blue); border-color: var(--blue); font-weight: 700; }
+.run-stages .is-complete { color: var(--success); border-color: var(--success); }
+.result-handover { margin: 0 -16px 16px; padding: 20px 20px 16px; border-bottom: 1px solid var(--line); }
+.handover-heading { display: flex; justify-content: space-between; gap: 18px; align-items: start; }
+.handover-heading h2 { font-size: 1.15rem; }
+#result-run-meta { margin: 6px 0 16px; font-size: .82rem; color: var(--ink-muted); overflow-wrap: anywhere; }
+.result-state { font-size: .79rem; font-weight: 650; padding: 5px 9px; background: var(--success-soft); color: var(--success); border: 1px solid #c4ddce; }
+.result-state.has-warning { background: var(--warning-soft); color: var(--warning); border-color: #ddcfae; }
+.result-stage-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 20px; margin-bottom: 16px; }
+.prepared-step { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: .79rem; }
+.prepared-step strong { font-weight: 550; }
+.prepared-step span { color: var(--success); text-transform: capitalize; }
+.prepared-step.warning span { color: var(--warning); }
+.prepared-step.skipped span { color: var(--ink-muted); }
+.prepared-step p { grid-column: 1 / -1; margin: 0; line-height: 1.5; color: var(--ink-muted); overflow-wrap: anywhere; }
+.artifact-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.artifact-actions button { font-size: .81rem; }
+.result-source-controls { margin: 10px 0 18px; border: 1px solid var(--line); padding: 0 12px 12px; }
+.result-source-controls:not([open]) { padding-bottom: 0; }
+.result-source-controls > summary { padding: 12px 0; color: var(--blue); cursor: pointer; font-size: .82rem; }
+.result-source-controls .panel-heading { margin-top: 0; }
+.research-jump { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.research-jump button { font-size: .8rem; background: transparent; }
+[id^="lab-"] { scroll-margin-top: 130px; }
+@media (max-width: 850px) {
+  .welcome-body { grid-template-columns: 1fr; gap: 18px; }
+  .workflow-outline { grid-template-columns: repeat(3, 1fr); gap: 18px; font-size: .8rem; }
+  .result-stage-list { grid-template-columns: 1fr; }
+  .handover-heading { flex-direction: column; gap: 0; margin-bottom: 12px; }
+}
+
 .panel {
   min-width: 0;
   padding: 0 16px 16px;
@@ -2121,3 +2173,22 @@ footer {
   color: var(--ink-muted);
   line-height: 1.45;
 }
+
+/* Technical values remain copyable without forcing the result grid wider. */
+.metric strong { overflow-wrap: anywhere; white-space: normal; }
+.secondary-details { margin: 10px 0; }
+.secondary-details > summary { color: var(--ink-muted); cursor: pointer; font-size: 12px; padding: 5px 0; }
+.secondary-details[open] > summary { margin-bottom: 8px; }
+
+/* The pathway map is schematic, bounded and legible; no anatomical scaling. */
+.digital-twin-canvas-wrap { overflow-x: auto; border: 1px solid var(--line); background: #fafbfc; }
+#digital-twin-illustration { min-width: 720px; height: auto; aspect-ratio: 840 / 520; background: #fafbfc; border: 0; border-radius: 0; overflow: visible; }
+.twin-organ text { stroke: none; fill: #263c48; pointer-events: none; }
+.twin-node-title { font-size: 13px; font-weight: 700; }
+.twin-node-value { font-size: 17px; font-family: monospace; font-weight: 600; }
+.twin-node-note { font-size: 10px; fill: #596b75; }
+.twin-state-text { font-size: 12px; font-weight: 650; fill: #263c48; }
+.twin-schema-text { font-size: 11px; fill: #596b75; }
+.digital-twin-card { position: static; max-width: none; margin: 12px; border-radius: 0; box-shadow: none; }
+.digital-twin-card code { color: #263c48; background: #f1f4f6; }
+.digital-twin-controls output { min-width: 160px; }

@@ -172,3 +172,61 @@ manual macOS/Windows/Linux first-run checklist for a milestone release
 ```
 
 Record any skipped item in the release notes. A green build proves that the checked software paths behaved as specified; it does not prove physiological or clinical validity.
+
+## Follow-up: automatic run handover and physiology map (2026-09-06)
+
+This check used the local macOS Tauri package with the repository Python engine
+(SDK 1.5.36, Python 3.13.9). It did not verify an updated managed Python installation
+or a downloaded, signed release.
+
+### Changes verified
+
+- A protocol run creates a unique directory and opens its results automatically.
+- Full-file metrics, the glucose figure, the data-contract check and reproducibility
+  package are prepared in sequence. Optional failures retain the simulation output.
+- Reopening the unchanged CSV restores the saved report links without rerunning it.
+  A CSV hash prevents attaching an old preparation record to changed data.
+- Run history clears on a directory change and ignores obsolete responses.
+- Primary metrics and files remain visible; technical metadata is collapsible.
+- Local AI remains opt-in. An actual Ollama review ran on the synthetic output;
+  the numerical guard rejected four unsupported lines. This verifies the guard
+  path, not the scientific quality of the model's interpretation.
+- Private MDMP signing keys stay outside the result directory. A local signature
+  is not an independent endorsement or clinical certification.
+- The Physiology map replaces the decorative torso. It uses recorded model fields,
+  units and sample times, identifies source/sink terms, and distinguishes missing
+  values from zero. The Bergman endogenous-production and uptake fields now map
+  correctly. A glucagon depot cannot be selected as the insulin depot.
+
+### Numerical and software checks
+
+The native booth meal-response run produced 37 samples over 180 minutes. At the
+last sample, glucose was 274.463 mg/dL, endogenous production 0.2352 mg/dL/min,
+meal appearance 2.26363 mg/dL/min and glucose disappearance 1.60665 mg/dL/min.
+These are a stress-scenario output, not a claim of good glucose control.
+A repeated seed-42 run matched all 84 non-latency CSV columns; the three measured
+execution-latency columns are expected to differ.
+
+The full Python suite passed 1,241 tests, with two skips. After the final bridge
+changes, 75 targeted desktop tests and the edited-module mypy check passed.
+Frontend checks cover missing channels, signed arrows, model-specific bindings,
+recorded-time selection and stale workflow responses. The Mac app was built and
+opened for native UI checks. Screenshots are included in the workbench guide.
+
+### Still required before a release
+
+- Windows and Linux packaged-app smoke and first-run checks.
+- macOS signing/notarization and clean-machine managed-engine installation checks.
+- Complete keyboard/screen-reader testing and broad narrow-window coverage.
+- Live verification of optional external tools and their failure/cancellation paths.
+- Independent model calibration and scientific validation; these UI and software
+  checks do not establish clinical accuracy.
+
+Final local checks also passed: Rust formatting and nine unit tests, the frontend
+check suite, and the strict MkDocs build. The final Physiology map screenshot
+shows the recorded plasma insulin value (28.14 mU/L at 180 minutes) separately
+from glucose. A smaller native window was inspected and then restored.
+
+The final build produced the local `.app` and it launched successfully. Updater
+archive signing then failed because `TAURI_SIGNING_PRIVATE_KEY` was not available.
+No signed updater or new public release was published during this review.

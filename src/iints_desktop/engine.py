@@ -4,9 +4,9 @@ import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from importlib import metadata
 from pathlib import Path
 from typing import Any, Callable
+from uuid import uuid4
 
 
 @dataclass(frozen=True)
@@ -225,7 +225,7 @@ def run_demo_preset(
     resolved_preset_name = preset_name or desktop_preset.preset_name
     preset = get_preset(resolved_preset_name)
     folder_name = _safe_slug(f"{desktop_preset.key}-{resolved_preset_name}")
-    target = base_output / folder_name
+    target = _new_run_directory(base_output, folder_name)
     outputs: dict[str, Any] = run_full(
         algorithm=ClinicalBaselineAlgorithm(),
         scenario=preset["scenario"],
@@ -319,7 +319,7 @@ def run_custom_preset(
 
     resolved_preset_name = custom_preset.get("name", "custom_scenario")
     folder_name = _safe_slug(f"custom-{resolved_preset_name}-{seed}")
-    target = base_output / folder_name
+    target = _new_run_directory(base_output, folder_name)
     outputs: dict[str, Any] = run_full(
         algorithm=ClinicalBaselineAlgorithm(),
         scenario=custom_preset.get("scenario", {}),
@@ -364,6 +364,14 @@ def run_custom_preset(
     except OSError:
         pass
     return result
+
+
+def _new_run_directory(base_output: Path, folder_name: str) -> Path:
+    """Never overwrite an earlier experiment, including runs with the same seed."""
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    target = base_output / f"{stamp}-{folder_name}-{uuid4().hex[:8]}"
+    target.mkdir(parents=True, exist_ok=False)
+    return target
 
 
 def _optional_path(value: object) -> Path | None:
@@ -447,8 +455,8 @@ def _optional_int(value: object) -> int | None:
 def get_desktop_environment(*, qt_available: bool) -> DesktopEnvironment:
     """Return lightweight runtime details for the desktop shell."""
 
-    try:
-        sdk_version = metadata.version("iints-sdk-python35")
-    except metadata.PackageNotFoundError:
-        sdk_version = "editable"
-    return DesktopEnvironment(sdk_version=sdk_version, qt_available=qt_available)
+    from iints import __version__
+
+    # Editable installs may retain older wheel metadata after a source update.
+    # Report the code actually used by the bridge, not that stale metadata.
+    return DesktopEnvironment(sdk_version=__version__, qt_available=qt_available)

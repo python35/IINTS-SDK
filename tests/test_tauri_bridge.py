@@ -327,7 +327,7 @@ def test_tauri_bridge_reads_run_history(tmp_path: Path) -> None:
 
 def test_tauri_bridge_run_writes_atomic_progress(tmp_path: Path, monkeypatch, capsys) -> None:
     from argparse import Namespace
-    from types import SimpleNamespace
+    from iints_desktop.engine import DesktopRunResult
 
     from iints_desktop import tauri_bridge
 
@@ -336,8 +336,8 @@ def test_tauri_bridge_run_writes_atomic_progress(tmp_path: Path, monkeypatch, ca
 
     def fake_run_demo_preset(*, step_callback, **_kwargs):
         step_callback(60, 120, 123.4)
-        assert json.loads(progress_file.read_text())["progress_percent"] == 50.0
-        return SimpleNamespace(
+        assert json.loads(progress_file.read_text())["progress_percent"] == 40.0
+        return DesktopRunResult(
             run_id="run-progress",
             workflow_title="Progress test",
             preset_name="baseline_t1d",
