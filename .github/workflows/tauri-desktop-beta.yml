@@ -298,17 +298,13 @@ jobs:
 
           This prerelease contains the native Rust/Tauri research workbench with a restrained text-only IINTS-AF identity, academic navigation, simulation workflows, results inspection, reproducibility controls, local Ollama review, MDMP evidence tools, and audited biology/research connectors.
 
-          Version 0.2.8 accompanies SDK v1.5.34. The Settings workspace now checks the installed desktop and Python SDK versions independently against their maintained release channels, uses semantic version comparison, caches successful checks, reports offline uncertainty honestly, and warns when active source code and installed package metadata disagree.
+          Version 0.2.14 accompanies SDK v1.5.37. Update the app and Python engine separately from Settings to enable all new features.
 
-          The command map and MDMP workflows were reviewed for accuracy. The workbench links to the version-specific latest beta when available, while Python updates use the stable PyPI release rather than silently switching to an unreleased source checkout.
+          Runs now prepare full-file metrics, a glucose figure, MDMP data checks and a reproducibility package automatically. Local Ollama review remains opt-in. Results reopen with their saved artifacts, and history refreshes when the output folder changes.
 
-          Result review now defaults to a bounded set of research-relevant columns, exposes deterministic summary metrics and threshold excursions, and clearly separates sampled safety states from intervention counts. Local Ollama output is screened against deterministic SDK facts; unsupported quantitative lines are suppressed, and CSV-based interpretation is constrained to limitations and next checks rather than treatment or causal claims.
+          The new Physiology map replaces the decorative torso with recorded model states and fluxes. It uses model-specific fields, correct units, signed arrows and recorded sample times. Missing data is never replaced by illustrative values. Technical result metadata is collapsible.
 
-          The Rust bridge now rejects incompatible Python bridge APIs, runs startup checks sequentially, uses a stable safe working directory, enables Python safe-path behavior, and enforces command-specific subprocess timeouts. These controls prevent stale SDK installations and unresponsive research subprocesses from freezing the workbench.
-
-          Paths across run output, result inspection, academic export, SBML, COPASI, CellML, and FMI workflows retain native file and folder selectors. Inputs remain editable for advanced use, while extension checks, required-field validation, consent-aware actions, disabled unavailable actions, explicit busy states, keyboard shortcuts, and responsive layouts reduce avoidable operator mistakes.
-
-          The Settings workspace stores non-sensitive local defaults, reports app and Python SDK versions independently, creates or repairs a private Python engine through a fixed visible command, links to the stable app installers, and provides direct access to the maintained user and installation guides.
+          The user guide includes actual Mac-app screenshots. This release has Python, Rust and frontend regression checks; software tests do not establish clinical validity.
 
           ## Downloads
 
@@ -345,6 +341,7 @@ jobs:
             --assets-dir release-assets \
             --version "$app_version" \
             --notes-file tauri-beta-release-notes.md \
+            --download-base-url "https://github.com/${{ github.repository }}/releases/download/${{ steps.release.outputs.tag }}" \
             --output release-assets/latest.json
 
       - name: Create or update requested GitHub prerelease

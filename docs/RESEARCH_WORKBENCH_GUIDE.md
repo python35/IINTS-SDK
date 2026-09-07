@@ -450,3 +450,17 @@ run-folder/
 ```
 
 The interface is a workbench, not the scientific authority. The Python SDK output, recorded configuration, deterministic checks, and source evidence remain the basis for interpretation.
+
+## Updating an installed Tauri workbench
+
+In **Settings**, check for an app update, then choose to install the offered
+version. The workbench downloads and verifies the signed update and restarts.
+You normally do not need to download another DMG or EXE manually. Finish running
+jobs first; Windows may display an installer or permissions prompt. On macOS,
+install the app in a writable location rather than running it inside the DMG.
+
+The **Python SDK is a separate update**: use **Install or update Python SDK** and
+then refresh versions. Beta 0.2.14 needs SDK 1.5.37 for automatic results
+preparation. Older engines retain the basic workflow and show an update hint.
+In-app updater signatures do not replace Apple notarization or Windows signing.
+The older PySide desktop app cannot update into Tauri through this mechanism.
