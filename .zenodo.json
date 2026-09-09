@@ -1,0 +1,29 @@
+{
+  "title": "IINTS-AF SDK",
+  "description": "<p>Python simulation framework for testing insulin-dosing algorithms against virtual patients under degraded data and device conditions. Includes ODE patient models (Bergman- and Hovorka-style), explicit CGM and insulin-pump device models, a machine-readable formula registry with evidence classes, a deterministic independent safety supervisor, and provenance-tracked experiment arms.</p><p><strong>Research and educational software. Not a medical device. Not clinically validated. Must not be used to determine a real insulin dose.</strong></p>",
+  "license": "Apache-2.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Bobbaers, Rune",
+      "affiliation": "Independent researcher, Belgium"
+    }
+  ],
+  "keywords": [
+    "diabetes technology",
+    "glucose simulation",
+    "artificial pancreas",
+    "digital twin",
+    "in-silico trial",
+    "research software",
+    "reproducible research"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/python35/IINTS-SDK",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}
