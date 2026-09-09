@@ -126,7 +126,9 @@ nav:
           - AI Safety Gates: LOCAL_AI_SAFETY_GATES.md
           - AI Red-Team Auditor: AI_RED_TEAM_AUDITOR.md
       - Evidence And Sources:
+          - SDK Bibliography: SDK_BIBLIOGRAPHY.md
           - Complete Source Library: SOURCE_LIBRARY.md
+          - Bibliography Verification Notes: SDK_BIBLIOGRAPHY_AUDIT.md
           - Evidence Base: EVIDENCE_BASE.md
           - OpenFDA Safety & Adverse Events: OPENFDA_SAFETY_BENCHMARK.md
       - Governance:

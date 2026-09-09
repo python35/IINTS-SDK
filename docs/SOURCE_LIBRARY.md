@@ -7,6 +7,7 @@ This page is the public source index for IINTS-AF. It collects the references us
 
 ## How To Use This Page
 
+- Use the [SDK bibliography](SDK_BIBLIOGRAPHY.md) for numbered references and a downloadable BibTeX file. Its [verification notes](SDK_BIBLIOGRAPHY_AUDIT.md) identify corrections and unresolved references in this older source index; prefer the corrected citations for submission.
 - Use this page when a reviewer asks: "Where did these assumptions come from?"
 - Use [Evidence Base](EVIDENCE_BASE.md) for the shorter explanation of how sources map to SDK components.
 - Use [Diabetes Research Datasets](DIABETES_RESEARCH_DATASETS.md) for dataset acquisition and local AI planning.
