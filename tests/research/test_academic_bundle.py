@@ -138,5 +138,9 @@ def test_repository_exposes_machine_readable_software_citation() -> None:
 
     assert "cff-version: 1.2.0" in citation
     assert 'title: "IINTS-AF SDK"' in citation
-    assert 'version: "1.5.34"' in citation
+    # Derived, not pinned: a hard-coded version here goes stale on every
+    # release and then reports a metadata error that does not exist.
+    from iints import __version__
+
+    assert f'version: "{__version__}"' in citation
     assert "https://github.com/python35/IINTS-SDK" in citation

@@ -1,7 +1,18 @@
 """Figures computed from the seed-fixed runs in jury_build/fresh/runs.
 
-Run with exec() inside the python kernel so the figure-style helpers are in
-scope. Every value drawn here is read from the run CSVs; nothing is typed in.
+NOT RUNNABLE AS A SCRIPT. This is a record of what was executed inside an
+interactive python kernel, kept so the figures in ../figures/ can be traced to
+the code that drew them. Five styling helpers were defined in that session and
+were never committed, so running this file raises NameError immediately:
+
+    apply_figure_style()   global matplotlib styling
+    focal_palette(...)     colour map that highlights one named series
+    panel_letter(...)      panel labels (a), (b), ...
+    end_of_line_labels(...) series labels at the right edge of an axis
+    goodness_arrow(...)    annotation arrow marking the desirable direction
+
+To make it reproducible, commit those helpers and import them here. Every value
+drawn is read from the run CSVs; nothing is typed in.
 """
 import pathlib
 
@@ -208,7 +219,7 @@ hypo_cmd = hypo["bolus_insulin_units"] + hypo["basal_insulin_units"]
 hypo_withheld = float((hypo_cmd - hypo["delivered_insulin_units"]).clip(lower=0).sum())
 dx2.bar(th, hypo["delivered_insulin_units"], width=0.06, color="#1f4e79", label="insulin delivered")
 dx2.set_title(f"The supervisor withheld {hypo_withheld:.1f} U of {float(hypo_cmd.sum()):.1f} U commanded "
-              f"and the run still reached {float(hypo["glucose_actual_mgdl"].min()):.0f} mg/dL")
+              f"and the run still reached {float(hypo['glucose_actual_mgdl'].min()):.0f} mg/dL")
 triggered = hypo[hypo["safety_triggered"].astype(bool)]
 dx2.plot(hours(triggered), [0] * len(triggered), marker="|", ls="none", ms=7,
          color=ALARM, label=f"safety supervisor acted ({len(triggered)} steps)")

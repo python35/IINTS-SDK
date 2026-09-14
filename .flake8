@@ -1,5 +1,7 @@
 [flake8]
-exclude = .venv,.venv*,.venv_ci_test,.mypy_cache,.pytest_cache,.uv-cache,.uv-python,build,dist,site,node_modules,target,IINTS-SDK,obsidian,src/iints/templates,local/mdmp-private,local/mdmp-private/.venv*,*/.venv*
+# docs/eucys/jury/scripts holds transcripts of an interactive kernel
+# session, not importable modules. See the docstring in make_figures.py.
+exclude = docs/eucys/jury/scripts,.venv,.venv*,.venv_ci_test,.mypy_cache,.pytest_cache,.uv-cache,.uv-python,build,dist,site,node_modules,target,IINTS-SDK,obsidian,src/iints/templates,local/mdmp-private,local/mdmp-private/.venv*,*/.venv*
 select = E9,F63,F7,F82
 show-source = True
 statistics = True

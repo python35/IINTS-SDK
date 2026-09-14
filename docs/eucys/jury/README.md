@@ -10,11 +10,16 @@ computed.
 
 ```bash
 python docs/eucys/jury/scripts/compute_runs.py   # five simulations, seed 42, raw traces + metrics
-python docs/eucys/jury/scripts/make_figures.py   # the four figures, computed from those traces
 python docs/eucys/jury/scripts/curate.py         # assembles the folder and writes MANIFEST.csv
 ```
 
-`compute_runs.py` and `make_figures.py` write into a `fresh/` working directory;
+`make_figures.py` is deliberately left out of the sequence above: it is a
+record of an interactive kernel session and depends on five styling helpers
+that were never committed, so it raises `NameError` if run directly. The
+figures in `figures/` were produced by that session. See the docstring in
+the script.
+
+`compute_runs.py` writes into a `fresh/` working directory;
 `curate.py` reads that plus files from the repository and copies the result to the
 destination named at the top of the script. The runs are seeded, so the metrics and the
 numbers printed on the figures reproduce exactly.
