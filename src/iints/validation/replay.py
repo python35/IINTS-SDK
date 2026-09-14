@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
@@ -73,13 +74,39 @@ def _stable_hash_dataframe(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _normalise_run_paths(value: Any) -> Any:
+    """Reduce absolute filesystem paths to their file name, recursively.
+
+    The safety report records where a run wrote its side artefacts, for example
+    ``run_quality.local_ai_review_json``. Every replay runs in its own temporary
+    directory, so that leaf differs between two otherwise identical replays.
+    The directory is a property of the invocation, not a simulation output, so
+    hashing it makes a bit-identical run look irreproducible. Keeping the file
+    name means a replay that stops producing an artefact is still detected.
+
+    Only the top level of ``NON_DETERMINISTIC_REPORT_KEYS`` is dropped outright;
+    this normalisation reaches nested values, which that set cannot.
+    """
+    if isinstance(value, dict):
+        return {key: _normalise_run_paths(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_normalise_run_paths(item) for item in value]
+    if isinstance(value, str) and os.path.isabs(value) and os.sep in value:
+        return os.path.basename(value)
+    return value
+
+
 def _stable_hash_report(
     safety_report: Dict[str, Any],
     *,
     ignore_keys: Optional[Iterable[str]] = None,
 ) -> str:
     ignore = set(ignore_keys or ())
-    payload = {key: value for key, value in safety_report.items() if key not in ignore}
+    payload = {
+        key: _normalise_run_paths(value)
+        for key, value in safety_report.items()
+        if key not in ignore
+    }
     encoded = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 

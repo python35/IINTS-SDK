@@ -103,3 +103,28 @@ def test_replay_check_fails_on_output_mismatch(monkeypatch) -> None:
         repeats=2,
     )
     assert result.passed is False
+
+
+def test_safety_hash_ignores_the_run_directory_but_not_the_file_name() -> None:
+    """A real replay writes each run into its own temporary directory.
+
+    The safety report records that location (run_quality.local_ai_review_json),
+    nested one level below the top-level ignore set, so two bit-identical runs
+    used to produce different safety hashes and `iints replay-check` reported
+    FAIL on a fully reproducible simulation. The directory must not enter the
+    hash; the file name must, so a run that stops emitting the artefact is
+    still caught.
+    """
+    from iints.validation.replay import _stable_hash_report
+
+    def report(directory: str, filename: str = "ai_review.json") -> Dict[str, Any]:
+        return {
+            "total_violations": 0,
+            "run_quality": {"score": 0.91, "local_ai_review_json": f"{directory}/{filename}"},
+        }
+
+    same_run_different_directory = _stable_hash_report(report("/tmp/iints_replay_0_abc"))
+    assert same_run_different_directory == _stable_hash_report(report("/tmp/iints_replay_1_xyz"))
+    assert same_run_different_directory != _stable_hash_report(
+        report("/tmp/iints_replay_0_abc", filename="other_review.json")
+    )
