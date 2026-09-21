@@ -1,5 +1,7 @@
 # Research Workbench User Guide
 
+**Liever eenvoudige uitleg in het Nederlands?** Lees de [app-wegwijzer: wat doet alles?](APP_WEGWIJZER_NL.md), met uitleg per scherm, knop en invoerveld.
+
 The IINTS-AF Research Workbench is the native desktop interface for the Python SDK. It helps you run a protocol, inspect its outputs, create reproducibility evidence, and request a local AI review without reimplementing scientific logic in the app.
 
 !!! warning "Research scope"
