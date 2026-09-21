@@ -140,7 +140,7 @@ def _prepare_ai_payloads(
     alert_counts: dict[str, int],
     sensor_exception_counts: dict[str, int],
 ) -> dict[str, dict[str, Any]]:
-    lowest_position = int(timeline["glucose"].idxmin())
+    lowest_position = int(timeline["glucose"].argmin())
     latest_position = len(timeline) - 1
 
     common = {

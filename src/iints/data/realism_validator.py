@@ -167,9 +167,12 @@ def _evaluate_meal_responses(
         if len(pre) < 2 or post.empty:
             continue
         baseline = float(pd.to_numeric(pre["glucose"], errors="coerce").median())
-        peak_idx = pd.to_numeric(post["glucose"], errors="coerce").idxmax()
-        peak_glucose = float(pd.to_numeric(pd.Series([post.loc[peak_idx, "glucose"]]), errors="coerce").iloc[0])
-        peak_time = float(pd.to_numeric(pd.Series([post.loc[peak_idx, "timestamp"]]), errors="coerce").iloc[0])
+        post_glucose = pd.to_numeric(post["glucose"], errors="coerce")
+        if not post_glucose.notna().any():
+            continue
+        peak_position = int(post_glucose.argmax())
+        peak_glucose = float(post_glucose.iloc[peak_position])
+        peak_time = float(pd.to_numeric(post["timestamp"], errors="coerce").iloc[peak_position])
         insulin_window = df[
             (df["timestamp"] >= meal_time - insulin_match_window_before_minutes)
             & (df["timestamp"] <= meal_time + insulin_match_window_after_minutes)

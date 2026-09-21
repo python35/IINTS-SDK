@@ -7,10 +7,29 @@ from typer.testing import CliRunner
 
 from iints.cli.cli import app
 from iints.data.importer import import_cgm_dataframe, load_demo_dataframe
-from iints.data.realism_validator import validate_realism_dataset
+from iints.data.realism_validator import _evaluate_meal_responses, validate_realism_dataset
 
 
 runner = CliRunner()
+
+
+def test_meal_peak_uses_position_with_duplicate_index_labels() -> None:
+    trace = pd.DataFrame(
+        {
+            "timestamp": [0, 10, 20, 40, 50],
+            "glucose": [100, 100, 110, 140, 130],
+            "carbs": [0, 0, 40, 0, 0],
+            "insulin": [0, 0, 0, 0, 0],
+        },
+        index=["sample"] * 5,
+    )
+    responses = _evaluate_meal_responses(trace, min_meal_grams=10)
+    assert len(responses) == 1
+    assert responses[0].peak_glucose_mgdl == 140
+    assert responses[0].peak_lag_minutes == 20
+
+    trace["glucose"] = [100, 100, 110, float("nan"), float("nan")]
+    assert _evaluate_meal_responses(trace, min_meal_grams=10) == []
 
 
 def _flat_meal_trace() -> pd.DataFrame:
