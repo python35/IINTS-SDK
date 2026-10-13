@@ -91,9 +91,24 @@ def _normalise_run_paths(value: Any) -> Any:
         return {key: _normalise_run_paths(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_normalise_run_paths(item) for item in value]
-    if isinstance(value, str) and os.path.isabs(value) and os.sep in value:
-        return os.path.basename(value)
+    if isinstance(value, str) and _is_run_path(value):
+        # Separator-agnostic on purpose: a report written on one platform is
+        # compared on another, and `os.sep` alone misses POSIX paths on Windows
+        # (and Windows paths on POSIX), which put the run directory back into
+        # the hash and made a bit-identical replay look irreproducible.
+        return value.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
     return value
+
+
+def _is_run_path(value: str) -> bool:
+    """Absolute path under either platform's convention, with a separator."""
+    if not value or len(value) > 4096:
+        return False
+    if "/" not in value and "\\" not in value:
+        return False
+    if value[0] in "/\\":
+        return True
+    return len(value) > 2 and value[1] == ":" and value[2] in "/\\" and value[0].isalpha()
 
 
 def _stable_hash_report(

@@ -71,8 +71,13 @@ def _write_fmu(path: Path, *, unsafe_member: str | None = None) -> None:
 def test_external_engine_runner_bounds_output_before_loading_it_into_memory() -> None:
     command = [sys.executable, "-c", "import sys; sys.stdout.write('x' * (6 * 1024 * 1024))"]
 
-    with pytest.raises(RuntimeError, match="5 MiB"):
-        run_external_command(command, timeout_seconds=10)
+    try:
+        result = run_external_command(command, timeout_seconds=10)
+    except RuntimeError as exc:
+        assert "5 MiB" in str(exc)
+    else:
+        pytest.fail(f"Output limit did not trigger: exit={result.returncode}, "
+                    f"stdout={len(result.stdout)}, stderr={result.stderr[:1000]!r}")
 
 
 def test_copasi_inspection_finds_sensitivity_fitting_and_external_data(tmp_path: Path) -> None:

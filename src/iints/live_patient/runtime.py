@@ -1031,6 +1031,31 @@ class LivePatientDaemon:
 def is_process_alive(pid: int | None) -> bool:
     if pid is None or pid <= 0:
         return False
+    if os.name == "nt":
+        # Signal 0 is CTRL_C_EVENT on Windows, not a harmless existence probe.
+        # It can interrupt every process sharing the console, including later
+        # subprocess tests. Query the exit code without sending any signal.
+        import ctypes
+        from ctypes import wintypes
+
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        get_exit_code = kernel.GetExitCodeProcess
+        get_exit_code.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        get_exit_code.restype = wintypes.BOOL
+        close_handle = kernel.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+        handle = open_process(0x1000, False, int(pid))  # QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ctypes.get_last_error() == 5  # access denied implies existence
+        try:
+            exit_code = wintypes.DWORD()
+            return bool(get_exit_code(handle, ctypes.byref(exit_code))) and exit_code.value == 259
+        finally:
+            close_handle(handle)
     try:
         os.kill(int(pid), 0)
     except OSError:

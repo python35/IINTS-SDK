@@ -153,6 +153,8 @@ class HovorkaPatientModel:
         carb_absorption_duration_minutes: float = 240.0,
         max_glucose_rate_mgdl_per_min: float = 3.0,
         hovorka_params: Optional[HovorkaParameters] = None,
+        insulin_sensitivity_scale: Optional[float] = None,
+        min_glucose_mgdl: float = 0.0,
     ) -> None:
         values = {
             "basal_insulin_rate": float(basal_insulin_rate),
@@ -241,6 +243,9 @@ class HovorkaPatientModel:
         self.dawn_end_hour = values["dawn_end_hour"]
         self.carb_absorption_duration_minutes = values["carb_absorption_duration_minutes"]
         self.max_glucose_rate_mgdl_per_min = values["max_glucose_rate_mgdl_per_min"]
+        self.min_glucose_mgdl = float(min_glucose_mgdl)
+        if not np.isfinite(self.min_glucose_mgdl) or self.min_glucose_mgdl < 0.0:
+            raise ValueError("min_glucose_mgdl must be finite and non-negative")
 
         self.params = hovorka_params if hovorka_params else HovorkaParameters(
             t_max_G=1.0 / max(float(glucose_absorption_rate), 1e-6)
@@ -251,9 +256,23 @@ class HovorkaPatientModel:
             if basal_glucose_target is None
             else float(basal_glucose_target)
         )
-        self._basal_parameter_scale = self._derive_basal_parameter_scale(
-            basal_reference
-        )
+        if insulin_sensitivity_scale is None:
+            # Default (legacy) behaviour: fit the published insulin
+            # sensitivities to whatever basal rate was configured. This makes
+            # the fasting state an equilibrium, but it also means the basal
+            # rate has no stationary effect and the configured ISF shifts the
+            # equilibrium instead of the insulin response. Use
+            # ``HovorkaPatientModel.from_clinical_targets`` (or
+            # ``patient.calibration.calibrate_hovorka``) for a patient in which
+            # the ISF is real and the basal rate is derived from physiology.
+            self._basal_parameter_scale = self._derive_basal_parameter_scale(
+                basal_reference
+            )
+        else:
+            scale = float(insulin_sensitivity_scale)
+            if not np.isfinite(scale) or scale <= 0.0:
+                raise ValueError("insulin_sensitivity_scale must be positive")
+            self._basal_parameter_scale = scale
 
         # Stress and Exercise book-keeping
         self.is_exercising = False
@@ -273,6 +292,125 @@ class HovorkaPatientModel:
         self._last_unsupported_event: Optional[Dict[str, Any]] = None
 
         self.reset()
+
+    @classmethod
+    def from_clinical_targets(
+        cls,
+        insulin_sensitivity: float = 50.0,
+        target_glucose_mgdl: float = 120.0,
+        *,
+        carb_factor: Optional[float] = 10.0,
+        auto_carb_factor: bool = False,
+        **model_kwargs: Any,
+    ) -> "HovorkaPatientModel":
+        """Build a patient whose clinical knobs are physiologically true.
+
+        The default constructor takes the basal rate as an input and rescales
+        insulin sensitivity to match it. That ordering makes the basal rate
+        unobservable and lets the configured ISF break the fasting
+        equilibrium. This constructor reverses it: insulin sensitivity is
+        solved so that a one-unit correction really lowers glucose by
+        ``insulin_sensitivity`` mg/dL, and the basal rate follows from the
+        fasting balance at ``target_glucose_mgdl``.
+
+        The calibration runs short simulations, so this is noticeably slower
+        than the plain constructor. The resulting
+        ``patient.calibration`` object can be stored and replayed through
+        ``HovorkaCalibration.build()`` without re-solving.
+        """
+
+        from .calibration import calibrate_carb_factor, calibrate_hovorka
+
+        calibration = calibrate_hovorka(
+            insulin_sensitivity=insulin_sensitivity,
+            target_glucose_mgdl=target_glucose_mgdl,
+            carb_factor=carb_factor,
+            extra_model_kwargs=model_kwargs or None,
+        )
+        if auto_carb_factor:
+            ratio = calibrate_carb_factor(calibration)
+            model = calibration.build(carb_factor=ratio)
+        else:
+            model = calibration.build()
+        model.calibration = calibration
+        return model
+
+    def _construction_kwargs(self) -> Dict[str, Any]:
+        """Arguments that rebuild an identical patient (used for auditing)."""
+        return {
+            "basal_insulin_rate": self.basal_insulin_rate,
+            "insulin_sensitivity": self.insulin_sensitivity,
+            "carb_factor": self.carb_factor,
+            "initial_glucose": self.initial_glucose,
+            "basal_glucose_target": self.basal_glucose_target,
+            "glucose_decay_rate": self.glucose_decay_rate,
+            "glucose_absorption_rate": self.glucose_absorption_rate,
+            "insulin_action_duration": self.insulin_action_duration,
+            "insulin_peak_time": self.insulin_peak_time,
+            "meal_mismatch_epsilon": self.meal_mismatch_epsilon,
+            "dawn_phenomenon_strength": self.dawn_phenomenon_strength,
+            "dawn_insulin_resistance_fraction": self.dawn_insulin_resistance_fraction,
+            "dawn_start_hour": self.dawn_start_hour,
+            "dawn_end_hour": self.dawn_end_hour,
+            "molecular_affinity_scalar": self.molecular_affinity_scalar,
+            "muscle_sensitivity_scalar": self.muscle_sensitivity_scalar,
+            "liver_sensitivity_scalar": self.liver_sensitivity_scalar,
+            "carb_absorption_duration_minutes": self.carb_absorption_duration_minutes,
+            "max_glucose_rate_mgdl_per_min": self.max_glucose_rate_mgdl_per_min,
+            "hovorka_params": copy.deepcopy(self.params),
+            "insulin_sensitivity_scale": self._basal_parameter_scale,
+            "min_glucose_mgdl": self.min_glucose_mgdl,
+        }
+
+    def measure_clinical_parameters(
+        self,
+        *,
+        measurement_glucose_mgdl: float = 180.0,
+        fasting_hours: float = 24.0,
+        dt: float = 5.0,
+    ) -> Dict[str, float]:
+        """Report what this patient does, next to what it was configured with.
+
+        Runs short simulations on throwaway copies, so the caller's own state
+        is untouched. The realised ISF is a paired measurement (one run with a
+        one-unit bolus, one without), which removes any drift the patient would
+        have shown anyway.
+        """
+
+        from . import calibration as _calibration
+
+        base = self._construction_kwargs()
+
+        def at(glucose_mgdl: float):
+            kwargs = dict(base)
+            kwargs["initial_glucose"] = float(glucose_mgdl)
+            return lambda: HovorkaPatientModel(**kwargs)
+
+        basal = self.basal_insulin_rate
+        effective = (
+            self._basal_parameter_scale
+            * self._clinical_sensitivity_scale
+            * self.molecular_affinity_scalar
+        )
+        report: Dict[str, float] = {
+            "configured_isf_mgdl_per_u": float(self.insulin_sensitivity),
+            "realised_isf_mgdl_per_u": _calibration.measure_insulin_sensitivity_factor(
+                at(measurement_glucose_mgdl), basal, dt=dt),
+            "plasma_insulin_tmax_min": _calibration.measure_plasma_insulin_tmax(
+                at(measurement_glucose_mgdl), basal),
+            "configured_basal_u_per_h": float(basal),
+            "euglycaemic_basal_u_per_h": _calibration.hovorka_euglycaemic_basal_rate(
+                self.params,
+                float(self.basal_glucose_target or self.initial_glucose),
+                transport_scale=effective,
+                disposal_scale=effective * self.muscle_sensitivity_scalar,
+                egp_scale=effective * self.liver_sensitivity_scalar),
+            "insulin_sensitivity_scale": float(self._basal_parameter_scale),
+        }
+        drift = _calibration.measure_fasting_drift(
+            at(self.initial_glucose), basal, hours=fasting_hours, dt=dt)
+        report.update({f"fasting_{key}": value for key, value in drift.items()})
+        return report
 
     def _glucose_volume_dl(self) -> float:
         p = self.params
@@ -406,9 +544,11 @@ class HovorkaPatientModel:
                 current_glucose=self.current_glucose,
                 proposed_glucose=proposed_glucose,
             )
-        if proposed_glucose < 0.0:
+        floor = max(0.0, float(getattr(self, "min_glucose_mgdl", 0.0)))
+        if proposed_glucose < floor:
             raise PatientModelDomainError(
-                f"Hovorka ODE produced negative glucose: {proposed_glucose}",
+                f"Hovorka ODE produced glucose {proposed_glucose:.4f} mg/dL "
+                f"below its declared {floor:.1f} mg/dL domain",
                 current_glucose=self.current_glucose,
                 proposed_glucose=proposed_glucose,
             )
@@ -711,6 +851,7 @@ class HovorkaPatientModel:
     def get_state(self) -> Dict[str, Any]:
         return {
             "state_schema": "hovorka_iints_v3_19",
+            "insulin_sensitivity_scale": float(self._basal_parameter_scale),
             "ode_state": self._state.tolist(),
             "current_glucose": self.current_glucose,
             "insulin_on_board": self.insulin_on_board,
@@ -824,6 +965,14 @@ class HovorkaPatientModel:
             minimum=0.0,
             maximum=1.0,
         )
+        if "insulin_sensitivity_scale" in state:
+            # A calibrated patient carries its own sensitivity scale; without
+            # this the clone would silently fall back to the basal-fitted one.
+            self._basal_parameter_scale = validated_snapshot_scalar(
+                state["insulin_sensitivity_scale"],
+                name="insulin_sensitivity_scale",
+                minimum=1e-9,
+            )
         self._last_unsupported_event = state.get("last_unsupported_event")
 
     # ------------------------------------------------------------------

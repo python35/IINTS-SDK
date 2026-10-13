@@ -109,7 +109,11 @@ def test_sensor_fail_soft_rate_limits_toward_incoming_value():
     simulator.add_stress_event(StressEvent(start_time=5, event_type="sensor_error", value=200.0))
     simulator.add_stress_event(StressEvent(start_time=10, event_type="sensor_error", value=200.0))
 
-    results, _ = simulator.run_batch(duration_minutes=10)
+    # 15 minutes requested so the interval starting at t=10 is part of the run.
+    # Under the corrected time contract (D2) a row covers
+    # [time_minutes, interval_end_minutes), so a 10-minute run ends with the
+    # interval starting at t=5 and no longer carries a row at t=10.
+    results, _ = simulator.run_batch(duration_minutes=15)
 
     by_time = results.set_index("time_minutes")
     assert by_time.loc[5, "glucose_to_algo_mgdl"] == 140.0

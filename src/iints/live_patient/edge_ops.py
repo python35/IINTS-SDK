@@ -1045,7 +1045,7 @@ def export_edge_setup(
 
     long_study_template = root / "edge_long_study.yaml"
     long_study_template.write_text(
-        render_edge_long_study_config_template(),
+        render_edge_long_study_config_template(scratch_dir="/tmp/iints_edge_long_study"),
         encoding="utf-8",
     )
 

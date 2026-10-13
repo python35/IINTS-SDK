@@ -157,6 +157,9 @@ class BergmanPatientModel:
         stem_cell_engraftment_percent: float = 0.0,
         stem_cell_subq_fraction: float = 0.0,
         immune_rejection_rate: float = 0.0,
+        insulin_action_reference: str = "basal",
+        insulin_absorption_tmax_minutes: Optional[float] = None,
+        gastric_emptying_minutes: Optional[float] = None,
         **kwargs: Any,
     ) -> None:
         if kwargs:
@@ -243,6 +246,21 @@ class BergmanPatientModel:
         self.dawn_end_hour = values["dawn_end_hour"]
         self.carb_absorption_duration_minutes = values["carb_absorption_duration_minutes"]
         self.max_glucose_rate_mgdl_per_min = values["max_glucose_rate_mgdl_per_min"]
+        if insulin_action_reference not in {"basal", "plasma_ib"}:
+            raise ValueError(
+                "insulin_action_reference must be 'basal' (legacy: the insulin "
+                "action reference follows the configured basal rate, so the "
+                "basal rate has no stationary effect) or 'plasma_ib' (the "
+                "reference is the physiological basal insulin params.Ib)")
+        self.insulin_action_reference = insulin_action_reference
+        if insulin_absorption_tmax_minutes is not None:
+            tmax = float(insulin_absorption_tmax_minutes)
+            if not np.isfinite(tmax) or tmax <= 0.0:
+                raise ValueError("insulin_absorption_tmax_minutes must be positive")
+        if gastric_emptying_minutes is not None:
+            emptying = float(gastric_emptying_minutes)
+            if not np.isfinite(emptying) or emptying <= 0.0:
+                raise ValueError("gastric_emptying_minutes must be positive")
 
         # Bergman ODE parameters
         gb_default = (
@@ -269,8 +287,19 @@ class BergmanPatientModel:
                 p1=0.028 * max(float(glucose_decay_rate), 1e-6) / 0.05,
                 p3=5.0e-6 * max(float(insulin_sensitivity), 1e-6) / 50.0,
                 Gb=gb_default,
-                k_a=1.0 / max(float(insulin_peak_time), 1.0),
-                tau_meal=max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0)),
+                # ``insulin_peak_time`` is an action-peak setting; using it as
+                # the subcutaneous absorption constant puts the plasma peak far
+                # past the 40-60 min reported for rapid-acting analogues. Pass
+                # ``insulin_absorption_tmax_minutes`` to set the absorption
+                # constant from an insulin PK source instead.
+                k_a=1.0 / max(float(
+                    insulin_absorption_tmax_minutes
+                    if insulin_absorption_tmax_minutes is not None
+                    else insulin_peak_time), 1.0),
+                tau_meal=(
+                    float(gastric_emptying_minutes)
+                    if gastric_emptying_minutes is not None
+                    else max(45.0, min(float(carb_absorption_duration_minutes) / 3.0, 100.0))),
                 k_abs=float(glucose_absorption_rate),
                 stem_cell_engraftment_percent=stem_cell_engraftment_percent,
                 stem_cell_subq_fraction=stem_cell_subq_fraction,
@@ -307,7 +336,7 @@ class BergmanPatientModel:
         self._state = np.array([
             initial_glucose,       # 0: G  (mg/dL)
             0.0,                   # 1: X  (1/min)
-            self._reference_insulin_mU_L,  # 2: I  (mU/L)
+            self._basal_plasma_insulin_mU_L,  # 2: I  (mU/L)
             0.0,                   # 3: Q_sto1 (mg) - Solid Stomach
             0.0,                   # 4: Q_sto2 (mg) - Liquid Stomach
             0.0,                   # 5: Q_gut (mg)  - Intestine
@@ -332,11 +361,19 @@ class BergmanPatientModel:
         )
         insulin_volume_l = p.Vi * p.body_weight_kg
         if self._basal_input_mU_per_min > 0.0:
-            self._reference_insulin_mU_L = self._basal_input_mU_per_min / max(
+            self._basal_plasma_insulin_mU_L = self._basal_input_mU_per_min / max(
                 insulin_volume_l * p.n, 1e-9
             )
         else:
+            self._basal_plasma_insulin_mU_L = max(float(p.Ib), 0.0)
+        # The reference subtracted in dX/dt. In the legacy 'basal' mode it
+        # tracks the configured basal rate, which cancels the basal rate out of
+        # the steady state entirely; 'plasma_ib' keeps it at the physiological
+        # basal insulin so that changing the basal rate changes fasting glucose.
+        if getattr(self, "insulin_action_reference", "basal") == "plasma_ib":
             self._reference_insulin_mU_L = max(float(p.Ib), 0.0)
+        else:
+            self._reference_insulin_mU_L = self._basal_plasma_insulin_mU_L
         self._basal_depot_mU = self._basal_input_mU_per_min / max(p.k_a, 1e-9)
 
     def _guard_glucose_transition(self, proposed_glucose: float, time_step: float) -> float:
@@ -382,7 +419,7 @@ class BergmanPatientModel:
         self._state = np.array([
             self.initial_glucose,
             0.0,
-            self._reference_insulin_mU_L,
+            self._basal_plasma_insulin_mU_L,
             0.0,
             0.0,
             0.0,

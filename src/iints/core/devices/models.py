@@ -559,8 +559,18 @@ class PumpModel:
             status = "clamped"
             reason = "negative_request"
 
-        if self.max_units_per_step is not None and delivered > self.max_units_per_step:
-            delivered = self.max_units_per_step
+        # D4 (delivery contract): a cap that is not a whole number of
+        # quantisation steps used to be applied after quantisation, so a capped
+        # dose could land on half a step - a dose the pump cannot physically
+        # produce. The effective ceiling is therefore floored onto the step
+        # grid. The hard cap is never exceeded; it can only become stricter.
+        delivery_ceiling = self.max_units_per_step
+        if delivery_ceiling is not None and self.quantization_units is not None:
+            whole_steps = np.floor((delivery_ceiling + 1e-12) / self.quantization_units)
+            delivery_ceiling = float(max(0.0, whole_steps) * self.quantization_units)
+
+        if delivery_ceiling is not None and delivered > delivery_ceiling:
+            delivered = delivery_ceiling
             status = "capped"
             reason = f"max_units_per_step {self.max_units_per_step:.2f}"
 
@@ -600,8 +610,11 @@ class PumpModel:
             status = "delivery_interruption"
             reason = "configured_dropout"
 
-        if self.max_units_per_step is not None:
-            delivered = min(delivered, self.max_units_per_step)
+        if delivery_ceiling is not None and delivered > delivery_ceiling:
+            delivered = delivery_ceiling
+            if status == "ok":
+                status = "capped"
+                reason = f"max_units_per_step {self.max_units_per_step:.2f}"
 
         return PumpDelivery(delivered_units=delivered, status=status, reason=reason)
 

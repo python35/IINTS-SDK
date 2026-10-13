@@ -7,6 +7,7 @@ import math
 import platform
 import shutil
 import tarfile
+import tempfile
 import time
 import zipfile
 from dataclasses import dataclass
@@ -27,6 +28,10 @@ from iints.live_patient.runtime import (
 )
 from iints.utils.run_io import write_json
 from iints.validation import compute_run_metrics
+
+# A hard-coded "/tmp" is not a path on Windows; tempfile resolves the
+# platform's own scratch location.
+DEFAULT_SCRATCH_DIR = str(Path(tempfile.gettempdir()) / "iints_edge_long_study")
 
 WEEKDAY_ORDER: tuple[str, ...] = (
     "monday",
@@ -73,7 +78,7 @@ class EdgeLongStudyConfig:
     week_schedule: dict[str, str]
     seeds: tuple[int, ...]
     output_dir: str = "/media/pi/usb_ssd/results/long_study"
-    scratch_dir: str = "/tmp/iints_edge_long_study"
+    scratch_dir: str = DEFAULT_SCRATCH_DIR
     snapshot_interval_hours: int = 24
     patient_config: str = "default_patient"
     patient_model_type: str = "auto"
@@ -153,7 +158,7 @@ class EdgeLongStudyExecutionError(RuntimeError):
 def render_edge_long_study_config_template(
     *,
     output_dir: str = "/media/pi/usb_ssd/results/long_study",
-    scratch_dir: str = "/tmp/iints_edge_long_study",
+    scratch_dir: str = DEFAULT_SCRATCH_DIR,
     algorithms: list[str] | None = None,
 ) -> str:
     payload = {
@@ -249,7 +254,7 @@ def load_edge_long_study_config(config_path: Path) -> EdgeLongStudyConfig:
     if not output_dir:
         raise LongStudyConfigError("`output_dir` must be a non-empty path.")
 
-    scratch_dir = str(payload.get("scratch_dir", "/tmp/iints_edge_long_study") or "/tmp/iints_edge_long_study").strip()
+    scratch_dir = str(payload.get("scratch_dir", DEFAULT_SCRATCH_DIR) or DEFAULT_SCRATCH_DIR).strip()
     if not scratch_dir:
         raise LongStudyConfigError("`scratch_dir` must be a non-empty path.")
 

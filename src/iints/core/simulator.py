@@ -163,6 +163,7 @@ class Simulator:
         self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
         self._critical_low_minutes = 0
         self._current_time = 0
+        self._endpoint_time = 0.0
         self._resume_state = False
         self._termination_info: Optional[Dict[str, Any]] = None
         self._ratio_overrides: List[Dict[str, Any]] = []
@@ -914,6 +915,7 @@ class Simulator:
             self._predictor_history = []
             self._critical_low_minutes = 0
             self._current_time = 0
+            self._endpoint_time = 0.0
             self._termination_info = None
             self._ratio_overrides = []
             self._base_ratio_state = self.patient_model.get_ratio_state()
@@ -939,8 +941,16 @@ class Simulator:
 
         logger.debug("Starting live simulation loop.")
 
-        while current_time <= duration_minutes:
+        while current_time < duration_minutes:
             self._current_time = current_time
+            # D2 (time contract): the loop used to run while current_time was
+            # <= duration_minutes, so a 120-minute request integrated the
+            # patient to 125 minutes and could book one extra interval of
+            # insulin. Rows now describe the half-open interval
+            # [time_minutes, interval_end_minutes) and the integrated horizon
+            # equals the requested duration exactly. A final partial interval
+            # is shortened instead of overshooting.
+            step_minutes = float(min(self.time_step, duration_minutes - current_time))
             if self.enable_profiling:
                 step_start_time = time.perf_counter()
             patient_carb_absorbed_this_step = 0.0
@@ -1115,7 +1125,7 @@ class Simulator:
             # --- Algorithm Input ---
             algo_input = AlgorithmInput(
                 current_glucose=glucose_to_algorithm,
-                time_step=self.time_step,
+                time_step=step_minutes,
                 insulin_on_board=self.patient_model.insulin_on_board,
                 carb_intake=algo_carb_intake_this_step, # Use algo's perspective of carbs
                 carbs_on_board=self.patient_model.carbs_on_board,
@@ -1154,7 +1164,7 @@ class Simulator:
             start_perf_time = time.perf_counter()
             proposed_basal_units = float(insulin_output.get("basal_insulin", 0.0))
             basal_limit_u_per_hr = effective_basal * self.safety_config.max_basal_multiplier
-            basal_limit_units = (basal_limit_u_per_hr / 60.0) * float(self.time_step)
+            basal_limit_units = (basal_limit_u_per_hr / 60.0) * step_minutes
             safety_result = self.supervisor.evaluate_safety(
                 current_glucose=glucose_to_algorithm,
                 proposed_insulin=algo_recommended_insulin,
@@ -1176,7 +1186,7 @@ class Simulator:
             safety_reason = safety_result.get("safety_reason", "")
             safety_triggered = safety_result.get("safety_triggered", False)
 
-            pump_delivery = self.pump_model.deliver(delivered_insulin, self.time_step)
+            pump_delivery = self.pump_model.deliver(delivered_insulin, step_minutes)
             delivered_insulin = pump_delivery.delivered_units
 
             if safety_triggered:
@@ -1330,13 +1340,23 @@ class Simulator:
                     }
                 )
 
+            # D1 (time contract): the compartment columns used to be read
+            # after the step while glucose_actual_mgdl was read before it, so a
+            # single row mixed two instants. Everything state-like is captured
+            # here, at the row's own timestamp; the delivery and carbohydrate
+            # columns describe the interval that follows it.
+            compartment_fields_at_row_time = self._patient_compartment_fields()
+            patient_iob_at_row_time = self.patient_model.insulin_on_board
+            patient_cob_at_row_time = self.patient_model.carbs_on_board
+
             self.patient_model.update(
-                time_step=self.time_step,
+                time_step=step_minutes,
                 delivered_insulin=delivered_insulin,
                 carb_intake=patient_carb_absorbed_this_step,
                 delivered_glucagon_mg=delivered_glucagon_mg,
                 current_time=float(current_time),
             )
+            self._endpoint_time = float(current_time) + step_minutes
 
             bolus_insulin_reported = insulin_output.get("bolus_insulin")
             if bolus_insulin_reported is None:
@@ -1360,6 +1380,7 @@ class Simulator:
             # --- Record Data ---
             record = {
                 "time_minutes": current_time,
+                "interval_end_minutes": float(current_time) + step_minutes,
                 "glucose_actual_mgdl": actual_glucose_reading,
                 "glucose_mechanistic_mgdl": mechanistic_glucose_reading,
                 "physiology_residual_mgdl": physiology_residual,
@@ -1395,8 +1416,10 @@ class Simulator:
                 "correction_bolus_units": insulin_output.get("correction_bolus", 0.0),
                 "carb_intake_grams": patient_carb_event_this_step,
                 "carb_absorbed_grams": patient_carb_absorbed_this_step,
-                "patient_iob_units": self.patient_model.insulin_on_board,
-                "patient_cob_grams": self.patient_model.carbs_on_board,
+                "patient_iob_units": patient_iob_at_row_time,
+                "patient_cob_grams": patient_cob_at_row_time,
+                "patient_iob_units_interval_end": self.patient_model.insulin_on_board,
+                "patient_cob_grams_interval_end": self.patient_model.carbs_on_board,
                 "effective_isf": effective_isf,
                 "effective_icr": effective_icr,
                 "effective_basal_rate_u_per_hr": effective_basal,
@@ -1412,7 +1435,7 @@ class Simulator:
                 "human_intervention_note": human_intervention.get("note") if isinstance(human_intervention, dict) else "",
                 "algorithm_why_log": [entry.to_dict() for entry in algorithm_why_log], # Convert WhyLogEntry to dict for serialization
                 "explainable_events": "; ".join(step_events) if step_events else "",
-                **self._patient_compartment_fields(),
+                **compartment_fields_at_row_time,
                 **{f"algo_state_{k}": v for k, v in self.algorithm.get_state().items()} # Include algorithm internal state
             }
 
@@ -1429,7 +1452,7 @@ class Simulator:
 
             # Critical failure stop: sustained severe hypoglycemia
             if actual_glucose_reading < self.critical_glucose_threshold:
-                self._critical_low_minutes += self.time_step
+                self._critical_low_minutes += step_minutes
                 if self._critical_low_minutes >= self.critical_glucose_duration_minutes:
                     message = (
                         f"Critical failure: glucose < {self.critical_glucose_threshold:.1f} mg/dL "
@@ -1444,12 +1467,28 @@ class Simulator:
             else:
                 self._critical_low_minutes = 0
 
-            current_time += self.time_step
+            current_time += step_minutes
+
+    def endpoint_observation(self) -> Dict[str, Any]:
+        """Terminal observation after the last integrated interval.
+
+        The simulation frame holds one row per interval, so the state at the
+        requested end time has no row of its own. This returns it explicitly,
+        which keeps endpoint observations separate from interval deliveries.
+        """
+        return {
+            "time_minutes": self._endpoint_time,
+            "glucose_actual_mgdl": float(self.patient_model.get_current_glucose()),
+            "patient_iob_units": float(self.patient_model.insulin_on_board),
+            "patient_cob_grams": float(self.patient_model.carbs_on_board),
+            **self._patient_compartment_fields(),
+        }
 
     def save_state(self) -> Dict[str, Any]:
         """Serialize simulator state for time-travel debugging."""
         return {
             "current_time": self._current_time,
+            "endpoint_time": self._endpoint_time,
             "patient_state": self.patient_model.get_state(),
             "algorithm_state": self.algorithm.get_state(),
             "supervisor_state": self.supervisor.get_state(),
@@ -1474,6 +1513,7 @@ class Simulator:
     def load_state(self, state: Dict[str, Any]) -> None:
         """Restore simulator state from a previous save."""
         self._current_time = state.get("current_time", 0)
+        self._endpoint_time = float(state.get("endpoint_time", self._current_time))
         self.patient_model.set_state(state.get("patient_state", {}))
         self.algorithm.set_state(state.get("algorithm_state", {}))
         self.supervisor.set_state(state.get("supervisor_state", {}))

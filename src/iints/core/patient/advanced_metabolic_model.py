@@ -82,7 +82,11 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         # steady state instead of starting with empty subcutaneous depots.
         self._basal_input_mu_per_min = max(self.basal_insulin_rate, 0.0) * 1000.0 / 60.0
         Vi_abs = self.params.Vi * self.params.body_weight_kg
-        if self._basal_input_mu_per_min > 0.0:
+        if (self._basal_input_mu_per_min > 0.0
+                and getattr(self, "insulin_action_reference", "basal") != "plasma_ib"):
+            # Under 'plasma_ib' the reference must stay a physiological
+            # constant; overwriting Ib with the configured basal rate would
+            # restore exactly the insensitivity that mode exists to remove.
             self.params.Ib = self._basal_input_mu_per_min / max(Vi_abs * self.params.n, 1e-9)
         
         # Override the Bergman state with an advanced 18-state vector.
@@ -92,7 +96,7 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         self._state = np.array([
             self.initial_glucose,  # 0: G
             0.0,                   # 1: X
-            self.params.Ib,        # 2: I
+            getattr(self, "_basal_plasma_insulin_mU_L", self.params.Ib),  # 2: I
             0.0,                   # 3: Q_sto1
             0.0,                   # 4: Q_sto2
             0.0,                   # 5: Q_gut

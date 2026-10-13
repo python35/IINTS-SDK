@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import builtins
+import math
+import sys
+import pytest
+
 from iints.live_patient.edge_benchmark import run_edge_benchmark
+from iints.live_patient.edge_benchmark import _max_rss_mb
 
 
 ALGO_TEMPLATE = '''from iints import InsulinAlgorithm, AlgorithmInput, AlgorithmMetadata
@@ -22,6 +28,18 @@ class DemoPID(InsulinAlgorithm):
             "meal_bolus": 0.0,
         }
 '''
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Real Windows native memory query")
+def test_peak_memory_without_optional_psutil(monkeypatch) -> None:
+    real_import = builtins.__import__
+    def without_psutil(name, *args, **kwargs):
+        if name == "psutil":
+            raise ImportError("Exercise the optional-dependency fallback")
+        return real_import(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, "__import__", without_psutil)
+    peak = _max_rss_mb()
+    assert math.isfinite(peak) and peak > 0
 
 
 def test_run_edge_benchmark_returns_core_metrics(tmp_path) -> None:

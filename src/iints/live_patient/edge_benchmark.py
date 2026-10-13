@@ -29,11 +29,80 @@ def _platform_label(requested: str) -> str:
 
 
 def _max_rss_mb() -> float:
-    import resource
-    usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if platform.system() == "Darwin":
-        return float(usage) / (1024 * 1024)
-    return float(usage) / 1024.0
+    """Peak resident set size in MiB, on every supported platform.
+
+    ``resource`` is Unix-only, so importing it unconditionally made this
+    benchmark unavailable on Windows. The Windows branch reads
+    PeakWorkingSetSize through psapi; both report the peak, not the current
+    footprint.
+    """
+    try:
+        import resource
+    except ImportError:
+        pass
+    else:
+        usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        if platform.system() == "Darwin":
+            return float(usage) / (1024 * 1024)
+        return float(usage) / 1024.0
+
+    try:
+        import psutil  # optional; present in some research environments
+        return float(psutil.Process().memory_info().peak_wset) / (1024 * 1024)
+    except (ImportError, AttributeError, OSError):
+        pass
+
+    return _windows_peak_rss_mb()
+
+
+def _windows_peak_rss_mb() -> float:
+    """Query Windows with pointer-sized handles, without requiring psutil."""
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class _ProcessMemoryCounters(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("PageFaultCount", wintypes.DWORD),
+                ("PeakWorkingSetSize", ctypes.c_size_t),
+                ("WorkingSetSize", ctypes.c_size_t),
+                ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+                ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+                ("PagefileUsage", ctypes.c_size_t),
+                ("PeakPagefileUsage", ctypes.c_size_t),
+            ]
+
+        counters = _ProcessMemoryCounters()
+        counters.cb = ctypes.sizeof(counters)
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        get_current_process = kernel.GetCurrentProcess
+        get_current_process.argtypes = []
+        get_current_process.restype = wintypes.HANDLE
+        handle = get_current_process()
+        # psapi on older Windows, kernel32's K32 alias on newer builds.
+        for library_name, function_name in (
+            ("kernel32", "K32GetProcessMemoryInfo"),
+            ("psapi", "GetProcessMemoryInfo"),
+        ):
+            try:
+                library = ctypes.WinDLL(library_name, use_last_error=True)
+                probe = getattr(library, function_name)
+                probe.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ProcessMemoryCounters), wintypes.DWORD]
+                probe.restype = wintypes.BOOL
+                if probe(handle, ctypes.byref(counters), counters.cb):
+                    break
+            except (OSError, AttributeError):
+                continue
+        else:
+            raise OSError("GetProcessMemoryInfo unavailable")
+        return float(counters.PeakWorkingSetSize) / (1024 * 1024)
+    except Exception:
+        # Reporting a wrong number would be worse than reporting none.
+        return float("nan")
 
 
 def _measure_http_ms(url: str, requests: int = 5) -> dict[str, float]:

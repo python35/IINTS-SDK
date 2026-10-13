@@ -3,6 +3,7 @@ import zipfile
 from pathlib import Path
 
 import pandas as pd
+import pytest
 from typer.testing import CliRunner
 
 from iints.cli.cli import app
@@ -179,13 +180,14 @@ def test_resume_continues_from_latest_checkpoint(tmp_path: Path) -> None:
     assert resumed["status"]["resume_count"] == 1
 
 
-def test_wall_clock_mode_paces_to_requested_duration(tmp_path: Path) -> None:
+@pytest.mark.parametrize("duration_minutes", [30, 123])
+def test_wall_clock_mode_paces_to_requested_duration(tmp_path: Path, duration_minutes: int) -> None:
     output_dir = tmp_path / "jetson_wall_clock"
     config = EnduranceConfig(
         algo_path="builtin:clinical_baseline",
         predictor_path=None,
-        duration="30m",
-        duration_minutes=parse_duration_to_minutes("30m"),
+        duration=f"{duration_minutes}m",
+        duration_minutes=duration_minutes,
         time_step_minutes=5,
         output_dir=str(output_dir),
         profile="normal",
@@ -220,9 +222,11 @@ def test_wall_clock_mode_paces_to_requested_duration(tmp_path: Path) -> None:
     )
 
     assert result["status"]["execution_mode"] == "wall_clock"
-    assert result["status"]["wall_elapsed_seconds"] == 1800.0
-    assert result["status"]["wall_clock_target_seconds"] == 1800
-    assert sum(fake_clock.sleeps) == 1800.0
+    assert result["status"]["wall_elapsed_seconds"] == duration_minutes * 60
+    assert result["status"]["wall_clock_target_seconds"] == duration_minutes * 60
+    assert sum(fake_clock.sleeps) == duration_minutes * 60
+    assert result["status"]["elapsed_minutes"] == duration_minutes
+    assert result["status"]["completed_steps"] == (duration_minutes + 4) // 5
 
 
 def test_jetson_endurance_cli_status_and_export(tmp_path: Path) -> None:

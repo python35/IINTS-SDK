@@ -1,10 +1,29 @@
 from __future__ import annotations
 
 import pytest
+import os
+import sys
+import subprocess
 
 from iints.core.simulator import SimulationLimitError
 from iints.live_patient.daemon import _resolve_api_token
 from iints.live_patient.runtime import LivePatientDaemon, PatientRuntimeConfig, PatientRuntimeStore
+from iints.live_patient.runtime import is_process_alive
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows must not send CTRL_C_EVENT for signal 0")
+def test_process_liveness_probe_does_not_send_console_signals(monkeypatch) -> None:
+    def forbidden_signal(*args, **kwargs):
+        pytest.fail("Process status must not send console signals on Windows")
+    monkeypatch.setattr(os, "kill", forbidden_signal)
+    assert is_process_alive(os.getpid())
+    assert not is_process_alive(None)
+    assert not is_process_alive(0)
+    child = subprocess.Popen([sys.executable, "-c", "pass"])
+    child.wait(timeout=10)
+    assert not is_process_alive(child.pid)
+    result = subprocess.run([sys.executable, "-c", "print('alive')"], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0 and result.stdout.strip() == "alive"
 
 
 def test_resolve_api_token_rejects_missing_or_blank_env(monkeypatch, tmp_path) -> None:

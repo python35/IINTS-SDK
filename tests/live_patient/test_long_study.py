@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 
 from iints.live_patient.long_study import (
+    DEFAULT_SCRATCH_DIR,
     export_edge_study_archive,
     load_edge_long_study_config,
     render_edge_long_study_config_template,
@@ -42,7 +43,7 @@ def test_load_edge_long_study_config_accepts_week_schedule(tmp_path: Path) -> No
     assert config.week_schedule["monday"] == "school_day"
     assert config.week_schedule["sunday"] == "relaxed_day"
     assert config.snapshot_every_days() == 1
-    assert config.scratch_dir == "/tmp/iints_edge_long_study"
+    assert config.scratch_dir == DEFAULT_SCRATCH_DIR
 
 
 def test_run_edge_long_study_writes_nested_outputs(monkeypatch, tmp_path: Path) -> None:

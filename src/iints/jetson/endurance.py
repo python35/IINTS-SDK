@@ -65,11 +65,17 @@ class EnduranceConfig:
 
     @property
     def expected_steps(self) -> int:
-        return max(1, self.duration_minutes // self.time_step_minutes)
+        return len(range(0, self.duration_minutes, self.time_step_minutes))
 
     @property
     def simulator_end_minutes(self) -> int:
-        return max(0, self.duration_minutes - self.time_step_minutes)
+        # The requested duration is passed through unchanged. This used to
+        # subtract one time step to compensate for the simulator's inclusive
+        # endpoint, which executed an extra interval. Now that a run of N
+        # minutes integrates exactly N minutes (defect D2), subtracting a step
+        # would drop a real interval: a 1 h run at dt=5 would yield 11 steps
+        # and 55 minutes instead of 12 steps and 60 minutes.
+        return max(0, self.duration_minutes)
 
     @property
     def wall_clock_target_seconds(self) -> int:
@@ -345,7 +351,7 @@ def _status_payload(
     resume_count: int = 0,
 ) -> Dict[str, Any]:
     progress = completed_steps / max(1, config.expected_steps)
-    elapsed_minutes = completed_steps * config.time_step_minutes
+    elapsed_minutes = min(completed_steps * config.time_step_minutes, config.duration_minutes)
     steps_per_second = None
     estimated_wall_remaining_seconds = None
     wall_clock_progress_pct = None
@@ -1173,7 +1179,7 @@ def run_endurance_study(
         if completed_steps % max(1, config.status_interval_steps) == 0 or completed_steps == config.expected_steps:
             partial_df = pd.DataFrame(records)
             partial_df.to_csv(raw_dir / "steps.csv", index=False)
-            elapsed_minutes = completed_steps * config.time_step_minutes
+            elapsed_minutes = min(completed_steps * config.time_step_minutes, config.duration_minutes)
             if (
                 config.hardware_sample_interval_minutes > 0
                 and elapsed_minutes % config.hardware_sample_interval_minutes == 0
@@ -1211,7 +1217,7 @@ def run_endurance_study(
             if progress_callback is not None:
                 progress_callback(status)
 
-        elapsed_minutes = completed_steps * config.time_step_minutes
+        elapsed_minutes = min(completed_steps * config.time_step_minutes, config.duration_minutes)
         if (
             config.checkpoint_interval_minutes > 0
             and elapsed_minutes > 0
@@ -1220,7 +1226,7 @@ def run_endurance_study(
         ):
             pd.DataFrame(records).to_csv(raw_dir / "steps.csv", index=False)
             state = simulator.save_state()
-            state["current_time"] = int(float(record["time_minutes"]) + config.time_step_minutes)
+            state["current_time"] = int(record["interval_end_minutes"])
             _write_json(
                 snapshot_dir / f"snapshot_{elapsed_minutes:06d}m.json",
                 {
@@ -1233,7 +1239,7 @@ def run_endurance_study(
             last_checkpoint_minute = elapsed_minutes
 
         if config.execution_mode == "wall_clock":
-            target_elapsed_seconds = completed_steps * config.time_step_minutes * 60
+            target_elapsed_seconds = float(record["interval_end_minutes"]) * 60
             current_elapsed_seconds = previous_wall_elapsed_seconds + (monotonic_fn() - wall_start)
             remaining_sleep_seconds = max(0.0, target_elapsed_seconds - current_elapsed_seconds)
             if remaining_sleep_seconds > 0:
