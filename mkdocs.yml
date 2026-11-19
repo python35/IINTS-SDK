@@ -8,6 +8,7 @@ exclude_docs: |
   obsidian/**
 not_in_nav: |
   releases/v*.md
+  WALKTHROUGH_TERMINAL.md
 
 theme:
   name: material

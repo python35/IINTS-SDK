@@ -1,7 +1,8 @@
-# IINTS-AF Research Track (AI Predictor)
+# IINTS-AF Research Track (AI Predictor & Closed-Loop Studies)
 
-This folder contains the **AI research pipeline** for training a glucose predictor model
-that plugs into the IINTS-AF safety workflow.
+This folder contains the **research pipelines** for training and evaluating glucose predictors, calibrating virtual patient realism, and running controlled closed-loop experiments within the IINTS-AF safety workflow.
+
+For the curated literature library on commercial & open-source closed-loop insulin pump algorithms (AID), simulators, fault tolerance, and datasets, see [`sources/README.md`](../sources/README.md).
 
 ## Plain Summary
 - The predictor forecasts glucose.
@@ -265,6 +266,9 @@ PYTHONPATH=src python3 research/calibrate_simulator_realism.py \
 
 The calibrator searches plausible physiology settings, evaluates every candidate
 across multiple deterministic seeds, and ranks them by robust realism first:
+how many runs are `likely_realistic`, then average realism score, then distance
+from the empirical reference median. That makes the chosen preset reproducible
+and less vulnerable to one lucky-looking trace.
 
 ## Local controller-policy research
 
@@ -305,9 +309,6 @@ The evaluation report is intentionally closed-loop and held out: it compares
 the learned controller against the clinical baseline over unseen scenarios and
 seeds, with TIR, hypo burden, supervisor interventions, and early termination
 counts all visible together.
-how many runs are `likely_realistic`, then average realism score, then distance
-from the empirical reference median. That makes the chosen preset reproducible
-and less vulnerable to one lucky-looking trace.
 
 To calibrate the packaged reference profiles for every supported real-data
 envelope in one pass:

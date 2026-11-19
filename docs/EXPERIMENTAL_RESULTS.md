@@ -7,7 +7,7 @@ memory. Sources:
 | --- | --- |
 | `results/eucys_2026/EUCYS_RESULTS_TABLE.csv` | Three-arm simulation benchmark, 3600 runs |
 | `apps/iints-tauri/frontend/evidence/crossfold_evidence.json` | Held-out subject forecasting, 6 subjects, SHA-256 pinned models and data |
-| `arm_comparison.json` | Training-loss comparison, 2 subjects |
+| `research/artifacts/arm_comparison.json` | Training-loss comparison, 2 subjects |
 
 Read this before quoting any performance figure. Two results are unfavourable
 and both are load-bearing.
@@ -104,7 +104,7 @@ have to be read together.
 
 ## 4. Training-loss comparison
 
-`arm_comparison.json` compares `safety_weighted` against `band_weighted` on a
+`research/artifacts/arm_comparison.json` compares `safety_weighted` against `band_weighted` on a
 shared split, holding twelve hyperparameters constant.
 
 Only **2 held-out subjects** were available. The artefact therefore reports
