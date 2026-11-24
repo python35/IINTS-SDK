@@ -18,10 +18,15 @@ import math
 import numpy as np
 from scipy.integrate import solve_ivp
 
+from iints.core.algorithms.whitebox_aid_pump import biexponential_iob_fraction
+from iints.core.digital_twin import DigitalTwinCalibrator
 from iints.core.glycemic_risk import (
     EUGLYCEMIC_CENTER_MGDL,
     bg_risk,
     bg_risk_transform,
+    bgri,
+    hbgi,
+    lbgi,
 )
 from iints.core.patient.advanced_metabolic_model import AdvancedMetabolicModel
 from iints.core.patient.hovorka_model import HovorkaPatientModel
@@ -230,3 +235,62 @@ def test_proof_7_emulator_gains_satisfy_nyquist_stability_margin() -> None:
     assert gm_780g_db > 6.0
     assert gm_ciq_db > 6.0
     assert gm_780g_db > gm_ciq_db
+
+
+def test_proof_8_biexponential_iob_no_singularity_at_a_equals_1() -> None:
+    # Removable 0/0 singularity occurs when tp / dia = 1 - 1/sqrt(2) ~= 0.2928932
+    dia = 300.0
+    tp_singular = dia * (1.0 - 1.0 / math.sqrt(2.0))
+
+    iob_mid, act_mid = biexponential_iob_fraction(120.0, peak_minutes=tp_singular, dia_minutes=dia)
+    assert math.isfinite(iob_mid) and 0.0 < iob_mid < 1.0
+    assert math.isfinite(act_mid) and act_mid > 0.0
+
+    # Verify smoothness across the singularity and normalization integral_0^D a_I(t) dt == 1
+    grid = np.linspace(0.0, dia, 601)
+    activities = np.array(
+        [biexponential_iob_fraction(float(t), peak_minutes=tp_singular, dia_minutes=dia)[1] for t in grid]
+    )
+    integral = float(np.trapezoid(activities, grid)) if hasattr(np, "trapezoid") else float(np.trapz(activities, grid))
+    assert math.isclose(integral, 1.0, rel_tol=1e-4)
+
+    # Verify -d(IOB)/dt == activity at t = 120 min
+    dt = 1e-3
+    iob_plus, _ = biexponential_iob_fraction(120.0 + dt, peak_minutes=tp_singular, dia_minutes=dia)
+    iob_minus, _ = biexponential_iob_fraction(120.0 - dt, peak_minutes=tp_singular, dia_minutes=dia)
+    assert math.isclose(-(iob_plus - iob_minus) / (2.0 * dt), act_mid, abs_tol=1e-6)
+
+
+def test_proof_9_glycemic_risk_no_nan_on_sub_unit_values() -> None:
+    readings = [0.2, 0.5, 0.99, 100.0, 140.0]
+    risks = bg_risk(readings)
+    assert np.all(np.isfinite(risks))
+    assert risks.size == 2
+    assert math.isfinite(lbgi(readings))
+    assert math.isfinite(hbgi(readings))
+    assert math.isfinite(bgri(readings))
+    assert math.isclose(lbgi(readings) + hbgi(readings), bgri(readings), rel_tol=1e-12)
+
+
+def test_proof_10_digital_twin_sensitivity_scale_is_not_cancelled() -> None:
+    # Generate synthetic meal + bolus trace from a known Hovorka patient
+    patient = HovorkaPatientModel(initial_glucose=115.0, basal_insulin_rate=0.8)
+    history = []
+    dt = 5.0
+    for step in range(30):
+        t = step * dt
+        carbs = 40.0 if step == 4 else 0.0
+        bolus = 3.0 if step == 4 else 0.0
+        history.append({"time_min": t, "cgm": patient.get_current_glucose(), "carbs": carbs, "insulin": bolus})
+        patient.update(
+            time_step=dt,
+            delivered_insulin=bolus + 0.8 * dt / 60.0,
+            carb_intake=carbs,
+            current_time=t,
+        )
+
+    calibrator = DigitalTwinCalibrator(base_weight_kg=70.0, basal_insulin_rate_u_per_hour=0.8)
+    calibrator.fit(history)
+    cond = calibrator.last_report["local_sensitivity_condition_number"]
+    # Before the fix, x[1] was cancelled out by auto-basal scaling, forcing cond == inf
+    assert math.isfinite(cond)

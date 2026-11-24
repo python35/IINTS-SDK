@@ -7,6 +7,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from iints.core.patient.hovorka_model import HovorkaPatientModel, HovorkaParameters
+from iints.core.patient.models import PatientModelDomainError
 
 logger = logging.getLogger(__name__)
 
@@ -114,14 +115,27 @@ class DigitalTwinCalibrator:
                 t_max_G=x[2] * nominal.t_max_G,
             )
 
+        first_valid_idx = int(np.argmax(valid_mask))
+        init_bg = float(true_cgm[first_valid_idx])
+
+        # Compute the basal equilibrium scale ONCE on the nominal profile and
+        # hold it fixed during optimization. Otherwise HovorkaPatientModel's
+        # default auto-scaling divides out x[1] (insulin_sensitivity_scale),
+        # rendering sensitivity completely inert in the ODE.
+        nominal_model = HovorkaPatientModel(
+            initial_glucose=init_bg,
+            basal_insulin_rate=self.basal_insulin_rate_u_per_hour,
+            hovorka_params=nominal,
+        )
+        base_sensitivity_scale = float(nominal_model._basal_parameter_scale)
+
         def simulate(x: np.ndarray) -> np.ndarray:
             params = params_from_scale(x)
-            first_valid_idx = int(np.argmax(valid_mask))
-            init_bg = float(true_cgm[first_valid_idx])
             model = HovorkaPatientModel(
                 initial_glucose=init_bg,
                 basal_insulin_rate=self.basal_insulin_rate_u_per_hour,
                 hovorka_params=params,
+                insulin_sensitivity_scale=base_sensitivity_scale,
             )
             sim_cgm = np.full_like(true_cgm, init_bg, dtype=float)
             sim_cgm[first_valid_idx] = model.get_current_glucose()
@@ -140,13 +154,20 @@ class DigitalTwinCalibrator:
             return sim_cgm
 
         def objective_function(x):
-            sim_cgm = simulate(np.asarray(x, dtype=float))
+            x_arr = np.asarray(x, dtype=float)
+            try:
+                sim_cgm = simulate(x_arr)
+            except (PatientModelDomainError, RuntimeError):
+                # Trial parameter combination drove the ODE out of its valid
+                # physiological domain; return a large finite penalty so Powell
+                # retreats smoothly instead of crashing calibration.
+                return 1.0e9
             diff = sim_cgm[calibration_mask] - true_cgm[calibration_mask]
             mse = np.mean(diff**2)
 
             # Weak prior regularization reduces compensation between poorly
             # identifiable parameters when only CGM/event data are available.
-            reg = 15.0 * np.sum(np.log(np.maximum(x, 1e-6)) ** 2)
+            reg = 15.0 * np.sum(np.log(np.maximum(x_arr, 1e-6)) ** 2)
 
             return mse + reg
 
@@ -197,7 +218,11 @@ class DigitalTwinCalibrator:
             if denominator <= 0.0:
                 sensitivity_columns.append(np.zeros(int(np.sum(calibration_mask))))
                 continue
-            derivative = (simulate(plus) - simulate(minus)) / denominator
+            try:
+                derivative = (simulate(plus) - simulate(minus)) / denominator
+            except (PatientModelDomainError, RuntimeError):
+                sensitivity_columns.append(np.zeros(int(np.sum(calibration_mask))))
+                continue
             sensitivity_columns.append(derivative[calibration_mask])
         sensitivity_matrix = np.column_stack(sensitivity_columns)
         singular_values = np.linalg.svd(sensitivity_matrix, compute_uv=False)

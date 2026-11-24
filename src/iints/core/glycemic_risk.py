@@ -72,14 +72,14 @@ GlucoseLike = Union[pd.Series, np.ndarray, Iterable[float]]
 
 
 def _clean(glucose: GlucoseLike) -> np.ndarray:
-    """Return finite, strictly positive glucose values as a float array.
+    """Return finite glucose values in the real domain of (ln G)^1.084 (G >= 1).
 
-    Non-positive and non-finite readings are dropped rather than clipped: the
-    logarithm is undefined there, and silently substituting a value would
-    invent data.
+    Values below 1.0 have ln(G) < 0, which yields NaN when raised to the
+    non-integer Kovatchev exponent 1.084; dropping them prevents NaN poisoning
+    of LBGI/HBGI/BGRI while keeping every physiological mg/dL reading intact.
     """
     values = np.asarray(glucose, dtype=float).ravel()
-    return values[np.isfinite(values) & (values > 0.0)]
+    return values[np.isfinite(values) & (values >= 1.0)]
 
 
 def bg_risk_transform(glucose: GlucoseLike) -> np.ndarray:
