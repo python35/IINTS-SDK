@@ -56,9 +56,9 @@ class PredictorConfig:
     train_fraction: float = 0.70
     target_glucose_mgdl: float = 110.0
     safety_floor_mgdl: float = 70.0
-    sensor_sd_mgdl: float = 5.0
-    sensor_tau_minutes: float = 5.0
-    noise_ar1_phi: float = 0.0
+    sensor_sd_mgdl: float = 6.0
+    sensor_tau_minutes: float = 6.0
+    noise_ar1_phi: float = 0.75
     meal_tau_minutes: float = 40.0
     bioavailability: float = 0.80
     fourier_harmonics: int = 2
