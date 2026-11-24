@@ -433,10 +433,15 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         dBeta_dt = -self.autoimmune_aggressiveness * Beta
 
         # --- FFA & Ketone Dynamics ---
-        l_0, l_1, k_f = 0.2, 0.23, 0.1
+        # Literature turnover rates (l_0, k_f, k_0, k_2) are hourly (1/h) and
+        # converted to 1/min to match the minute-based ODE integrator.
+        # Equilibria F_inf = (l_0/k_f)*exp(-l_1*I) and K_inf = (k_0*F_inf/k_2)*exp(-k_1*I)
+        # are invariant under this time-unit conversion, while tau_F = 600 min
+        # and tau_K = 1200 min match the slower hour-scale metabolic memory.
+        l_0, l_1, k_f = 0.2 / 60.0, 0.23, 0.1 / 60.0
         dF_dt = l_0 * np.exp(-l_1 * I) - k_f * F
 
-        k_0, k_1, k_2 = 0.125, 0.33, 0.05
+        k_0, k_1, k_2 = 0.125 / 60.0, 0.33, 0.05 / 60.0
         dK_dt = k_0 * F * np.exp(-k_1 * I) - k_2 * K
 
         # --- Lipotoxicity (Insulin Resistance via FFAs) ---
@@ -507,7 +512,9 @@ class AdvancedMetabolicModel(BergmanPatientModel):
         endogenous_secretion = Beta * self.gamma_healthy * max(G - p.h, 0.0)
         target_Ib = p.Ib * Beta
         
-        dIdt = -p.n * (I - target_Ib) + endogenous_secretion + Ra_I / Vi_abs
+        graft_plasma = getattr(self, "_endogenous_plasma_mu_per_min", 0.0)
+        dIdt = (-p.n * (I - target_Ib) + endogenous_secretion
+                + (Ra_I + graft_plasma) / Vi_abs)
 
         # Adapted multi-compartment meal chain with a heuristic fat delay.
         fat_delay_factor = np.exp(-0.02 * Q_fat) 
