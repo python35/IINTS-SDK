@@ -69,38 +69,38 @@ def _insert_gap_nans(
 
 
 def _draw_clarke_boundaries(ax: plt.Axes) -> None:
-    """Draw canonical Clarke Error Grid (1987) A/B/C/D/E boundaries on [0, 400]^2."""
+    """Draw exact Clarke Error Grid (1987) A/B/C/D/E boundaries matching error_grid.clarke_zones."""
     kw = {"color": "#64748B", "linewidth": 0.9, "linestyle": "--"}
     # Identity line
     ax.plot([0, 400], [0, 400], color="#0F172A", linewidth=1.0, alpha=0.45)
 
-    # Zone A boundaries
+    # Zone A boundaries: rel_error <= 0.2 or (ref <= 70 and pred <= 70)
     ax.plot([0, 70], [70, 70], **kw)
     ax.plot([70, 70], [0, 56], **kw)
     ax.plot([70, 400], [56, 320], **kw)
-    ax.plot([70, 333.33], [84, 400], **kw)
+    ax.plot([58.333, 333.333], [70, 400], **kw)
 
-    # Zone C upper & lower boundaries
-    ax.plot([70, 180], [180, 180], **kw)
-    ax.plot([70, 70], [180, 400], **kw)
+    # Zone C boundaries (exact match to error_grid.py lines 93-94)
+    ax.plot([70, 290], [180, 400], **kw)
     ax.plot([130, 180], [0, 70], **kw)
-    ax.plot([180, 180], [0, 70], **kw)
 
     # Zone D & E boundaries
     ax.plot([0, 70], [180, 180], **kw)
+    ax.plot([70, 70], [180, 400], **kw)
     ax.plot([180, 400], [70, 70], **kw)
+    ax.plot([180, 180], [0, 70], **kw)
     ax.plot([240, 240], [70, 180], **kw)
     ax.plot([240, 400], [180, 180], **kw)
 
     # Zone labels placed strictly inside their true geometric regions
     ax.text(295, 305, "A", fontsize=11, fontweight="bold", color="#0F766E")
-    ax.text(135, 290, "B", fontsize=10, fontweight="bold", color="#475569")
+    ax.text(135, 220, "B", fontsize=10, fontweight="bold", color="#475569")
     ax.text(285, 200, "B", fontsize=10, fontweight="bold", color="#475569")
-    ax.text(105, 350, "C", fontsize=10, fontweight="bold", color="#B45309")
-    ax.text(158, 22, "C", fontsize=10, fontweight="bold", color="#B45309")
-    ax.text(28, 125, "D", fontsize=10, fontweight="bold", color="#DC2626")
+    ax.text(135, 345, "C", fontsize=10, fontweight="bold", color="#B45309")
+    ax.text(158, 20, "C", fontsize=10, fontweight="bold", color="#B45309")
+    ax.text(24, 125, "D", fontsize=10, fontweight="bold", color="#DC2626")
     ax.text(320, 120, "D", fontsize=10, fontweight="bold", color="#DC2626")
-    ax.text(28, 300, "E", fontsize=10, fontweight="bold", color="#991B1B")
+    ax.text(24, 300, "E", fontsize=10, fontweight="bold", color="#991B1B")
     ax.text(320, 28, "E", fontsize=10, fontweight="bold", color="#991B1B")
 
 
