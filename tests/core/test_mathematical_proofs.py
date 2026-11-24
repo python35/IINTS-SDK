@@ -294,3 +294,69 @@ def test_proof_10_digital_twin_sensitivity_scale_is_not_cancelled() -> None:
     cond = calibrator.last_report["local_sensitivity_condition_number"]
     # Before the fix, x[1] was cancelled out by auto-basal scaling, forcing cond == inf
     assert math.isfinite(cond)
+
+
+def test_proof_11_carelink_decimal_parser_preserves_dot_and_comma() -> None:
+    import pandas as pd
+    from iints.data.importer import _parse_decimal_series
+
+    series = pd.Series(["1.25", "0,85", "1.234,56", "1,234.56", "", "nan"])
+    parsed = _parse_decimal_series(series)
+    assert math.isclose(float(parsed.iloc[0]), 1.25, rel_tol=1e-12)
+    assert math.isclose(float(parsed.iloc[1]), 0.85, rel_tol=1e-12)
+    assert math.isclose(float(parsed.iloc[2]), 1234.56, rel_tol=1e-12)
+    assert math.isclose(float(parsed.iloc[3]), 1234.56, rel_tol=1e-12)
+    assert math.isnan(float(parsed.iloc[4]))
+    assert math.isnan(float(parsed.iloc[5]))
+
+
+def test_proof_12_carelink_smartguard_auto_basal_and_mmoll_support(tmp_path) -> None:
+    from iints.data.importer import import_carelink_timeline
+
+    csv_text = "\n".join(
+        [
+            "Last Name,First Name,Patient ID,System ID,Start Date,End Date,Device,MiniMed 780G",
+            "User,Test,,,2026-03-21,2026-03-21,Serial Number,NG000001",
+            "",
+            "Index,Date,Time,Sensor Glucose (mmol/L),Basal Rate (U/h),Bolus Volume Delivered (U),Bolus Source,BWZ Carb Input (grams)",
+            "0,21/03/2026,18:00:00,7.5,,0.10,CLOSED_LOOP_AUTO_INSULIN,",
+            "1,21/03/2026,18:05:00,7.8,,0.15,CLOSED_LOOP_AUTO_INSULIN,",
+            "2,21/03/2026,18:06:00,,,3.00,BOLUS_WIZARD,30",
+            "3,21/03/2026,18:10:00,8.0,,0.12,CLOSED_LOOP_AUTO_INSULIN,",
+        ]
+    )
+    sample = tmp_path / "smartguard_mmoll.csv"
+    sample.write_text(csv_text, encoding="utf-8")
+
+    timeline = import_carelink_timeline(sample)
+    assert len(timeline) == 3
+    # mmol/L -> mg/dL exact conversion: 7.5 * 18.0182 = 135.1365
+    assert math.isclose(float(timeline["glucose"].iloc[0]), 7.5 * 18.0182, rel_tol=1e-6)
+    # SmartGuard auto-basal preserved (0.10 + 0.15 + 0.12 = 0.37 U) + manual bolus (3.00 U)
+    assert math.isclose(float(timeline["basal_units"].sum()), 0.37, rel_tol=1e-9)
+    assert math.isclose(float(timeline["bolus_units"].sum()), 3.00, rel_tol=1e-9)
+    assert math.isclose(float(timeline["insulin"].sum()), 3.37, rel_tol=1e-9)
+
+
+def test_proof_13_digital_twin_handles_variable_step_minimed_gaps() -> None:
+    patient = HovorkaPatientModel(initial_glucose=115.0, basal_insulin_rate=0.8)
+    history = []
+    # Realistic variable cadence with 10-min and 15-min CGM sensor gaps
+    step_sizes = [5.0] * 8 + [10.0] + [5.0] * 10 + [15.0] + [5.0] * 10
+    t = 0.0
+    for idx, step_dt in enumerate(step_sizes):
+        carbs = 35.0 if idx == 4 else 0.0
+        bolus = 2.5 if idx == 4 else 0.0
+        history.append({"time_min": t, "cgm": patient.get_current_glucose(), "carbs": carbs, "insulin": bolus})
+        patient.update(
+            time_step=step_dt,
+            delivered_insulin=bolus + 0.8 * step_dt / 60.0,
+            carb_intake=carbs,
+            current_time=t,
+        )
+        t += step_dt
+
+    calibrator = DigitalTwinCalibrator(base_weight_kg=70.0, basal_insulin_rate_u_per_hour=0.8)
+    calibrator.fit(history)
+    assert math.isfinite(calibrator.last_report["validation_rmse_mgdl"])
+    assert math.isfinite(calibrator.last_report["local_sensitivity_condition_number"])

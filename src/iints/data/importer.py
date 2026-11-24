@@ -79,27 +79,54 @@ class ImportResult:
     scenario: Dict[str, Any]
 
 
+def _parse_single_decimal(raw: Any) -> float:
+    if raw is None or pd.isna(raw):
+        return float("nan")
+    text = str(raw).strip()
+    if text in ("", "nan", "None"):
+        return float("nan")
+    has_comma = "," in text
+    has_dot = "." in text
+    if has_comma and has_dot:
+        # Whichever separator appears last is the decimal mark.
+        if text.rfind(",") > text.rfind("."):
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", "")
+    elif has_comma:
+        text = text.replace(",", ".")
+    # If only '.' is present (e.g. "1.25" U or "0.85" U/h), preserve it as decimal.
+    try:
+        return float(text)
+    except ValueError:
+        return float("nan")
+
+
 def _parse_decimal_series(series: pd.Series) -> pd.Series:
-    cleaned = series.astype("string").str.strip()
-    cleaned = cleaned.mask(cleaned.isin(["", "nan", "None"]))
-    cleaned = cleaned.str.replace(".", "", regex=False).str.replace(",", ".", regex=False)
-    return pd.to_numeric(cleaned, errors="coerce")
+    if series.empty:
+        return pd.Series(dtype=float, index=series.index)
+    return series.map(_parse_single_decimal).astype(float)
 
 
-def _find_carelink_header_index(lines: List[str]) -> int:
+def _find_carelink_header_index(lines: List[str]) -> tuple[int, str]:
     for idx, line in enumerate(lines):
-        if line.startswith("Index;Date;Time;"):
-            return idx
-    raise ValueError("Could not find the CareLink event table header (Index;Date;Time;...).")
+        stripped = line.lstrip("\ufeff")
+        if stripped.startswith("Index;Date;Time;"):
+            return idx, ";"
+        if stripped.startswith("Index,Date,Time,"):
+            return idx, ","
+    raise ValueError(
+        "Could not find the CareLink event table header (Index;Date;Time;... or Index,Date,Time,...)."
+    )
 
 
-def _parse_carelink_metadata(lines: List[str]) -> Dict[str, Any]:
+def _parse_carelink_metadata(lines: List[str], *, delimiter: str = ";") -> Dict[str, Any]:
     metadata: Dict[str, Any] = {"raw_preamble_lines": [line for line in lines if line.strip()]}
     parsed_lines: List[List[str]] = []
     for line in lines:
         if not line.strip() or line.startswith("-------"):
             continue
-        parts = next(csv.reader([line], delimiter=";"))
+        parts = next(csv.reader([line], delimiter=delimiter))
         cleaned = [part.strip().strip('"') for part in parts]
         parsed_lines.append(cleaned)
         for i in range(6, len(cleaned) - 1, 2):
@@ -131,15 +158,24 @@ def _parse_carelink_metadata(lines: List[str]) -> Dict[str, Any]:
     return metadata
 
 
+def _parse_carelink_timestamps(date_col: pd.Series, time_col: pd.Series) -> pd.Series:
+    combined = date_col.fillna("") + " " + time_col.fillna("")
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%d/%m/%Y %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%d-%m-%Y %H:%M:%S"):
+        parsed = pd.to_datetime(combined, format=fmt, errors="coerce")
+        if parsed.notna().any():
+            return parsed
+    return pd.to_datetime(combined, errors="coerce", dayfirst=True)
+
+
 def _read_carelink_event_frame(path: Union[str, Path]) -> tuple[pd.DataFrame, Dict[str, Any]]:
     file_path = Path(path)
     lines = file_path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
-    header_idx = _find_carelink_header_index(lines)
-    metadata = _parse_carelink_metadata(lines[:header_idx])
+    header_idx, delimiter = _find_carelink_header_index(lines)
+    metadata = _parse_carelink_metadata(lines[:header_idx], delimiter=delimiter)
 
     df = pd.read_csv(
         file_path,
-        sep=";",
+        sep=delimiter,
         skiprows=header_idx,
         encoding="utf-8-sig",
         dtype=str,
@@ -152,11 +188,7 @@ def _read_carelink_event_frame(path: Union[str, Path]) -> tuple[pd.DataFrame, Di
         raise ValueError("CareLink export is missing the expected Date/Time columns.")
 
     df = df[df["Date"].notna() & df["Time"].notna()].copy()
-    dt = pd.to_datetime(
-        df["Date"].fillna("") + " " + df["Time"].fillna(""),
-        format="%Y/%m/%d %H:%M:%S",
-        errors="coerce",
-    )
+    dt = _parse_carelink_timestamps(df["Date"], df["Time"])
     df = df[dt.notna()].copy()
     df["timestamp_dt"] = dt[dt.notna()]
     df = df.sort_values("timestamp_dt").reset_index(drop=True)
@@ -252,8 +284,13 @@ def import_carelink_timeline(
     """
     raw_df, _metadata = _read_carelink_event_frame(path)
 
+    MGDL_PER_MMOLL = 18.0182
     sensor_glucose = _parse_decimal_series(raw_df.get("Sensor Glucose (mg/dL)", pd.Series(dtype="string")))
+    if sensor_glucose.notna().sum() == 0 and "Sensor Glucose (mmol/L)" in raw_df.columns:
+        sensor_glucose = _parse_decimal_series(raw_df["Sensor Glucose (mmol/L)"]) * MGDL_PER_MMOLL
     bg_reading = _parse_decimal_series(raw_df.get("BG Reading (mg/dL)", pd.Series(dtype="string")))
+    if bg_reading.notna().sum() == 0 and "BG Reading (mmol/L)" in raw_df.columns:
+        bg_reading = _parse_decimal_series(raw_df["BG Reading (mmol/L)"]) * MGDL_PER_MMOLL
     raw_df["effective_glucose"] = sensor_glucose.combine_first(bg_reading)
 
     glucose_df = (
@@ -269,14 +306,16 @@ def import_carelink_timeline(
     carbs_df["carbs"] = _parse_decimal_series(raw_df.get("BWZ Carb Input (grams)", pd.Series(dtype="string")))
     carbs_df = carbs_df[carbs_df["carbs"].notna() & (carbs_df["carbs"] > 0)].groupby("timestamp_dt", as_index=False).sum()
 
-    bolus_df = raw_df.loc[:, ["timestamp_dt"]].copy()
-    bolus_df["bolus_units"] = _parse_decimal_series(raw_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string")))
-    bolus_df["bolus_number"] = raw_df.get("Bolus Number", pd.Series(dtype="string")).astype("string").fillna("")
-    bolus_df["bolus_source"] = raw_df.get("Bolus Source", pd.Series(dtype="string")).astype("string").fillna("")
-    bolus_df = bolus_df[
-        bolus_df["bolus_units"].notna()
-        & (bolus_df["bolus_units"] > 0)
-        & (bolus_df["bolus_source"] != "CLOSED_LOOP_AUTO_INSULIN")
+    all_bolus_df = raw_df.loc[:, ["timestamp_dt"]].copy()
+    all_bolus_df["bolus_units"] = _parse_decimal_series(raw_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string")))
+    all_bolus_df["bolus_number"] = raw_df.get("Bolus Number", pd.Series(dtype="string")).astype("string").fillna("")
+    all_bolus_df["bolus_source"] = raw_df.get("Bolus Source", pd.Series(dtype="string")).astype("string").fillna("")
+
+    # Manual boluses + SmartGuard auto-correction boluses (exclude SmartGuard auto-basal micro-boluses here)
+    bolus_df = all_bolus_df[
+        all_bolus_df["bolus_units"].notna()
+        & (all_bolus_df["bolus_units"] > 0)
+        & (all_bolus_df["bolus_source"] != "CLOSED_LOOP_AUTO_INSULIN")
     ].copy()
     bolus_df["bolus_key"] = bolus_df["bolus_number"].where(
         bolus_df["bolus_number"].str.len() > 0,
@@ -286,6 +325,20 @@ def import_carelink_timeline(
         bolus_df.groupby(["timestamp_dt", "bolus_key"], as_index=False)["bolus_units"].max()
         .groupby("timestamp_dt", as_index=False)["bolus_units"]
         .sum()
+    )
+
+    # MiniMed 780G SmartGuard auto-basal micro-boluses (CLOSED_LOOP_AUTO_INSULIN):
+    # preserved separately so SmartGuard basal delivery is never dropped or double-counted.
+    auto_basal_df = all_bolus_df[
+        all_bolus_df["bolus_units"].notna()
+        & (all_bolus_df["bolus_units"] > 0)
+        & (all_bolus_df["bolus_source"] == "CLOSED_LOOP_AUTO_INSULIN")
+    ].copy()
+    auto_basal_df["auto_basal_units"] = auto_basal_df["bolus_units"]
+    auto_basal_df = (
+        auto_basal_df.groupby("timestamp_dt", as_index=False)["auto_basal_units"].sum()
+        if not auto_basal_df.empty
+        else pd.DataFrame(columns=["timestamp_dt", "auto_basal_units"])
     )
 
     basal_df = raw_df.loc[:, ["timestamp_dt"]].copy()
@@ -312,6 +365,13 @@ def import_carelink_timeline(
         output_column="bolus_units",
         tolerance_minutes=event_tolerance_minutes,
     )
+    glucose_df = _attach_events_to_glucose_timeline(
+        glucose_df,
+        auto_basal_df,
+        value_column="auto_basal_units",
+        output_column="auto_basal_units",
+        tolerance_minutes=event_tolerance_minutes,
+    )
 
     if not basal_df.empty:
         glucose_df = pd.merge_asof(
@@ -336,7 +396,14 @@ def import_carelink_timeline(
 
     glucose_df["carbs"] = glucose_df.get("carbs", 0.0)
     glucose_df["bolus_units"] = glucose_df.get("bolus_units", 0.0)
-    glucose_df["basal_units"] = glucose_df["basal_rate_u_per_hr"] * capped_step_minutes.div(60.0)
+    auto_basal_series = glucose_df.get("auto_basal_units", pd.Series(0.0, index=glucose_df.index)).fillna(0.0)
+    manual_basal_units = glucose_df["basal_rate_u_per_hr"] * capped_step_minutes.div(60.0)
+    has_auto_basal = auto_basal_series > 0.0
+    glucose_df["basal_units"] = manual_basal_units.where(~has_auto_basal, auto_basal_series)
+    safe_step_hr = capped_step_minutes.clip(lower=1e-6).div(60.0)
+    glucose_df["basal_rate_u_per_hr"] = glucose_df["basal_rate_u_per_hr"].where(
+        ~has_auto_basal, auto_basal_series.div(safe_step_hr)
+    )
     glucose_df["insulin"] = glucose_df["bolus_units"].fillna(0.0) + glucose_df["basal_units"].fillna(0.0)
     glucose_df["timestamp"] = (
         glucose_df["timestamp_dt"] - glucose_df["timestamp_dt"].iloc[0]

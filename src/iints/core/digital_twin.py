@@ -71,9 +71,6 @@ class DigitalTwinCalibrator:
         deltas = np.diff(times.astype(float))
         if np.any(deltas <= 0.0):
             raise ValueError("time_min must be strictly increasing")
-        dt = float(np.median(deltas))
-        if not np.allclose(deltas, dt, rtol=0.0, atol=1e-6):
-            raise ValueError("Calibration currently requires uniformly sampled data")
 
         # We only consider valid true_cgm for MSE calculation (ignore NaNs)
         valid_mask = ~np.isnan(true_cgm)
@@ -141,11 +138,12 @@ class DigitalTwinCalibrator:
             sim_cgm[first_valid_idx] = model.get_current_glucose()
             for i in range(first_valid_idx + 1, len(times)):
                 event_index = i - 1
+                step_dt = float(deltas[event_index])
                 delivered = float(insulin[event_index])
                 if self.insulin_semantics == "bolus_only":
-                    delivered += self.basal_insulin_rate_u_per_hour * dt / 60.0
+                    delivered += self.basal_insulin_rate_u_per_hour * step_dt / 60.0
                 model.update(
-                    time_step=dt,
+                    time_step=step_dt,
                     delivered_insulin=delivered,
                     carb_intake=float(carbs[event_index]),
                     current_time=float(times[event_index]),
