@@ -50,17 +50,18 @@ def main() -> None:
         f"Physics OP : G0={fit['operating_glucose_mgdl']:.1f} mg/dL | "
         f"Basal={fit['basal_rate_u_per_h']:.2f} U/h | "
         f"Est TDD={fit.get('estimated_tdd_u_per_day', 0.0):.1f} U/day | "
-        f"Est ISF={fit.get('estimated_isf_mgdl_per_u', 50.0):.1f} mg/dL/U"
+        f"k_SG={fit.get('identified_smartguard_gain', 0.0):.4f} U/h/(mg/dL)"
     )
     print(
-        "\nHorizon |  N   | Naive RMSE | WhiteBox RMSE | GrayBox RMSE | MAE  | Clarke A+B | 90% Cov | Dir Acc | Dir Err"
+        "\nHorizon |  N   | Persist | AR(2) | WhiteBox | GrayBox | MAE  | Clarke A+B | 90% Cov | Dir Acc | Dir Err"
     )
     print("-" * 106)
     for row in report["horizon_evaluations"]:
         print(
             f"{row['horizon_minutes']:4d} min | {row['n_samples']:4d} | "
-            f"{row['naive_rmse_mgdl']:10.2f} | {row['whitebox_rmse_mgdl']:13.2f} | "
-            f"{row['graybox_rmse_mgdl']:12.2f} | {row['graybox_mae_mgdl']:4.1f} | "
+            f"{row['persistence_rmse_mgdl']:7.2f} | {row['ar2_rmse_mgdl']:5.2f} | "
+            f"{row['whitebox_rmse_mgdl']:8.2f} | {row['graybox_rmse_mgdl']:7.2f} | "
+            f"{row['graybox_mae_mgdl']:4.1f} | "
             f"{row['graybox_clarke_ab_pct']:9.2f}% | {row['graybox_coverage_90_pct']:6.2f}% | "
             f"{row['graybox_directional_accurate_pct']:6.2f}% | {row['graybox_directional_erroneous_pct']:6.2f}%"
         )

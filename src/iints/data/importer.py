@@ -167,22 +167,65 @@ def _parse_carelink_timestamps(date_col: pd.Series, time_col: pd.Series) -> pd.S
     return pd.to_datetime(combined, errors="coerce", dayfirst=True)
 
 
+def _classify_carelink_section(banner_line: str, delimiter: str) -> str:
+    lower = banner_line.lower()
+    if "aggregated auto insulin" in lower:
+        return "aggregated_auto_insulin"
+    if f"{delimiter}sensor{delimiter}" in lower or lower.endswith(f"{delimiter}sensor"):
+        return "sensor"
+    return "pump"
+
+
 def _read_carelink_event_frame(path: Union[str, Path]) -> tuple[pd.DataFrame, Dict[str, Any]]:
     file_path = Path(path)
     lines = file_path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
-    header_idx, delimiter = _find_carelink_header_index(lines)
-    metadata = _parse_carelink_metadata(lines[:header_idx], delimiter=delimiter)
+    first_header_idx, delimiter = _find_carelink_header_index(lines)
+    metadata = _parse_carelink_metadata(lines[:first_header_idx], delimiter=delimiter)
 
-    df = pd.read_csv(
-        file_path,
-        sep=delimiter,
-        skiprows=header_idx,
-        encoding="utf-8-sig",
-        dtype=str,
-    )
-    df.columns = [str(col).strip() for col in df.columns]
+    # Split into explicit CareLink sections (Pump, Aggregated Auto Insulin Data, Sensor)
+    # so daily aggregated totals are never mixed with 5-minute pump/sensor events.
+    header_prefix = f"Index{delimiter}Date{delimiter}Time{delimiter}"
+    section_blocks: List[tuple[str, List[str]]] = []
+    current_section = "pump"
+    active_lines: Optional[List[str]] = None
+
+    for line in lines:
+        stripped = line.lstrip("\ufeff")
+        if stripped.startswith("-------"):
+            if active_lines is not None and len(active_lines) > 1:
+                section_blocks.append((current_section, active_lines))
+                active_lines = None
+            current_section = _classify_carelink_section(stripped, delimiter)
+            continue
+        if stripped.startswith(header_prefix):
+            if active_lines is not None and len(active_lines) > 1:
+                section_blocks.append((current_section, active_lines))
+            active_lines = [stripped]
+            continue
+        if active_lines is not None and stripped.strip():
+            active_lines.append(stripped)
+
+    if active_lines is not None and len(active_lines) > 1:
+        section_blocks.append((current_section, active_lines))
+
+    if not section_blocks:
+        raise ValueError("CareLink export contains no event rows after the header.")
+
+    frames: List[pd.DataFrame] = []
+    for section_name, block_lines in section_blocks:
+        sec_df = pd.read_csv(
+            io.StringIO("\n".join(block_lines)),
+            sep=delimiter,
+            dtype=str,
+        )
+        sec_df.columns = [str(col).strip() for col in sec_df.columns]
+        sec_df["carelink_section"] = section_name
+        frames.append(sec_df)
+
+    df = pd.concat(frames, ignore_index=True, sort=False)
     for column in df.columns:
-        df[column] = df[column].astype("string").str.strip()
+        if column != "carelink_section":
+            df[column] = df[column].astype("string").str.strip()
 
     if {"Date", "Time"} - set(df.columns):
         raise ValueError("CareLink export is missing the expected Date/Time columns.")
@@ -210,7 +253,7 @@ def _attach_events_to_glucose_timeline(
     glucose_df = glucose_df.copy()
     glucose_df[output_column] = glucose_df.get(output_column, 0.0)
     timestamps = list(glucose_df["timestamp_dt"])
-    tolerance = pd.Timedelta(minutes=tolerance_minutes)
+    tolerance = pd.to_timedelta(float(tolerance_minutes), unit="m")
 
     for row in event_df.itertuples(index=False):
         event_time = getattr(row, "timestamp_dt")
@@ -273,45 +316,82 @@ def import_carelink_timeline(
     *,
     source: Optional[str] = None,
     event_tolerance_minutes: float = 7.5,
+    fill_gaps: bool = False,
+    grid_step_minutes: float = 5.0,
 ) -> pd.DataFrame:
     """
     Import a CareLink export into an enriched glucose timeline with real datetimes.
 
+    Section-aware accounting:
+    - Separates ``Aggregated Auto Insulin Data`` daily totals from 5-minute
+      ``Pump`` / ``Sensor`` rows so daily totals are never booked as 5-minute
+      bolus spikes and never double-counted with the programmed fallback
+      ``Basal Rate (U/h)``.
+    - When ``fill_gaps=True``, builds a continuous ``grid_step_minutes`` grid
+      where sensor dropouts have ``glucose = NaN`` while every bolus and carb
+      event is conserved (exact 0.0000 U bolus/carb conservation).
+
     Returns:
         DataFrame with columns:
         `timestamp_dt`, `timestamp`, `glucose`, `carbs`, `insulin`,
-        `bolus_units`, `basal_units`, `basal_rate_u_per_hr`, `source`
+        `bolus_units`, `basal_units`, `basal_rate_u_per_hr`, `isig`,
+        `bwz_active_insulin`, `source`
     """
     raw_df, _metadata = _read_carelink_event_frame(path)
 
-    MGDL_PER_MMOLL = 18.0182
-    sensor_glucose = _parse_decimal_series(raw_df.get("Sensor Glucose (mg/dL)", pd.Series(dtype="string")))
-    if sensor_glucose.notna().sum() == 0 and "Sensor Glucose (mmol/L)" in raw_df.columns:
-        sensor_glucose = _parse_decimal_series(raw_df["Sensor Glucose (mmol/L)"]) * MGDL_PER_MMOLL
-    bg_reading = _parse_decimal_series(raw_df.get("BG Reading (mg/dL)", pd.Series(dtype="string")))
-    if bg_reading.notna().sum() == 0 and "BG Reading (mmol/L)" in raw_df.columns:
-        bg_reading = _parse_decimal_series(raw_df["BG Reading (mmol/L)"]) * MGDL_PER_MMOLL
-    raw_df["effective_glucose"] = sensor_glucose.combine_first(bg_reading)
+    section_col = raw_df.get("carelink_section", pd.Series("pump", index=raw_df.index))
+    agg_df = raw_df[section_col == "aggregated_auto_insulin"].copy()
+    event_df = raw_df[section_col != "aggregated_auto_insulin"].copy()
 
-    glucose_df = (
-        raw_df.loc[raw_df["effective_glucose"].notna(), ["timestamp_dt", "effective_glucose"]]
+    # Extract daily aggregated SmartGuard auto-insulin totals (U/day) by calendar date.
+    daily_auto_by_date: Dict[Any, float] = {}
+    if not agg_df.empty:
+        agg_df["agg_units"] = _parse_decimal_series(
+            agg_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string"))
+        )
+        valid_agg = agg_df[agg_df["agg_units"].notna() & (agg_df["agg_units"] > 0)].copy()
+        if not valid_agg.empty:
+            valid_agg["cal_date"] = valid_agg["timestamp_dt"].dt.date
+            daily_auto_by_date = {
+                d: float(v) for d, v in valid_agg.groupby("cal_date")["agg_units"].sum().items()
+            }
+
+    MGDL_PER_MMOLL = 18.0182
+    sensor_glucose = _parse_decimal_series(event_df.get("Sensor Glucose (mg/dL)", pd.Series(dtype="string")))
+    if sensor_glucose.notna().sum() == 0 and "Sensor Glucose (mmol/L)" in event_df.columns:
+        sensor_glucose = _parse_decimal_series(event_df["Sensor Glucose (mmol/L)"]) * MGDL_PER_MMOLL
+    bg_reading = _parse_decimal_series(event_df.get("BG Reading (mg/dL)", pd.Series(dtype="string")))
+    if bg_reading.notna().sum() == 0 and "BG Reading (mmol/L)" in event_df.columns:
+        bg_reading = _parse_decimal_series(event_df["BG Reading (mmol/L)"]) * MGDL_PER_MMOLL
+    event_df["effective_glucose"] = sensor_glucose.combine_first(bg_reading)
+    event_df["isig_val"] = _parse_decimal_series(event_df.get("ISIG Value", pd.Series(dtype="string")))
+    event_df["bwz_iob_val"] = _parse_decimal_series(
+        event_df.get("BWZ Active Insulin (U)", pd.Series(dtype="string"))
+    )
+
+    glucose_obs_df = (
+        event_df.loc[event_df["effective_glucose"].notna(), ["timestamp_dt", "effective_glucose", "isig_val"]]
         .groupby("timestamp_dt", as_index=False)
         .last()
-        .rename(columns={"effective_glucose": "glucose"})
+        .rename(columns={"effective_glucose": "glucose", "isig_val": "isig"})
+        .sort_values("timestamp_dt")
+        .reset_index(drop=True)
     )
-    if glucose_df.empty:
+    if glucose_obs_df.empty:
         raise ValueError("No glucose readings were found in the CareLink export.")
 
-    carbs_df = raw_df.loc[:, ["timestamp_dt"]].copy()
-    carbs_df["carbs"] = _parse_decimal_series(raw_df.get("BWZ Carb Input (grams)", pd.Series(dtype="string")))
+    carbs_df = event_df.loc[:, ["timestamp_dt"]].copy()
+    carbs_df["carbs"] = _parse_decimal_series(event_df.get("BWZ Carb Input (grams)", pd.Series(dtype="string")))
     carbs_df = carbs_df[carbs_df["carbs"].notna() & (carbs_df["carbs"] > 0)].groupby("timestamp_dt", as_index=False).sum()
 
-    all_bolus_df = raw_df.loc[:, ["timestamp_dt"]].copy()
-    all_bolus_df["bolus_units"] = _parse_decimal_series(raw_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string")))
-    all_bolus_df["bolus_number"] = raw_df.get("Bolus Number", pd.Series(dtype="string")).astype("string").fillna("")
-    all_bolus_df["bolus_source"] = raw_df.get("Bolus Source", pd.Series(dtype="string")).astype("string").fillna("")
+    all_bolus_df = event_df.loc[:, ["timestamp_dt"]].copy()
+    all_bolus_df["bolus_units"] = _parse_decimal_series(
+        event_df.get("Bolus Volume Delivered (U)", pd.Series(dtype="string"))
+    )
+    all_bolus_df["bolus_number"] = event_df.get("Bolus Number", pd.Series(dtype="string")).astype("string").fillna("")
+    all_bolus_df["bolus_source"] = event_df.get("Bolus Source", pd.Series(dtype="string")).astype("string").fillna("")
 
-    # Manual boluses + SmartGuard auto-correction boluses (exclude SmartGuard auto-basal micro-boluses here)
+    # Manual boluses + SmartGuard food/correction boluses (exclude per-5-min auto-basal here)
     bolus_df = all_bolus_df[
         all_bolus_df["bolus_units"].notna()
         & (all_bolus_df["bolus_units"] > 0)
@@ -327,8 +407,7 @@ def import_carelink_timeline(
         .sum()
     )
 
-    # MiniMed 780G SmartGuard auto-basal micro-boluses (CLOSED_LOOP_AUTO_INSULIN):
-    # preserved separately so SmartGuard basal delivery is never dropped or double-counted.
+    # Per-5-min CLOSED_LOOP_AUTO_INSULIN rows inside Pump section (when no aggregated daily section exists)
     auto_basal_df = all_bolus_df[
         all_bolus_df["bolus_units"].notna()
         & (all_bolus_df["bolus_units"] > 0)
@@ -341,8 +420,15 @@ def import_carelink_timeline(
         else pd.DataFrame(columns=["timestamp_dt", "auto_basal_units"])
     )
 
-    basal_df = raw_df.loc[:, ["timestamp_dt"]].copy()
-    basal_df["basal_rate_u_per_hr"] = _parse_decimal_series(raw_df.get("Basal Rate (U/h)", pd.Series(dtype="string")))
+    bwz_iob_df = (
+        event_df.loc[event_df["bwz_iob_val"].notna(), ["timestamp_dt", "bwz_iob_val"]]
+        .groupby("timestamp_dt", as_index=False)
+        .last()
+        .rename(columns={"bwz_iob_val": "bwz_active_insulin"})
+    )
+
+    basal_df = event_df.loc[:, ["timestamp_dt"]].copy()
+    basal_df["basal_rate_u_per_hr"] = _parse_decimal_series(event_df.get("Basal Rate (U/h)", pd.Series(dtype="string")))
     basal_df = (
         basal_df[basal_df["basal_rate_u_per_hr"].notna()]
         .groupby("timestamp_dt", as_index=False)
@@ -350,28 +436,64 @@ def import_carelink_timeline(
         .sort_values("timestamp_dt")
     )
 
+    if fill_gaps:
+        # Build a continuous grid_step_minutes grid covering all glucose, bolus, and carb events
+        all_ts_min = [glucose_obs_df["timestamp_dt"].iloc[0]]
+        all_ts_max = [glucose_obs_df["timestamp_dt"].iloc[-1]]
+        for extra_df in (bolus_df, carbs_df):
+            if not extra_df.empty:
+                all_ts_min.append(extra_df["timestamp_dt"].min())
+                all_ts_max.append(extra_df["timestamp_dt"].max())
+        grid_start = min(all_ts_min).floor(f"{int(round(grid_step_minutes))}min")
+        grid_end = max(all_ts_max).ceil(f"{int(round(grid_step_minutes))}min")
+        grid_times = pd.date_range(start=grid_start, end=grid_end, freq=f"{int(round(grid_step_minutes))}min")
+        glucose_df = pd.DataFrame({"timestamp_dt": grid_times})
+        # Nearest-align observed CGM readings onto the 5-min grid (within half a step + small margin)
+        tol_grid = pd.to_timedelta(float(grid_step_minutes) * 0.55, unit="m")
+        glucose_df = pd.merge_asof(
+            glucose_df,
+            glucose_obs_df,
+            on="timestamp_dt",
+            direction="nearest",
+            tolerance=tol_grid,
+        )
+        attach_tol = max(float(event_tolerance_minutes), float(grid_step_minutes))
+    else:
+        glucose_df = glucose_obs_df.copy()
+        attach_tol = float(event_tolerance_minutes)
+
     glucose_df = glucose_df.sort_values("timestamp_dt").reset_index(drop=True)
     glucose_df = _attach_events_to_glucose_timeline(
         glucose_df,
         carbs_df,
         value_column="carbs",
         output_column="carbs",
-        tolerance_minutes=event_tolerance_minutes,
+        tolerance_minutes=attach_tol,
     )
     glucose_df = _attach_events_to_glucose_timeline(
         glucose_df,
         bolus_df,
         value_column="bolus_units",
         output_column="bolus_units",
-        tolerance_minutes=event_tolerance_minutes,
+        tolerance_minutes=attach_tol,
     )
     glucose_df = _attach_events_to_glucose_timeline(
         glucose_df,
         auto_basal_df,
         value_column="auto_basal_units",
         output_column="auto_basal_units",
-        tolerance_minutes=event_tolerance_minutes,
+        tolerance_minutes=attach_tol,
     )
+    if not bwz_iob_df.empty:
+        glucose_df = pd.merge_asof(
+            glucose_df,
+            bwz_iob_df.sort_values("timestamp_dt"),
+            on="timestamp_dt",
+            direction="nearest",
+            tolerance=pd.to_timedelta(float(attach_tol), unit="m"),
+        )
+    else:
+        glucose_df["bwz_active_insulin"] = float("nan")
 
     if not basal_df.empty:
         glucose_df = pd.merge_asof(
@@ -386,17 +508,29 @@ def import_carelink_timeline(
 
     timestamp_series = pd.to_datetime(glucose_df["timestamp_dt"], errors="coerce")
     raw_step_minutes = timestamp_series.diff().dt.total_seconds().div(60.0)
-    typical_step = raw_step_minutes[(raw_step_minutes > 0) & (raw_step_minutes <= 15)].median()
-    if pd.isna(typical_step):
-        typical_step = 5.0
-    capped_step_minutes = raw_step_minutes.fillna(float(typical_step)).clip(
-        lower=0.0,
-        upper=max(float(typical_step) * 1.5, 15.0),
-    )
+    if fill_gaps:
+        capped_step_minutes = pd.Series(float(grid_step_minutes), index=glucose_df.index)
+    else:
+        typical_step = raw_step_minutes[(raw_step_minutes > 0) & (raw_step_minutes <= 15)].median()
+        if pd.isna(typical_step):
+            typical_step = 5.0
+        capped_step_minutes = raw_step_minutes.fillna(float(typical_step)).clip(
+            lower=0.0,
+            upper=max(float(typical_step) * 1.5, 15.0),
+        )
 
     glucose_df["carbs"] = glucose_df.get("carbs", 0.0)
     glucose_df["bolus_units"] = glucose_df.get("bolus_units", 0.0)
     auto_basal_series = glucose_df.get("auto_basal_units", pd.Series(0.0, index=glucose_df.index)).fillna(0.0)
+
+    # Prefer section-separated daily Aggregated Auto Insulin rate over the programmed
+    # fallback Basal Rate (U/h) whenever Aggregated Auto Insulin Data is present.
+    if daily_auto_by_date:
+        cal_dates = timestamp_series.dt.date
+        agg_daily_rate = cal_dates.map(lambda d: daily_auto_by_date.get(d, float("nan")) / 24.0)
+        has_agg = agg_daily_rate.notna()
+        glucose_df["basal_rate_u_per_hr"] = glucose_df["basal_rate_u_per_hr"].where(~has_agg, agg_daily_rate)
+
     manual_basal_units = glucose_df["basal_rate_u_per_hr"] * capped_step_minutes.div(60.0)
     has_auto_basal = auto_basal_series > 0.0
     glucose_df["basal_units"] = manual_basal_units.where(~has_auto_basal, auto_basal_series)
@@ -420,6 +554,8 @@ def import_carelink_timeline(
             "bolus_units",
             "basal_units",
             "basal_rate_u_per_hr",
+            "isig",
+            "bwz_active_insulin",
             "source",
         ]
     ].copy()
