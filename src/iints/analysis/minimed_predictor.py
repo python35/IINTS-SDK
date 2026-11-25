@@ -162,7 +162,7 @@ class PredictorConfig:
     insulin_weight: float = 800.0
     max_gap_minutes: float = 20.0
     warmup_steps: int = 6
-    smartguard_gain_grid: Tuple[float, ...] = (0.0, 0.005, 0.01, 0.02, 0.03)
+    smartguard_gain_grid: Tuple[float, ...] = (0.0, 0.015, 0.03, 0.05, 0.075, 0.10, 0.14)
     process_noise_scale: float = 2.0
 
     def __post_init__(self) -> None:
@@ -194,24 +194,45 @@ class HorizonEvaluation:
     graybox_coverage_90_pct: float
     graybox_directional_accurate_pct: float
     graybox_directional_erroneous_pct: float
+    hypo_n: int = 0
+    hypo_sensitivity_p05_pct: float = 0.0
+    hypo_false_alarm_pct: float = 0.0
+    hypo_brier_score: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
 
+def _normal_cdf(z: np.ndarray) -> np.ndarray:
+    """Exact Gaussian CDF Phi(z) using math.erfc (no extra scipy.stats dependency)."""
+    return np.array([0.5 * math.erfc(-float(v) / math.sqrt(2.0)) for v in z], dtype=float)
+
+
 def _circadian_features(
     minute_of_day: float,
     glucose_mgdl: float,
+    prev_glucose_mgdl: float,
+    wb_delta_mgdl: float,
     slope_15m: float,
     innovation_mgdl: float,
     harmonics: int = 2,
 ) -> np.ndarray:
+    """Physics-informed Gray-Box feature vector (strictly causal).
+
+    Includes the Hovorka+Kalman predicted change ``wb_delta_mgdl = y_wb - G_i``
+    alongside lag-1 momentum ``G_i - G_{i-1}``, level deviation ``(G_i - 120)/50``,
+    24-hour Fourier harmonics, 15-min slope, and Kalman innovation. Because AR(2)
+    is a strict linear subset of this basis, Ridge regression optimally blends
+    causal physics with autoregressive mean reversion.
+    """
     feats: List[float] = [1.0]
     for m in range(1, harmonics + 1):
         angle = 2.0 * math.pi * m * (minute_of_day % 1440.0) / 1440.0
         feats.append(math.sin(angle))
         feats.append(math.cos(angle))
     feats.append((glucose_mgdl - 120.0) / 50.0)
+    feats.append(max(-40.0, min(40.0, glucose_mgdl - prev_glucose_mgdl)) / 10.0)
+    feats.append(max(-150.0, min(150.0, wb_delta_mgdl)) / 30.0)
     feats.append(max(-4.0, min(4.0, slope_15m)))
     feats.append(max(-5.0, min(5.0, innovation_mgdl / 20.0)))
     return np.asarray(feats, dtype=float)
@@ -417,13 +438,6 @@ class MiniMedGrayBoxPredictor:
 
             g_prev = float(glucose[prev_valid_idx]) if prev_valid_idx >= 0 else g_i
             means, stds = self._rollout_observer(observer, max_steps, dt_nom)
-            feat = _circadian_features(
-                minutes_of_day[i],
-                g_i,
-                slope_15m,
-                observer.innovation,
-                harmonics=cfg.fourier_harmonics,
-            )
 
             for h in horizons:
                 k_steps = int(round(h / dt_nom))
@@ -438,13 +452,21 @@ class MiniMedGrayBoxPredictor:
                 wb_sd = float(stds[k_steps - 1])
                 naive_pred = float(np.clip(g_i + slope_15m * h, 20.0, 500.0))
 
+                feat = _circadian_features(
+                    minutes_of_day[i],
+                    g_i,
+                    g_prev,
+                    wb_pred - g_i,
+                    slope_15m,
+                    observer.innovation,
+                    harmonics=cfg.fourier_harmonics,
+                )
+
                 if apply_residual and h in self._residual_weights:
-                    corr = float(feat @ self._residual_weights[h])
-                    corr = float(np.clip(corr, -cfg.max_residual_correction_mgdl, cfg.max_residual_correction_mgdl))
-                    gray_pred = float(np.clip(wb_pred + corr, 20.0, 500.0))
+                    delta_pred = float(feat @ self._residual_weights[h])
+                    gray_pred = float(np.clip(g_i + delta_pred, 20.0, 500.0))
                     gray_sd = wb_sd * self._uncertainty_scales.get(h, 1.0)
                 else:
-                    corr = 0.0
                     gray_pred = wb_pred
                     gray_sd = wb_sd
 
@@ -463,7 +485,7 @@ class MiniMedGrayBoxPredictor:
                 if collect_profiles and k_steps >= 4:
                     ref_prof = glucose[i : target_idx + 1]
                     if np.all(np.isfinite(ref_prof)):
-                        ramp = np.linspace(0.0, corr, k_steps + 1)
+                        ramp = np.linspace(0.0, gray_pred - wb_pred, k_steps + 1)
                         pred_prof = np.concatenate(([g_i], np.clip(means[:k_steps], 20.0, 500.0))) + ramp
                         b["ref_profile"].append(ref_prof)
                         b["gray_profile"].append(np.clip(pred_prof, 20.0, 500.0))
@@ -546,8 +568,9 @@ class MiniMedGrayBoxPredictor:
                 continue
             X = np.vstack(b["features"])
             y_true = np.asarray(b["y_true"], dtype=float)
+            y_pers = np.asarray(b["persistence"], dtype=float)
             y_wb = np.asarray(b["wb"], dtype=float)
-            y_res = y_true - y_wb
+            y_delta = y_true - y_pers
             wb_sd = np.asarray(b["wb_std"], dtype=float)
 
             # Honest AR(2) statistical baseline fitted strictly on training split
@@ -555,15 +578,15 @@ class MiniMedGrayBoxPredictor:
             w_ar2 = np.linalg.lstsq(X_ar2, y_true, rcond=None)[0]
             self._ar2_weights[h] = w_ar2
 
-            # Closed-form Ridge regression (intercept unpenalized)
+            # Closed-form Ridge regression on delta = y_true - G_i (strictly nests AR(2) + physics)
             reg = self.config.ridge_alpha * np.eye(X.shape[1])
             reg[0, 0] = 1e-6
-            w = np.linalg.solve(X.T @ X + reg, X.T @ y_res)
+            w = np.linalg.solve(X.T @ X + reg, X.T @ y_delta)
             self._residual_weights[h] = w
 
             # Conformal calibration of 90% uncertainty scale (high ceiling 10.0 so clip never binds silently)
-            pred_corr = np.clip(X @ w, -self.config.max_residual_correction_mgdl, self.config.max_residual_correction_mgdl)
-            abs_err = np.abs(y_res - pred_corr)
+            pred_delta = X @ w
+            abs_err = np.abs(y_delta - pred_delta)
             z_scores = abs_err / np.maximum(wb_sd, 1.0)
             q90 = float(np.quantile(z_scores, 0.90))
             scale = float(np.clip(q90 / Z_90_TWO_SIDED, 0.5, 10.0))
@@ -571,7 +594,8 @@ class MiniMedGrayBoxPredictor:
             fit_summary["horizons"][str(h)] = {
                 "train_samples": len(b["y_true"]),
                 "uncertainty_scale_90": round(scale, 3),
-                "mean_train_residual_mgdl": round(float(np.mean(y_res)), 2),
+                "mean_train_wb_residual_mgdl": round(float(np.mean(y_true - y_wb)), 2),
+                "physics_blend_weight": round(float(w[-3]), 3),
             }
         return fit_summary
 
@@ -676,6 +700,16 @@ class MiniMedGrayBoxPredictor:
             hi_90 = y_gray + Z_90_TWO_SIDED * sd_gray
             cov_90 = float(np.mean((y_true >= lo_90) & (y_true <= hi_90)) * 100.0)
 
+            # Dedicated hypoglycemia early-warning metrics (< 70 mg/dL)
+            is_hypo = y_true < self.config.safety_floor_mgdl
+            hypo_n = int(np.sum(is_hypo))
+            p05_alarm = lo_90 < self.config.safety_floor_mgdl
+            hypo_sens = float(np.mean(p05_alarm[is_hypo]) * 100.0) if hypo_n > 0 else 0.0
+            non_hypo = ~is_hypo
+            hypo_far = float(np.mean(p05_alarm[non_hypo]) * 100.0) if int(np.sum(non_hypo)) > 0 else 0.0
+            p_hypo = _normal_cdf((self.config.safety_floor_mgdl - y_gray) / np.maximum(sd_gray, 1.0))
+            hypo_brier = float(np.mean((p_hypo - is_hypo.astype(float)) ** 2))
+
             dir_acc = float("nan")
             dir_err = float("nan")
             if b["ref_profile"]:
@@ -703,6 +737,10 @@ class MiniMedGrayBoxPredictor:
                 graybox_coverage_90_pct=round(cov_90, 2),
                 graybox_directional_accurate_pct=round(dir_acc, 2) if math.isfinite(dir_acc) else 0.0,
                 graybox_directional_erroneous_pct=round(dir_err, 2) if math.isfinite(dir_err) else 0.0,
+                hypo_n=hypo_n,
+                hypo_sensitivity_p05_pct=round(hypo_sens, 1),
+                hypo_false_alarm_pct=round(hypo_far, 1),
+                hypo_brier_score=round(hypo_brier, 5),
             )
             evaluations.append(ev.to_dict())
 

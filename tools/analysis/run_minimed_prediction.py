@@ -53,9 +53,9 @@ def main() -> None:
         f"k_SG={fit.get('identified_smartguard_gain', 0.0):.4f} U/h/(mg/dL)"
     )
     print(
-        "\nHorizon |  N   | Persist | AR(2) | WhiteBox | GrayBox | MAE  | Clarke A+B | 90% Cov | Dir Acc | Dir Err"
+        "\nHorizon |  N   | Persist | AR(2) | WhiteBox | GrayBox | MAE  | Clarke A+B | 90% Cov | Hypo Sens | Brier"
     )
-    print("-" * 106)
+    print("-" * 108)
     for row in report["horizon_evaluations"]:
         print(
             f"{row['horizon_minutes']:4d} min | {row['n_samples']:4d} | "
@@ -63,7 +63,7 @@ def main() -> None:
             f"{row['whitebox_rmse_mgdl']:8.2f} | {row['graybox_rmse_mgdl']:7.2f} | "
             f"{row['graybox_mae_mgdl']:4.1f} | "
             f"{row['graybox_clarke_ab_pct']:9.2f}% | {row['graybox_coverage_90_pct']:6.2f}% | "
-            f"{row['graybox_directional_accurate_pct']:6.2f}% | {row['graybox_directional_erroneous_pct']:6.2f}%"
+            f"{row['hypo_sensitivity_p05_pct']:8.1f}% | {row['hypo_brier_score']:.4f}"
         )
 
     qp = report["latest_in_silico_boxqp"]

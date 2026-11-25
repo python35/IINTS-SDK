@@ -18,7 +18,7 @@ def _synthetic_minimed_timeline(n_steps: int = 220) -> pd.DataFrame:
     rows = []
     for k in range(n_steps):
         t = k * dt
-        ts = start + pd.Timedelta(minutes=t)
+        ts = start + pd.to_timedelta(float(t), unit="m")
         carbs = 35.0 if k in (20, 90, 160) else 0.0
         bolus = 3.0 if k in (20, 90, 160) else 0.0
         basal_u = 1.2 * dt / 60.0
@@ -59,6 +59,7 @@ def test_minimed_graybox_predictor_end_to_end_benchmark() -> None:
         assert math.isfinite(ev["graybox_rmse_mgdl"])
         assert ev["graybox_clarke_ab_pct"] >= 80.0
         assert 0.0 <= ev["graybox_coverage_90_pct"] <= 100.0
+        assert 0.0 <= ev["hypo_brier_score"] <= 1.0
 
     qp = report["latest_in_silico_boxqp"]
     assert 0.0 <= qp["recommended_rate_u_per_h"] <= cfg.max_insulin_rate_u_per_h
