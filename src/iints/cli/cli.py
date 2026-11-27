@@ -37,6 +37,7 @@ from iints.ai.cli import app as ai_app
 from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
 from iints.cli.research_cli import app as research_lab_app
+from iints.cli.forecasting_cli import app as forecasting_app
 from iints.versioning import (
     ComponentVersionStatus,
     check_sdk_version,
@@ -316,6 +317,7 @@ jetson_app.add_typer(jetson_endurance_app, name="endurance")
 jetson_app.add_typer(jetson_theory_stress_app, name="theory-stress")
 app.add_typer(safety_app, name="safety")
 app.add_typer(research_lab_app, name="lab")
+app.add_typer(forecasting_app, name="forecasting")
 
 
 @app.callback(invoke_without_command=True)

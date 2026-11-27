@@ -98,7 +98,7 @@ _STUDIO_HTML = """<!DOCTYPE html>
 <body>
   <header>
     <h1>IINTS Research Studio 2.0 — Reproducible Diabetes Algorithm Lab</h1>
-    <span style="font-size:0.82rem;opacity:0.9">SDK 2.0 Engine + Pre-Registered Research Lab</span>
+    <span style="font-size:0.82rem;opacity:0.9"><a href="/neural-forecasting" style="color:#bae6fd;text-decoration:underline;margin-right:14px;">Open Neural Forecasting &amp; Jetson Lab →</a> SDK 2.0 + Research Lab</span>
   </header>
   <div class="banner">
     <strong>Pre-Clinical Research &amp; Education Only:</strong> Not a medical device. All numbers come strictly from stored simulation artifacts, never from generative text.
@@ -337,6 +337,74 @@ def create_studio_app(workspace_dir: Path | str = "results/research_studio") -> 
     def api_list_experiments() -> Dict[str, Any]:
         store = ExperimentStore(runs_dir / "experiments.sqlite")
         return {"experiments": store.list_experiments()}
+
+    @studio.get("/api/forecasting/registry")
+    def api_forecasting_registry(registry_dir: str = "results/neural_forecasting_v1/model_registry") -> Dict[str, Any]:
+        from iints.forecasting import ForecastingModelRegistry
+
+        reg = ForecastingModelRegistry(registry_dir)
+        return {
+            "disclaimer": RESEARCH_ONLY_DISCLAIMER,
+            "clinical_use": False,
+            "models": [e.model_dump(mode="json") for e in reg.list_entries()],
+        }
+
+    @studio.get("/neural-forecasting", response_class=HTMLResponse)
+    def neural_forecasting_page() -> str:
+        return """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" /><title>IINTS Neural Forecasting &amp; Jetson Orin Nano Lab</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a; margin: 0; }
+    header { background: #1b4965; color: #fff; padding: 16px 28px; display: flex; justify-content: space-between; }
+    .warn { background: #fef2f2; border-bottom: 2px solid #dc2626; color: #991b1b; padding: 10px 28px; font-size: 0.85rem; font-weight: 600; }
+    .tabs { display: flex; gap: 8px; padding: 18px 28px 0; max-width: 1180px; margin: 0 auto; }
+    .tab { padding: 9px 18px; border: 1px solid #cbd5e1; background: #e2e8f0; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; }
+    .tab.active { background: #fff; border-bottom-color: #fff; color: #1b4965; }
+    .panel { max-width: 1180px; margin: 0 auto 28px; background: #fff; border: 1px solid #cbd5e1; border-radius: 0 8px 8px 8px; padding: 22px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; font-size: 0.82rem; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border-bottom: 1px solid #e2e8f0; padding: 8px; text-align: left; }
+  </style>
+</head>
+<body>
+  <header><strong>IINTS Neural Forecasting v1 — Models · Training · CGM Robustness · Jetson Orin Nano</strong><a href="/" style="color:#bae6fd">← Back to Studio</a></header>
+  <div class="warn">RESEARCH PREDICTION DISPLAY ONLY (clinical_use=false) — Predicted values are experimental AI estimates, NEVER measured blood/CGM glucose, and must never guide insulin dosing.</div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab(0)">1. Models &amp; Registry</div>
+    <div class="tab" onclick="showTab(1)">2. 5-Seed Training Protocol</div>
+    <div class="tab" onclick="showTab(2)">3. CGM Robustness Designer</div>
+    <div class="tab" onclick="showTab(3)">4. NVIDIA Jetson Orin Nano Edge</div>
+  </div>
+  <div class="panel" id="p0">
+    <h3>Registered Forecasting Checkpoints (SHA-256 Verified)</h3>
+    <div id="regBox">Loading Model Registry...</div>
+  </div>
+  <div class="panel" id="p1" style="display:none">
+    <h3>Leakage-Resistant 5-Seed Training Configuration</h3>
+    <p>Input: 12 contiguous 5-min CGM samples (55.0 min elapsed span) → Target: +30 min. Chronological validation split with strict target-to-input embargo purge.</p>
+    <pre>iints forecasting train-all --dataset ohiot1dm --data-path OhioT1DM-volledig --seeds 11,23,42,67,89</pre>
+  </div>
+  <div class="panel" id="p2" style="display:none">
+    <h3>CGM Fault Robustness Configurator (Evaluated Against Unperturbed Reference)</h3>
+    <label>Architecture: <select id="rArch" onchange="updCfg()"><option>gru</option><option>tcn</option></select></label>
+    <label style="margin-left:14px">Horizon: <select id="rHor" onchange="updCfg()"><option>15</option><option selected>30</option><option>60</option></select> min</label>
+    <label style="margin-left:14px">Fault: <select id="rFault" onchange="updCfg()"><option value="dropout_locf:15">CGM Dropout (15 min + LOCF)</option><option value="sensor_noise:10">Colored Sensor Noise (10 mg/dL)</option><option value="sensor_delay:10">Delayed Readings (10 min)</option></select></label>
+    <pre id="cfgOut"></pre>
+  </div>
+  <div class="panel" id="p3" style="display:none">
+    <h3>NVIDIA Jetson Orin Nano Super — Local Inference &amp; tegrastats Telemetry</h3>
+    <p>Exports static batch-size-1 ONNX (opset 17) &amp; `.iints_edge.json`, compiles FP16 TensorRT via <code>/usr/src/tensorrt/bin/trtexec</code>, and measures P50/P95/P99 latency, Peak RSS, and <code>VDD_IN</code> mJ/prediction.</p>
+    <pre>iints forecasting export-edge iints-tcn-glucose-v1\niints forecasting edge-benchmark results/neural_forecasting_v1/edge_exports/iints-tcn-glucose-v1.iints_edge.json\niints forecasting serve-jetson-worker results/neural_forecasting_v1/edge_exports/iints-tcn-glucose-v1.iints_edge.json --port 8770</pre>
+  </div>
+  <script>
+    function showTab(i){document.querySelectorAll('.tab').forEach((t,k)=>t.classList.toggle('active',k===i));for(let k=0;k<4;k++)document.getElementById('p'+k).style.display=(k===i?'block':'none');}
+    function updCfg(){const a=document.getElementById('rArch').value,h=document.getElementById('rHor').value,f=document.getElementById('rFault').value.split(':');document.getElementById('cfgOut').textContent=`experiment:\\n  architecture: ${a}\\n  prediction_horizon_minutes: ${h}\\n  perturbation_family: ${f[0]}\\n  severity: ${f[1]}\\n  clinical_use: false`;}
+    fetch('/api/forecasting/registry').then(r=>r.json()).then(d=>{if(!d.models.length){document.getElementById('regBox').textContent='No models in default registry yet — run `iints forecasting train-all`.';return;}let h='<table><tr><th>Model ID</th><th>Arch</th><th>Dataset</th><th>Synthetic</th><th>Clinical Val</th><th>SHA-256</th></tr>';for(const m of d.models)h+=`<tr><td>${m.model_id}</td><td>${m.architecture}</td><td>${m.dataset_id}</td><td>${m.is_synthetic}</td><td>${m.clinical_validation}</td><td>${m.checkpoint_sha256.slice(0,16)}...</td></tr>`;document.getElementById('regBox').innerHTML=h+'</table>';});
+    updCfg();
+  </script>
+</body></html>"""
 
     return studio
 

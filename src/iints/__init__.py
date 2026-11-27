@@ -158,6 +158,7 @@ except ImportError:  # pragma: no cover - scipy may not be installed
 
 from . import sdk2
 from . import research
+from . import forecasting
 
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)

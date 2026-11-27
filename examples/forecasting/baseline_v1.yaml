@@ -1,0 +1,21 @@
+project: iints-neural-forecasting
+version: 1
+dataset: ohiot1dm
+history_minutes: 60
+prediction_horizon_minutes: 30
+sample_interval_minutes: 5.0
+validation_fraction: 0.20
+features:
+  - glucose
+ridge_alphas:
+  - 0.1
+  - 1.0
+  - 10.0
+  - 50.0
+  - 200.0
+  - 1000.0
+primary_metric: mae
+secondary_metrics:
+  - rmse
+  - median_absolute_error
+  - clarke_ab_pct
