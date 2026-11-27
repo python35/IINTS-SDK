@@ -99,6 +99,8 @@ Thumbs.db
 env/
 venv/
 .venv_test/
+.venv-stress/
+.pytest_tmp/
 
 # Documentation Build Output
 docssphinx/_build/
