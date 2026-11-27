@@ -48,7 +48,7 @@ def _max_rss_mb() -> float:
 
     try:
         import psutil  # optional; present in some research environments
-        return float(psutil.Process().memory_info().peak_wset) / (1024 * 1024)
+        return float(getattr(psutil.Process().memory_info(), "peak_wset")) / (1024 * 1024)
     except (ImportError, AttributeError, OSError):
         pass
 
@@ -78,7 +78,7 @@ def _windows_peak_rss_mb() -> float:
 
         counters = _ProcessMemoryCounters()
         counters.cb = ctypes.sizeof(counters)
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel = getattr(ctypes, "WinDLL")("kernel32", use_last_error=True)
         get_current_process = kernel.GetCurrentProcess
         get_current_process.argtypes = []
         get_current_process.restype = wintypes.HANDLE
@@ -89,7 +89,7 @@ def _windows_peak_rss_mb() -> float:
             ("psapi", "GetProcessMemoryInfo"),
         ):
             try:
-                library = ctypes.WinDLL(library_name, use_last_error=True)
+                library = getattr(ctypes, "WinDLL")(library_name, use_last_error=True)
                 probe = getattr(library, function_name)
                 probe.argtypes = [wintypes.HANDLE, ctypes.POINTER(_ProcessMemoryCounters), wintypes.DWORD]
                 probe.restype = wintypes.BOOL

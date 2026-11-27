@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Union, cast
 import warnings
 
 import numpy as np
@@ -119,8 +119,11 @@ def evaluate_carelink_csv(
             {
                 "horizon_minutes": int(horizon),
                 "n_origins": int(len(rows)),
-                "rmse": {model: round(float(subset.loc[model, "rmse"]), 2) for model in subset.index},
-                "bias_graybox_mgdl": round(float(subset.loc["graybox", "bias"]), 2),
+                "rmse": {
+                    model: round(float(cast(Any, subset.loc[model, "rmse"])), 2)
+                    for model in subset.index
+                },
+                "bias_graybox_mgdl": round(float(cast(Any, subset.loc["graybox", "bias"])), 2),
                 "post_meal_rmse_mgdl": round(pm_rmse, 2),
                 "post_meal_bias_mgdl": round(pm_bias, 2),
                 "coverage_90_pct": round(100.0 * float(inside.mean()), 1),
@@ -172,9 +175,9 @@ def compare_variants(
             sub = scores[scores["horizon"] == h].set_index("model")
             h_rows = table[table["horizon"] == h]
             pm = h_rows[h_rows["post_meal"]]
-            entry[f"ar2_{h}m"] = round(float(sub.loc["ar2", "rmse"]), 2)
-            entry[f"wb_{h}m"] = round(float(sub.loc["whitebox", "rmse"]), 2)
-            entry[f"gb_{h}m"] = round(float(sub.loc["graybox", "rmse"]), 2)
+            entry[f"ar2_{h}m"] = round(float(cast(Any, sub.loc["ar2", "rmse"])), 2)
+            entry[f"wb_{h}m"] = round(float(cast(Any, sub.loc["whitebox", "rmse"])), 2)
+            entry[f"gb_{h}m"] = round(float(cast(Any, sub.loc["graybox", "rmse"])), 2)
             entry[f"pm_gb_{h}m"] = round(
                 float(np.sqrt(np.mean((pm["y_graybox"] - pm["y_true"]) ** 2))), 2
             )

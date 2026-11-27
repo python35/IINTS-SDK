@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, replace
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple, cast
 
 import numpy as np
 
@@ -155,7 +155,7 @@ class CPeptideParameters:
         return k1, k2, k3
 
     def with_subject(self, **changes: float) -> "CPeptideParameters":
-        return replace(self, **changes)
+        return replace(self, **cast(Any, changes))
 
 
 class CPeptideModel:

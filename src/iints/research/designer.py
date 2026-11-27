@@ -295,11 +295,11 @@ def propose_research_plan(
 
     if template_id == "study_003_cross_simulator":
         per_sim = max(2, n_profiles // 3)
-        cohort: List[PatientSpec] = []
+        cross_simulator_cohort: List[PatientSpec] = []
         for sim_model in ("hovorka_equilibrium", "bergman", "iints_ode"):
             sub = generate_virtual_cohort(n_profiles=per_sim, seed=seed, unseen_fraction=0.30, model=sim_model)  # type: ignore[arg-type]
             for p in sub:
-                cohort.append(p.model_copy(update={"profile": f"{sim_model}_{p.profile}"}))
+                cross_simulator_cohort.append(p.model_copy(update={"profile": f"{sim_model}_{p.profile}"}))
         conditions = generate_dropout_conditions([0, 15, 30], display_mode="nan_blank")
         return ResearchPlan(
             plan_id=plan_id or "study_003_cross_simulator",
@@ -323,7 +323,7 @@ def propose_research_plan(
             confounders_and_controls=[
                 "Matched meal schedules, sensor noise seeds, and missing-data contract across all three simulator backends."
             ],
-            patients=cohort,
+            patients=cross_simulator_cohort,
             scenarios=scenarios[:2],
             sensor_conditions=conditions,
             algorithms=default_algos,

@@ -647,7 +647,7 @@ def _build_blind_view(trace: pd.DataFrame, contract: MissingDataContract) -> pd.
         sensor = pd.Series(sensor).ffill().to_numpy(dtype=float)
     elif not contract.allow_last_valid_observation:
         stale = trace["is_stale_displayed"].to_numpy(dtype=bool)
-        sensor = np.where(stale, np.nan, sensor)
+        sensor[:] = np.where(stale, np.nan, sensor)
 
     view = pd.DataFrame(
         {

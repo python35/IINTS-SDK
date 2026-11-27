@@ -22,7 +22,7 @@ import platform
 import sqlite3
 import subprocess
 import sys
-from typing import Any, Dict, Optional, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -171,7 +171,7 @@ def summarize_forecast_metrics(forecasts: pd.DataFrame) -> pd.DataFrame:
         rows.append(
             {
                 "algorithm_id": str(algo_id),
-                "horizon_min": int(horizon),
+                "horizon_min": int(cast(Any, horizon)),
                 "n_origins": int(len(grp)),
                 "mae": float(np.mean(abs_err)),
                 "rmse": float(np.sqrt(np.mean(sq_err))),

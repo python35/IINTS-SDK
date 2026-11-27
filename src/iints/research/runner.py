@@ -17,7 +17,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 import pandas as pd
 
@@ -69,7 +69,7 @@ def _run_patient_scenario_bundle(
         metrics_df = summarize_forecast_metrics(fc)
         rows: List[Dict[str, Any]] = []
         for _, r in metrics_df.iterrows():
-            rec = r.to_dict()
+            rec = cast(Dict[str, Any], r.to_dict())
             rec.update(
                 {
                     "cell_key": key,
