@@ -156,6 +156,9 @@ try:
 except ImportError:  # pragma: no cover - scipy may not be installed
     BergmanPatientModel = None  # type: ignore[assignment,misc]
 
+from . import sdk2
+from . import research
+
 # Placeholder for Reporting/Analysis
 # This will be further developed in a dedicated module (e.g., iints.analysis.reporting)
 def generate_report(simulation_results: 'pd.DataFrame', output_path: Optional[str] = None, safety_report: Optional[dict] = None) -> Optional[str]:

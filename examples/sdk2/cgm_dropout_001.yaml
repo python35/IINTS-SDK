@@ -1,0 +1,57 @@
+experiment:
+  id: cgm_dropout_001
+  seed: 42
+  patient:
+    model: hovorka_equilibrium
+    profile: virtual_adult_01
+    split: dev
+    initial_glucose_mgdl: 135.0
+    basal_u_per_h: 1.5
+    meal_tau_min: 50.0
+    bioavailability: 0.80
+  scenario:
+    id: standard_day
+    duration_hours: 24.0
+    warmup_hours: 6.0
+    step_minutes: 5.0
+    meal_schedule: standard_day
+  sensor:
+    model: cgm_v1
+    condition_id: dropout_15m
+    isf_tau_minutes: 6.0
+    noise_sd_mgdl: 6.0
+    noise_ar1_phi: 0.75
+    dropout_minutes: 15
+    dropout_at_hour: 8.5
+    recurring_dropout_every_hours: 6.0
+    display_mode: nan_blank
+  algorithms:
+    - type: glucose_forecaster
+      model_id: persistence_v1
+    - type: glucose_forecaster
+      model_id: savgol_linear_v1
+    - type: glucose_forecaster
+      model_id: ar2_v1
+    - type: glucose_forecaster
+      model_id: ridge_ml_v1
+    - type: glucose_forecaster
+      model_id: hovorka_graybox_v2
+  evaluation:
+    prediction_horizon_minutes: 30
+    extra_horizons_minutes:
+      - 60
+    recovery_window_minutes: 30
+    metrics:
+      - mae
+      - rmse
+      - dropout_mae
+      - dropout_recovery_mae
+      - clarke_ab_pct
+      - coverage_90_pct
+    missing_data_contract:
+      allow_last_valid_observation: true
+      expose_stale_flag_to_algorithm: true
+      expose_insulin_and_announced_carbs: true
+      impute_before_algorithm: none
+      reference_target: true_plasma_glucose
+      history_window_minutes: 180

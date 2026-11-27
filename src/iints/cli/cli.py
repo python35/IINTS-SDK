@@ -36,6 +36,7 @@ from iints.ai import prepare_ai_ready_artifacts
 from iints.ai.cli import app as ai_app
 from iints.cli import patient_cli as patient_cli_module
 from iints.cli.patient_cli import app as patient_app
+from iints.cli.research_cli import app as research_lab_app
 from iints.versioning import (
     ComponentVersionStatus,
     check_sdk_version,
@@ -314,6 +315,7 @@ app.add_typer(jetson_app, name="jetson")
 jetson_app.add_typer(jetson_endurance_app, name="endurance")
 jetson_app.add_typer(jetson_theory_stress_app, name="theory-stress")
 app.add_typer(safety_app, name="safety")
+app.add_typer(research_lab_app, name="lab")
 
 
 @app.callback(invoke_without_command=True)
@@ -9221,6 +9223,10 @@ binding_evidence_app = typer.Typer(
     help="Retrieve measured BindingDB affinity evidence without changing patient parameters."
 )
 research_app.add_typer(binding_evidence_app, name="binding")
+alphagenome_app = typer.Typer(
+    help="Google AlphaGenome regulatory/splicing variant impact and Atlas deep-link tools."
+)
+research_app.add_typer(alphagenome_app, name="alphagenome")
 regenerative_app = typer.Typer(
     help="Research-only stem-cell-derived islet protein evidence and comparison tools."
 )
@@ -10694,6 +10700,226 @@ def research_binding_query(
     console.print(
         "[yellow]Interpretation:[/yellow] Ki, Kd, IC50, and in-vivo effects are not interchangeable."
     )
+
+
+@alphagenome_app.command(name="status")
+def research_alphagenome_status(
+    json_output: Annotated[bool, typer.Option("--json", help="Emit machine-readable JSON status.")] = False,
+) -> None:
+    """Inspect Google AlphaGenome SDK availability, API key presence, and offline Atlas capabilities."""
+
+    from iints.research.alphagenome_engine import alphagenome_status
+
+    status = alphagenome_status()
+    if json_output:
+        print(json.dumps(status, indent=2, sort_keys=True))
+        return
+    console = Console()
+    table = Table(title="IINTS Google AlphaGenome Status")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Engine", str(status["engine"]))
+    table.add_row("alphagenome package installed", str(status["sdk_installed"]))
+    table.add_row("ALPHAGENOME_API_KEY configured", str(status["api_key_configured"]))
+    table.add_row("Live AVI API ready", str(status["live_api_ready"]))
+    table.add_row("Offline Atlas deep-links available", str(status["offline_atlas_links_available"]))
+    table.add_row("Curated diabetes genes", ", ".join(status["curated_diabetes_genes"]))
+    table.add_row("Atlas URL", str(status["atlas_base_url"]))
+    console.print(table)
+    console.print(
+        "[yellow]Research only:[/yellow] AlphaGenome AVI scores describe molecular/regulatory impact, "
+        "not clinical pathogenicity or virtual-patient parameters."
+    )
+
+
+@alphagenome_app.command(name="genes")
+def research_alphagenome_genes(
+    json_output: Annotated[bool, typer.Option("--json", help="Emit machine-readable JSON gene panel.")] = False,
+) -> None:
+    """List curated diabetes gene loci (INS, INSR, SLC2A4, GCGR, GCK, HNF1A) and AlphaGenome Atlas links."""
+
+    from iints.research.alphagenome_engine import list_diabetes_alphagenome_loci
+
+    cards = list_diabetes_alphagenome_loci()
+    if json_output:
+        print(json.dumps({"genes": cards, "research_only": True, "medical_device": False}, indent=2))
+        return
+    console = Console()
+    table = Table(title="IINTS Diabetes Loci in Google AlphaGenome Atlas (GRCh38 / GENCODE v46)")
+    table.add_column("Gene", style="cyan", no_wrap=True)
+    table.add_column("Locus (1-based)", style="white")
+    table.add_column("Biosample", style="green")
+    table.add_column("Key TFs", style="yellow")
+    table.add_column("Atlas Locus URL", overflow="fold")
+    for card in cards:
+        table.add_row(
+            str(card["gene_symbol"]),
+            str(card["interval_1_based"]),
+            str(card["primary_biosample"]),
+            ", ".join(card["key_transcription_factors"]),
+            str(card["atlas_locus_url"]),
+        )
+    console.print(table)
+
+
+@alphagenome_app.command(name="link")
+def research_alphagenome_link(
+    variant: Annotated[Optional[str], typer.Option("--variant", help="1-based variant in chr:pos:ref>alt format.")] = None,
+    locus: Annotated[Optional[str], typer.Option("--locus", help="1-based closed interval in chr:start-end format.")] = None,
+    gene: Annotated[Optional[str], typer.Option("--gene", help="Curated diabetes gene symbol (e.g. INS, INSR, SLC2A4, GCGR, GCK, HNF1A).")] = None,
+    biosample: Annotated[Optional[str], typer.Option("--biosample", help="Optional biosample filter (e.g. Pancreas, Muscle_Skeletal, Liver, K562).")] = None,
+    modalities: Annotated[str, typer.Option("--modalities", help="Comma-separated layout modalities.")] = "RNA_SEQ,DNASE,CHIP_TF",
+    tf: Annotated[Optional[str], typer.Option("--tf", help="Comma-separated ChIP-TF filter codes (auto-includes RNA-seq & DNase per Assay rule).")] = None,
+) -> None:
+    """Construct validated Google AlphaGenome Atlas exploration deep-links offline."""
+
+    from iints.research.alphagenome_engine import (
+        build_atlas_locus_url,
+        build_atlas_variant_url,
+        get_diabetes_gene_atlas_context,
+    )
+
+    console = Console()
+    mod_list = [m.strip() for m in modalities.split(",") if m.strip()]
+    tf_list = [t.strip() for t in (tf or "").split(",") if t.strip()]
+
+    try:
+        if variant:
+            url = build_atlas_variant_url(
+                variant,
+                biosample=biosample,
+                modalities=mod_list,
+                tfs=tf_list,
+            )
+            target_desc = f"Variant {variant}"
+        elif locus:
+            url = build_atlas_locus_url(
+                locus,
+                biosample=biosample,
+                modalities=mod_list,
+                tfs=tf_list,
+            )
+            target_desc = f"Locus {locus}"
+        elif gene:
+            ctx = get_diabetes_gene_atlas_context(gene)
+            if ctx is None:
+                console.print(
+                    f"[bold red]Unknown curated diabetes gene '{gene}'.[/bold red] "
+                    "Supported: INS, INSR, SLC2A4, GCGR, GCK, HNF1A."
+                )
+                raise typer.Exit(code=1)
+            url = build_atlas_locus_url(
+                str(ctx["interval_1_based"]),
+                biosample=biosample or str(ctx["primary_biosample"]),
+                modalities=mod_list or list(ctx["default_modalities"]),
+                tfs=tf_list or list(ctx["key_transcription_factors"]),
+            )
+            target_desc = f"Gene {ctx['gene_symbol']} ({ctx['interval_1_based']})"
+        else:
+            console.print("[bold red]Provide one of --variant, --locus, or --gene.[/bold red]")
+            raise typer.Exit(code=1)
+    except ValueError as exc:
+        console.print(f"[bold red]Invalid AlphaGenome target:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Google AlphaGenome Atlas Deep-Link")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Target", target_desc)
+    table.add_row("Atlas URL", url)
+    console.print(table)
+
+
+@alphagenome_app.command(name="query")
+def research_alphagenome_query(
+    variant: Annotated[str, typer.Option("--variant", help="One or more comma-separated variants in 1-based chr:pos:ref>alt format.")] = "chr11:2160494:C>T",
+    output_dir: Annotated[Path, typer.Option("--output-dir", help="Evidence output root.")] = Path("results/alphagenome"),
+    biosample: Annotated[Optional[str], typer.Option("--biosample", help="Optional biosample filter.")] = None,
+    modalities: Annotated[str, typer.Option("--modalities", help="Comma-separated modalities.")] = "RNA_SEQ,DNASE,CHIP_TF",
+    tf: Annotated[Optional[str], typer.Option("--tf", help="Comma-separated transcription factors.")] = None,
+    offline: Annotated[bool, typer.Option("--offline", help="Generate validated Atlas deep-links and bundle without calling the live gRPC API.")] = False,
+) -> None:
+    """Score genetic variants via AlphaGenome AVI (or build offline Atlas evidence bundles)."""
+
+    from iints.research.alphagenome_engine import query_alphagenome_variants
+
+    console = Console()
+    mod_list = [m.strip() for m in modalities.split(",") if m.strip()]
+    tf_list = [t.strip() for t in (tf or "").split(",") if t.strip()]
+    try:
+        result = query_alphagenome_variants(
+            variant,
+            output_dir,
+            biosample=biosample,
+            modalities=mod_list,
+            tfs=tf_list,
+            offline=offline,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]AlphaGenome query failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Google AlphaGenome Variant Evidence")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Target", result.query_target)
+    table.add_row("Execution mode", result.query_mode)
+    table.add_row("Variants exported", str(result.record_count))
+    table.add_row("Atlas Deep-Link", result.atlas_url)
+    table.add_row("CSV", str(result.records_csv))
+    table.add_row("Evidence JSON", str(result.evidence_json))
+    table.add_row("Review Markdown", str(result.report_md))
+    console.print(table)
+    console.print(
+        "[yellow]Interpretation:[/yellow] High AVI Phred scores reflect predicted molecular/functional "
+        "effects only and never calibrate virtual-patient physiology or clinical treatment."
+    )
+
+
+@alphagenome_app.command(name="region")
+def research_alphagenome_region(
+    region: Annotated[str, typer.Option("--region", help="1-based closed genomic window in chr:start-end format (<= 1,000 bp for live scan).")] = "chr11:2160450-2160550",
+    output_dir: Annotated[Path, typer.Option("--output-dir", help="Evidence output root.")] = Path("results/alphagenome"),
+    biosample: Annotated[Optional[str], typer.Option("--biosample", help="Optional biosample filter.")] = None,
+    modalities: Annotated[str, typer.Option("--modalities", help="Comma-separated modalities.")] = "RNA_SEQ,DNASE,CHIP_TF",
+    tf: Annotated[Optional[str], typer.Option("--tf", help="Comma-separated transcription factors.")] = None,
+    min_phred: Annotated[float, typer.Option("--min-phred", help="Minimum AVI Phred threshold for live scan ranking.")] = 15.0,
+    top_k: Annotated[int, typer.Option("--top-k", help="Maximum top candidate variants exported.")] = 20,
+    offline: Annotated[bool, typer.Option("--offline", help="Generate locus Atlas deep-link bundle without live gRPC execution.")] = False,
+) -> None:
+    """Scan a genomic window (saturation mutagenesis) or export an AlphaGenome locus evidence bundle."""
+
+    from iints.research.alphagenome_engine import scan_alphagenome_region
+
+    console = Console()
+    mod_list = [m.strip() for m in modalities.split(",") if m.strip()]
+    tf_list = [t.strip() for t in (tf or "").split(",") if t.strip()]
+    try:
+        result = scan_alphagenome_region(
+            region,
+            output_dir,
+            biosample=biosample,
+            modalities=mod_list,
+            tfs=tf_list,
+            min_phred=min_phred,
+            top_k=top_k,
+            offline=offline,
+        )
+    except Exception as exc:
+        console.print(f"[bold red]AlphaGenome region scan failed:[/bold red] {exc}")
+        raise typer.Exit(code=1)
+
+    table = Table(title="IINTS Google AlphaGenome Region Evidence")
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", overflow="fold")
+    table.add_row("Region (1-based)", result.query_target)
+    table.add_row("Execution mode", result.query_mode)
+    table.add_row("Candidate hits", str(result.record_count))
+    table.add_row("Atlas Locus URL", result.atlas_url)
+    table.add_row("CSV", str(result.records_csv))
+    table.add_row("Evidence JSON", str(result.evidence_json))
+    table.add_row("Review Markdown", str(result.report_md))
+    console.print(table)
 
 
 @regenerative_app.command(name="panels")

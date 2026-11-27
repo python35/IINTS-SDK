@@ -58,16 +58,21 @@ class GenomicsEngine:
         """Return an explicit demo assumption plus external evidence context.
 
         Unknown variants deliberately receive no functional scalar. AlphaFold
-        pLDDT and ClinVar classification cannot quantify retained receptor
-        function, so callers must provide validated functional evidence before
-        running a physiological comparison.
+        pLDDT, AlphaGenome AVI scores, and ClinVar classification cannot quantify
+        retained receptor function, so callers must provide validated functional
+        evidence before running a physiological comparison.
         """
         import re
         from iints.research.alphafold_engine import AlphaFoldGenomicsEngine
+        from iints.research.alphagenome_engine import (
+            DIABETES_ALPHAGENOME_LOCI,
+            get_diabetes_gene_atlas_context,
+        )
         from iints.research.clinvar_engine import ClinVarEngine
 
         normalized_gene = gene.upper().strip()
         variant = variant.upper().strip()
+        alphagenome_context = get_diabetes_gene_atlas_context(normalized_gene)
 
         # Check known mutations first for fast/offline execution
         if normalized_gene == "INSR" and variant in KNOWN_MUTATIONS:
@@ -79,6 +84,7 @@ class GenomicsEngine:
                     "physiological_simulation_allowed": True,
                     "evidence_type": "illustrative_scenario_assumption",
                     "functional_scalar_provenance": "versioned SDK scenario assumption",
+                    "alphagenome_context": alphagenome_context,
                     "desc": (
                         f"Illustrative INSR scenario assuming {retained_percent}% retained "
                         "receptor function. This is not a clinical estimate for the variant."
@@ -87,8 +93,9 @@ class GenomicsEngine:
             )
             return result
 
-        # Determine UniProt ID (INSR -> P06213)
-        uniprot_id = "P06213" if normalized_gene == "INSR" else gene.strip()
+        # Determine UniProt ID from curated diabetes gene map or fallback
+        locus = DIABETES_ALPHAGENOME_LOCI.get(normalized_gene)
+        uniprot_id = locus.uniprot_id if locus is not None else ("P06213" if normalized_gene == "INSR" else gene.strip())
 
         # Extract residue index from variant (e.g. V938M -> 938)
         match = re.search(r"\d+", variant)
@@ -100,6 +107,7 @@ class GenomicsEngine:
                 "evidence_type": "insufficient_evidence",
                 "desc": "Unknown mutation format; no functional effect was inferred.",
                 "residue": None,
+                "alphagenome_context": alphagenome_context,
             }
 
         residue_idx = int(match.group())
@@ -126,6 +134,12 @@ class GenomicsEngine:
             )
             structural_context = af_result
 
+        if alphagenome_context is not None:
+            description_parts.append(
+                f"AlphaGenome Atlas locus ({alphagenome_context['interval_1_based']}): "
+                f"{alphagenome_context['atlas_locus_url']}"
+            )
+
         description_parts.append(
             "REJECTED: no physiological effect is simulated without an explicit, "
             "quantitative functional scalar and provenance."
@@ -148,6 +162,81 @@ class GenomicsEngine:
             "residue": residue_idx,
             "clinvar_context": clinvar_result,
             "structural_context": structural_context,
+            "alphagenome_context": alphagenome_context,
+        }
+
+    @staticmethod
+    def evaluate_regulatory_variant(
+        gene: str,
+        genomic_variant: str,
+        *,
+        biosample: str | None = None,
+        offline: bool = False,
+        _client: Any | None = None,
+    ) -> dict[str, Any]:
+        """Evaluate a 1-based genomic variant (`chr:pos:ref>alt`) with Google AlphaGenome context.
+
+        Returns molecular/regulatory AlphaGenome AVI context and mandatory Atlas
+        deep-links without ever inferring a physiological simulation scalar.
+        """
+        from dataclasses import asdict
+        from iints.research.alphagenome_engine import (
+            DIABETES_ALPHAGENOME_LOCI,
+            _create_live_atlas_client,
+            _offline_variant_score,
+            _resolve_api_key,
+            _score_variant_with_client,
+            get_diabetes_gene_atlas_context,
+            normalize_genomic_variant,
+        )
+        import importlib.util
+
+        normalized_gene = gene.strip().upper()
+        parsed_var = normalize_genomic_variant(genomic_variant)
+        gene_context = get_diabetes_gene_atlas_context(normalized_gene)
+        locus = DIABETES_ALPHAGENOME_LOCI.get(normalized_gene)
+        effective_biosample = biosample or (locus.primary_biosample if locus else None)
+        effective_mods = locus.default_modalities if locus else ("RNA_SEQ", "DNASE", "CHIP_TF")
+        effective_tfs = locus.key_transcription_factors if locus else ()
+
+        client = _client
+        if client is None and not offline:
+            api_key = _resolve_api_key()
+            if api_key and importlib.util.find_spec("alphagenome") is not None:
+                client = _create_live_atlas_client(api_key)
+
+        if client is not None and not offline:
+            score = _score_variant_with_client(
+                parsed_var,
+                client,
+                biosample=effective_biosample,
+                modalities=effective_mods,
+                tfs=effective_tfs,
+            )
+        else:
+            score = _offline_variant_score(
+                parsed_var,
+                biosample=effective_biosample,
+                modalities=effective_mods,
+                tfs=effective_tfs,
+            )
+
+        return {
+            "gene": normalized_gene,
+            "variant": parsed_var["variant"],
+            "scalar": None,
+            "supported": False,
+            "physiological_simulation_allowed": False,
+            "evidence_type": "alphagenome_regulatory_context_only",
+            "alphagenome_score": asdict(score),
+            "alphagenome_gene_context": gene_context,
+            "atlas_url": score.atlas_url,
+            "desc": (
+                f"AlphaGenome regulatory context for {parsed_var['variant']} "
+                f"(mode: {score.query_mode}, Atlas: {score.atlas_url}). "
+                "REJECTED for automatic simulation: AlphaGenome AVI predictions measure "
+                "molecular/regulatory effects and do not define a quantitative patient-model scalar."
+            ),
         }
 
     @staticmethod
