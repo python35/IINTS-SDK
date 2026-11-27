@@ -415,7 +415,7 @@ def import_carelink_timeline(
     ].copy()
     auto_basal_df["auto_basal_units"] = auto_basal_df["bolus_units"]
     auto_basal_df = (
-        auto_basal_df.groupby("timestamp_dt", as_index=False)["auto_basal_units"].sum()
+        auto_basal_df.groupby("timestamp_dt", as_index=False).agg({"auto_basal_units": "sum"})
         if not auto_basal_df.empty
         else pd.DataFrame(columns=["timestamp_dt", "auto_basal_units"])
     )

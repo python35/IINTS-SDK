@@ -13,7 +13,7 @@ Research, education and in-silico evaluation only; not a medical device.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Sequence, cast
 
 import numpy as np
 import pandas as pd
@@ -119,7 +119,7 @@ def analyze_research_results(
         cond_rows.append(
             {
                 "condition_id": str(cond_id),
-                "dropout_minutes": int(drop_min),
+                "dropout_minutes": int(cast(Any, drop_min)),
                 "algorithm_id": str(algo_id),
                 "n_patients": int(len(grp)),
                 "mean_mae": float(np.mean( grp["mae"])),
@@ -159,7 +159,7 @@ def analyze_research_results(
         paired_rows.append(
             {
                 "condition_id": str(cond_id),
-                "dropout_minutes": int(drop_min),
+                "dropout_minutes": int(cast(Any, drop_min)),
                 "algorithm_id": str(algo_id),
                 "n_paired_patients": int(len(deltas)),
                 "mean_delta_mae": float(np.mean(deltas)),

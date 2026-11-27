@@ -255,7 +255,7 @@ def build_timeline(
     carbs = _numeric(pump, "BWZ Carb Input (grams)")
     carb_events = pump.loc[carbs.notna() & (carbs > 0), ["timestamp_dt"]].copy()
     carb_events["carbs_g"] = carbs[carbs.notna() & (carbs > 0)]
-    carb_events = carb_events.groupby("timestamp_dt", as_index=False)["carbs_g"].max()
+    carb_events = carb_events.groupby("timestamp_dt", as_index=False).agg({"carbs_g": "max"})
     grid["carbs_g"] = _align_to_grid(carb_events, times, "carbs_g")
 
     programmed = _programmed_basal(pump)

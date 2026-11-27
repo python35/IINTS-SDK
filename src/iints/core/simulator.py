@@ -34,7 +34,7 @@ class StressEvent:
     """Represents a discrete event that can occur during a simulation for stress testing."""
     def __init__(
         self,
-        start_time: int,
+        start_time: float,
         event_type: str,
         value: Any = None,
         reported_value: Any = None,
@@ -47,7 +47,7 @@ class StressEvent:
     ) -> None:
         """
         Args:
-            start_time (int): The simulation time (in minutes) when the event should occur.
+            start_time (float): The simulation time (in minutes) when the event should occur.
             event_type (str): Type of event (e.g., 'meal', 'missed_meal', 'sensor_error', 'exercise').
             value (Any): Value associated with the event (e.g., carb amount, error value).
             reported_value (Any): Value reported to the algorithm (if different from actual value, e.g., for "prul" scenarios).
@@ -161,8 +161,8 @@ class Simulator:
             critical_glucose_duration_minutes = self.safety_config.critical_glucose_duration_minutes
         self.critical_glucose_threshold = critical_glucose_threshold
         self.critical_glucose_duration_minutes = critical_glucose_duration_minutes
-        self._critical_low_minutes = 0
-        self._current_time = 0
+        self._critical_low_minutes = 0.0
+        self._current_time = 0.0
         self._endpoint_time = 0.0
         self._resume_state = False
         self._termination_info: Optional[Dict[str, Any]] = None
@@ -913,8 +913,8 @@ class Simulator:
             self.explainable_events_log = []
             self.meal_queue = [] # Reset meal queue for new run
             self._predictor_history = []
-            self._critical_low_minutes = 0
-            self._current_time = 0
+            self._critical_low_minutes = 0.0
+            self._current_time = 0.0
             self._endpoint_time = 0.0
             self._termination_info = None
             self._ratio_overrides = []

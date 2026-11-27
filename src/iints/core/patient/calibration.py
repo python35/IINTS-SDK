@@ -85,9 +85,9 @@ def run_protocol(
     boluses = {round(float(k), 6): float(v) for k, v in (boluses or {}).items()}
     meals = {round(float(k), 6): float(v) for k, v in (meals or {}).items()}
     steps = int(round(minutes / dt))
-    times = np.zeros(steps + 1)
-    glucose = np.zeros(steps + 1)
-    insulin = np.full(steps + 1, np.nan)
+    times: np.ndarray = np.zeros(steps + 1)
+    glucose: np.ndarray = np.zeros(steps + 1)
+    insulin: np.ndarray = np.full(steps + 1, np.nan)
     times[0] = t0
     glucose[0] = float(model.get_current_glucose())
     insulin[0] = plasma_insulin_mu_per_l(model)

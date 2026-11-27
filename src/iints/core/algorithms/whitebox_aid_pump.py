@@ -637,7 +637,7 @@ class WhiteBoxPumpStateEstimator:
 
         cgm = float(data.current_glucose)
         if not self.initialized:
-            self.x_hat = np.array([cgm - self.target_glucose, 0.0, 0.0], dtype=float)
+            self.x_hat[:] = [cgm - self.target_glucose, 0.0, 0.0]
             self.i_sc_u_hr = self.basal_rate_u_hr
             self.i_p_u_hr = self.basal_rate_u_hr
             self.adaptive_tdd_units = max(10.0, 2.0 * 24.0 * max(0.3, self.basal_rate_u_hr))

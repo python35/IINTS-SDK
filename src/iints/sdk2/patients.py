@@ -265,7 +265,7 @@ class ExternalSimglucoseAdapter:
 
     @property
     def true_glucose_mgdl(self) -> float:
-        return float(self._model.current_glucose)
+        return float(self._model.get_current_glucose())
 
     def metadata(self) -> Dict[str, Any]:
         return {

@@ -188,7 +188,7 @@ def apply_sensor_fault_model(
         eval_h = df["eval_hour"].to_numpy(dtype=float)
         c_start = float(sensor_spec.compression_low_at_hour)
         c_end = c_start + float(sensor_spec.compression_low_minutes) / 60.0
-        is_compression = (eval_h >= c_start - 1e-9) & (eval_h < c_end - 1e-9)
+        is_compression[:] = (eval_h >= c_start - 1e-9) & (eval_h < c_end - 1e-9)
         cgm_clean = np.where(is_compression, cgm_clean - sensor_spec.compression_low_drop_mgdl, cgm_clean)
 
     cgm_clean = np.clip(cgm_clean, 40.0, 400.0)

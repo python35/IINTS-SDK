@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
-from typing import Any, Literal, Mapping, Sequence
+from typing import Any, Literal, Mapping, Sequence, cast
 
 import numpy as np
 
@@ -223,7 +223,7 @@ class StemCellTransplantParameters:
             raise ValueError(
                 f"Unknown islet function preset: {preset}. "
                 f"Known: {sorted(ISLET_FUNCTION_PRESETS)}")
-        return replace(self, **ISLET_FUNCTION_PRESETS[preset])
+        return replace(self, **cast(Any, ISLET_FUNCTION_PRESETS[preset]))
 
     @property
     def effective_max_secretion_units_per_min(self) -> float:
